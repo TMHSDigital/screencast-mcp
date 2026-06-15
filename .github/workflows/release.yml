@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  tag-and-release:
+    name: Tag and release
+    runs-on: ubuntu-latest
+    steps:
+      # The default GITHUB_TOKEN (contents: write) pushes tags and creates the
+      # release. main is protected and is NEVER written to by CI; bump the
+      # version in your PR. A GITHUB_TOKEN release does not trigger publish.yml,
+      # so this job dispatches it explicitly afterward.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Read version from package.json
+        id: ver
+        run: |
+          v=$(node -p "require('./package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "package.json version: $v"
+
+      - name: Check if tag already exists
+        id: check
+        run: |
+          if git rev-parse "v${{ steps.ver.outputs.version }}" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Tag v${{ steps.ver.outputs.version }} exists; nothing to release."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tag, release, and trigger publish
+        if: steps.check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          v="${{ steps.ver.outputs.version }}"
+          IFS='.' read -r major minor _patch <<< "$v"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "v$v"
+          git tag -f "v$major"
+          git tag -f "v$major.$minor"
+          git push origin "v$v"
+          git push origin "v$major" --force
+          git push origin "v$major.$minor" --force
+          gh release create "v$v" --title "v$v" --generate-notes
+          # publish.yml is idempotent (skips an already-published version), so a
+          # duplicate dispatch is harmless.
+          gh workflow run publish.yml --ref main

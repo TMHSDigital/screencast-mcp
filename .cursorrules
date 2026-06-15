@@ -1,0 +1,15 @@
+# Screencast MCP
+
+This is a mcp-server repository for Screencast MCP development.
+
+## Project structure
+
+- `src/` -- TypeScript source
+- `package.json` -- npm package manifest
+
+## Conventions
+
+- Use conventional commits (feat:, fix:, chore:, docs:)
+- Bump the version in package.json in your PR; CI tags and publishes it
+- Keep mcp-tools.json in sync with the registered tools
+- Provider adapters live in src/providers/; tools live in src/tools/

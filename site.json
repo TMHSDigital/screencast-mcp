@@ -1,0 +1,14 @@
+{
+  "accent": "#7c3aed",
+  "accentLight": "#a78bfa",
+  "heroGradientFrom": "#0d1117",
+  "heroGradientTo": "#161b22",
+  "links": {
+    "github": "https://github.com/TMHSDigital/screencast-mcp"
+  },
+  "installSteps": [
+    "Install with <code>npx -y @tmhsdigital/screencast-mcp</code>",
+    "Add to your Claude Desktop or Cursor mcpServers config",
+    "Restart your MCP client"
+  ]
+}

@@ -1,0 +1,85 @@
+# ---------------------------------------------------------------------------
+# Captured media - NEVER commit. This repo is PUBLIC and screen recordings
+# can contain anything that was on screen (credentials, tokens, private data).
+# The server writes recordings, sampled frames, and screenshots into these
+# directories by default; all of them are ignored.
+# ---------------------------------------------------------------------------
+recordings/
+captures/
+frames/
+screenshots/
+.screencast/
+out/
+output/
+
+# Video containers (these are never source files).
+*.mp4
+*.mkv
+*.mov
+*.avi
+*.webm
+*.flv
+*.wmv
+*.m4v
+*.mpg
+*.mpeg
+# Note: *.ts is intentionally NOT ignored - it is TypeScript source. MPEG-TS
+# segments are written only inside the ignored capture directories above.
+
+# Loose capture images dropped at the repo root (keeps assets/ and docs/ safe).
+/*.png
+/*.jpg
+/*.jpeg
+/*.gif
+/*.webp
+/*.bmp
+
+# Audio (Phase 2 capture seam - ignore pre-emptively).
+*.wav
+*.mp3
+*.aac
+*.m4a
+*.flac
+
+# ---------------------------------------------------------------------------
+# Node / TypeScript
+# ---------------------------------------------------------------------------
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+coverage/
+.nyc_output/
+.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------------------------------------------------------------------------
+# Environment / secrets
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---------------------------------------------------------------------------
+# Logs and temp
+# ---------------------------------------------------------------------------
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+
+# ---------------------------------------------------------------------------
+# OS / editor
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+*.swp
+*~
