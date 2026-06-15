@@ -1,14 +1,17 @@
 {
   "name": "@tmhsdigital/screencast-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server for Windows screen recording, frame sampling, and minimal ffmpeg edits",
   "type": "module",
   "main": "dist/index.js",
   "bin": {"screencast-mcp": "dist/index.js"},
   "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
-    "build": "echo 'No build target yet'",
-    "test": "echo 'No tests yet' && exit 0",
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "npm run build"
   },
   "author": "TMHSDigital",
@@ -16,6 +19,16 @@
   "repository": {"type": "git", "url": "git+https://github.com/TMHSDigital/screencast-mcp.git"},
   "homepage": "https://github.com/TMHSDigital/screencast-mcp#readme",
   "bugs": {"url": "https://github.com/TMHSDigital/screencast-mcp/issues"},
-  "keywords": ["mcp", "model-context-protocol", "developer-tools"],
-  "engines": {"node": ">=20.0.0"}
+  "keywords": ["mcp", "model-context-protocol", "screen-recording", "screenshot", "ffmpeg", "gdigrab", "windows", "developer-tools"],
+  "engines": {"node": ">=20.0.0"},
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.2"
+  }
 }

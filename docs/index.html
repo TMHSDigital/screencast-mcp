@@ -4,16 +4,95 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Screencast MCP</title>
+  <meta name="description" content="A Windows-first MCP server for screen recording, frame sampling, and minimal ffmpeg edits.">
   <style>
-    body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; margin: 0; padding: 2rem; }
-    h1 { color: #7c3aed; }
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; background: #0d1117; color: #e6edf3; margin: 0; line-height: 1.6; }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+    h1 { color: #a78bfa; font-size: 2.2rem; margin-bottom: 0.25rem; }
+    h2 { color: #c4b5fd; border-bottom: 1px solid #21262d; padding-bottom: 0.3rem; margin-top: 2.5rem; }
+    .tag { display: inline-block; background: #161b22; border: 1px solid #30363d; color: #8b949e; border-radius: 999px; padding: 0.15rem 0.7rem; font-size: 0.8rem; margin-right: 0.4rem; }
     a { color: #a78bfa; }
+    code { background: #161b22; border: 1px solid #21262d; border-radius: 4px; padding: 0.1rem 0.35rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+    pre { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 1rem; overflow-x: auto; }
+    pre code { border: 0; padding: 0; background: none; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid #21262d; vertical-align: top; }
+    th { color: #c9d1d9; }
+    td code { white-space: nowrap; }
+    .note { background: #161b22; border-left: 3px solid #a78bfa; border-radius: 0 8px 8px 0; padding: 0.8rem 1rem; margin: 1rem 0; }
+    footer { margin-top: 3rem; color: #8b949e; font-size: 0.85rem; }
   </style>
 </head>
 <body>
-  <h1>Screencast MCP</h1>
-  <p>MCP server for Windows screen recording, frame sampling, and minimal ffmpeg edits</p>
-  <p>Full documentation will be available here once the server implementation is complete.</p>
-  <p><a href="https://github.com/TMHSDigital/screencast-mcp">View on GitHub</a></p>
+  <div class="wrap">
+    <h1>Screencast MCP</h1>
+    <p>
+      <span class="tag">MCP server</span>
+      <span class="tag">TypeScript</span>
+      <span class="tag">Windows-first</span>
+      <span class="tag">ffmpeg</span>
+    </p>
+    <p>A Model Context Protocol server that lets an agent record the screen, take
+    screenshots, "watch" footage by sampling frames into viewable images, and run
+    a small set of ffmpeg edits. It speaks MCP over stdio.</p>
+    <p><a href="https://github.com/TMHSDigital/screencast-mcp">View on GitHub</a></p>
+
+    <h2>Prerequisites</h2>
+    <p><code>ffmpeg</code> and <code>ffprobe</code> must be installed and on
+    <code>PATH</code> (or set via <code>FFMPEG_PATH</code> /
+    <code>FFPROBE_PATH</code>). Screen capture uses <code>gdigrab</code>, which is
+    Windows-only; the watch and edit tools run anywhere ffmpeg runs.</p>
+
+    <h2>Install</h2>
+    <pre><code>npm install -g @tmhsdigital/screencast-mcp</code></pre>
+    <pre><code>{
+  "mcpServers": {
+    "screencast": {
+      "command": "npx",
+      "args": ["-y", "@tmhsdigital/screencast-mcp"]
+    }
+  }
+}</code></pre>
+
+    <h2>Tools (Phase 1)</h2>
+    <table>
+      <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>start_recording</code></td><td>Start a background recording. Target = full, a monitor, a window by title, or a region. Optional fps and quality preset.</td></tr>
+        <tr><td><code>stop_recording</code></td><td>Stop a session by id with a graceful quit so the file is finalized, not truncated.</td></tr>
+        <tr><td><code>list_sessions</code></td><td>List active and finished recording sessions.</td></tr>
+        <tr><td><code>get_session</code></td><td>Inspect a single session by id.</td></tr>
+        <tr><td><code>screenshot</code></td><td>Capture a single PNG of a target.</td></tr>
+        <tr><td><code>sample_frames</code></td><td>Extract frames at a fixed fps or at explicit timestamps so the agent can view what happened.</td></tr>
+        <tr><td><code>get_media_info</code></td><td>ffprobe wrapper: duration, resolution, fps, codecs, format, size.</td></tr>
+        <tr><td><code>trim</code></td><td>Cut a sub-clip by start + end or duration.</td></tr>
+        <tr><td><code>concat</code></td><td>Join two or more videos into one.</td></tr>
+        <tr><td><code>convert</code></td><td>Convert between mp4, gif, and webm.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Windows notes</h2>
+    <ul>
+      <li>Monitor targets crop the virtual desktop to a display's real pixel
+      bounds, so <code>monitor:1</code> grabs the second display at its true
+      offset; <code>monitor:0</code> is primary.</li>
+      <li>Window capture matches by exact title.</li>
+      <li>Fullscreen-exclusive apps can produce black frames under gdigrab; use
+      borderless-windowed mode.</li>
+      <li>Audio capture is a Phase 2 seam (gdigrab is video-only).</li>
+    </ul>
+
+    <h2>Threat model</h2>
+    <div class="note">
+      Screen capture can record anything on screen, including secrets. Capture is
+      always explicit (a tool call, never automatic), output stays on the local
+      filesystem, and this public repo ignores captured media so test recordings
+      cannot be committed by accident. Review frames before sharing a file.
+    </div>
+
+    <footer>Built by TMHSDigital &middot; CC-BY-NC-ND-4.0</footer>
+  </div>
 </body>
 </html>

@@ -2,26 +2,35 @@
 
 # Roadmap
 
-**Current:** v0.1.0
+**Current:** v0.2.0 (Phase 1)
 
-## Screencast MCP
+Screencast MCP ships in phases. Phase 1 is the capture / watch / minimal-edit
+core. Later phases add the full edit surface and a production layer.
 
-### v0.1.x -- Foundation
+## Phase 1 -- Capture, watch, minimal edit (shipped)
 
-- [x] Core provider adapters
-- [x] Initial tool surface
-- [x] stdio transport
-- [ ] CI/CD workflows
-- [ ] GitHub Pages documentation site
+- [x] stdio MCP server (`@modelcontextprotocol/sdk`), npm-publishable
+- [x] ffmpeg / ffprobe detection with a clear install hint when missing
+- [x] Capture: `start_recording`, `stop_recording`, `list_sessions`,
+      `get_session`, `screenshot`
+- [x] Session registry (in memory + on disk) with graceful stop and orphan reaping
+- [x] Multi-monitor offsets and window-by-title via gdigrab
+- [x] Watch: `sample_frames`, `get_media_info`
+- [x] Minimal edit: `trim`, `concat`, `convert` (mp4 / gif / webm)
+- [x] Quality presets (draft / standard / high) instead of raw ffmpeg flags
+- [x] Threat-model documentation
 
-### v0.2.0 -- Expansion
+## Phase 2 -- Full edit surface and audio
 
-- [ ] Additional provider adapters
-- [ ] Richer tooling
-- [ ] Streaming support
+- [ ] Audio capture (dshow / WASAPI loopback) - the clean seam is already in place
+- [ ] `crop`, `scale`, `speed`, `overlay`, `extract`, `compress`
+- [ ] Re-encode trim option for frame-accurate cuts
 
-### v1.0.0 -- Stable Release
+## Phase 3 -- Produce / trailer layer
 
-- [ ] Broader provider coverage
-- [ ] Full test coverage
-- [ ] Complete documentation
+- [ ] `assemble_highlights`, `title_card`, `music_bed`
+- [ ] `xfade` transitions, aspect variants, platform presets
+
+## Cross-platform
+
+- [ ] Capture backends beyond gdigrab (avfoundation on macOS, x11grab on Linux)
