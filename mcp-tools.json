@@ -1,1 +1,122 @@
-[]
+[
+  {
+    "name": "start_recording",
+    "description": "Start a screen recording (Windows gdigrab) as a background ffmpeg process. Returns a session id and output path. Recording is explicit and never auto-starts. Audio is not captured in Phase 1 (video only).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "target": { "type": "string", "description": "full | monitor:<index> (0 = primary) | window:<exact title> | region:<x>,<y>,<w>,<h>" },
+        "fps": { "type": "integer", "minimum": 1, "maximum": 120, "description": "Frames per second (default 30)" },
+        "quality": { "type": "string", "enum": ["draft", "standard", "high"], "description": "Encoder preset (default standard)" },
+        "output": { "type": "string", "description": "Optional output .mp4 path (defaults under SCREENCAST_HOME/recordings)" }
+      },
+      "required": ["target"]
+    }
+  },
+  {
+    "name": "stop_recording",
+    "description": "Stop a recording by session id. Sends ffmpeg a graceful quit so the file is finalized rather than truncated, then returns the final path and duration.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string", "description": "Session id returned by start_recording" }
+      },
+      "required": ["sessionId"]
+    }
+  },
+  {
+    "name": "list_sessions",
+    "description": "List all recording sessions (active and finished) with their status, target, output path, and whether the process is still alive.",
+    "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  },
+  {
+    "name": "get_session",
+    "description": "Inspect a single recording session by id, including live status and whether its output file exists on disk.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string", "description": "Session id returned by start_recording" }
+      },
+      "required": ["sessionId"]
+    }
+  },
+  {
+    "name": "screenshot",
+    "description": "Capture a single still frame (PNG) of a target (full screen, a monitor, a window by title, or a region). Returns the image path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "target": { "type": "string", "description": "full | monitor:<index> | window:<exact title> | region:<x>,<y>,<w>,<h>" },
+        "output": { "type": "string", "description": "Optional output .png path (defaults under SCREENCAST_HOME/screenshots)" }
+      },
+      "required": ["target"]
+    }
+  },
+  {
+    "name": "sample_frames",
+    "description": "Sample frames from a video so the agent can view what happened: either at a fixed rate (fps) or at explicit timestamps. Writes PNG frames to a folder and returns their paths.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video file" },
+        "fps": { "type": "number", "description": "Sample this many frames per second (mutually exclusive with timestamps)" },
+        "timestamps": { "type": "array", "items": { "type": "number" }, "description": "Explicit second offsets to grab one frame at each (mutually exclusive with fps)" },
+        "outputDir": { "type": "string", "description": "Optional folder for the frames (defaults under SCREENCAST_HOME/frames)" }
+      },
+      "required": ["input"]
+    }
+  },
+  {
+    "name": "get_media_info",
+    "description": "Probe a media file with ffprobe and return duration, resolution, frame rate, codecs, container format, and size.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the media file to probe" }
+      },
+      "required": ["input"]
+    }
+  },
+  {
+    "name": "trim",
+    "description": "Trim a video to a sub-clip by start + (end or duration). Uses stream copy for speed; cut points snap to the nearest keyframe.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "start": { "type": "number", "description": "Start time in seconds" },
+        "end": { "type": "number", "description": "End time in seconds (use end OR duration)" },
+        "duration": { "type": "number", "description": "Clip length in seconds (use end OR duration)" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["input", "start"]
+    }
+  },
+  {
+    "name": "concat",
+    "description": "Concatenate two or more videos into a single file using the ffmpeg concat demuxer (stream copy). Inputs should share the same codec and format.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "inputs": { "type": "array", "items": { "type": "string" }, "minItems": 2, "description": "Two or more video paths to join, in order" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["inputs"]
+    }
+  },
+  {
+    "name": "convert",
+    "description": "Convert a video between mp4, gif, and webm. mp4 uses H.264, webm uses VP9, and gif uses a palette filter for quality. Returns the output path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source media" },
+        "format": { "type": "string", "enum": ["mp4", "gif", "webm"], "description": "Target format" },
+        "fps": { "type": "number", "description": "Output fps (gif only; default 12)" },
+        "width": { "type": "number", "description": "Output width in px, height auto (gif only; default 720)" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["input", "format"]
+    }
+  }
+]
