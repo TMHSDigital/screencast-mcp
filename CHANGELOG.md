@@ -5,6 +5,20 @@ All notable changes to Screencast MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.4]
+
+### Changed
+
+- **Session registry is now concurrency-aware and bounded** (#17). `persist()`
+  reads the file and merges before writing, so a concurrent server instance's
+  records are no longer clobbered (record ids are unique, so the merge is a
+  union). The file is written atomically (temp + rename) so a kill mid-write
+  cannot corrupt it. Finished records are pruned to the most recent
+  `MAX_FINISHED_RECORDS` (100) on load and persist, keeping every active
+  recording, so the registry stays bounded. This reduces but does not fully
+  eliminate the read-modify-write race; cross-process file locking remains out
+  of scope.
+
 ## [0.8.3]
 
 ### Fixed

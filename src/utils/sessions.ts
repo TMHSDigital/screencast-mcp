@@ -11,9 +11,13 @@
  * logic (classifyOrphan) is pure so it is unit-tested without real processes.
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, existsSync } from "node:fs";
 import type { ChildProcess } from "node:child_process";
 import type { Quality } from "./targets.js";
+
+/** Cap on retained finished records, so the registry does not grow without
+ * bound. Active ("recording") records are always kept. */
+export const MAX_FINISHED_RECORDS = 100;
 
 export type SessionStatus = "recording" | "stopped" | "failed" | "orphaned";
 
@@ -110,24 +114,50 @@ export function killPid(pid: number): void {
   }
 }
 
+/** Keep every active recording plus the most recent MAX_FINISHED_RECORDS
+ * finished records (newest first), so the registry stays bounded. Pure. */
+export function pruneRecords(records: SessionRecord[]): SessionRecord[] {
+  const active = records.filter((r) => r.status === "recording");
+  const finished = records
+    .filter((r) => r.status !== "recording")
+    .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))
+    .slice(0, MAX_FINISHED_RECORDS);
+  return [...active, ...finished];
+}
+
 export class SessionStore {
   private records = new Map<string, SessionRecord>();
   private children = new Map<string, ChildProcess>();
 
   constructor(private readonly path: string) {}
 
-  load(): void {
-    if (!existsSync(this.path)) return;
+  /** Read the on-disk records, tolerating a missing or corrupt file. */
+  private readDisk(): Map<string, SessionRecord> {
+    if (!existsSync(this.path)) return new Map();
     try {
       const data = JSON.parse(readFileSync(this.path, "utf8")) as SessionRecord[];
-      this.records = new Map(data.map((r) => [r.id, r]));
+      return new Map(data.map((r) => [r.id, r]));
     } catch {
-      this.records = new Map();
+      return new Map();
     }
   }
 
+  load(): void {
+    this.records = new Map(pruneRecords([...this.readDisk().values()]).map((r) => [r.id, r]));
+  }
+
   persist(): void {
-    writeFileSync(this.path, JSON.stringify([...this.records.values()], null, 2));
+    // Merge with what is on disk so a concurrent server instance's records are
+    // not clobbered; our in-memory view wins for the ids we own (ids are unique
+    // per recording, so this is effectively a union). Then prune and write
+    // atomically (temp + rename) so a kill mid-write cannot corrupt the file.
+    const merged = this.readDisk();
+    for (const [id, rec] of this.records) merged.set(id, rec);
+    const pruned = pruneRecords([...merged.values()]);
+    const tmp = `${this.path}.${process.pid}.tmp`;
+    writeFileSync(tmp, JSON.stringify(pruned, null, 2));
+    renameSync(tmp, this.path);
+    this.records = new Map(pruned.map((r) => [r.id, r]));
   }
 
   create(record: SessionRecord): void {

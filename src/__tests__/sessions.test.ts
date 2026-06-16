@@ -1,11 +1,13 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { rmSync, existsSync } from "node:fs";
+import { rmSync, existsSync, writeFileSync, readFileSync } from "node:fs";
 import {
   classifyOrphan,
   isAlive,
   isForeignLiveRecording,
+  pruneRecords,
+  MAX_FINISHED_RECORDS,
   SessionStore,
   type SessionRecord,
 } from "../utils/sessions.js";
@@ -68,6 +70,31 @@ describe("isAlive", () => {
   });
 });
 
+describe("pruneRecords", () => {
+  it("keeps every active recording and caps finished records (newest first)", () => {
+    const active = [
+      record({ id: "live-1", status: "recording" }),
+      record({ id: "live-2", status: "recording" }),
+    ];
+    const finished = Array.from({ length: MAX_FINISHED_RECORDS + 25 }, (_, i) =>
+      record({
+        id: `done-${i}`,
+        status: "stopped",
+        startedAt: new Date(2026, 0, 1, 0, 0, i).toISOString(),
+      }),
+    );
+    const pruned = pruneRecords([...finished, ...active]);
+    const ids = pruned.map((r) => r.id);
+    expect(ids).toContain("live-1");
+    expect(ids).toContain("live-2");
+    const keptFinished = pruned.filter((r) => r.status !== "recording");
+    expect(keptFinished).toHaveLength(MAX_FINISHED_RECORDS);
+    // Newest finished record is kept; the oldest is dropped.
+    expect(ids).toContain(`done-${MAX_FINISHED_RECORDS + 24}`);
+    expect(ids).not.toContain("done-0");
+  });
+});
+
 describe("SessionStore", () => {
   const paths: string[] = [];
   function newPath(): string {
@@ -100,6 +127,21 @@ describe("SessionStore", () => {
     const b = new SessionStore(p);
     b.load();
     expect(b.get("x")?.id).toBe("x");
+  });
+
+  it("merges with concurrent on-disk records instead of clobbering them", () => {
+    const p = newPath();
+    const a = new SessionStore(p);
+    a.load();
+    a.create(record({ id: "a" }));
+    // Simulate another server instance writing its own record to the shared file.
+    const onDisk = JSON.parse(readFileSync(p, "utf8")) as SessionRecord[];
+    onDisk.push(record({ id: "b" }));
+    writeFileSync(p, JSON.stringify(onDisk));
+    // A persists again (via update); b must survive.
+    a.update("a", { fps: 60 });
+    const finalIds = (JSON.parse(readFileSync(p, "utf8")) as SessionRecord[]).map((r) => r.id).sort();
+    expect(finalIds).toEqual(["a", "b"]);
   });
 
   it("reaps a dead recording into a stopped state at boot", () => {
