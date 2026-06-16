@@ -5,6 +5,22 @@ All notable changes to Screencast MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0]
+
+### Added
+
+- **Title cards and music bed.**
+  - `title_card` generates a standalone title clip: centered text on a solid
+    background, plus a silent stereo track so it composes with audio-bearing
+    clips. Text is written to a temp file and rendered via `drawtext=textfile`,
+    so arbitrary content (quotes, colons, percent signs) needs no escaping.
+  - `music_bed` lays a music track under a video: looped/trimmed to the video
+    length, faded in/out, leveled, and mixed with any existing audio, optionally
+    ducked under the original via a sidechain.
+- **Bundled font.** The package now ships two Inter weights (SIL Open Font
+  License) under `assets/fonts/`, so `title_card` works without a system font.
+  `assets` is added to the published package `files`.
+
 ## [0.6.0]
 
 ### Added

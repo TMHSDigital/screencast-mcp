@@ -4,6 +4,8 @@ import {
   videoNormalizeChain,
   buildXfadeArgs,
   buildAssembleArgs,
+  buildTitleCardArgs,
+  buildMusicBedArgs,
 } from "../utils/produce.js";
 
 describe("xfadeOffsets", () => {
@@ -66,5 +68,45 @@ describe("buildAssembleArgs", () => {
   });
   it("requires a duration per clip for an xfade transition", () => {
     expect(() => buildAssembleArgs(["a", "b"], [5], "o.mp4", { transition: "fade" })).toThrow();
+  });
+});
+
+describe("buildTitleCardArgs", () => {
+  it("builds a color source, a silent track, and centered drawtext", () => {
+    const s = buildTitleCardArgs("text.txt", "font.ttf", "o.mp4", { duration: 4 }).join(" ");
+    expect(s).toContain("color=c=black:s=1920x1080:d=4");
+    expect(s).toContain("anullsrc");
+    expect(s).toContain("drawtext=fontfile=font.ttf:textfile=text.txt");
+    expect(s).toContain("x=(w-text_w)/2:y=(h-text_h)/2");
+    expect(s).toContain("-shortest");
+  });
+  it("rejects a non-positive duration or fontSize", () => {
+    expect(() => buildTitleCardArgs("t", "f", "o", { duration: 0 })).toThrow();
+    expect(() => buildTitleCardArgs("t", "f", "o", { fontSize: 0 })).toThrow();
+  });
+});
+
+describe("buildMusicBedArgs", () => {
+  it("loops the music, fades, levels, and mixes when the video has audio", () => {
+    const s = buildMusicBedArgs("v.mp4", "m.mp3", "o.mp4", 10, true, { musicVolume: 0.3, fadeOut: 2 }).join(" ");
+    expect(s).toContain("-stream_loop -1 -i m.mp3");
+    expect(s).toContain("afade=t=in:st=0:d=1");
+    expect(s).toContain("afade=t=out:st=8:d=2");
+    expect(s).toContain("volume=0.3");
+    expect(s).toContain("amix=inputs=2");
+    expect(s).toContain("-c:v copy");
+    expect(s).toContain("-t 10");
+  });
+  it("ducks via a sidechain when requested", () => {
+    const s = buildMusicBedArgs("v.mp4", "m.mp3", "o.mp4", 10, true, { duck: true }).join(" ");
+    expect(s).toContain("sidechaincompress");
+  });
+  it("uses the music as the only track when the video has no audio", () => {
+    const s = buildMusicBedArgs("v.mp4", "m.mp3", "o.mp4", 10, false).join(" ");
+    expect(s).not.toContain("amix");
+    expect(s).toContain("[aout]");
+  });
+  it("requires a known positive video duration", () => {
+    expect(() => buildMusicBedArgs("v", "m", "o", 0, true)).toThrow();
   });
 });
