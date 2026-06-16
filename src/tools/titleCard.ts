@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { writeFileSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { errorResponse, okResponse } from "../utils/errors.js";
 import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
 import { buildTitleCardArgs } from "../utils/produce.js";
 import { bundledFontPath } from "../utils/fonts.js";

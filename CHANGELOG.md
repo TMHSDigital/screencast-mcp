@@ -5,6 +5,13 @@ All notable changes to Screencast MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+
+- ESLint (flat config, typescript-eslint recommended) with a `lint` script, run
+  in CI (#23). Tooling only; not part of the published package.
+
 ## [0.8.7]
 
 ### Changed
