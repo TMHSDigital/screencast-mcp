@@ -104,7 +104,19 @@ Any tool also accepts an explicit output path.
   pixel bounds. The bounds come from `System.Windows.Forms.Screen.AllScreens`, so
   `monitor:1` correctly grabs the second display at its real offset (for example
   `x=2560` on a 4480x1440 dual-monitor desktop). `monitor:0` is always primary.
-- **Window capture** matches by exact window title (`window:My App`).
+- **Window capture** (`window:My App`) captures the on-screen **rectangle** the
+  window currently occupies, not the window's own surface. `gdigrab`'s native
+  `title=` grab returns a blank frame for GPU- or DirectComposition-composited
+  windows (Chrome, Electron editors, UWP apps), so the window is instead resolved
+  to its screen rectangle (per-monitor DPI aware) and captured through the same
+  desktop path as `monitor`/`region`. Consequences: the window must be **visible,
+  on top, and not minimized** (a minimized window is rejected with a clear error);
+  the capture includes anything drawn over that rectangle; and for
+  `start_recording` the rectangle is fixed **once at start**, so a window moved or
+  resized mid-recording is not followed. Title matching is case-insensitive —
+  exact match wins, otherwise a substring match, and the topmost window wins ties.
+  True per-window background capture (Windows Graphics Capture API) is a
+  deliberate future phase, not in this build.
 - **Fullscreen-exclusive apps** often produce black frames under `gdigrab`. Run
   the source in borderless-windowed mode for reliable capture.
 - **Audio is not captured in Phase 1.** `gdigrab` is video-only; audio
@@ -116,7 +128,9 @@ Any tool also accepts an explicit output path.
 
 Screen capture can record **anything** that is on screen at the moment of
 capture, including passwords, tokens, private messages, and other secrets. Treat
-recordings, screenshots, and sampled frames as sensitive by default.
+recordings, screenshots, and sampled frames as sensitive by default. Note that
+`window:` captures the screen rectangle a window occupies, so anything drawn over
+that rectangle (overlays, notifications, another window) is captured too.
 
 - **Capture is always explicit.** A recording or screenshot only happens when a
   tool is called; nothing auto-fires, and there is no background or scheduled

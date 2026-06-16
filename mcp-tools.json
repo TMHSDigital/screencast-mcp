@@ -1,11 +1,11 @@
 [
   {
     "name": "start_recording",
-    "description": "Start a screen recording (Windows gdigrab) as a background ffmpeg process. Returns a session id and output path. Recording is explicit and never auto-starts. Audio is not captured in Phase 1 (video only).",
+    "description": "Start a screen recording (Windows gdigrab) as a background ffmpeg process. Returns a session id and output path. Recording is explicit and never auto-starts. Audio is not captured in Phase 1 (video only). A window: target records the on-screen rectangle the window occupies, resolved once at start (window must be visible, on top, not minimized); it does not follow a window moved/resized mid-recording.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "target": { "type": "string", "description": "full | monitor:<index> (0 = primary) | window:<exact title> | region:<x>,<y>,<w>,<h>" },
+        "target": { "type": "string", "description": "full | monitor:<index> (0 = primary) | window:<title> | region:<x>,<y>,<w>,<h>. window: captures the rectangle the window occupies as displayed (case-insensitive exact title, else substring; topmost match)" },
         "fps": { "type": "integer", "minimum": 1, "maximum": 120, "description": "Frames per second (default 30)" },
         "quality": { "type": "string", "enum": ["draft", "standard", "high"], "description": "Encoder preset (default standard)" },
         "output": { "type": "string", "description": "Optional output .mp4 path (defaults under SCREENCAST_HOME/recordings)" }
@@ -42,11 +42,11 @@
   },
   {
     "name": "screenshot",
-    "description": "Capture a single still frame (PNG) of a target (full screen, a monitor, a window by title, or a region). Returns the image path.",
+    "description": "Capture a single still frame (PNG) of a target (full screen, a monitor, a window, or a region). Returns the image path. A window: target captures the on-screen rectangle the window occupies as currently displayed (it must be visible, on top, and not minimized).",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "target": { "type": "string", "description": "full | monitor:<index> | window:<exact title> | region:<x>,<y>,<w>,<h>" },
+        "target": { "type": "string", "description": "full | monitor:<index> | window:<title> | region:<x>,<y>,<w>,<h>. window: captures the rectangle the window occupies as displayed (case-insensitive exact title, else substring; topmost match)" },
         "output": { "type": "string", "description": "Optional output .png path (defaults under SCREENCAST_HOME/screenshots)" }
       },
       "required": ["target"]

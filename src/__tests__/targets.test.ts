@@ -113,12 +113,13 @@ describe("buildCaptureArgs", () => {
     expect(s).toContain("-video_size 800x600");
   });
 
-  it("targets a window by title", () => {
-    const s = buildCaptureArgs(
-      { kind: "window", title: "Notepad" },
-      { output: "w.mp4" },
-    ).join(" ");
-    expect(s).toContain("title=Notepad");
+  it("refuses an unresolved window target (must become a region first)", () => {
+    // gdigrab `title=` grabs a blank surface for GPU-composited windows, so a
+    // window target must be resolved to its on-screen rectangle by
+    // resolveCaptureTarget before args are built. Building directly must throw.
+    expect(() =>
+      buildCaptureArgs({ kind: "window", title: "Notepad" }, { output: "w.mp4" }),
+    ).toThrow();
   });
 
   it("rejects an out-of-range fps", () => {

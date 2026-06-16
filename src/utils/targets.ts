@@ -119,7 +119,13 @@ export function targetInputArgs(target: Target, monitors: Monitor[]): string[] {
     case "full":
       return ["-i", "desktop"];
     case "window":
-      return ["-i", `title=${target.title}`];
+      // A window target must be resolved to its on-screen rectangle first (see
+      // resolveCaptureTarget). gdigrab `title=` grabs a blank surface for
+      // GPU-composited windows, so it is never used.
+      throw new ScreencastError(
+        "Internal: a window target must be resolved to a region before " +
+          "building capture args. Call resolveCaptureTarget().",
+      );
     case "region":
       return [
         "-offset_x", String(target.x),

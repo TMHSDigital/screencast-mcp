@@ -3,14 +3,13 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
-import { getMonitors } from "../utils/monitors.js";
 import {
   buildCaptureArgs,
-  parseTarget,
   DEFAULT_FPS,
   DEFAULT_QUALITY,
   type Quality,
 } from "../utils/targets.js";
+import { resolveCaptureTarget } from "../utils/resolveTarget.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { getStore } from "../context.js";
 import type { SessionRecord } from "../utils/sessions.js";
@@ -20,7 +19,10 @@ const inputSchema = {
     .string()
     .describe(
       "Capture target: 'full' | 'monitor:<index>' (0 = primary) | " +
-        "'window:<exact title>' | 'region:<x>,<y>,<w>,<h>' (absolute pixels).",
+        "'window:<title>' | 'region:<x>,<y>,<w>,<h>' (absolute pixels). " +
+        "window: records the on-screen rectangle the window occupies, resolved " +
+        "ONCE at start (it must be visible, on top, not minimized); it does not " +
+        "follow a window moved or resized mid-recording.",
     ),
   fps: z
     .number()
@@ -52,8 +54,7 @@ export function register(server: McpServer): void {
     async (args) => {
       try {
         const { ffmpeg } = requireFfmpeg();
-        const target = parseTarget(args.target);
-        const monitors = target.kind === "monitor" ? getMonitors() : [];
+        const { target, monitors } = resolveCaptureTarget(args.target);
         const fps = args.fps ?? DEFAULT_FPS;
         const quality: Quality = (args.quality as Quality) ?? DEFAULT_QUALITY;
         const output = resolveOutput(
