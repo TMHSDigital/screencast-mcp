@@ -18,7 +18,9 @@ export function register(server: McpServer): void {
     async () => {
       try {
         requireFfmpeg();
-        const devices = await listDshowAudioDevices();
+        // Always re-probe: this is the explicit "show me what's available" call,
+        // so a device enabled since the last recording must show up.
+        const devices = await listDshowAudioDevices(true);
         const loopback = pickLoopbackDevice(devices);
         return okResponse({
           devices,

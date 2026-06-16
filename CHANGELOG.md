@@ -12,6 +12,20 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - ESLint (flat config, typescript-eslint recommended) with a `lint` script, run
   in CI (#23). Tooling only; not part of the published package.
 
+## [0.8.10]
+
+### Fixed
+
+- **Audio device enumeration no longer hangs for 30s with a misleading timeout**
+  (#40). The dshow `-list_devices` probe can block on some setups (a misbehaving
+  audio driver), and `list_audio_devices` / system-audio recording surfaced the
+  raw `ffmpeg timed out after 30s` text. Enumeration now uses a 12s cap, closes
+  the child's stdin (a known hang cause), and returns a clear "could not
+  enumerate audio devices" message with a fix hint. A successful result is cached
+  for the process so an audio recording does not re-pay the probe; the
+  `list_audio_devices` tool forces a fresh probe so a newly enabled device still
+  shows up.
+
 ## [0.8.9]
 
 ### Fixed
