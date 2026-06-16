@@ -5,6 +5,15 @@ All notable changes to Screencast MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.3]
+
+### Fixed
+
+- **`sample_frames` (fps mode) no longer returns stale frames from a reused
+  `outputDir`** (#20). It snapshots the PNGs already present before sampling and
+  returns only the frames written by this run, so a directory that already
+  contained images does not contaminate the result.
+
 ## [0.8.2]
 
 ### Fixed

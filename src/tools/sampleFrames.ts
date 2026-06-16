@@ -53,10 +53,15 @@ export function register(server: McpServer): void {
 
         let frames: string[] = [];
         if (hasFps) {
+          const isPng = (f: string) => f.endsWith(".png");
+          // Snapshot any pre-existing PNGs so a reused outputDir does not
+          // contaminate the result; return only the frames this run wrote.
+          const before = new Set(readdirSync(dir).filter(isPng));
           const pattern = join(dir, "frame_%05d.png");
           await runFfmpeg(buildSampleByFpsArgs(args.input, args.fps!, pattern), 5 * 60_000);
           frames = readdirSync(dir)
-            .filter((f) => f.endsWith(".png"))
+            .filter(isPng)
+            .filter((f) => !before.has(f))
             .sort()
             .map((f) => join(dir, f));
         } else {
