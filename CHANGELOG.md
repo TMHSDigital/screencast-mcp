@@ -12,6 +12,17 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - ESLint (flat config, typescript-eslint recommended) with a `lint` script, run
   in CI (#23). Tooling only; not part of the published package.
 
+## [0.8.11]
+
+### Fixed
+
+- **`sample_frames` (timestamps) no longer returns paths for frames past the end
+  of the video** (#35). A timestamp beyond the video length makes ffmpeg exit 0
+  without writing a file, but the tool still reported that (nonexistent) path.
+  It now returns only frames that actually exist on disk and lists any
+  out-of-range timestamps under `skippedTimestamps` with a note. Mirrors the
+  fps-mode fix in #20.
+
 ## [0.8.10]
 
 ### Fixed

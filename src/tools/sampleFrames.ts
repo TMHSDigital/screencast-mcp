@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { join } from "node:path";
-import { mkdirSync, readdirSync, existsSync } from "node:fs";
+import { mkdirSync, readdirSync, existsSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
@@ -52,6 +52,7 @@ export function register(server: McpServer): void {
         mkdirSync(dir, { recursive: true });
 
         let frames: string[] = [];
+        const skipped: number[] = [];
         if (hasFps) {
           const isPng = (f: string) => f.endsWith(".png");
           // Snapshot any pre-existing PNGs so a reused outputDir does not
@@ -68,8 +69,14 @@ export function register(server: McpServer): void {
           const ts = args.timestamps!;
           for (let i = 0; i < ts.length; i++) {
             const out = join(dir, `frame_${String(i).padStart(3, "0")}_${ts[i]}s.png`);
+            // Clear any stale file at this path (reused outputDir) so existence
+            // after the run reflects only what this invocation wrote.
+            rmSync(out, { force: true });
             await runFfmpeg(buildSampleAtTimestampArgs(args.input, ts[i], out), 60_000);
-            frames.push(out);
+            // A timestamp past the end of the video makes ffmpeg exit 0 without
+            // writing a file. Report only frames that actually exist (#35).
+            if (existsSync(out)) frames.push(out);
+            else skipped.push(ts[i]);
           }
         }
 
@@ -78,6 +85,14 @@ export function register(server: McpServer): void {
           frameCount: frames.length,
           frames,
           mode: hasFps ? `fps=${args.fps}` : `timestamps=[${args.timestamps!.join(", ")}]`,
+          ...(skipped.length > 0
+            ? {
+                skippedTimestamps: skipped,
+                note:
+                  `No frame was written for ${skipped.length} timestamp(s) past the ` +
+                  `end of the video: [${skipped.join(", ")}].`,
+              }
+            : {}),
         });
       } catch (error) {
         return errorResponse(error);
