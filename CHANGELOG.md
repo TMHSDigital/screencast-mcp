@@ -5,6 +5,17 @@ All notable changes to Screencast MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.7]
+
+### Changed
+
+- **String filter parameters are validated up front** (#22). A transition name
+  (`xfade_transition`, `assemble_highlights`) must be a lowercase xfade name, and
+  a color (`title_card` `bg`/`fontColor`, `redact_region` `color`) may not
+  contain filtergraph metacharacters. An invalid value now returns a clear error
+  instead of a cryptic ffmpeg filtergraph parse failure. This is a usability fix,
+  not a security boundary (args are passed without a shell).
+
 ## [0.8.6]
 
 ### Changed

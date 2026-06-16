@@ -10,6 +10,7 @@
 import { ScreencastError } from "./errors.js";
 import { resolveQuality, type Quality } from "./targets.js";
 import { escapeFilterPath } from "./fonts.js";
+import { validateTransition, validateColor } from "./validate.js";
 
 export const DEFAULT_PRODUCE_WIDTH = 1920;
 export const DEFAULT_PRODUCE_HEIGHT = 1080;
@@ -82,7 +83,7 @@ export function buildXfadeArgs(
   const h = opts.height ?? DEFAULT_PRODUCE_HEIGHT;
   const fps = opts.fps ?? DEFAULT_PRODUCE_FPS;
   const rate = opts.audioRate ?? DEFAULT_AUDIO_RATE;
-  const transition = opts.transition ?? "fade";
+  const transition = validateTransition(opts.transition ?? "fade");
   const d = opts.duration ?? DEFAULT_TRANSITION_DUR;
   if (!Number.isFinite(d) || d <= 0) {
     throw new ScreencastError("transition duration must be a positive number.");
@@ -183,6 +184,7 @@ export function buildAssembleArgs(
       maps.push("-map", "[vout]");
     }
   } else {
+    validateTransition(transition);
     if (durations.length !== n) {
       throw new ScreencastError(
         `a ${transition} transition needs a duration for each of the ${n} clips.`,
@@ -258,8 +260,8 @@ export function buildTitleCardArgs(
   const h = opts.height ?? DEFAULT_PRODUCE_HEIGHT;
   const dur = opts.duration ?? 3;
   const fps = opts.fps ?? DEFAULT_PRODUCE_FPS;
-  const bg = opts.bg ?? "black";
-  const fontColor = opts.fontColor ?? "white";
+  const bg = validateColor(opts.bg ?? "black", "bg");
+  const fontColor = validateColor(opts.fontColor ?? "white", "fontColor");
   const fontSize = opts.fontSize ?? 96;
   if (!Number.isFinite(dur) || dur <= 0) {
     throw new ScreencastError("title duration must be a positive number.");
