@@ -1,37 +1,97 @@
+<div align="center">
+
 # Screencast MCP
 
-**MCP server for Windows screen recording, frame sampling, and minimal ffmpeg edits**
+**An MCP server that lets an agent record the screen, _watch_ the footage, and make minimal ffmpeg edits — over stdio, on Windows.**
 
-![License: CC-BY-NC-ND-4.0](https://img.shields.io/badge/license-CC--BY--NC--ND--4.0-green)
-![Version](https://img.shields.io/badge/version-0.2.0-blue)
+Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, concat, and convert. No cloud, no streaming — ffmpeg and ffprobe wrapped behind ten typed tools.
 
----
+<br />
 
-Screencast MCP is a Windows-first [Model Context Protocol](https://modelcontextprotocol.io)
-server that lets an agent record the screen, take screenshots, "watch" footage by
-sampling frames into images it can actually view, and perform a small set of
-ffmpeg edits (trim, concat, convert). It speaks MCP over stdio and wraps ffmpeg
-and ffprobe.
+[![Documentation](https://img.shields.io/badge/Documentation-2D7FF9?style=for-the-badge&logo=readthedocs&logoColor=white)](https://tmhsdigital.github.io/screencast-mcp/)
 
-This is Phase 1. The full edit surface (crop, scale, speed, overlay, extract,
-compress), audio capture, and a higher-level production layer are deliberately
-later phases. See [ROADMAP.md](ROADMAP.md).
+<br />
+
+[![CI](https://github.com/TMHSDigital/screencast-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/TMHSDigital/screencast-mcp/actions/workflows/ci.yml)
+[![License: CC BY-NC-ND 4.0](https://img.shields.io/badge/license-CC--BY--NC--ND--4.0-green)](LICENSE)
+![Last commit](https://img.shields.io/github/last-commit/TMHSDigital/screencast-mcp)
+![Repo size](https://img.shields.io/github/repo-size/TMHSDigital/screencast-mcp)
+![Top language](https://img.shields.io/github/languages/top/TMHSDigital/screencast-mcp)
+
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js_%E2%89%A520-339933?logo=node.js&logoColor=white)
+![Model Context Protocol](https://img.shields.io/badge/MCP-stdio-6E56CF)
+![ffmpeg](https://img.shields.io/badge/ffmpeg-required-007808?logo=ffmpeg&logoColor=white)
+![Capture](https://img.shields.io/badge/capture-Windows_gdigrab-0078D6?logo=windows&logoColor=white)
+
+</div>
+
+> [!NOTE]
+> This is **Phase 1**. Screen capture uses `gdigrab` and is Windows-only; the watch and edit tools work anywhere ffmpeg runs. The fuller edit surface (crop, scale, speed, overlay, extract, compress), audio capture, and a higher-level production layer are deliberately later phases — see [ROADMAP.md](ROADMAP.md).
+
+## Overview
+
+Screencast MCP gives an agent a screen recorder it can drive and reason about. It speaks [Model Context Protocol](https://modelcontextprotocol.io) over stdio and exposes ffmpeg as a small, typed tool surface rather than a flag soup. The defining capability is the **watch loop**: an agent records footage, samples it into PNG frames, and views those frames to confirm what actually happened on screen.
+
+The design choices are deliberate rather than incidental:
+
+- **Capture is always explicit.** A recording or screenshot happens only on a tool call — nothing auto-fires and there is no background or scheduled capture.
+- **Footage is made viewable.** `sample_frames` turns a video into images an agent can open, so "watch what happened" is a first-class operation, not an afterthought.
+- **Presets over raw flags.** Quality is `draft` / `standard` / `high`; the agent never reasons about codecs, CRF, or pixel formats.
+- **Safe by default.** Output lands under `SCREENCAST_HOME`, never inside a project checkout, and the public repo's `.gitignore` blocks captured media from being committed.
+- **Crash-safe sessions.** A recording interrupted by a crash is reconciled on the next start (orphan reaping), so no ffmpeg child silently outlives the server.
+
+## Tools
+
+Ten tools across three concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
+
+### Capture
+
+| Tool | Purpose |
+| --- | --- |
+| `start_recording` | Start a background recording. `target` = `full` \| `monitor:<index>` \| `window:<title>` \| `region:<x>,<y>,<w>,<h>`; optional `fps` and `quality`. Returns a session id and output path. |
+| `stop_recording` | Stop a session by id. Sends ffmpeg a graceful quit so the file is **finalized, not truncated**. Returns the final path and duration. |
+| `list_sessions` | List active and finished sessions. |
+| `get_session` | Inspect a single session by id. |
+| `screenshot` | Capture a single PNG of a `target`. |
+
+### Watch
+
+| Tool | Purpose |
+| --- | --- |
+| `sample_frames` | Extract frames from a video — at a fixed `fps` or at explicit `timestamps` — so the agent can view what happened. Returns the frame paths. |
+| `get_media_info` | ffprobe wrapper: duration, resolution, fps, codecs, container format, and size. |
+
+### Minimal edit
+
+| Tool | Purpose |
+| --- | --- |
+| `trim` | Cut a sub-clip by `start` + (`end` or `duration`). Stream-copy for speed. |
+| `concat` | Join two or more videos into one. |
+| `convert` | Convert between `mp4`, `gif`, and `webm`. |
+
+### Targets
+
+Every capture tool takes a single `target` string, so an agent never has to juggle quoting:
+
+| Target | Captures |
+| --- | --- |
+| `full` | The whole virtual desktop |
+| `monitor:<index>` | One display; `0` is always primary |
+| `window:<title>` | The on-screen rectangle a window occupies (case-insensitive exact title, else substring; topmost wins) |
+| `region:<x>,<y>,<w>,<h>` | An absolute pixel rectangle |
+
+Output is written under `SCREENCAST_HOME` (default `<homedir>/.screencast-mcp`) into `recordings/`, `frames/`, `screenshots/`, and `edits/`. Any tool also accepts an explicit output path.
 
 ## Prerequisites
 
-`ffmpeg` and `ffprobe` are external dependencies and must be installed and on
-`PATH` (or pointed at with the `FFMPEG_PATH` / `FFPROBE_PATH` environment
-variables). The server detects them per call and returns a clear error with an
-install hint if either is missing.
+`ffmpeg` and `ffprobe` are external dependencies and must be on `PATH` (or pointed at via the `FFMPEG_PATH` / `FFPROBE_PATH` environment variables). The server detects them per call and returns a clear error with an install hint if either is missing.
 
 | Platform | Install |
-|----------|---------|
-| Windows  | `winget install Gyan.FFmpeg` or `choco install ffmpeg` |
-| macOS    | `brew install ffmpeg` |
-| Linux    | `apt install ffmpeg` |
-
-Screen capture itself uses `gdigrab`, which is Windows-only; the watch and edit
-tools work anywhere ffmpeg runs.
+| --- | --- |
+| Windows | `winget install Gyan.FFmpeg` or `choco install ffmpeg` |
+| macOS | `brew install ffmpeg` |
+| Linux | `apt install ffmpeg` |
 
 ## Installation
 
@@ -39,9 +99,11 @@ tools work anywhere ffmpeg runs.
 npm install -g @tmhsdigital/screencast-mcp
 ```
 
-Or run it directly from a clone:
+Or run it from a clone:
 
 ```bash
+git clone https://github.com/TMHSDigital/screencast-mcp.git
+cd screencast-mcp
 npm install
 npm run build
 node dist/index.js
@@ -60,112 +122,91 @@ node dist/index.js
 }
 ```
 
-## Tool reference
+> [!TIP]
+> Running from a clone instead of the published package? Point the client straight at the build: set `"command": "node"` and `"args": ["C:/path/to/screencast-mcp/dist/index.js"]`.
 
-### Capture
+## Usage
 
-| Tool | Purpose |
-|------|---------|
-| `start_recording` | Start a background recording. `target` = `full` \| `monitor:<index>` \| `window:<title>` \| `region:<x>,<y>,<w>,<h>`; optional `fps` and `quality` (`draft` \| `standard` \| `high`). Returns a session id and output path. |
-| `stop_recording` | Stop a session by id. Sends ffmpeg a graceful quit so the file is finalized, not truncated. Returns final path and duration. |
-| `list_sessions` | List active and finished sessions. |
-| `get_session` | Inspect one session by id. |
-| `screenshot` | Capture a single PNG of a `target`. |
+A typical watch loop — record, sample, look:
 
-### Watch
+```jsonc
+// 1. record a region for a few seconds
+start_recording { "target": "region:0,0,1280,720", "quality": "draft" }
+//    -> { "sessionId": "rec-…", "outputPath": "…/recordings/rec-….mp4" }
 
-| Tool | Purpose |
-|------|---------|
-| `sample_frames` | Extract frames from a video, either at a fixed `fps` or at explicit `timestamps`, so the agent can view what happened. Returns the frame paths. |
-| `get_media_info` | ffprobe wrapper: duration, resolution, fps, codecs, format, size. |
+// 2. finalize the file
+stop_recording { "sessionId": "rec-…" }
+//    -> { "durationSec": 4.2, "finalizedGracefully": true }
 
-### Minimal edit
+// 3. turn it into frames the agent can view
+sample_frames { "input": "…/recordings/rec-….mp4", "timestamps": [0.5, 2, 3.5] }
+//    -> { "frames": ["…/frames/…/frame_000_0.5s.png", …] }
+```
 
-| Tool | Purpose |
-|------|---------|
-| `trim` | Cut a sub-clip by `start` + (`end` or `duration`). |
-| `concat` | Join two or more videos into one. |
-| `convert` | Convert between `mp4`, `gif`, and `webm`. |
-
-Quality is exposed as presets (`draft` / `standard` / `high`), not raw ffmpeg
-flags, so the agent never has to reason about codecs.
-
-### Output locations
-
-By default everything is written under `SCREENCAST_HOME`
-(default `<homedir>/.screencast-mcp`) in `recordings/`, `frames/`,
-`screenshots/`, and `edits/`, so captures never land inside a project checkout.
-Any tool also accepts an explicit output path.
+`screenshot { "target": "window:My App" }` is the one-shot equivalent for a still.
 
 ## Windows notes
 
-- **Multi-monitor offsets.** `gdigrab` has no "capture monitor N" selector, so a
-  monitor target captures the whole virtual desktop and crops to that display's
-  pixel bounds. The bounds come from `System.Windows.Forms.Screen.AllScreens`, so
-  `monitor:1` correctly grabs the second display at its real offset (for example
-  `x=2560` on a 4480x1440 dual-monitor desktop). `monitor:0` is always primary.
-- **Window capture** (`window:My App`) captures the on-screen **rectangle** the
-  window currently occupies, not the window's own surface. `gdigrab`'s native
-  `title=` grab returns a blank frame for GPU- or DirectComposition-composited
-  windows (Chrome, Electron editors, UWP apps), so the window is instead resolved
-  to its screen rectangle (per-monitor DPI aware) and captured through the same
-  desktop path as `monitor`/`region`. Consequences: the window must be **visible,
-  on top, and not minimized** (a minimized window is rejected with a clear error);
-  the capture includes anything drawn over that rectangle; and for
-  `start_recording` the rectangle is fixed **once at start**, so a window moved or
-  resized mid-recording is not followed. Title matching is case-insensitive —
-  exact match wins, otherwise a substring match, and the topmost window wins ties.
-  True per-window background capture (Windows Graphics Capture API) is a
-  deliberate future phase, not in this build.
-- **Fullscreen-exclusive apps** often produce black frames under `gdigrab`. Run
-  the source in borderless-windowed mode for reliable capture.
-- **Audio is not captured in Phase 1.** `gdigrab` is video-only; audio
-  (dshow / WASAPI loopback) is a Phase 2 seam and is intentionally not half-wired.
-- A recording that is interrupted by a crash is reconciled on the next server
-  start (orphan reaping), so no ffmpeg child silently outlives the server.
+- **Multi-monitor offsets.** `gdigrab` has no "capture monitor N" selector, so a monitor target captures the whole virtual desktop and crops to that display's pixel bounds (from `System.Windows.Forms.Screen.AllScreens`). `monitor:1` grabs the second display at its real offset; `monitor:0` is always primary.
+- **Window capture** resolves the window to the on-screen **rectangle** it occupies and captures that, rather than the window's own surface — `gdigrab`'s native `title=` grab returns a blank frame for GPU- or DirectComposition-composited windows (Chrome, Electron, UWP). The window must be **visible, on top, and not minimized** (a minimized window is rejected with a clear error), the capture includes anything drawn over that rectangle, and for `start_recording` the rectangle is fixed **once at start**. True per-window background capture (Windows Graphics Capture API) is a future phase.
+- **Fullscreen-exclusive apps** often produce black frames under `gdigrab`; run the source in borderless-windowed mode for reliable capture.
+- **No audio in Phase 1.** `gdigrab` is video-only; audio (dshow / WASAPI loopback) is a Phase 2 seam and is intentionally not half-wired.
 
 ## Threat model
 
-Screen capture can record **anything** that is on screen at the moment of
-capture, including passwords, tokens, private messages, and other secrets. Treat
-recordings, screenshots, and sampled frames as sensitive by default. Note that
-`window:` captures the screen rectangle a window occupies, so anything drawn over
-that rectangle (overlays, notifications, another window) is captured too.
+> [!WARNING]
+> Screen capture can record **anything** on screen at the moment of capture — passwords, tokens, private messages, and other secrets. `window:` captures the screen rectangle a window occupies, so overlays, notifications, or another window drawn over it are captured too. Treat recordings, screenshots, and sampled frames as sensitive by default.
 
-- **Capture is always explicit.** A recording or screenshot only happens when a
-  tool is called; nothing auto-fires, and there is no background or scheduled
-  capture. This mirrors how privileged operations are gated behind an explicit
-  action rather than implied.
-- **Output stays local.** Files are written to the local filesystem only. This
-  server never uploads, streams, or transmits captured media anywhere.
-- **Public repo, private captures.** This repository is public. Its `.gitignore`
-  ignores recordings, frames, screenshots, and common video/image output so test
-  media cannot be committed by accident. Keep your real captures out of version
-  control.
-- **Review before sharing.** Sample frames or inspect a recording before passing
-  a file to any other tool or person, so you know what it actually contains.
+- **Capture is always explicit.** Nothing auto-fires; capture is gated behind an explicit tool call.
+- **Output stays local.** Files are written to the local filesystem only — never uploaded, streamed, or transmitted anywhere.
+- **Public repo, private captures.** The `.gitignore` blocks recordings, frames, screenshots, and common video/image output so test media cannot be committed by accident.
+- **Review before sharing.** Sample frames or inspect a recording before handing a file to another tool or person, so you know what it contains.
+
+## Project structure
+
+```
+.
+├── src/
+│   ├── index.ts          # MCP server entry (stdio); registers every tool, reaps orphans
+│   ├── context.ts        # shared session-store singleton
+│   ├── tools/            # one file per tool (capture, watch, edit)
+│   ├── utils/            # ffmpeg, monitors, windows, sessions, paths, targets
+│   └── __tests__/        # vitest unit tests + guarded local-capture harness
+├── docs/                 # GitHub Pages documentation site
+├── mcp-tools.json        # canonical tool manifest (kept in sync with src/tools)
+├── .github/workflows/    # CI, release, npm publish, Pages, ecosystem drift check
+├── ROADMAP.md · CONTRIBUTING.md · SECURITY.md · LICENSE
+└── package.json
+```
 
 ## Development
 
 ```bash
 npm install
 npm run build      # tsc -> dist/
-npm test           # vitest (pure unit tests, no ffmpeg required)
+npm test           # vitest (pure unit tests; no ffmpeg or display required)
 npm run dev        # tsx watch
 ```
 
-## Roadmap
+The capture path can't be exercised on CI's headless Linux runners, so an end-to-end harness lives behind a flag and is skipped by default:
 
-See [ROADMAP.md](ROADMAP.md) for the phased plan.
+```bash
+RUN_LOCAL_CAPTURE_TESTS=1 npm test   # Windows + ffmpeg + a real display
+```
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Security reports go through [SECURITY.md](SECURITY.md).
 
 ## License
 
-CC-BY-NC-ND-4.0 -- see [LICENSE](LICENSE) for details.
+Released under the [CC-BY-NC-ND-4.0](LICENSE) license.
 
----
+<div align="center">
+<br />
 
-**Built by TMHSDigital**
+[**Documentation**](https://tmhsdigital.github.io/screencast-mcp/) · [**Roadmap**](ROADMAP.md) · [**Report an issue**](https://github.com/TMHSDigital/screencast-mcp/issues) · [**License**](LICENSE)
+
+<sub>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a> · <a href="#screencast-mcp">Back to top ↑</a></sub>
+
+</div>
