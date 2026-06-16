@@ -173,6 +173,15 @@ export function buildAssembleArgs(
     if (!Number.isFinite(d) || d <= 0) {
       throw new ScreencastError("transition duration must be a positive number.");
     }
+    // Every clip must be longer than the transition, or xfade offsets collapse
+    // (a too-short or unknown-duration clip yields overlapping/garbled cuts).
+    const badClip = durations.findIndex((dur) => !Number.isFinite(dur) || dur <= d);
+    if (badClip !== -1) {
+      throw new ScreencastError(
+        `clip ${badClip} (${durations[badClip]}s) must be longer than the ` +
+          `${d}s ${transition} transition. Use a shorter transition or trim fewer frames.`,
+      );
+    }
     const offsets = xfadeOffsets(durations, d);
     let vPrev = "v0";
     for (let m = 1; m < n; m++) {

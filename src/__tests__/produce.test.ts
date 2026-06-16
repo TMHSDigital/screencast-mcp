@@ -74,6 +74,16 @@ describe("buildAssembleArgs", () => {
   it("requires a duration per clip for an xfade transition", () => {
     expect(() => buildAssembleArgs(["a", "b"], [5], "o.mp4", { transition: "fade" })).toThrow();
   });
+  it("rejects a clip not longer than the transition", () => {
+    // second clip is exactly the transition length -> invalid
+    expect(() =>
+      buildAssembleArgs(["a", "b"], [5, 1], "o.mp4", { transition: "fade", duration: 1 }),
+    ).toThrow(/clip 1/);
+    // an unknown (0) duration is also rejected
+    expect(() =>
+      buildAssembleArgs(["a", "b"], [5, 0], "o.mp4", { transition: "fade", duration: 1 }),
+    ).toThrow();
+  });
 });
 
 describe("buildTitleCardArgs", () => {

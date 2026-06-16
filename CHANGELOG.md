@@ -5,6 +5,16 @@ All notable changes to Screencast MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.2]
+
+### Fixed
+
+- **`assemble_highlights` now validates clip durations against the transition**
+  (#18). With an xfade transition, a clip not longer than the transition (or one
+  whose duration could not be probed) is rejected with a clear error naming the
+  offending clip, instead of producing overlapping/garbled cuts or a cryptic
+  ffmpeg failure.
+
 ## [0.8.1]
 
 ### Fixed
