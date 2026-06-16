@@ -5,6 +5,23 @@ All notable changes to Screencast MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0]
+
+### Added
+
+- **`redact_region` safety redaction.** Cover declared rectangles in a video so
+  on-screen secrets are hidden. The default `box` style draws a solid,
+  irreversible fill; `blur` and `pixelate` are offered for non-secret content.
+  Each region can be limited to a time window and expanded with `pad`.
+- Regions are bounds-checked against the real frame (probed first), so an
+  off-frame request is rejected rather than silently leaving the secret visible.
+
+### Security
+
+- Documented the redaction guarantee in `SECURITY.md` and the README threat
+  model: redaction covers declared regions only and is not automatic secret
+  detection; prefer the irreversible `box` style for real secrets.
+
 ## [0.3.0]
 
 ### Added

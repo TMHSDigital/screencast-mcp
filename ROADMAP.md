@@ -27,7 +27,7 @@ core. Later phases add the full edit surface and a production layer.
       segment extraction; `extract` split into these two non-overlapping tools)
 - [x] Re-encode trim option for frame-accurate cuts (delivered as `clip`; `trim`
       stays the fast stream-copy single cut)
-- [ ] `redact_region` safety redaction (declared regions, irreversible solid box)
+- [x] `redact_region` safety redaction (declared regions, irreversible solid box)
 - [ ] System audio capture (dshow loopback) - the clean seam is already in place.
       Microphone capture is deferred indefinitely.
 

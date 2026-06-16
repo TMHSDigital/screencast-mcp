@@ -442,3 +442,138 @@ export function buildClipArgs(
     output,
   ];
 }
+
+// --- Phase 2 safety redaction ---------------------------------------------
+//
+// redact_region covers DECLARED rectangles. It is not automatic secret
+// detection. The default style is a solid box: a filled rectangle is
+// irreversible, where a blur or a mosaic can be partially recovered, so for an
+// actual secret the solid box is the safe choice. Regions are bounds-checked
+// against the real frame so an off-frame typo fails loudly instead of leaving
+// the secret visible.
+
+export type RedactStyle = "box" | "blur" | "pixelate";
+
+export interface RedactRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  start?: number;
+  end?: number;
+}
+
+interface NormalizedRegion {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  enable: string;
+}
+
+/** Validate each region against the frame, then apply an optional pad (dilation)
+ * clamped to the frame edges. The unpadded region is what gets bounds-checked,
+ * so a clearly off-frame request is rejected before any padding math. */
+function normalizeRegions(
+  regions: RedactRegion[],
+  pad: number,
+  dims?: { width: number | null; height: number | null },
+): NormalizedRegion[] {
+  return regions.map((r, i) => {
+    const x0 = requireNonNegativeInt(r.x, `region[${i}] x`);
+    const y0 = requireNonNegativeInt(r.y, `region[${i}] y`);
+    const w0 = requirePositiveInt(r.width, `region[${i}] width`);
+    const h0 = requirePositiveInt(r.height, `region[${i}] height`);
+    if (dims && dims.width != null && dims.height != null) {
+      if (x0 + w0 > dims.width || y0 + h0 > dims.height) {
+        throw new ScreencastError(
+          `region[${i}] ${w0}x${h0}+${x0}+${y0} falls outside the ` +
+            `${dims.width}x${dims.height} frame.`,
+        );
+      }
+    }
+    const x = Math.max(0, x0 - pad);
+    const y = Math.max(0, y0 - pad);
+    let right = x0 + w0 + pad;
+    let bottom = y0 + h0 + pad;
+    if (dims && dims.width != null) right = Math.min(right, dims.width);
+    if (dims && dims.height != null) bottom = Math.min(bottom, dims.height);
+    return { x, y, w: right - x, h: bottom - y, enable: enableExpr(r.start, r.end) };
+  });
+}
+
+/** boxblur radius scaled to the region so small boxes do not exceed the limit
+ * (the radius must stay under half the smaller side). */
+function blurRadius(r: NormalizedRegion): number {
+  return Math.max(2, Math.min(20, Math.floor(Math.min(r.w, r.h) / 4)));
+}
+
+export interface RedactOptions {
+  style?: RedactStyle;
+  pad?: number;
+  color?: string;
+}
+
+/** Redact declared rectangles. `box` (default) draws an irreversible solid fill;
+ * `blur` and `pixelate` composite a softened crop back over each region. */
+export function buildRedactArgs(
+  input: string,
+  output: string,
+  regions: RedactRegion[],
+  opts: RedactOptions = {},
+  dims?: { width: number | null; height: number | null },
+): string[] {
+  if (regions.length === 0) {
+    throw new ScreencastError("redact_region requires at least one region.");
+  }
+  const style = opts.style ?? "box";
+  const pad = opts.pad ?? 0;
+  if (!Number.isInteger(pad) || pad < 0) {
+    throw new ScreencastError("pad must be a non-negative integer.");
+  }
+  const color = opts.color ?? "black";
+  const rs = normalizeRegions(regions, pad, dims);
+
+  // A crisp re-encode keeps the redaction edges sharp.
+  const encode = resolveQuality("high");
+
+  if (style === "box") {
+    const boxes = rs
+      .map((r) => {
+        const en = r.enable ? `:enable='${r.enable}'` : "";
+        return `drawbox=x=${r.x}:y=${r.y}:w=${r.w}:h=${r.h}:color=${color}:t=fill${en}`;
+      })
+      .join(",");
+    return ["-y", "-i", input, "-vf", boxes, ...encode, "-c:a", "copy", output];
+  }
+
+  // blur / pixelate: split the source, soften each cropped region, then overlay
+  // the softened patches back over the base in order.
+  const n = rs.length;
+  const parts: string[] = [];
+  const splitOuts = ["base", ...rs.map((_, i) => `s${i}`)];
+  parts.push(`[0:v]split=${n + 1}[${splitOuts.join("][")}]`);
+  rs.forEach((r, i) => {
+    const crop = `crop=${r.w}:${r.h}:${r.x}:${r.y}`;
+    const soften =
+      style === "blur"
+        ? `boxblur=${blurRadius(r)}`
+        : `scale='max(1,iw/16)':'max(1,ih/16)':flags=neighbor,scale=${r.w}:${r.h}:flags=neighbor`;
+    parts.push(`[s${i}]${crop},${soften}[b${i}]`);
+  });
+  let prev = "base";
+  rs.forEach((r, i) => {
+    const en = r.enable ? `:enable='${r.enable}'` : "";
+    const out = i === n - 1 ? "out" : `c${i}`;
+    parts.push(`[${prev}][b${i}]overlay=${r.x}:${r.y}${en}[${out}]`);
+    prev = `c${i}`;
+  });
+  return [
+    "-y", "-i", input,
+    "-filter_complex", parts.join(";"),
+    "-map", "[out]", "-map", "0:a?",
+    ...encode,
+    "-c:a", "copy",
+    output,
+  ];
+}
