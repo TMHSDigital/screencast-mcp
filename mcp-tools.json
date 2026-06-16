@@ -278,5 +278,37 @@
     "name": "list_audio_devices",
     "description": "List the DirectShow audio devices ffmpeg can see on this machine and flag a likely system-audio loopback device. Use the returned name as the audio device for start_recording. System audio needs a loopback device (Stereo Mix or a virtual-audio driver); microphone capture is not supported.",
     "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  },
+  {
+    "name": "xfade_transition",
+    "description": "Crossfade two videos into one with an xfade transition. Both clips are auto-normalized to a common resolution, fps, and audio rate first, so they need not match. Audio is crossfaded when both clips have a track.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "inputA": { "type": "string", "description": "Path to the first (outgoing) video" },
+        "inputB": { "type": "string", "description": "Path to the second (incoming) video" },
+        "transition": { "type": "string", "description": "xfade transition name (default fade): fade, wipeleft, slideup, circleopen, dissolve, ..." },
+        "duration": { "type": "number", "exclusiveMinimum": 0, "description": "Transition length in seconds (default 1)" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["inputA", "inputB"]
+    }
+  },
+  {
+    "name": "assemble_highlights",
+    "description": "Stitch two or more clips into a single video, with hard cuts or an xfade transition between each. Clips are auto-normalized to a common resolution, fps, and audio rate, so they need not match.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "clips": { "type": "array", "items": { "type": "string" }, "minItems": 2, "description": "Two or more clip paths, in order" },
+        "transition": { "type": "string", "description": "'cut' (default, hard cuts) or an xfade transition name (fade, wipeleft, slideup, ...)" },
+        "duration": { "type": "number", "exclusiveMinimum": 0, "description": "Transition length in seconds when not a cut (default 1)" },
+        "width": { "type": "integer", "minimum": 1, "description": "Common output width (default 1920)" },
+        "height": { "type": "integer", "minimum": 1, "description": "Common output height (default 1080)" },
+        "fps": { "type": "integer", "minimum": 1, "description": "Common output fps (default 30)" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["clips"]
+    }
   }
 ]

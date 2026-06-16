@@ -34,8 +34,10 @@ A later phase adds a production layer.
 
 ## Phase 3 -- Produce / trailer layer
 
-- [ ] `assemble_highlights`, `title_card`, `music_bed`
-- [ ] `xfade` transitions, aspect variants, platform presets
+- [x] `assemble_highlights` (stitch clips with cuts or transitions) and
+      `xfade_transition` (crossfade two clips), with auto-normalized inputs
+- [ ] `title_card`, `music_bed`
+- [ ] Aspect variants (`reframe`) and platform export presets
 
 ## Cross-platform
 
