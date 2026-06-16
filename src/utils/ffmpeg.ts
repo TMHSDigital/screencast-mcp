@@ -72,15 +72,27 @@ export interface RunResult {
   stderr: string;
 }
 
+export interface RunCaptureOptions {
+  /**
+   * End the child's stdin immediately. dshow device enumeration
+   * (`-list_devices`) can block waiting on stdin on some setups; closing it
+   * removes that hang as a cause. Safe only for jobs that do not read stdin
+   * (which is every short job that goes through runCapture).
+   */
+  closeStdin?: boolean;
+}
+
 /** Run a binary to completion, capturing stdout/stderr. Used for ffprobe and
  * short ffmpeg edit jobs (not for long-running captures). */
 export function runCapture(
   bin: string,
   args: string[],
   timeoutMs = 5 * 60 * 1000,
+  opts: RunCaptureOptions = {},
 ): Promise<RunResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(bin, args, { windowsHide: true });
+    if (opts.closeStdin) child.stdin?.end();
     let stdout = "";
     let stderr = "";
     const timer = setTimeout(() => {

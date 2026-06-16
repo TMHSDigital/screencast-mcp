@@ -80,17 +80,56 @@ export function pickLoopbackDevice(
   );
 }
 
+/**
+ * Device enumeration must not block a recording start for long. The dshow
+ * `-list_devices` probe hangs on some setups (a misbehaving audio driver, no
+ * audio hardware), so it is capped well below the normal ffmpeg job timeout.
+ */
+export const ENUM_TIMEOUT_MS = 12_000;
+
+const ENUM_FAILED_HINT =
+  "Enumerating DirectShow audio devices timed out or failed - usually a " +
+  "misbehaving audio driver, or no audio device present. Record without system " +
+  "audio, or fix the device, then retry. " + NO_LOOPBACK_HINT;
+
+// A successful enumeration is cached for the process lifetime so an audio
+// recording does not re-pay the cost (or risk the hang) on every start. The
+// list_audio_devices tool forces a refresh, so a device enabled mid-session is
+// still discoverable.
+let cachedDevices: string[] | null = null;
+
 /** Run ffmpeg's device list and return the audio device names. ffmpeg exits
  * non-zero for the dummy input by design, so the exit code is ignored and the
- * names are read from stderr. */
-export async function listDshowAudioDevices(): Promise<string[]> {
+ * names are read from stderr. A timeout or spawn failure becomes a clear,
+ * actionable error rather than the raw "ffmpeg timed out" text. */
+export async function listDshowAudioDevices(forceRefresh = false): Promise<string[]> {
+  if (!forceRefresh && cachedDevices) return cachedDevices;
   const { ffmpeg } = requireFfmpeg();
-  const res = await runCapture(
-    ffmpeg,
-    ["-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
-    30_000,
-  );
-  return parseDshowAudioDevices(res.stderr);
+  let res;
+  try {
+    res = await runCapture(
+      ffmpeg,
+      ["-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
+      ENUM_TIMEOUT_MS,
+      { closeStdin: true },
+    );
+  } catch (err) {
+    // runCapture rejects on timeout (and on spawn error); ffmpeg's by-design
+    // non-zero exit for the dummy input resolves instead, so reaching here is a
+    // genuine failure, not the expected exit code.
+    throw new ScreencastError(
+      `Could not enumerate audio devices (${(err as Error).message}).`,
+      ENUM_FAILED_HINT,
+    );
+  }
+  const devices = parseDshowAudioDevices(res.stderr);
+  cachedDevices = devices;
+  return devices;
+}
+
+/** Drop the cached device list (test seam; also lets a caller force a re-probe). */
+export function clearAudioDeviceCache(): void {
+  cachedDevices = null;
 }
 
 /** Resolve the loopback device to use, throwing a clear, actionable error when
