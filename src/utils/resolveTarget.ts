@@ -10,7 +10,7 @@
  *     surface for GPU-composited windows). The rect is resolved once, here.
  *   - full / region -> passed through unchanged.
  */
-import { parseTarget, type Target } from "./targets.js";
+import { parseTarget, validateRegionOnDesktop, type Target } from "./targets.js";
 import { getMonitors, type Monitor } from "./monitors.js";
 import { resolveWindowBounds, type WindowBounds } from "./windows.js";
 
@@ -34,6 +34,13 @@ export function resolveCaptureTarget(spec: string): ResolvedTarget {
   }
   if (parsed.kind === "monitor") {
     return { target: parsed, monitors: getMonitors() };
+  }
+  if (parsed.kind === "region") {
+    // A window resolves to a region already clamped to the desktop; a raw
+    // region does not, so validate it against the live desktop bounds before
+    // gdigrab fails cryptically on an off-desktop rectangle.
+    validateRegionOnDesktop(parsed, getMonitors());
+    return { target: parsed, monitors: [] };
   }
   return { target: parsed, monitors: [] };
 }
