@@ -1,6 +1,6 @@
 {
   "name": "@tmhs/screencast-mcp",
-  "version": "0.8.8",
+  "version": "0.8.9",
   "description": "MCP server for Windows screen recording, frame sampling, and minimal ffmpeg edits",
   "type": "module",
   "main": "dist/index.js",

@@ -142,6 +142,34 @@ describe("buildCaptureArgs", () => {
     expect(s).toContain("-video_size 800x600");
   });
 
+  it("rounds an odd region down to even dimensions (libx264 needs even W/H)", () => {
+    const s = buildCaptureArgs(
+      { kind: "region", x: 10, y: 20, w: 101, h: 101 },
+      { output: "odd.mp4" },
+    ).join(" ");
+    // Offset is unchanged; only the size is rounded down to the nearest even.
+    expect(s).toContain("-offset_x 10");
+    expect(s).toContain("-offset_y 20");
+    expect(s).toContain("-video_size 100x100");
+  });
+
+  it("rounds an odd monitor size down to even", () => {
+    const s = buildCaptureArgs(
+      { kind: "region", x: 0, y: 0, w: 1919, h: 1199 },
+      { output: "m.mp4" },
+    ).join(" ");
+    expect(s).toContain("-video_size 1918x1198");
+  });
+
+  it("rejects a region too small to record after even-rounding", () => {
+    expect(() =>
+      buildCaptureArgs(
+        { kind: "region", x: 0, y: 0, w: 1, h: 50 },
+        { output: "tiny.mp4" },
+      ),
+    ).toThrow(/too small to record/);
+  });
+
   it("refuses an unresolved window target (must become a region first)", () => {
     // gdigrab `title=` grabs a blank surface for GPU-composited windows, so a
     // window target must be resolved to its on-screen rectangle by
@@ -172,5 +200,13 @@ describe("buildScreenshotArgs", () => {
     const args = buildScreenshotArgs({ kind: "full" }, "shot.png");
     expect(args.join(" ")).toContain("-frames:v 1");
     expect(args[args.length - 1]).toBe("shot.png");
+  });
+
+  it("keeps an odd region size for a screenshot (PNG needs no even dims)", () => {
+    const s = buildScreenshotArgs(
+      { kind: "region", x: 0, y: 0, w: 101, h: 101 },
+      "odd.png",
+    ).join(" ");
+    expect(s).toContain("-video_size 101x101");
   });
 });
