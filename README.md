@@ -43,7 +43,7 @@ The design choices are deliberate rather than incidental:
 
 ## Tools
 
-Ten tools across three concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
+Seventeen tools across three concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
 
 ### Capture
 
@@ -69,6 +69,20 @@ Ten tools across three concerns. The manifest in [`mcp-tools.json`](mcp-tools.js
 | `trim` | Cut a sub-clip by `start` + (`end` or `duration`). Stream-copy for speed. |
 | `concat` | Join two or more videos into one. |
 | `convert` | Convert between `mp4`, `gif`, and `webm`. |
+
+### Edit surface
+
+These tools re-encode (a filter rewrites pixels, so stream copy does not apply). They reuse the same `draft`/`standard`/`high` presets as capture.
+
+| Tool | Purpose |
+| --- | --- |
+| `crop` | Crop to a pixel rectangle (`x`, `y`, `width`, `height`). A rectangle that runs off the frame is rejected, not silently clamped. |
+| `scale` | Resize to a `width` and/or `height`. One side keeps the aspect ratio; both set an exact size. |
+| `speed` | Change playback speed by a `factor` (>1 faster, <1 slower). Audio is retempo'd when present. |
+| `overlay` | Composite a logo, watermark, or picture-in-picture onto a base video at a position, optionally scaled and time-limited. |
+| `compress` | Re-encode smaller with a `light`/`medium`/`heavy` CRF ladder and an optional `maxWidth` that only downscales. |
+| `extract_audio` | Write the audio track to its own file (`mp3`, `aac`, `wav`, or `copy`). |
+| `clip` | Extract one or more frame-accurate sub-segments to separate files. Unlike `trim`, it re-encodes so cuts land exactly on the given times. |
 
 ### Targets
 

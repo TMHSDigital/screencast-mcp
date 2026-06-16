@@ -9,6 +9,15 @@ import {
   buildConcatListContent,
   buildConcatArgs,
   buildConvertArgs,
+  enableExpr,
+  buildCropArgs,
+  buildScaleArgs,
+  atempoChain,
+  buildSpeedArgs,
+  buildOverlayArgs,
+  buildCompressArgs,
+  buildExtractAudioArgs,
+  buildClipArgs,
 } from "../utils/media.js";
 
 describe("parseFrameRate", () => {
@@ -128,5 +137,115 @@ describe("buildConvertArgs", () => {
     const s = buildConvertArgs("in.webm", "o.mp4", "mp4").join(" ");
     expect(s).toContain("libx264");
     expect(s).toContain("+faststart");
+  });
+});
+
+describe("enableExpr", () => {
+  it("builds between/gte/lte and an always-on empty string", () => {
+    expect(enableExpr(1, 3)).toBe("between(t,1,3)");
+    expect(enableExpr(2, undefined)).toBe("gte(t,2)");
+    expect(enableExpr(undefined, 5)).toBe("lte(t,5)");
+    expect(enableExpr()).toBe("");
+  });
+  it("rejects end <= start", () => {
+    expect(() => enableExpr(5, 2)).toThrow();
+  });
+});
+
+describe("buildCropArgs", () => {
+  it("builds a crop filter and re-encodes", () => {
+    const s = buildCropArgs("in.mp4", "o.mp4", { x: 10, y: 20, width: 100, height: 50 }).join(" ");
+    expect(s).toContain("crop=100:50:10:20");
+    expect(s).toContain("libx264");
+    expect(s).toContain("-c:a copy");
+  });
+  it("rejects a region that runs off the frame", () => {
+    expect(() =>
+      buildCropArgs("in.mp4", "o.mp4", { x: 1900, y: 0, width: 100, height: 50 }, { width: 1920, height: 1080 }),
+    ).toThrow(/outside/);
+  });
+  it("rejects non-integer or non-positive dimensions", () => {
+    expect(() => buildCropArgs("i", "o", { x: 0, y: 0, width: 0, height: 50 })).toThrow();
+    expect(() => buildCropArgs("i", "o", { x: -1, y: 0, width: 10, height: 10 })).toThrow();
+  });
+});
+
+describe("buildScaleArgs", () => {
+  it("uses -2 for the omitted side", () => {
+    expect(buildScaleArgs("in.mp4", "o.mp4", { width: 1280 }).join(" ")).toContain("scale=1280:-2");
+    expect(buildScaleArgs("in.mp4", "o.mp4", { height: 720 }).join(" ")).toContain("scale=-2:720");
+  });
+  it("requires at least one side", () => {
+    expect(() => buildScaleArgs("i", "o", {})).toThrow();
+  });
+});
+
+describe("atempoChain / buildSpeedArgs", () => {
+  it("keeps a single atempo within range", () => {
+    expect(atempoChain(1.5)).toBe("atempo=1.5");
+  });
+  it("chains atempo stages beyond the 0.5-2.0 range", () => {
+    expect(atempoChain(4)).toBe("atempo=2.0,atempo=2");
+    expect(atempoChain(0.25)).toBe("atempo=0.5,atempo=0.5");
+  });
+  it("retempos audio when present and drops it otherwise", () => {
+    const withAudio = buildSpeedArgs("in.mp4", "o.mp4", 2, true).join(" ");
+    expect(withAudio).toContain("setpts=PTS/2");
+    expect(withAudio).toContain("atempo=2");
+    expect(withAudio).toContain("-c:a aac");
+    const noAudio = buildSpeedArgs("in.mp4", "o.mp4", 2, false).join(" ");
+    expect(noAudio).toContain("-an");
+  });
+  it("rejects a non-positive factor", () => {
+    expect(() => buildSpeedArgs("i", "o", 0, false)).toThrow();
+  });
+});
+
+describe("buildOverlayArgs", () => {
+  it("composites a second input at x:y", () => {
+    const s = buildOverlayArgs("base.mp4", "logo.png", "o.mp4", { x: 12, y: 8 }).join(" ");
+    expect(s).toContain("-i base.mp4");
+    expect(s).toContain("-i logo.png");
+    expect(s).toContain("[0:v][1:v]overlay=12:8");
+  });
+  it("scales the overlay and time-gates it", () => {
+    const s = buildOverlayArgs("base.mp4", "logo.png", "o.mp4", {
+      x: 0, y: 0, start: 1, end: 4, scale: { width: 200 },
+    }).join(" ");
+    expect(s).toContain("[1:v]scale=200:-1[ovl]");
+    expect(s).toContain("enable='between(t,1,4)'");
+  });
+});
+
+describe("buildCompressArgs", () => {
+  it("maps levels to a CRF ladder", () => {
+    expect(buildCompressArgs("in.mp4", "o.mp4", { level: "light" }).join(" ")).toContain("-crf 23");
+    expect(buildCompressArgs("in.mp4", "o.mp4").join(" ")).toContain("-crf 28");
+    expect(buildCompressArgs("in.mp4", "o.mp4", { level: "heavy" }).join(" ")).toContain("-crf 32");
+  });
+  it("only downscales with the width cap", () => {
+    expect(buildCompressArgs("in.mp4", "o.mp4", { maxWidth: 1280 }).join(" ")).toContain("scale='min(1280,iw)':-2");
+  });
+});
+
+describe("buildExtractAudioArgs", () => {
+  it("strips video and selects the codec", () => {
+    expect(buildExtractAudioArgs("in.mp4", "o.mp3", "mp3").join(" ")).toContain("libmp3lame");
+    expect(buildExtractAudioArgs("in.mp4", "o.wav", "wav").join(" ")).toContain("pcm_s16le");
+    expect(buildExtractAudioArgs("in.mp4", "o.m4a", "copy").join(" ")).toContain("-c:a copy");
+    expect(buildExtractAudioArgs("in.mp4", "o.mp3", "mp3").join(" ")).toContain("-vn");
+  });
+});
+
+describe("buildClipArgs", () => {
+  it("re-encodes a frame-accurate segment with -ss + -t", () => {
+    const s = buildClipArgs("in.mp4", "o.mp4", { start: 2, end: 6 }).join(" ");
+    expect(s).toContain("-ss 2");
+    expect(s).toContain("-t 4");
+    expect(s).toContain("libx264");
+    expect(s).not.toContain("-c copy");
+  });
+  it("rejects end <= start", () => {
+    expect(() => buildClipArgs("i", "o", { start: 5, end: 5 })).toThrow();
   });
 });

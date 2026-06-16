@@ -22,10 +22,17 @@ import { register as registerGetMediaInfo } from "./tools/getMediaInfo.js";
 import { register as registerTrim } from "./tools/trim.js";
 import { register as registerConcat } from "./tools/concat.js";
 import { register as registerConvert } from "./tools/convert.js";
+import { register as registerCrop } from "./tools/crop.js";
+import { register as registerScale } from "./tools/scale.js";
+import { register as registerSpeed } from "./tools/speed.js";
+import { register as registerOverlay } from "./tools/overlay.js";
+import { register as registerCompress } from "./tools/compress.js";
+import { register as registerExtractAudio } from "./tools/extractAudio.js";
+import { register as registerClip } from "./tools/clip.js";
 
 const server = new McpServer({
   name: "screencast-mcp",
-  version: "0.2.2",
+  version: "0.3.0",
 });
 
 registerStartRecording(server);
@@ -38,6 +45,13 @@ registerGetMediaInfo(server);
 registerTrim(server);
 registerConcat(server);
 registerConvert(server);
+registerCrop(server);
+registerScale(server);
+registerSpeed(server);
+registerOverlay(server);
+registerCompress(server);
+registerExtractAudio(server);
+registerClip(server);
 
 async function main(): Promise<void> {
   // Reconcile any sessions interrupted by a previous crash and kill ffmpeg

@@ -5,6 +5,25 @@ All notable changes to Screencast MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0]
+
+### Added
+
+- **Phase 2 edit surface.** Seven re-encoding edit tools that reuse the
+  `draft`/`standard`/`high` quality presets: `crop`, `scale`, `speed`, `overlay`,
+  `compress`, `extract_audio`, and `clip`.
+- `crop` rejects a rectangle that runs off the source frame rather than letting
+  ffmpeg silently clamp it, so an out-of-bounds request fails loudly.
+- `clip` extracts one or more frame-accurate sub-segments to separate files. It
+  re-encodes (output `-ss` + `-t`) so cuts land exactly on the given times, which
+  covers the roadmap's "re-encode trim option"; `trim` stays the fast
+  stream-copy single cut.
+
+### Changed
+
+- Factored a shared `probeMedia()` helper into `src/utils/ffmpeg.js`; `crop`,
+  `speed`, and `get_media_info` now reuse it instead of each running ffprobe.
+
 ## [0.2.2]
 
 ### Changed

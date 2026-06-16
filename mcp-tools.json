@@ -118,5 +118,119 @@
       },
       "required": ["input", "format"]
     }
+  },
+  {
+    "name": "crop",
+    "description": "Crop a video to a pixel rectangle (x, y, width, height) and re-encode. A rectangle that runs off the source frame is rejected rather than silently clamped.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "x": { "type": "integer", "minimum": 0, "description": "Left edge of the crop in pixels" },
+        "y": { "type": "integer", "minimum": 0, "description": "Top edge of the crop in pixels" },
+        "width": { "type": "integer", "minimum": 1, "description": "Crop width in pixels" },
+        "height": { "type": "integer", "minimum": 1, "description": "Crop height in pixels" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["input", "x", "y", "width", "height"]
+    }
+  },
+  {
+    "name": "scale",
+    "description": "Resize a video to a target width and/or height and re-encode. Provide one side to keep the aspect ratio, or both for an exact size.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "width": { "type": "integer", "minimum": 1, "description": "Target width in px (omit to derive from height)" },
+        "height": { "type": "integer", "minimum": 1, "description": "Target height in px (omit to derive from width)" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["input"]
+    }
+  },
+  {
+    "name": "speed",
+    "description": "Change playback speed by a factor (>1 faster, <1 slower) and re-encode. Audio is retempo'd to match when the source has an audio track.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "factor": { "type": "number", "exclusiveMinimum": 0, "description": "Speed multiplier: >1 faster, <1 slower (2 = double speed)" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["input", "factor"]
+    }
+  },
+  {
+    "name": "overlay",
+    "description": "Composite an image or video (logo, watermark, picture-in-picture) onto a base video at a pixel position, optionally scaled and time-limited.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the base video" },
+        "overlay": { "type": "string", "description": "Path to the overlay image or video" },
+        "x": { "type": "integer", "minimum": 0, "description": "Overlay left position in pixels" },
+        "y": { "type": "integer", "minimum": 0, "description": "Overlay top position in pixels" },
+        "width": { "type": "integer", "minimum": 1, "description": "Optional overlay width in px (height auto)" },
+        "height": { "type": "integer", "minimum": 1, "description": "Optional overlay height in px (width auto)" },
+        "start": { "type": "number", "minimum": 0, "description": "Optional second to show the overlay from" },
+        "end": { "type": "number", "exclusiveMinimum": 0, "description": "Optional second to hide the overlay after" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["input", "overlay", "x", "y"]
+    }
+  },
+  {
+    "name": "compress",
+    "description": "Re-encode a video to a smaller file with a CRF quality ladder (light/medium/heavy) and an optional width cap that only downscales.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "level": { "type": "string", "enum": ["light", "medium", "heavy"], "description": "Compression strength (CRF 23 / 28 / 32; default medium)" },
+        "maxWidth": { "type": "integer", "minimum": 1, "description": "Optional width cap in px; only ever downscales" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["input"]
+    }
+  },
+  {
+    "name": "extract_audio",
+    "description": "Extract the audio track of a media file to its own file (mp3, aac, wav, or copy). Returns the output path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source media" },
+        "format": { "type": "string", "enum": ["mp3", "aac", "wav", "copy"], "description": "Audio output codec; copy keeps the source codec without re-encoding" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["input", "format"]
+    }
+  },
+  {
+    "name": "clip",
+    "description": "Extract one or more frame-accurate sub-segments to separate files. Unlike trim (fast stream copy that snaps to a keyframe), clip re-encodes so cuts land exactly on the given times.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "number", "minimum": 0, "description": "Segment start in seconds" },
+              "end": { "type": "number", "exclusiveMinimum": 0, "description": "Segment end in seconds" }
+            },
+            "required": ["start", "end"]
+          },
+          "description": "One or more {start, end} segments; each becomes its own output file"
+        },
+        "output": { "type": "string", "description": "Optional output path (single segment only; multi-segment lands under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["input", "segments"]
+    }
   }
 ]
