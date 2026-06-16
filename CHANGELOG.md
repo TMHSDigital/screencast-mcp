@@ -12,6 +12,19 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - ESLint (flat config, typescript-eslint recommended) with a `lint` script, run
   in CI (#23). Tooling only; not part of the published package.
 
+## [0.8.12]
+
+### Fixed
+
+- **Off-desktop region offsets are rejected with a clear error** (#41). A
+  `region:` whose rectangle fell outside the virtual desktop (a negative offset
+  before the leftmost monitor, or one running past the right/bottom edge) was
+  accepted by `parseTarget` and then failed in gdigrab with a cryptic libav
+  error. The region is now validated against the live virtual-desktop bounds (the
+  bounding box of all monitors) before capture. Negative offsets remain valid
+  when a monitor sits left of or above the primary, since the check uses the real
+  desktop origin rather than a blanket `>= 0`.
+
 ## [0.8.11]
 
 ### Fixed

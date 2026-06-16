@@ -113,6 +113,50 @@ export function resolveMonitor(index: number, monitors: Monitor[]): Monitor {
   return m;
 }
 
+/** The virtual desktop = the bounding box of every monitor. gdigrab captures
+ * this rectangle, so a region must fit inside it. Returns a zero-size box when
+ * no monitors are supplied (the caller then skips bounds validation). */
+export function virtualDesktopBounds(
+  monitors: Monitor[],
+): { x: number; y: number; w: number; h: number } {
+  if (monitors.length === 0) return { x: 0, y: 0, w: 0, h: 0 };
+  const minX = Math.min(...monitors.map((m) => m.x));
+  const minY = Math.min(...monitors.map((m) => m.y));
+  const maxX = Math.max(...monitors.map((m) => m.x + m.width));
+  const maxY = Math.max(...monitors.map((m) => m.y + m.height));
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+/**
+ * Reject a region rectangle that is not fully inside the virtual desktop.
+ * gdigrab passes the offset/size straight through, so an off-desktop rectangle
+ * (a negative offset before the leftmost monitor, or one running past the
+ * right/bottom edge) otherwise fails with a cryptic libav error. Negative
+ * offsets are legitimate when a monitor sits left of / above the primary, so
+ * the rectangle is checked against the real desktop origin, not a blanket >= 0.
+ * With no monitor geometry the check is skipped (cannot validate).
+ */
+export function validateRegionOnDesktop(
+  region: { x: number; y: number; w: number; h: number },
+  monitors: Monitor[],
+): void {
+  if (monitors.length === 0) return;
+  const v = virtualDesktopBounds(monitors);
+  const within =
+    region.x >= v.x &&
+    region.y >= v.y &&
+    region.x + region.w <= v.x + v.w &&
+    region.y + region.h <= v.y + v.h;
+  if (!within) {
+    throw new ScreencastError(
+      `region ${region.x},${region.y},${region.w},${region.h} is outside the ` +
+        `virtual desktop (origin ${v.x},${v.y}, size ${v.w}x${v.h}). gdigrab ` +
+        `captures the desktop, so the rectangle must fit inside it. Adjust the ` +
+        `offset/size, or use monitor:<index> to capture a whole display.`,
+    );
+  }
+}
+
 /** Encoder args for a quality preset (libx264, web-safe pixel format). */
 export function resolveQuality(quality: Quality): string[] {
   const q = QUALITY_PRESETS[quality];

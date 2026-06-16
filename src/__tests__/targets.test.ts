@@ -6,6 +6,8 @@ import {
   buildScreenshotArgs,
   buildAudioInputArgs,
   resolveMonitor,
+  virtualDesktopBounds,
+  validateRegionOnDesktop,
   QUALITY_PRESETS,
 } from "../utils/targets.js";
 import type { Monitor } from "../utils/monitors.js";
@@ -99,6 +101,47 @@ describe("resolveMonitor", () => {
   });
   it("throws for an unknown index", () => {
     expect(() => resolveMonitor(5, MONITORS)).toThrow();
+  });
+});
+
+describe("virtualDesktopBounds", () => {
+  it("is the bounding box of all monitors", () => {
+    expect(virtualDesktopBounds(MONITORS)).toEqual({ x: 0, y: 0, w: 4480, h: 1440 });
+  });
+  it("returns a zero box with no monitors", () => {
+    expect(virtualDesktopBounds([])).toEqual({ x: 0, y: 0, w: 0, h: 0 });
+  });
+});
+
+describe("validateRegionOnDesktop", () => {
+  it("accepts a region inside the desktop", () => {
+    expect(() =>
+      validateRegionOnDesktop({ x: 100, y: 50, w: 800, h: 600 }, MONITORS),
+    ).not.toThrow();
+  });
+  it("rejects a negative offset before the leftmost monitor", () => {
+    expect(() =>
+      validateRegionOnDesktop({ x: -100, y: 0, w: 300, h: 200 }, MONITORS),
+    ).toThrow(/outside the virtual desktop/);
+  });
+  it("rejects a rectangle running past the right edge", () => {
+    expect(() =>
+      validateRegionOnDesktop({ x: 4400, y: 0, w: 200, h: 200 }, MONITORS),
+    ).toThrow(/outside the virtual desktop/);
+  });
+  it("accepts a legitimate negative offset when a monitor sits left of the primary", () => {
+    const withLeft: Monitor[] = [
+      { index: 0, x: 0, y: 0, width: 1920, height: 1080, primary: true },
+      { index: 1, x: -1920, y: 0, width: 1920, height: 1080, primary: false },
+    ];
+    expect(() =>
+      validateRegionOnDesktop({ x: -100, y: 0, w: 300, h: 200 }, withLeft),
+    ).not.toThrow();
+  });
+  it("skips validation when no monitor geometry is available", () => {
+    expect(() =>
+      validateRegionOnDesktop({ x: -9999, y: -9999, w: 10, h: 10 }, []),
+    ).not.toThrow();
   });
 });
 
