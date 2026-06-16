@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { extname, join } from "node:path";
+import { extname } from "node:path";
 import { existsSync, writeFileSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
 import { buildConcatArgs, buildConcatListContent } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { resolveOutput, subdir, stamp, rand, tempPath } from "../utils/paths.js";
 
 const inputSchema = {
   inputs: z
@@ -28,9 +28,8 @@ export function register(server: McpServer): void {
           if (!existsSync(f)) throw new ScreencastError(`Input file not found: ${f}`);
         }
         const ext = extname(args.inputs[0]) || ".mp4";
-        const editsDir = subdir("edits");
-        const output = resolveOutput(args.output, editsDir, `concat-${stamp()}-${rand()}${ext}`);
-        const listFile = join(editsDir, `.concat-${stamp()}-${rand()}.txt`);
+        const output = resolveOutput(args.output, subdir("edits"), `concat-${stamp()}-${rand()}${ext}`);
+        const listFile = tempPath(".txt");
         writeFileSync(listFile, buildConcatListContent(args.inputs));
         try {
           await runFfmpeg(buildConcatArgs(listFile, output), 10 * 60_000);

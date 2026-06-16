@@ -1,12 +1,11 @@
 import { z } from "zod";
-import { join } from "node:path";
 import { writeFileSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
 import { buildTitleCardArgs } from "../utils/produce.js";
 import { bundledFontPath } from "../utils/fonts.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { resolveOutput, subdir, stamp, rand, tempPath } from "../utils/paths.js";
 
 const inputSchema = {
   text: z.string().min(1).describe("Title text. Multiple lines are allowed (use \\n)."),
@@ -32,12 +31,11 @@ export function register(server: McpServer): void {
     async (args) => {
       try {
         requireFfmpeg();
-        const editsDir = subdir("edits");
-        const output = resolveOutput(args.output, editsDir, `title-${stamp()}-${rand()}.mp4`);
+        const output = resolveOutput(args.output, subdir("edits"), `title-${stamp()}-${rand()}.mp4`);
         const fontFile = bundledFontPath(args.bold === false ? "regular" : "bold");
         // Write the text to a temp file so arbitrary content (quotes, colons,
         // percent signs) needs no inline filtergraph escaping.
-        const textFile = join(editsDir, `.title-${stamp()}-${rand()}.txt`);
+        const textFile = tempPath(".txt");
         writeFileSync(textFile, args.text);
         try {
           const ffArgs = buildTitleCardArgs(textFile, fontFile, output, {

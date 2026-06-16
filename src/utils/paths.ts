@@ -7,7 +7,7 @@
  * pass an absolute `output` path per call. The repo .gitignore is a second line
  * of defence for the case where output is pointed back into the project.
  */
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, isAbsolute, resolve } from "node:path";
 import { mkdirSync } from "node:fs";
 
@@ -40,6 +40,13 @@ export function stamp(date = new Date()): string {
 /** Short random suffix to make ids/filenames unique within the same ms. */
 export function rand(n = 4): string {
   return Math.random().toString(36).slice(2, 2 + n);
+}
+
+/** A unique scratch path in the OS temp dir for short-lived working files (a
+ * concat list, a drawtext textfile). Kept out of SCREENCAST_HOME/edits so a hard
+ * crash before cleanup leaves it where the OS reaps it, not next to outputs. */
+export function tempPath(suffix = ""): string {
+  return join(tmpdir(), `screencast-${stamp()}-${rand()}${suffix}`);
 }
 
 /** Resolve a caller-supplied output path, or build a default under a subdir. */
