@@ -1,13 +1,22 @@
 [
   {
     "name": "start_recording",
-    "description": "Start a screen recording (Windows gdigrab) as a background ffmpeg process. Returns a session id and output path. Recording is explicit and never auto-starts. Audio is not captured in Phase 1 (video only). A window: target records the on-screen rectangle the window occupies, resolved once at start (window must be visible, on top, not minimized); it does not follow a window moved/resized mid-recording.",
+    "description": "Start a screen recording (Windows gdigrab) as a background ffmpeg process. Returns a session id and output path. Recording is explicit and never auto-starts. Audio is video-only by default; set audio.source = system to also capture loopback audio (needs a virtual-audio device; microphone capture is not supported). A window: target records the on-screen rectangle the window occupies, resolved once at start (window must be visible, on top, not minimized); it does not follow a window moved/resized mid-recording.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "target": { "type": "string", "description": "full | monitor:<index> (0 = primary) | window:<title> | region:<x>,<y>,<w>,<h>. window: captures the rectangle the window occupies as displayed (case-insensitive exact title, else substring; topmost match)" },
         "fps": { "type": "integer", "minimum": 1, "maximum": 120, "description": "Frames per second (default 30)" },
         "quality": { "type": "string", "enum": ["draft", "standard", "high"], "description": "Encoder preset (default standard)" },
+        "audio": {
+          "type": "object",
+          "description": "Audio capture (default none, video-only). source system needs a loopback device; microphone capture is not supported.",
+          "properties": {
+            "source": { "type": "string", "enum": ["system", "none"], "description": "system captures what is playing on the machine; none is video-only" },
+            "device": { "type": "string", "description": "Optional dshow loopback device name (from list_audio_devices); auto-detected when omitted" }
+          },
+          "required": ["source"]
+        },
         "output": { "type": "string", "description": "Optional output .mp4 path (defaults under SCREENCAST_HOME/recordings)" }
       },
       "required": ["target"]
@@ -264,5 +273,10 @@
       },
       "required": ["input", "regions"]
     }
+  },
+  {
+    "name": "list_audio_devices",
+    "description": "List the DirectShow audio devices ffmpeg can see on this machine and flag a likely system-audio loopback device. Use the returned name as the audio device for start_recording. System audio needs a loopback device (Stereo Mix or a virtual-audio driver); microphone capture is not supported.",
+    "inputSchema": { "type": "object", "properties": {}, "required": [] }
   }
 ]

@@ -10,6 +10,7 @@ import {
   type Quality,
 } from "../utils/targets.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
+import { resolveLoopbackDevice } from "../utils/audioDevices.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { getStore } from "../context.js";
 import type { SessionRecord } from "../utils/sessions.js";
@@ -35,6 +36,24 @@ const inputSchema = {
     .enum(["draft", "standard", "high"])
     .optional()
     .describe(`Encoder preset (default ${DEFAULT_QUALITY}).`),
+  audio: z
+    .object({
+      source: z
+        .enum(["system", "none"])
+        .describe("system captures what is playing on the machine; none is video-only."),
+      device: z
+        .string()
+        .optional()
+        .describe(
+          "Optional dshow loopback device name (from list_audio_devices). When " +
+            "omitted, a loopback device is auto-detected.",
+        ),
+    })
+    .optional()
+    .describe(
+      "Audio capture (default none, video-only). source 'system' needs a " +
+        "loopback device; microphone capture is not supported.",
+    ),
   output: z
     .string()
     .optional()
@@ -49,7 +68,8 @@ export function register(server: McpServer): void {
     "Start a screen recording (Windows gdigrab) as a background ffmpeg process. " +
       "Returns a session id and output path. Recording is explicit and never " +
       "auto-starts. Use stop_recording with the id to finalize the file. " +
-      "Audio is not captured in Phase 1 (video only).",
+      "Audio is video-only by default; set audio.source = 'system' to also " +
+      "capture system (loopback) audio. Microphone capture is not supported.",
     inputSchema,
     async (args) => {
       try {
@@ -63,7 +83,14 @@ export function register(server: McpServer): void {
           `rec-${stamp()}-${rand()}.mp4`,
         );
 
-        const ffArgs = buildCaptureArgs(target, { fps, quality, output, monitors });
+        // Resolve a loopback device up front so a missing one fails before the
+        // ffmpeg child is spawned, with a clear install hint.
+        const audio =
+          args.audio?.source === "system"
+            ? { device: await resolveLoopbackDevice(args.audio.device) }
+            : undefined;
+
+        const ffArgs = buildCaptureArgs(target, { fps, quality, output, monitors, audio });
         const child = spawn(ffmpeg, ffArgs, {
           stdio: ["pipe", "ignore", "pipe"],
           windowsHide: true,
@@ -124,6 +151,7 @@ export function register(server: McpServer): void {
           pid: record.pid,
           fps,
           quality,
+          audioDevice: audio?.device ?? null,
           note: "Call stop_recording with this sessionId to finalize the file.",
         });
       } catch (error) {

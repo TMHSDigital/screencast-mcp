@@ -4,7 +4,7 @@
 
 **An MCP server that lets an agent record the screen, _watch_ the footage, and make minimal ffmpeg edits — over stdio, on Windows.**
 
-Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, concat, and convert. No cloud, no streaming — ffmpeg and ffprobe wrapped behind ten typed tools.
+Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, scale, overlay, compress, redact, and convert. No cloud, no streaming — ffmpeg and ffprobe wrapped behind nineteen typed tools.
 
 <br />
 
@@ -27,7 +27,7 @@ Capture the desktop, a monitor, a window, or a region; sample a recording into f
 </div>
 
 > [!NOTE]
-> This is **Phase 1**. Screen capture uses `gdigrab` and is Windows-only; the watch and edit tools work anywhere ffmpeg runs. The fuller edit surface (crop, scale, speed, overlay, extract, compress), audio capture, and a higher-level production layer are deliberately later phases — see [ROADMAP.md](ROADMAP.md).
+> Screen capture uses `gdigrab` and is Windows-only; the watch and edit tools work anywhere ffmpeg runs. **Phase 2** adds the full edit surface (crop, scale, speed, overlay, compress, extract_audio, clip), `redact_region` safety redaction, and system-audio capture. The higher-level production layer is a later phase — see [ROADMAP.md](ROADMAP.md).
 
 ## Overview
 
@@ -43,17 +43,18 @@ The design choices are deliberate rather than incidental:
 
 ## Tools
 
-Eighteen tools across three concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
+Nineteen tools across three concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
 
 ### Capture
 
 | Tool | Purpose |
 | --- | --- |
-| `start_recording` | Start a background recording. `target` = `full` \| `monitor:<index>` \| `window:<title>` \| `region:<x>,<y>,<w>,<h>`; optional `fps` and `quality`. Returns a session id and output path. |
+| `start_recording` | Start a background recording. `target` = `full` \| `monitor:<index>` \| `window:<title>` \| `region:<x>,<y>,<w>,<h>`; optional `fps`, `quality`, and `audio` (set `audio.source` = `system` to also capture loopback audio). Returns a session id and output path. |
 | `stop_recording` | Stop a session by id. Sends ffmpeg a graceful quit so the file is **finalized, not truncated**. Returns the final path and duration. |
 | `list_sessions` | List active and finished sessions. |
 | `get_session` | Inspect a single session by id. |
 | `screenshot` | Capture a single PNG of a `target`. |
+| `list_audio_devices` | List the DirectShow audio devices ffmpeg can see and flag a likely system-audio loopback device for `start_recording`. |
 
 ### Watch
 
@@ -172,7 +173,7 @@ sample_frames { "input": "…/recordings/rec-….mp4", "timestamps": [0.5, 2, 3.
 - **Multi-monitor offsets.** `gdigrab` has no "capture monitor N" selector, so a monitor target captures the whole virtual desktop and crops to that display's pixel bounds (from `System.Windows.Forms.Screen.AllScreens`). `monitor:1` grabs the second display at its real offset; `monitor:0` is always primary.
 - **Window capture** resolves the window to the on-screen **rectangle** it occupies and captures that, rather than the window's own surface — `gdigrab`'s native `title=` grab returns a blank frame for GPU- or DirectComposition-composited windows (Chrome, Electron, UWP). The window must be **visible, on top, and not minimized** (a minimized window is rejected with a clear error), the capture includes anything drawn over that rectangle, and for `start_recording` the rectangle is fixed **once at start**. True per-window background capture (Windows Graphics Capture API) is a future phase.
 - **Fullscreen-exclusive apps** often produce black frames under `gdigrab`; run the source in borderless-windowed mode for reliable capture.
-- **No audio in Phase 1.** `gdigrab` is video-only; audio (dshow / WASAPI loopback) is a Phase 2 seam and is intentionally not half-wired.
+- **System audio needs a loopback device.** `gdigrab` is video-only, so `start_recording` with `audio.source` = `system` captures from a separate dshow input. Windows has no native loopback, so this needs a virtual-audio device (enable Stereo Mix, or install a driver such as screen-capture-recorder's `virtual-audio-capturer` or VB-CABLE). Run `list_audio_devices` to find it. Microphone capture is intentionally not supported.
 
 ## Threat model
 
@@ -184,6 +185,7 @@ sample_frames { "input": "…/recordings/rec-….mp4", "timestamps": [0.5, 2, 3.
 - **Public repo, private captures.** The `.gitignore` blocks recordings, frames, screenshots, and common video/image output so test media cannot be committed by accident.
 - **Review before sharing.** Sample frames or inspect a recording before handing a file to another tool or person, so you know what it contains.
 - **Redaction is declared, not detected.** `redact_region` covers only the rectangles you specify, so it depends on you (or the agent) having found the secret first. Use the default `box` style for a solid irreversible fill, and still review the output before sharing.
+- **System audio is sensitive too.** When `audio.source` = `system`, the recording captures everything playing on the machine (call audio, notifications, media). Treat audio-bearing recordings with the same care as the video.
 
 ## Project structure
 

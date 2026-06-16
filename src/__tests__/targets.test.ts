@@ -4,6 +4,7 @@ import {
   resolveQuality,
   buildCaptureArgs,
   buildScreenshotArgs,
+  buildAudioInputArgs,
   resolveMonitor,
   QUALITY_PRESETS,
 } from "../utils/targets.js";
@@ -15,6 +16,34 @@ const MONITORS: Monitor[] = [
   { index: 0, x: 0, y: 0, width: 2560, height: 1440, primary: true },
   { index: 1, x: 2560, y: 0, width: 1920, height: 1440, primary: false },
 ];
+
+describe("buildAudioInputArgs", () => {
+  it("returns no args when audio is absent or empty", () => {
+    expect(buildAudioInputArgs()).toEqual([]);
+    expect(buildAudioInputArgs({ device: "" })).toEqual([]);
+  });
+  it("builds a dshow input with an unquoted device spec", () => {
+    expect(buildAudioInputArgs({ device: "virtual-audio-capturer" })).toEqual([
+      "-f", "dshow", "-i", "audio=virtual-audio-capturer",
+    ]);
+  });
+});
+
+describe("buildCaptureArgs audio", () => {
+  it("adds a second dshow input and an aac codec when audio is set", () => {
+    const a = buildCaptureArgs({ kind: "full" }, {
+      output: "o.mp4",
+      audio: { device: "Stereo Mix" },
+    }).join(" ");
+    expect(a).toContain("-f dshow -i audio=Stereo Mix");
+    expect(a).toContain("-c:a aac");
+  });
+  it("omits audio args by default (video-only)", () => {
+    const a = buildCaptureArgs({ kind: "full" }, { output: "o.mp4" }).join(" ");
+    expect(a).not.toContain("dshow");
+    expect(a).not.toContain("-c:a");
+  });
+});
 
 describe("parseTarget", () => {
   it("parses full (explicit and empty)", () => {
