@@ -58,13 +58,32 @@ describe("buildXfadeArgs", () => {
 
 describe("buildAssembleArgs", () => {
   it("uses the concat filter for hard cuts", () => {
-    const s = buildAssembleArgs(["a.mp4", "b.mp4", "c.mp4"], [3, 3, 3], "o.mp4", {}, true).join(" ");
+    const s = buildAssembleArgs(["a.mp4", "b.mp4", "c.mp4"], [3, 3, 3], "o.mp4", {}, [true, true, true]).join(" ");
     expect(s).toContain("concat=n=3:v=1:a=1[vout][aout]");
     expect(s).toContain("-i a.mp4");
     expect(s).toContain("-i c.mp4");
   });
+  it("synthesizes silence for a clip lacking audio so audio is not dropped", () => {
+    const s = buildAssembleArgs(["a.mp4", "b.mp4"], [5, 4], "o.mp4", {}, [true, false]).join(" ");
+    // clip 0 uses its real track; clip 1 gets matching-length generated silence.
+    expect(s).toContain("[0:a]");
+    expect(s).toContain("anullsrc=channel_layout=stereo:sample_rate=48000:d=4[a1]");
+    expect(s).toContain("concat=n=2:v=1:a=1[vout][aout]");
+    expect(s).toContain("-c:a aac");
+  });
+  it("rejects a video-only clip with unknown duration when audio is needed", () => {
+    expect(() =>
+      buildAssembleArgs(["a.mp4", "b.mp4"], [5, 0], "o.mp4", {}, [true, false]),
+    ).toThrow(/silent track cannot be generated/);
+  });
+  it("stays video-only when no clip has audio", () => {
+    const s = buildAssembleArgs(["a", "b"], [3, 3], "o.mp4", {}, [false, false]).join(" ");
+    expect(s).toContain("concat=n=2:v=1:a=0[vout]");
+    expect(s).toContain("-an");
+    expect(s).not.toContain("anullsrc");
+  });
   it("chains xfade with cumulative offsets for a named transition", () => {
-    const s = buildAssembleArgs(["a", "b", "c"], [5, 4, 6], "o.mp4", { transition: "fade", duration: 1 }, false).join(" ");
+    const s = buildAssembleArgs(["a", "b", "c"], [5, 4, 6], "o.mp4", { transition: "fade", duration: 1 }, [false, false, false]).join(" ");
     expect(s).toContain("[v0][v1]xfade=transition=fade:duration=1:offset=4");
     expect(s).toContain("xfade=transition=fade:duration=1:offset=7[vout]");
   });

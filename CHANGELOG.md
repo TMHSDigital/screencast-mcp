@@ -5,6 +5,17 @@ All notable changes to Screencast MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.5]
+
+### Fixed
+
+- **`assemble_highlights` no longer drops audio when only some clips have a
+  track** (#19). A clip lacking audio now gets a matching length of generated
+  silence (`anullsrc`), so mixing an audio-bearing clip with a video-only one
+  keeps the audio instead of silencing the whole result. If no clip has audio
+  the output stays video-only, as before. A video-only clip with an unknown
+  duration is rejected with a clear error (silence cannot be sized).
+
 ## [0.8.4]
 
 ### Changed

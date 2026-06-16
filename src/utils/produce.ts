@@ -132,7 +132,7 @@ export function buildAssembleArgs(
   durations: number[],
   output: string,
   opts: AssembleOptions = {},
-  hasAudio = false,
+  clipHasAudio: boolean[] = [],
 ): string[] {
   if (inputs.length < 2) {
     throw new ScreencastError("assemble_highlights requires at least two clips.");
@@ -147,15 +147,33 @@ export function buildAssembleArgs(
   const vf = videoNormalizeChain(w, h, fps);
   const af = audioNormalizeChain(rate);
 
+  // If any clip has audio, the output carries audio: clips that lack a track get
+  // a matching length of generated silence, so a single video-only clip no
+  // longer drops audio from the whole result. If no clip has audio, stay
+  // video-only.
+  const anyAudio = clipHasAudio.some(Boolean);
+
   const parts: string[] = [];
   for (let i = 0; i < n; i++) {
     parts.push(`[${i}:v]${vf}[v${i}]`);
-    if (hasAudio) parts.push(`[${i}:a]${af}[a${i}]`);
+    if (!anyAudio) continue;
+    if (clipHasAudio[i]) {
+      parts.push(`[${i}:a]${af}[a${i}]`);
+    } else {
+      const dur = durations[i];
+      if (!Number.isFinite(dur) || dur <= 0) {
+        throw new ScreencastError(
+          `clip ${i} has no audio track and its duration is unknown, so a ` +
+            `matching silent track cannot be generated.`,
+        );
+      }
+      parts.push(`anullsrc=channel_layout=stereo:sample_rate=${rate}:d=${dur}[a${i}]`);
+    }
   }
 
   const maps: string[] = [];
   if (transition === "cut") {
-    if (hasAudio) {
+    if (anyAudio) {
       const labels = inputs.map((_, i) => `[v${i}][a${i}]`).join("");
       parts.push(`${labels}concat=n=${n}:v=1:a=1[vout][aout]`);
       maps.push("-map", "[vout]", "-map", "[aout]");
@@ -192,7 +210,7 @@ export function buildAssembleArgs(
       vPrev = out;
     }
     maps.push("-map", "[vout]");
-    if (hasAudio) {
+    if (anyAudio) {
       let aPrev = "a0";
       for (let m = 1; m < n; m++) {
         const out = m === n - 1 ? "aout" : `ax${m}`;
@@ -209,7 +227,7 @@ export function buildAssembleArgs(
     "-filter_complex", parts.join(";"),
     ...maps,
     ...encodeArgs(opts.quality ?? DEFAULT_QUALITY),
-    ...(hasAudio ? ["-c:a", "aac", "-b:a", "160k"] : ["-an"]),
+    ...(anyAudio ? ["-c:a", "aac", "-b:a", "160k"] : ["-an"]),
     "-movflags", "+faststart",
     output,
   ];
