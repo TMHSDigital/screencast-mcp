@@ -129,6 +129,7 @@ export function register(server: McpServer): void {
           fps,
           quality,
           pid: child.pid ?? null,
+          serverPid: process.pid,
           status: "recording",
           startedAt: new Date().toISOString(),
         };

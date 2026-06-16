@@ -24,6 +24,9 @@ export interface SessionRecord {
   fps: number;
   quality: Quality;
   pid: number | null;
+  /** The node process (server instance) that created this record. Used so a
+   * second server instance does not reap a recording owned by a still-live one. */
+  serverPid?: number;
   status: SessionStatus;
   startedAt: string;
   stoppedAt?: string;
@@ -43,6 +46,28 @@ export function classifyOrphan(
   return alive
     ? { status: "orphaned", reaped: true }
     : { status: "stopped", reaped: false };
+}
+
+/**
+ * True if a "recording" record is owned by a DIFFERENT, still-live server
+ * instance. Such a record must be left alone: another running server is actively
+ * recording it, so reaping would kill that server's live capture. Pure so the
+ * ownership rule is unit-tested without real processes.
+ *
+ * Records with no `serverPid` (older registries) are not treated as foreign, so
+ * genuine orphans there still get reaped.
+ */
+export function isForeignLiveRecording(
+  record: SessionRecord,
+  currentServerPid: number,
+  ownerAlive: boolean,
+): boolean {
+  return (
+    record.status === "recording" &&
+    record.serverPid !== undefined &&
+    record.serverPid !== currentServerPid &&
+    ownerAlive
+  );
 }
 
 /** True if a pid exists. `process.kill(pid, 0)` throws ESRCH when it does not. */
@@ -150,6 +175,11 @@ export class SessionStore {
     const reaped: string[] = [];
     for (const record of this.records.values()) {
       if (record.status !== "recording") continue;
+      // Never reap a recording owned by another still-live server instance:
+      // that would kill its active capture. Leave the record untouched.
+      if (isForeignLiveRecording(record, process.pid, isAlive(record.serverPid ?? null))) {
+        continue;
+      }
       const alive = isAlive(record.pid);
       const verdict = classifyOrphan(record, alive);
       if (verdict.reaped && record.pid !== null) {

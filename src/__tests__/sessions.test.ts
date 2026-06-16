@@ -5,6 +5,7 @@ import { rmSync, existsSync } from "node:fs";
 import {
   classifyOrphan,
   isAlive,
+  isForeignLiveRecording,
   SessionStore,
   type SessionRecord,
 } from "../utils/sessions.js";
@@ -35,6 +36,24 @@ describe("classifyOrphan", () => {
       status: "stopped",
       reaped: false,
     });
+  });
+});
+
+describe("isForeignLiveRecording", () => {
+  it("is true for a recording owned by a different, still-live server", () => {
+    expect(isForeignLiveRecording(record({ serverPid: 999 }), 1000, true)).toBe(true);
+  });
+  it("is false when the owning server is dead (a genuine orphan)", () => {
+    expect(isForeignLiveRecording(record({ serverPid: 999 }), 1000, false)).toBe(false);
+  });
+  it("is false when this process is the owner", () => {
+    expect(isForeignLiveRecording(record({ serverPid: 1000 }), 1000, true)).toBe(false);
+  });
+  it("is false for older records with no serverPid", () => {
+    expect(isForeignLiveRecording(record({ serverPid: undefined }), 1000, true)).toBe(false);
+  });
+  it("is false for a record that is not recording", () => {
+    expect(isForeignLiveRecording(record({ serverPid: 999, status: "stopped" }), 1000, true)).toBe(false);
   });
 });
 
