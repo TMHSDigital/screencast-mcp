@@ -95,7 +95,11 @@ Output is written under `SCREENCAST_HOME` (default `<homedir>/.screencast-mcp`) 
 
 ## Installation
 
-Run it from a clone — this is the supported install today:
+```bash
+npm install -g @tmhs/screencast-mcp
+```
+
+Or run it from a clone:
 
 ```bash
 git clone https://github.com/TMHSDigital/screencast-mcp.git
@@ -104,26 +108,21 @@ npm install
 npm run build      # produces dist/index.js, the server entry point
 ```
 
-> [!NOTE]
-> A published npm package is planned but **not yet live**. Once it is, `npm install -g @tmhsdigital/screencast-mcp` (or `npx -y @tmhsdigital/screencast-mcp`) will be the one-line install. Until then, use the from-clone path above.
-
 ### MCP client configuration
-
-Point your client at the built entry:
 
 ```json
 {
   "mcpServers": {
     "screencast": {
-      "command": "node",
-      "args": ["C:/path/to/screencast-mcp/dist/index.js"]
+      "command": "npx",
+      "args": ["-y", "@tmhs/screencast-mcp"]
     }
   }
 }
 ```
 
 > [!TIP]
-> Once the package is on npm, this simplifies to `"command": "npx"`, `"args": ["-y", "@tmhsdigital/screencast-mcp"]`.
+> Running from a clone instead of the published package? Point the client straight at the build: `"command": "node"`, `"args": ["C:/path/to/screencast-mcp/dist/index.js"]`.
 
 ## Usage
 
