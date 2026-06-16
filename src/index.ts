@@ -25,7 +25,7 @@ import { register as registerConvert } from "./tools/convert.js";
 
 const server = new McpServer({
   name: "screencast-mcp",
-  version: "0.2.1",
+  version: "0.2.2",
 });
 
 registerStartRecording(server);
