@@ -12,6 +12,17 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - ESLint (flat config, typescript-eslint recommended) with a `lint` script, run
   in CI (#23). Tooling only; not part of the published package.
 
+## [0.8.8]
+
+### Fixed
+
+- **`monitor:<index>` capture is correct on DPI-scaled displays** (#39). Monitor
+  enumeration is now per-monitor-DPI-aware, so it reads physical pixel bounds
+  instead of DPI-scaled logical ones. Previously, on a display scaled above 100%
+  (e.g. 150%), `monitor:0` captured only a cropped top-left slice (1280x800 of a
+  1920x1200 screen). Verified live: `monitor:0` now matches the full physical
+  resolution. A gated regression test guards it.
+
 ## [0.8.7]
 
 ### Changed

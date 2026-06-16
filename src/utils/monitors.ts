@@ -6,7 +6,12 @@
  * -video_size. To do that correctly on a multi-monitor setup (for example a
  * 4480x1440 dual-monitor desktop where the second display starts at x=2560),
  * we need each monitor's pixel bounds. On Windows those come from
- * System.Windows.Forms.Screen.AllScreens via PowerShell.
+ * System.Windows.Forms.Screen.AllScreens via PowerShell. The enumeration must be
+ * per-monitor-DPI-aware, or Screen.Bounds returns LOGICAL (DPI-scaled)
+ * coordinates while gdigrab works in PHYSICAL pixels - on a scaled display that
+ * makes monitor:N capture a cropped top-left slice (e.g. 1280x800 of a 1920x1200
+ * screen at 150%). So the shim sets DPI awareness before reading bounds, exactly
+ * as the window-bounds shim in windows.ts does.
  *
  * `parseMonitors` is pure so the offset math is unit-tested without Windows.
  */
@@ -49,11 +54,20 @@ export function parseMonitors(raw: unknown): Monitor[] {
   return screens.map((s, index) => ({ index, ...s }));
 }
 
-const PS_SCRIPT =
-  "Add-Type -AssemblyName System.Windows.Forms; " +
-  "[System.Windows.Forms.Screen]::AllScreens | ForEach-Object { " +
-  "[pscustomobject]@{ X=$_.Bounds.X; Y=$_.Bounds.Y; Width=$_.Bounds.Width; " +
-  "Height=$_.Bounds.Height; Primary=$_.Primary } } | ConvertTo-Json -Compress";
+// Set per-monitor-DPI-awareness-v2 (-4) before reading Screen.AllScreens so the
+// bounds are PHYSICAL pixels (matching gdigrab), not DPI-scaled logical ones.
+// Passed base64 (EncodedCommand) so the C# shim needs no quoting through argv.
+const PS_SCRIPT = `
+Add-Type @"
+using System;using System.Runtime.InteropServices;
+public class DpiShim{ [DllImport("user32.dll")] public static extern IntPtr SetProcessDpiAwarenessContext(IntPtr v); }
+"@
+try{[void][DpiShim]::SetProcessDpiAwarenessContext([IntPtr](-4))}catch{}
+Add-Type -AssemblyName System.Windows.Forms
+[System.Windows.Forms.Screen]::AllScreens | ForEach-Object {
+  [pscustomobject]@{ X=$_.Bounds.X; Y=$_.Bounds.Y; Width=$_.Bounds.Width; Height=$_.Bounds.Height; Primary=$_.Primary }
+} | ConvertTo-Json -Compress
+`;
 
 /** Query live monitor geometry on Windows. Throws on non-Windows or failure. */
 export function getMonitors(): Monitor[] {
@@ -62,9 +76,10 @@ export function getMonitors(): Monitor[] {
       "Monitor enumeration is implemented for Windows (gdigrab) only.",
     );
   }
+  const encoded = Buffer.from(PS_SCRIPT, "utf16le").toString("base64");
   const res = spawnSync(
     "powershell",
-    ["-NoProfile", "-NonInteractive", "-Command", PS_SCRIPT],
+    ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
     { encoding: "utf8", windowsHide: true },
   );
   if (res.status !== 0 || !res.stdout) {

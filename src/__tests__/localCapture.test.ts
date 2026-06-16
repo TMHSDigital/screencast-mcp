@@ -101,6 +101,21 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     for (const f of sf.json.frames) expect(existsSync(f)).toBe(true);
   }, 30_000);
 
+  it("monitor:0 captures physical pixels, matching full on a single-monitor host (#39)", async () => {
+    // DPI-scaled displays exposed the bug: monitor:N used logical (scaled)
+    // bounds, so it captured a cropped slice. On a single-monitor host the
+    // primary monitor should equal the whole desktop in physical pixels.
+    const multi = await call("screenshot", { target: "monitor:1" });
+    if (!multi.isError) return; // more than one monitor; skip the single-monitor invariant
+    const full = await call("screenshot", { target: "full" });
+    const m0 = await call("screenshot", { target: "monitor:0" });
+    expect(m0.isError).toBe(false);
+    const f = ffprobe(full.json.outputPath);
+    const m = ffprobe(m0.json.outputPath);
+    expect(m.width).toBe(f.width);
+    expect(m.height).toBe(f.height);
+  }, 30_000);
+
   it("BUG-1: window: captures real window pixels, not a blank surface", async () => {
     const title = openWindows()[0];
     if (!title) return; // no titled window available in this environment
