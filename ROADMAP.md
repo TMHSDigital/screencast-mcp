@@ -36,7 +36,7 @@ A later phase adds a production layer.
 
 - [x] `assemble_highlights` (stitch clips with cuts or transitions) and
       `xfade_transition` (crossfade two clips), with auto-normalized inputs
-- [ ] `title_card`, `music_bed`
+- [x] `title_card` (bundled font) and `music_bed` (loop, fade, mix, duck)
 - [ ] Aspect variants (`reframe`) and platform export presets
 
 ## Cross-platform

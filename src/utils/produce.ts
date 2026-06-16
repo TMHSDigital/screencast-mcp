@@ -9,6 +9,7 @@
  */
 import { ScreencastError } from "./errors.js";
 import { resolveQuality, type Quality } from "./targets.js";
+import { escapeFilterPath } from "./fonts.js";
 
 export const DEFAULT_PRODUCE_WIDTH = 1920;
 export const DEFAULT_PRODUCE_HEIGHT = 1080;
@@ -200,6 +201,121 @@ export function buildAssembleArgs(
     ...maps,
     ...encodeArgs(opts.quality ?? DEFAULT_QUALITY),
     ...(hasAudio ? ["-c:a", "aac", "-b:a", "160k"] : ["-an"]),
+    "-movflags", "+faststart",
+    output,
+  ];
+}
+
+export interface TitleCardOptions {
+  width?: number;
+  height?: number;
+  duration?: number;
+  fps?: number;
+  bg?: string;
+  fontColor?: string;
+  fontSize?: number;
+  quality?: Quality;
+}
+
+/** Generate a standalone title clip: a solid background with centered text from
+ * a font file and a temp text file (so arbitrary text needs no inline
+ * escaping), plus a silent stereo track so it composes with audio-bearing
+ * clips. Caller resolves fontFile (a bundled weight) and writes textFile. */
+export function buildTitleCardArgs(
+  textFile: string,
+  fontFile: string,
+  output: string,
+  opts: TitleCardOptions = {},
+): string[] {
+  const w = opts.width ?? DEFAULT_PRODUCE_WIDTH;
+  const h = opts.height ?? DEFAULT_PRODUCE_HEIGHT;
+  const dur = opts.duration ?? 3;
+  const fps = opts.fps ?? DEFAULT_PRODUCE_FPS;
+  const bg = opts.bg ?? "black";
+  const fontColor = opts.fontColor ?? "white";
+  const fontSize = opts.fontSize ?? 96;
+  if (!Number.isFinite(dur) || dur <= 0) {
+    throw new ScreencastError("title duration must be a positive number.");
+  }
+  if (!Number.isInteger(fontSize) || fontSize <= 0) {
+    throw new ScreencastError("fontSize must be a positive integer.");
+  }
+  const draw =
+    `drawtext=fontfile=${escapeFilterPath(fontFile)}:` +
+    `textfile=${escapeFilterPath(textFile)}:` +
+    `fontcolor=${fontColor}:fontsize=${fontSize}:` +
+    `x=(w-text_w)/2:y=(h-text_h)/2:` +
+    `shadowcolor=black@0.5:shadowx=2:shadowy=2`;
+  return [
+    "-y",
+    "-f", "lavfi", "-i", `color=c=${bg}:s=${w}x${h}:d=${dur}:r=${fps}`,
+    "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+    "-vf", draw,
+    "-shortest",
+    ...encodeArgs(opts.quality ?? DEFAULT_QUALITY),
+    "-c:a", "aac", "-b:a", "160k",
+    "-movflags", "+faststart",
+    output,
+  ];
+}
+
+export interface MusicBedOptions {
+  musicVolume?: number;
+  fadeIn?: number;
+  fadeOut?: number;
+  duck?: boolean;
+}
+
+/** Lay a music track under a video: loop/trim the music to the video duration,
+ * fade it in/out, and set its level. When the video already has audio the two
+ * are mixed (optionally ducking the music under the original via a sidechain).
+ * The video stream is copied; only audio is re-encoded. */
+export function buildMusicBedArgs(
+  video: string,
+  music: string,
+  output: string,
+  videoDuration: number,
+  hasVideoAudio: boolean,
+  opts: MusicBedOptions = {},
+): string[] {
+  if (!Number.isFinite(videoDuration) || videoDuration <= 0) {
+    throw new ScreencastError("video duration must be known and positive.");
+  }
+  const vol = opts.musicVolume ?? (hasVideoAudio ? 0.25 : 0.8);
+  const fin = opts.fadeIn ?? 1;
+  const fout = opts.fadeOut ?? 2;
+  for (const [v, label] of [[vol, "musicVolume"], [fin, "fadeIn"], [fout, "fadeOut"]] as const) {
+    if (!Number.isFinite(v) || v < 0) {
+      throw new ScreencastError(`${label} must be a non-negative number.`);
+    }
+  }
+  const duck = opts.duck ?? false;
+  const fadeOutStart = Math.max(0, round3(videoDuration - fout));
+  const musicChain =
+    `[1:a]afade=t=in:st=0:d=${fin},afade=t=out:st=${fadeOutStart}:d=${fout},volume=${vol}`;
+
+  const parts: string[] = [];
+  if (hasVideoAudio) {
+    parts.push(`${musicChain}[music]`);
+    if (duck) {
+      parts.push("[music][0:a]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=300[ducked]");
+      parts.push("[0:a][ducked]amix=inputs=2:duration=first:dropout_transition=0[aout]");
+    } else {
+      parts.push("[0:a][music]amix=inputs=2:duration=first:dropout_transition=0[aout]");
+    }
+  } else {
+    parts.push(`${musicChain}[aout]`);
+  }
+
+  return [
+    "-y",
+    "-i", video,
+    "-stream_loop", "-1", "-i", music,
+    "-filter_complex", parts.join(";"),
+    "-map", "0:v", "-map", "[aout]",
+    "-t", String(videoDuration),
+    "-c:v", "copy",
+    "-c:a", "aac", "-b:a", "192k",
     "-movflags", "+faststart",
     output,
   ];

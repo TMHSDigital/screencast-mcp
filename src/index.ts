@@ -33,10 +33,12 @@ import { register as registerRedactRegion } from "./tools/redactRegion.js";
 import { register as registerListAudioDevices } from "./tools/listAudioDevices.js";
 import { register as registerXfadeTransition } from "./tools/xfadeTransition.js";
 import { register as registerAssembleHighlights } from "./tools/assembleHighlights.js";
+import { register as registerTitleCard } from "./tools/titleCard.js";
+import { register as registerMusicBed } from "./tools/musicBed.js";
 
 const server = new McpServer({
   name: "screencast-mcp",
-  version: "0.6.0",
+  version: "0.7.0",
 });
 
 registerStartRecording(server);
@@ -60,6 +62,8 @@ registerRedactRegion(server);
 registerListAudioDevices(server);
 registerXfadeTransition(server);
 registerAssembleHighlights(server);
+registerTitleCard(server);
+registerMusicBed(server);
 
 async function main(): Promise<void> {
   // Reconcile any sessions interrupted by a previous crash and kill ffmpeg

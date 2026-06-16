@@ -310,5 +310,42 @@
       },
       "required": ["clips"]
     }
+  },
+  {
+    "name": "title_card",
+    "description": "Generate a standalone title card: centered text on a solid background, with a silent audio track so it composes with audio-bearing clips (stitch it in with assemble_highlights). Text is rendered with a bundled font, so no system font is required.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "description": "Title text; multiple lines allowed (use \\n)" },
+        "duration": { "type": "number", "exclusiveMinimum": 0, "description": "Card length in seconds (default 3)" },
+        "width": { "type": "integer", "minimum": 1, "description": "Card width (default 1920)" },
+        "height": { "type": "integer", "minimum": 1, "description": "Card height (default 1080)" },
+        "fps": { "type": "integer", "minimum": 1, "description": "Card fps (default 30)" },
+        "bg": { "type": "string", "description": "Background color (default black)" },
+        "fontColor": { "type": "string", "description": "Text color (default white)" },
+        "fontSize": { "type": "integer", "minimum": 1, "description": "Text size in px (default 96)" },
+        "bold": { "type": "boolean", "description": "Use the bold weight (default true)" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["text"]
+    }
+  },
+  {
+    "name": "music_bed",
+    "description": "Lay a music track under a video: the music is looped/trimmed to the video length, faded in and out, and leveled. When the video already has audio the two are mixed, optionally ducking the music under the original. The video stream is copied; only audio is re-encoded.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "video": { "type": "string", "description": "Path to the video" },
+        "music": { "type": "string", "description": "Path to the music audio file (looped/trimmed to the video length)" },
+        "musicVolume": { "type": "number", "minimum": 0, "description": "Music level 0..1 (default 0.25 over existing audio, 0.8 alone)" },
+        "fadeIn": { "type": "number", "minimum": 0, "description": "Music fade-in seconds (default 1)" },
+        "fadeOut": { "type": "number", "minimum": 0, "description": "Music fade-out seconds (default 2)" },
+        "duck": { "type": "boolean", "description": "Duck the music under the original audio via a sidechain (default false)" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["video", "music"]
+    }
   }
 ]
