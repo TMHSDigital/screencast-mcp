@@ -347,5 +347,33 @@
       },
       "required": ["video", "music"]
     }
+  },
+  {
+    "name": "reframe",
+    "description": "Re-aspect a video to a target ratio (16:9, 9:16, 1:1, 4:5). pad letterboxes so nothing is lost; crop fills the frame and trims the overflow.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "aspect": { "type": "string", "enum": ["16:9", "9:16", "1:1", "4:5"], "description": "Target aspect ratio" },
+        "fit": { "type": "string", "enum": ["pad", "crop"], "description": "pad (default): scale to fit and letterbox. crop: scale to fill and center-crop." },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["input", "aspect"]
+    }
+  },
+  {
+    "name": "export_preset",
+    "description": "Encode a platform-ready file for youtube, instagram_reel, tiktok, x, or square. Reframes to the platform aspect, caps fps, and encodes H.264 at the platform bitrate with faststart.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "platform": { "type": "string", "enum": ["youtube", "instagram_reel", "tiktok", "x", "square"], "description": "Target platform (sets aspect, resolution, fps, bitrate)" },
+        "fit": { "type": "string", "enum": ["pad", "crop"], "description": "How to fit the source into the platform aspect: pad (default) or crop" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["input", "platform"]
+    }
   }
 ]

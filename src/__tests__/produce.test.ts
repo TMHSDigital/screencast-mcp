@@ -6,6 +6,11 @@ import {
   buildAssembleArgs,
   buildTitleCardArgs,
   buildMusicBedArgs,
+  reframeFilter,
+  buildReframeArgs,
+  buildExportPresetArgs,
+  PLATFORM_PRESETS,
+  ASPECT_DIMS,
 } from "../utils/produce.js";
 
 describe("xfadeOffsets", () => {
@@ -108,5 +113,49 @@ describe("buildMusicBedArgs", () => {
   });
   it("requires a known positive video duration", () => {
     expect(() => buildMusicBedArgs("v", "m", "o", 0, true)).toThrow();
+  });
+});
+
+describe("reframeFilter / buildReframeArgs", () => {
+  it("pads (scale-to-fit + letterbox) by default", () => {
+    const f = reframeFilter(1080, 1920, "pad");
+    expect(f).toContain("force_original_aspect_ratio=decrease");
+    expect(f).toContain("pad=1080:1920");
+  });
+  it("crops (scale-to-fill + center crop)", () => {
+    const f = reframeFilter(1080, 1080, "crop");
+    expect(f).toContain("force_original_aspect_ratio=increase");
+    expect(f).toContain("crop=1080:1080");
+  });
+  it("maps each aspect to canonical dimensions and re-encodes", () => {
+    const s = buildReframeArgs("in.mp4", "o.mp4", "9:16", "pad").join(" ");
+    expect(s).toContain(`pad=${ASPECT_DIMS["9:16"].w}:${ASPECT_DIMS["9:16"].h}`);
+    expect(s).toContain("libx264");
+    expect(s).toContain("-c:a copy");
+  });
+  it("rejects an unknown aspect", () => {
+    // @ts-expect-error testing a bad value at runtime
+    expect(() => buildReframeArgs("i", "o", "3:2")).toThrow();
+  });
+});
+
+describe("buildExportPresetArgs / PLATFORM_PRESETS", () => {
+  it("applies the platform aspect, fps, and bitrate", () => {
+    const s = buildExportPresetArgs("in.mp4", "o.mp4", "tiktok").join(" ");
+    const p = PLATFORM_PRESETS.tiktok;
+    expect(s).toContain(`pad=${ASPECT_DIMS[p.aspect].w}:${ASPECT_DIMS[p.aspect].h}`);
+    expect(s).toContain(`-b:v ${p.videoBitrate}`);
+    expect(s).toContain(`-r ${p.fps}`);
+    expect(s).toContain("+faststart");
+  });
+  it("covers every platform with a 16:9 / 9:16 / 1:1 aspect", () => {
+    for (const platform of Object.keys(PLATFORM_PRESETS) as Array<keyof typeof PLATFORM_PRESETS>) {
+      const spec = PLATFORM_PRESETS[platform];
+      expect(ASPECT_DIMS[spec.aspect]).toBeDefined();
+    }
+  });
+  it("rejects an unknown platform", () => {
+    // @ts-expect-error testing a bad value at runtime
+    expect(() => buildExportPresetArgs("i", "o", "myspace")).toThrow();
   });
 });
