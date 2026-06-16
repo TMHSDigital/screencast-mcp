@@ -41,7 +41,7 @@ export function register(server: McpServer): void {
         }
         const infos = await Promise.all(args.clips.map((c) => probeMedia(c)));
         const durations = infos.map((i) => i.durationSec ?? 0);
-        const hasAudio = infos.every((i) => i.audioCodec !== null);
+        const clipHasAudio = infos.map((i) => i.audioCodec !== null);
         const output = resolveOutput(
           args.output,
           subdir("edits"),
@@ -58,14 +58,14 @@ export function register(server: McpServer): void {
             height: args.height,
             fps: args.fps,
           },
-          hasAudio,
+          clipHasAudio,
         );
         await runFfmpeg(ffArgs, 20 * 60_000);
         return okResponse({
           outputPath: output,
           clips: args.clips.length,
           transition: args.transition ?? "cut",
-          audio: hasAudio,
+          audio: clipHasAudio.some(Boolean),
         });
       } catch (error) {
         return errorResponse(error);
