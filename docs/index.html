@@ -78,6 +78,7 @@
         <tr><td><code>extract_audio</code></td><td>Write the audio track to its own file (mp3, aac, wav, or copy).</td></tr>
         <tr><td><code>clip</code></td><td>Extract one or more frame-accurate sub-segments to separate files.</td></tr>
         <tr><td><code>redact_region</code></td><td>Cover declared rectangles (solid box, blur, or pixelate) to hide on-screen secrets. Declared regions only, not automatic detection.</td></tr>
+        <tr><td><code>list_audio_devices</code></td><td>List DirectShow audio devices and flag a likely system-audio loopback device for start_recording.</td></tr>
       </tbody>
     </table>
 
@@ -89,7 +90,11 @@
       <li>Window capture matches by exact title.</li>
       <li>Fullscreen-exclusive apps can produce black frames under gdigrab; use
       borderless-windowed mode.</li>
-      <li>Audio capture is a Phase 2 seam (gdigrab is video-only).</li>
+      <li>System audio capture (<code>start_recording</code> with
+      <code>audio.source</code> = system) needs a virtual-audio loopback device,
+      since gdigrab is video-only and Windows has no native loopback. Use
+      <code>list_audio_devices</code> to find one. Microphone capture is not
+      supported.</li>
     </ul>
 
     <h2>Threat model</h2>

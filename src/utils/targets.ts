@@ -31,11 +31,19 @@ export const QUALITY_PRESETS: Record<Quality, { preset: string; crf: number }> =
 export const DEFAULT_FPS = 30;
 export const DEFAULT_QUALITY: Quality = "standard";
 
-// Phase 2 seam: audio capture (dshow / WASAPI loopback) attaches here. gdigrab
-// is video-only, so Phase 1 records no audio. Keep this returning [] until the
-// audio device-selection surface lands - do NOT half-wire it.
-export function buildAudioInputArgs(): string[] {
-  return [];
+export interface AudioCaptureOptions {
+  /** A resolved dshow loopback device name (see utils/audioDevices.ts). */
+  device: string;
+}
+
+// gdigrab is video-only, so system audio comes from a separate dshow input.
+// Device resolution (enumeration + loopback selection) lives in
+// utils/audioDevices.ts; this stays pure and just takes the resolved name.
+export function buildAudioInputArgs(audio?: AudioCaptureOptions): string[] {
+  if (!audio || audio.device.trim().length === 0) return [];
+  // No surrounding quotes: passed as a single argv element, ffmpeg reads the
+  // whole value (spaces included) as the device spec.
+  return ["-f", "dshow", "-i", `audio=${audio.device}`];
 }
 
 function parseIntStrict(value: string, label: string): number {
@@ -150,6 +158,7 @@ export interface CaptureOptions {
   quality?: Quality;
   output: string;
   monitors?: Monitor[];
+  audio?: AudioCaptureOptions;
 }
 
 function validateFps(fps: number): number {
@@ -169,8 +178,9 @@ export function buildCaptureArgs(target: Target, opts: CaptureOptions): string[]
     "-f", "gdigrab",
     "-framerate", String(fps),
     ...targetInputArgs(target, monitors),
-    ...buildAudioInputArgs(),
+    ...buildAudioInputArgs(opts.audio),
     ...resolveQuality(quality),
+    ...(opts.audio ? ["-c:a", "aac", "-b:a", "160k"] : []),
     // Fragmented mp4: keeps the file playable even if the process is killed
     // before the trailing moov atom would normally be written.
     "-movflags", "+frag_keyframe+empty_moov+default_base_moof",

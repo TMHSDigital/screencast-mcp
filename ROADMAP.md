@@ -2,10 +2,11 @@
 
 # Roadmap
 
-**Current:** v0.2.0 (Phase 1)
+**Current:** v0.5.0 (Phase 2 complete)
 
 Screencast MCP ships in phases. Phase 1 is the capture / watch / minimal-edit
-core. Later phases add the full edit surface and a production layer.
+core. Phase 2 adds the full edit surface, safety redaction, and system audio.
+A later phase adds a production layer.
 
 ## Phase 1 -- Capture, watch, minimal edit (shipped)
 
@@ -28,8 +29,8 @@ core. Later phases add the full edit surface and a production layer.
 - [x] Re-encode trim option for frame-accurate cuts (delivered as `clip`; `trim`
       stays the fast stream-copy single cut)
 - [x] `redact_region` safety redaction (declared regions, irreversible solid box)
-- [ ] System audio capture (dshow loopback) - the clean seam is already in place.
-      Microphone capture is deferred indefinitely.
+- [x] System audio capture (dshow loopback) via the `start_recording` audio
+      option and `list_audio_devices`. Microphone capture is deferred indefinitely.
 
 ## Phase 3 -- Produce / trailer layer
 

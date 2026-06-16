@@ -5,6 +5,25 @@ All notable changes to Screencast MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0]
+
+### Added
+
+- **System audio capture.** `start_recording` accepts an `audio` option; set
+  `audio.source` to `system` to capture loopback audio from a separate dshow
+  input alongside the gdigrab video. The loopback device is auto-detected or
+  named explicitly via `audio.device`.
+- **`list_audio_devices`** enumerates the DirectShow audio devices ffmpeg can
+  see and flags a likely loopback device.
+- A missing loopback device fails before ffmpeg starts, with an install hint
+  (Stereo Mix, `virtual-audio-capturer`, or VB-CABLE).
+
+### Notes
+
+- Windows has no native loopback, so system audio needs a virtual-audio device.
+  Microphone capture is intentionally not supported. This implements the
+  `buildAudioInputArgs()` seam that Phase 1 deliberately left unwired.
+
 ## [0.4.0]
 
 ### Added
