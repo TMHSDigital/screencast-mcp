@@ -5,6 +5,17 @@ All notable changes to Screencast MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.0]
+
+### Added
+
+- **Aspect variants and platform export complete Phase 3.**
+  - `reframe` re-aspects a video to `16:9`, `9:16`, `1:1`, or `4:5` with `pad`
+    (letterbox, no content lost) or `crop` (fill, trims the overflow).
+  - `export_preset` encodes a platform-ready file for `youtube`,
+    `instagram_reel`, `tiktok`, `x`, or `square`: reframes to the platform
+    aspect, caps fps, and encodes H.264 at the platform bitrate with faststart.
+
 ## [0.7.0]
 
 ### Added

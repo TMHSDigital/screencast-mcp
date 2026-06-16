@@ -2,11 +2,11 @@
 
 # Roadmap
 
-**Current:** v0.5.0 (Phase 2 complete)
+**Current:** v0.8.0 (Phase 3 complete)
 
 Screencast MCP ships in phases. Phase 1 is the capture / watch / minimal-edit
 core. Phase 2 adds the full edit surface, safety redaction, and system audio.
-A later phase adds a production layer.
+Phase 3 adds the produce / trailer layer. Cross-platform capture is next.
 
 ## Phase 1 -- Capture, watch, minimal edit (shipped)
 
@@ -37,7 +37,7 @@ A later phase adds a production layer.
 - [x] `assemble_highlights` (stitch clips with cuts or transitions) and
       `xfade_transition` (crossfade two clips), with auto-normalized inputs
 - [x] `title_card` (bundled font) and `music_bed` (loop, fade, mix, duck)
-- [ ] Aspect variants (`reframe`) and platform export presets
+- [x] Aspect variants (`reframe`) and platform export presets (`export_preset`)
 
 ## Cross-platform
 

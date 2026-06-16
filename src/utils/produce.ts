@@ -320,3 +320,91 @@ export function buildMusicBedArgs(
     output,
   ];
 }
+
+// --- Aspect variants and platform export ----------------------------------
+
+export type Aspect = "16:9" | "9:16" | "1:1" | "4:5";
+export type ReframeFit = "pad" | "crop";
+
+/** Canonical target dimensions per aspect (even dims, social-ready). */
+export const ASPECT_DIMS: Record<Aspect, { w: number; h: number }> = {
+  "16:9": { w: 1920, h: 1080 },
+  "9:16": { w: 1080, h: 1920 },
+  "1:1": { w: 1080, h: 1080 },
+  "4:5": { w: 1080, h: 1350 },
+};
+
+/** Filter chain to fit content into a WxH canvas. pad scales to fit and adds
+ * bars (no content lost); crop scales to fill and center-crops the overflow. */
+export function reframeFilter(w: number, h: number, fit: ReframeFit): string {
+  if (fit === "crop") {
+    return `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},setsar=1`;
+  }
+  return (
+    `scale=${w}:${h}:force_original_aspect_ratio=decrease,` +
+    `pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1`
+  );
+}
+
+/** Re-aspect a video to a target aspect with pad (default) or crop. */
+export function buildReframeArgs(
+  input: string,
+  output: string,
+  aspect: Aspect,
+  fit: ReframeFit = "pad",
+  quality: Quality = DEFAULT_QUALITY,
+): string[] {
+  const dim = ASPECT_DIMS[aspect];
+  if (!dim) throw new ScreencastError(`Unknown aspect "${aspect}".`);
+  return [
+    "-y", "-i", input,
+    "-vf", `${reframeFilter(dim.w, dim.h, fit)},format=yuv420p`,
+    ...encodeArgs(quality),
+    "-c:a", "copy",
+    "-movflags", "+faststart",
+    output,
+  ];
+}
+
+export type Platform = "youtube" | "instagram_reel" | "tiktok" | "x" | "square";
+
+interface PresetSpec {
+  aspect: Aspect;
+  fps: number;
+  videoBitrate: string;
+  bufsize: string;
+  audioBitrate: string;
+}
+
+export const PLATFORM_PRESETS: Record<Platform, PresetSpec> = {
+  youtube: { aspect: "16:9", fps: 30, videoBitrate: "8M", bufsize: "16M", audioBitrate: "192k" },
+  instagram_reel: { aspect: "9:16", fps: 30, videoBitrate: "6M", bufsize: "12M", audioBitrate: "160k" },
+  tiktok: { aspect: "9:16", fps: 30, videoBitrate: "6M", bufsize: "12M", audioBitrate: "160k" },
+  x: { aspect: "16:9", fps: 30, videoBitrate: "5M", bufsize: "10M", audioBitrate: "128k" },
+  square: { aspect: "1:1", fps: 30, videoBitrate: "6M", bufsize: "12M", audioBitrate: "160k" },
+};
+
+/** Encode a platform-ready file: reframe to the platform aspect, cap fps, and
+ * encode H.264 at the platform's bitrate with faststart. */
+export function buildExportPresetArgs(
+  input: string,
+  output: string,
+  platform: Platform,
+  fit: ReframeFit = "pad",
+): string[] {
+  const p = PLATFORM_PRESETS[platform];
+  if (!p) throw new ScreencastError(`Unknown platform "${platform}".`);
+  const dim = ASPECT_DIMS[p.aspect];
+  const vf = `${reframeFilter(dim.w, dim.h, fit)},fps=${p.fps},format=yuv420p`;
+  return [
+    "-y", "-i", input,
+    "-vf", vf,
+    "-c:v", "libx264", "-preset", "medium",
+    "-b:v", p.videoBitrate, "-maxrate", p.videoBitrate, "-bufsize", p.bufsize,
+    "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", p.audioBitrate,
+    "-r", String(p.fps),
+    "-movflags", "+faststart",
+    output,
+  ];
+}
