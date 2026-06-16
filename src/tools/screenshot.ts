@@ -2,16 +2,19 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
 import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
-import { getMonitors } from "../utils/monitors.js";
-import { buildScreenshotArgs, parseTarget } from "../utils/targets.js";
+import { buildScreenshotArgs } from "../utils/targets.js";
+import { resolveCaptureTarget } from "../utils/resolveTarget.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
   target: z
     .string()
     .describe(
-      "Capture target: 'full' | 'monitor:<index>' | 'window:<exact title>' | " +
-        "'region:<x>,<y>,<w>,<h>'.",
+      "Capture target: 'full' | 'monitor:<index>' | 'window:<title>' | " +
+        "'region:<x>,<y>,<w>,<h>'. window: captures the on-screen rectangle the " +
+        "window occupies as currently displayed - it must be visible, on top, " +
+        "and not minimized (case-insensitive exact title, else substring; " +
+        "topmost match wins).",
     ),
   output: z
     .string()
@@ -30,15 +33,18 @@ export function register(server: McpServer): void {
     async (args) => {
       try {
         requireFfmpeg();
-        const target = parseTarget(args.target);
-        const monitors = target.kind === "monitor" ? getMonitors() : [];
+        const { target, monitors, window } = resolveCaptureTarget(args.target);
         const output = resolveOutput(
           args.output,
           subdir("screenshots"),
           `shot-${stamp()}-${rand()}.png`,
         );
         await runFfmpeg(buildScreenshotArgs(target, output, monitors), 60_000);
-        return okResponse({ outputPath: output, target: args.target });
+        return okResponse({
+          outputPath: output,
+          target: args.target,
+          ...(window ? { matchedWindow: window.matchedTitle, region: window } : {}),
+        });
       } catch (error) {
         return errorResponse(error);
       }
