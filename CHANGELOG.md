@@ -5,6 +5,16 @@ All notable changes to Screencast MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.1]
+
+### Fixed
+
+- **A second server instance no longer kills another instance's active
+  recording** (#16). Records are now tagged with the owning server's process id
+  (`serverPid`), and orphan reaping skips any `recording` record owned by a
+  different, still-live server. A genuine orphan (owning server dead) is still
+  reaped; older records without `serverPid` keep the previous behavior.
+
 ## [0.8.0]
 
 ### Added
