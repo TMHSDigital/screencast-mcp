@@ -5,6 +5,15 @@ All notable changes to Screencast MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.6]
+
+### Changed
+
+- **Short-lived working files no longer land in the edits dir** (#24). The
+  `concat` list file and the `title_card` drawtext text file are now written to
+  the OS temp dir via a new `tempPath()` helper, so a hard crash before cleanup
+  leaves them where the OS reaps them instead of next to real outputs.
+
 ## [0.8.5]
 
 ### Fixed
