@@ -5,6 +5,20 @@ All notable changes to Screencast MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0]
+
+### Added
+
+- **Phase 3 produce layer begins: transitions and assembly.**
+  - `xfade_transition` crossfades two videos into one with an xfade transition
+    (`fade`, `wipeleft`, `slideup`, ...), crossfading audio when both have a track.
+  - `assemble_highlights` stitches N clips into one with hard cuts or an xfade
+    transition between each.
+- Both auto-normalize every input to a common resolution, fps, SAR, and audio
+  rate before stitching, so heterogeneous clips compose cleanly. The xfade chain
+  computes cumulative offsets from each clip's probed duration. New pure builders
+  live in `src/utils/produce.js`, unit tested without ffmpeg.
+
 ## [0.5.0]
 
 ### Added

@@ -43,7 +43,7 @@ The design choices are deliberate rather than incidental:
 
 ## Tools
 
-Nineteen tools across three concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
+Twenty-one tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
 
 ### Capture
 
@@ -93,6 +93,15 @@ These tools re-encode (a filter rewrites pixels, so stream copy does not apply).
 
 > [!IMPORTANT]
 > `redact_region` covers the regions **you** declare. It is not automatic secret detection, so it cannot find a secret you did not point it at. The default `box` style is a solid fill, which is irreversible; `blur` and `pixelate` are softer but can be partially recovered, so prefer `box` for real secrets. A region that falls outside the frame is rejected rather than silently doing nothing.
+
+### Produce
+
+The production layer turns raw clips into a finished piece. Tools that combine clips auto-normalize each input to a common resolution, fps, and audio rate first, so heterogeneous sources compose cleanly.
+
+| Tool | Purpose |
+| --- | --- |
+| `xfade_transition` | Crossfade two videos into one with an `xfade` transition (`fade`, `wipeleft`, `slideup`, ...). Audio is crossfaded when both clips have a track. |
+| `assemble_highlights` | Stitch two or more clips into one, with hard cuts (`transition: "cut"`) or an xfade transition between each. |
 
 ### Targets
 

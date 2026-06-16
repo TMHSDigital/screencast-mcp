@@ -1,0 +1,70 @@
+import { describe, it, expect } from "vitest";
+import {
+  xfadeOffsets,
+  videoNormalizeChain,
+  buildXfadeArgs,
+  buildAssembleArgs,
+} from "../utils/produce.js";
+
+describe("xfadeOffsets", () => {
+  it("computes cumulative offsets for an xfade chain", () => {
+    // durations 5, 4, 6 with a 1s transition:
+    //   join clip 1: 5 - 1 = 4
+    //   join clip 2: (5 + 4) - 2 = 7
+    expect(xfadeOffsets([5, 4, 6], 1)).toEqual([4, 7]);
+  });
+  it("returns one offset per join and never goes negative", () => {
+    expect(xfadeOffsets([2, 2], 1)).toEqual([1]);
+    expect(xfadeOffsets([0.5, 5], 1)).toEqual([0]);
+  });
+});
+
+describe("videoNormalizeChain", () => {
+  it("fits, letterboxes, squares pixels, and pins fps", () => {
+    const c = videoNormalizeChain(1920, 1080, 30);
+    expect(c).toContain("scale=1920:1080:force_original_aspect_ratio=decrease");
+    expect(c).toContain("pad=1920:1080");
+    expect(c).toContain("setsar=1");
+    expect(c).toContain("fps=30");
+  });
+});
+
+describe("buildXfadeArgs", () => {
+  it("sets the offset from the first clip duration and maps video only without audio", () => {
+    const s = buildXfadeArgs("a.mp4", "b.mp4", 5, "o.mp4", { duration: 1 }, false).join(" ");
+    expect(s).toContain("xfade=transition=fade:duration=1:offset=4");
+    expect(s).toContain("-map [vout]");
+    expect(s).toContain("-an");
+    expect(s).not.toContain("acrossfade");
+  });
+  it("adds an audio crossfade when both clips have audio", () => {
+    const s = buildXfadeArgs("a.mp4", "b.mp4", 5, "o.mp4", { transition: "wipeleft" }, true).join(" ");
+    expect(s).toContain("transition=wipeleft");
+    expect(s).toContain("acrossfade=d=1");
+    expect(s).toContain("-map [aout]");
+    expect(s).toContain("-c:a aac");
+  });
+  it("rejects a first clip shorter than the transition", () => {
+    expect(() => buildXfadeArgs("a", "b", 0.5, "o", { duration: 1 })).toThrow();
+  });
+});
+
+describe("buildAssembleArgs", () => {
+  it("uses the concat filter for hard cuts", () => {
+    const s = buildAssembleArgs(["a.mp4", "b.mp4", "c.mp4"], [3, 3, 3], "o.mp4", {}, true).join(" ");
+    expect(s).toContain("concat=n=3:v=1:a=1[vout][aout]");
+    expect(s).toContain("-i a.mp4");
+    expect(s).toContain("-i c.mp4");
+  });
+  it("chains xfade with cumulative offsets for a named transition", () => {
+    const s = buildAssembleArgs(["a", "b", "c"], [5, 4, 6], "o.mp4", { transition: "fade", duration: 1 }, false).join(" ");
+    expect(s).toContain("[v0][v1]xfade=transition=fade:duration=1:offset=4");
+    expect(s).toContain("xfade=transition=fade:duration=1:offset=7[vout]");
+  });
+  it("requires at least two clips", () => {
+    expect(() => buildAssembleArgs(["only.mp4"], [3], "o.mp4")).toThrow();
+  });
+  it("requires a duration per clip for an xfade transition", () => {
+    expect(() => buildAssembleArgs(["a", "b"], [5], "o.mp4", { transition: "fade" })).toThrow();
+  });
+});
