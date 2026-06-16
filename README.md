@@ -43,7 +43,7 @@ The design choices are deliberate rather than incidental:
 
 ## Tools
 
-Seventeen tools across three concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
+Eighteen tools across three concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
 
 ### Capture
 
@@ -83,6 +83,15 @@ These tools re-encode (a filter rewrites pixels, so stream copy does not apply).
 | `compress` | Re-encode smaller with a `light`/`medium`/`heavy` CRF ladder and an optional `maxWidth` that only downscales. |
 | `extract_audio` | Write the audio track to its own file (`mp3`, `aac`, `wav`, or `copy`). |
 | `clip` | Extract one or more frame-accurate sub-segments to separate files. Unlike `trim`, it re-encodes so cuts land exactly on the given times. |
+
+### Redact
+
+| Tool | Purpose |
+| --- | --- |
+| `redact_region` | Cover declared rectangles in a video. `style` is `box` (default, a solid irreversible fill), `blur`, or `pixelate`; each region may be limited to a `start`/`end` window and expanded with `pad`. |
+
+> [!IMPORTANT]
+> `redact_region` covers the regions **you** declare. It is not automatic secret detection, so it cannot find a secret you did not point it at. The default `box` style is a solid fill, which is irreversible; `blur` and `pixelate` are softer but can be partially recovered, so prefer `box` for real secrets. A region that falls outside the frame is rejected rather than silently doing nothing.
 
 ### Targets
 
@@ -174,6 +183,7 @@ sample_frames { "input": "…/recordings/rec-….mp4", "timestamps": [0.5, 2, 3.
 - **Output stays local.** Files are written to the local filesystem only — never uploaded, streamed, or transmitted anywhere.
 - **Public repo, private captures.** The `.gitignore` blocks recordings, frames, screenshots, and common video/image output so test media cannot be committed by accident.
 - **Review before sharing.** Sample frames or inspect a recording before handing a file to another tool or person, so you know what it contains.
+- **Redaction is declared, not detected.** `redact_region` covers only the rectangles you specify, so it depends on you (or the agent) having found the secret first. Use the default `box` style for a solid irreversible fill, and still review the output before sharing.
 
 ## Project structure
 

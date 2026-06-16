@@ -232,5 +232,37 @@
       },
       "required": ["input", "segments"]
     }
+  },
+  {
+    "name": "redact_region",
+    "description": "Redact declared rectangles in a video so on-screen secrets are covered. This covers regions you specify; it is NOT automatic secret detection. The default style is a solid box, which is irreversible (a blur or mosaic can be partially recovered). A region that falls outside the frame is rejected rather than silently doing nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "regions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "x": { "type": "integer", "minimum": 0, "description": "Left edge in pixels" },
+              "y": { "type": "integer", "minimum": 0, "description": "Top edge in pixels" },
+              "width": { "type": "integer", "minimum": 1, "description": "Region width in pixels" },
+              "height": { "type": "integer", "minimum": 1, "description": "Region height in pixels" },
+              "start": { "type": "number", "minimum": 0, "description": "Optional second to start redacting from" },
+              "end": { "type": "number", "exclusiveMinimum": 0, "description": "Optional second to stop redacting after" }
+            },
+            "required": ["x", "y", "width", "height"]
+          },
+          "description": "One or more rectangles to redact; each may be limited to a time window"
+        },
+        "style": { "type": "string", "enum": ["box", "blur", "pixelate"], "description": "box (default) draws an irreversible solid fill; blur and pixelate are softer but partially recoverable" },
+        "pad": { "type": "integer", "minimum": 0, "description": "Optional pixels to expand each region by, to cover anti-aliased edges (default 0)" },
+        "color": { "type": "string", "description": "Fill color for box style (default black)" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+      },
+      "required": ["input", "regions"]
+    }
   }
 ]

@@ -29,10 +29,11 @@ import { register as registerOverlay } from "./tools/overlay.js";
 import { register as registerCompress } from "./tools/compress.js";
 import { register as registerExtractAudio } from "./tools/extractAudio.js";
 import { register as registerClip } from "./tools/clip.js";
+import { register as registerRedactRegion } from "./tools/redactRegion.js";
 
 const server = new McpServer({
   name: "screencast-mcp",
-  version: "0.3.0",
+  version: "0.4.0",
 });
 
 registerStartRecording(server);
@@ -52,6 +53,7 @@ registerOverlay(server);
 registerCompress(server);
 registerExtractAudio(server);
 registerClip(server);
+registerRedactRegion(server);
 
 async function main(): Promise<void> {
   // Reconcile any sessions interrupted by a previous crash and kill ffmpeg
