@@ -66,6 +66,8 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
   async function call(name: string, args: Record<string, unknown> = {}) {
     const res = await client.callTool({ name, arguments: args });
     const text = (res.content as Array<{ text: string }>)?.map((c) => c.text).join("\n") ?? "";
+    // The parsed JSON shape varies per tool; this test helper handles all of them.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let json: any = null;
     try { json = JSON.parse(text); } catch { /* plain text */ }
     return { isError: !!res.isError, text, json };
