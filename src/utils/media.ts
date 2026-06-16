@@ -6,6 +6,7 @@
  */
 import { ScreencastError } from "./errors.js";
 import { resolveQuality, type Quality } from "./targets.js";
+import { validateColor } from "./validate.js";
 
 /** Edit re-encodes default to the same preset as a standard capture. */
 const DEFAULT_EDIT_QUALITY: Quality = "standard";
@@ -531,7 +532,7 @@ export function buildRedactArgs(
   if (!Number.isInteger(pad) || pad < 0) {
     throw new ScreencastError("pad must be a non-negative integer.");
   }
-  const color = opts.color ?? "black";
+  const color = validateColor(opts.color ?? "black", "color");
   const rs = normalizeRegions(regions, pad, dims);
 
   // A crisp re-encode keeps the redaction edges sharp.
