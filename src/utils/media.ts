@@ -5,6 +5,10 @@
  * watch surfaces are unit-tested without ffmpeg present.
  */
 import { ScreencastError } from "./errors.js";
+import { resolveQuality, type Quality } from "./targets.js";
+
+/** Edit re-encodes default to the same preset as a standard capture. */
+const DEFAULT_EDIT_QUALITY: Quality = "standard";
 
 export interface MediaInfo {
   durationSec: number | null;
@@ -182,4 +186,259 @@ export function buildConvertArgs(
     default:
       throw new ScreencastError(`Unsupported convert format "${format}".`);
   }
+}
+
+// --- Phase 2 edit surface -------------------------------------------------
+//
+// Every tool below RE-ENCODES (a filter rewrites pixels, so stream copy is not
+// an option). They reuse resolveQuality() so the draft/standard/high presets
+// are identical to capture. Audio is copied unless a filter forces a re-encode.
+
+function requireNonNegativeInt(value: number, label: string): number {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new ScreencastError(`${label} must be a non-negative integer.`);
+  }
+  return value;
+}
+
+function requirePositiveInt(value: number, label: string): number {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new ScreencastError(`${label} must be a positive integer.`);
+  }
+  return value;
+}
+
+/** Build a libavfilter `enable=` timeline expression, or "" for always-on. */
+export function enableExpr(start?: number, end?: number): string {
+  if (start !== undefined && end !== undefined) {
+    if (end <= start) throw new ScreencastError("end must be greater than start.");
+    return `between(t,${start},${end})`;
+  }
+  if (start !== undefined) return `gte(t,${start})`;
+  if (end !== undefined) return `lte(t,${end})`;
+  return "";
+}
+
+export interface CropRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Crop to a pixel rectangle. If frame dims are supplied, a rectangle that
+ * runs off the frame is rejected rather than silently clamped by ffmpeg. */
+export function buildCropArgs(
+  input: string,
+  output: string,
+  rect: CropRect,
+  dims?: { width: number | null; height: number | null },
+  quality: Quality = DEFAULT_EDIT_QUALITY,
+): string[] {
+  const x = requireNonNegativeInt(rect.x, "crop x");
+  const y = requireNonNegativeInt(rect.y, "crop y");
+  const w = requirePositiveInt(rect.width, "crop width");
+  const h = requirePositiveInt(rect.height, "crop height");
+  if (dims && dims.width != null && dims.height != null) {
+    if (x + w > dims.width || y + h > dims.height) {
+      throw new ScreencastError(
+        `crop region ${w}x${h}+${x}+${y} falls outside the ` +
+          `${dims.width}x${dims.height} frame.`,
+      );
+    }
+  }
+  return [
+    "-y", "-i", input,
+    "-vf", `crop=${w}:${h}:${x}:${y}`,
+    ...resolveQuality(quality),
+    "-c:a", "copy",
+    output,
+  ];
+}
+
+/** Scale to a width and/or height. A missing side uses -2 (keep aspect, even
+ * dimension as required by yuv420p). */
+export function buildScaleArgs(
+  input: string,
+  output: string,
+  opts: { width?: number; height?: number },
+  quality: Quality = DEFAULT_EDIT_QUALITY,
+): string[] {
+  if (opts.width === undefined && opts.height === undefined) {
+    throw new ScreencastError("scale requires width or height (or both).");
+  }
+  if (opts.width !== undefined) requirePositiveInt(opts.width, "scale width");
+  if (opts.height !== undefined) requirePositiveInt(opts.height, "scale height");
+  const w = opts.width ?? -2;
+  const h = opts.height ?? -2;
+  return [
+    "-y", "-i", input,
+    "-vf", `scale=${w}:${h}`,
+    ...resolveQuality(quality),
+    "-c:a", "copy",
+    output,
+  ];
+}
+
+/** Decompose a tempo factor into an atempo chain (each atempo is limited to
+ * the 0.5 - 2.0 range, so larger changes are multiplied across stages). */
+export function atempoChain(factor: number): string {
+  let remaining = factor;
+  const parts: string[] = [];
+  while (remaining > 2.0) {
+    parts.push("atempo=2.0");
+    remaining /= 2.0;
+  }
+  while (remaining < 0.5) {
+    parts.push("atempo=0.5");
+    remaining /= 0.5;
+  }
+  parts.push(`atempo=${Math.round(remaining * 1000) / 1000}`);
+  return parts.join(",");
+}
+
+/** Change playback speed. factor > 1 is faster, < 1 is slower. Video uses
+ * setpts; audio is retempo'd when present and dropped otherwise. */
+export function buildSpeedArgs(
+  input: string,
+  output: string,
+  factor: number,
+  hasAudio: boolean,
+  quality: Quality = DEFAULT_EDIT_QUALITY,
+): string[] {
+  if (!Number.isFinite(factor) || factor <= 0) {
+    throw new ScreencastError("speed factor must be a positive number.");
+  }
+  const args = ["-y", "-i", input, "-filter:v", `setpts=PTS/${factor}`];
+  if (hasAudio) args.push("-filter:a", atempoChain(factor));
+  args.push(...resolveQuality(quality));
+  if (hasAudio) {
+    args.push("-c:a", "aac");
+  } else {
+    args.push("-an");
+  }
+  args.push(output);
+  return args;
+}
+
+export interface OverlayOptions {
+  x: number;
+  y: number;
+  start?: number;
+  end?: number;
+  scale?: { width?: number; height?: number };
+}
+
+/** Composite an overlay image or video onto the input at (x, y), optionally
+ * scaled and optionally limited to a time window. */
+export function buildOverlayArgs(
+  input: string,
+  overlay: string,
+  output: string,
+  opts: OverlayOptions,
+  quality: Quality = DEFAULT_EDIT_QUALITY,
+): string[] {
+  const x = requireNonNegativeInt(opts.x, "overlay x");
+  const y = requireNonNegativeInt(opts.y, "overlay y");
+  const expr = enableExpr(opts.start, opts.end);
+  const enable = expr ? `:enable='${expr}'` : "";
+  let filter: string;
+  if (opts.scale && (opts.scale.width !== undefined || opts.scale.height !== undefined)) {
+    if (opts.scale.width !== undefined) requirePositiveInt(opts.scale.width, "overlay scale width");
+    if (opts.scale.height !== undefined) requirePositiveInt(opts.scale.height, "overlay scale height");
+    const sw = opts.scale.width ?? -1;
+    const sh = opts.scale.height ?? -1;
+    filter = `[1:v]scale=${sw}:${sh}[ovl];[0:v][ovl]overlay=${x}:${y}${enable}`;
+  } else {
+    filter = `[0:v][1:v]overlay=${x}:${y}${enable}`;
+  }
+  return [
+    "-y", "-i", input, "-i", overlay,
+    "-filter_complex", filter,
+    ...resolveQuality(quality),
+    "-c:a", "copy",
+    output,
+  ];
+}
+
+export type CompressLevel = "light" | "medium" | "heavy";
+
+const COMPRESS_CRF: Record<CompressLevel, number> = {
+  light: 23,
+  medium: 28,
+  heavy: 32,
+};
+
+/** Re-encode to a smaller file with a CRF ladder and an optional width cap.
+ * The width cap only ever downscales (min of the source width and maxWidth). */
+export function buildCompressArgs(
+  input: string,
+  output: string,
+  opts: { level?: CompressLevel; maxWidth?: number } = {},
+): string[] {
+  const level = opts.level ?? "medium";
+  const crf = COMPRESS_CRF[level];
+  if (crf === undefined) throw new ScreencastError(`Unknown compress level "${level}".`);
+  const args = ["-y", "-i", input];
+  if (opts.maxWidth !== undefined) {
+    requirePositiveInt(opts.maxWidth, "maxWidth");
+    args.push("-vf", `scale='min(${opts.maxWidth},iw)':-2`);
+  }
+  args.push(
+    "-c:v", "libx264", "-preset", "slow", "-crf", String(crf), "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", "128k",
+    "-movflags", "+faststart",
+    output,
+  );
+  return args;
+}
+
+export type AudioFormat = "mp3" | "aac" | "wav" | "copy";
+
+const AUDIO_CODEC: Record<AudioFormat, string[]> = {
+  mp3: ["-c:a", "libmp3lame", "-q:a", "2"],
+  aac: ["-c:a", "aac", "-b:a", "192k"],
+  wav: ["-c:a", "pcm_s16le"],
+  copy: ["-c:a", "copy"],
+};
+
+/** Strip video and write the audio track on its own (mp3 / aac / wav / copy). */
+export function buildExtractAudioArgs(
+  input: string,
+  output: string,
+  format: AudioFormat,
+): string[] {
+  const codec = AUDIO_CODEC[format];
+  if (!codec) throw new ScreencastError(`Unknown audio format "${format}".`);
+  return ["-y", "-i", input, "-vn", ...codec, output];
+}
+
+export interface Segment {
+  start: number;
+  end: number;
+}
+
+/** Extract one frame-accurate sub-segment. Unlike trim (stream copy, snaps to a
+ * keyframe), clip re-encodes so the cut lands exactly on start/end. Output -ss
+ * plus -t (a duration) avoids the -to seek ambiguity. */
+export function buildClipArgs(
+  input: string,
+  output: string,
+  seg: Segment,
+  quality: Quality = DEFAULT_EDIT_QUALITY,
+): string[] {
+  if (!Number.isFinite(seg.start) || seg.start < 0) {
+    throw new ScreencastError("clip start must be a non-negative number.");
+  }
+  if (!Number.isFinite(seg.end) || seg.end <= seg.start) {
+    throw new ScreencastError("clip end must be greater than start.");
+  }
+  return [
+    "-y", "-i", input,
+    "-ss", String(seg.start),
+    "-t", String(seg.end - seg.start),
+    ...resolveQuality(quality),
+    "-c:a", "aac",
+    output,
+  ];
 }

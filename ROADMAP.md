@@ -22,9 +22,14 @@ core. Later phases add the full edit surface and a production layer.
 
 ## Phase 2 -- Full edit surface and audio
 
-- [ ] Audio capture (dshow / WASAPI loopback) - the clean seam is already in place
-- [ ] `crop`, `scale`, `speed`, `overlay`, `extract`, `compress`
-- [ ] Re-encode trim option for frame-accurate cuts
+- [x] `crop`, `scale`, `speed`, `overlay`, `compress`
+- [x] `extract_audio` (extract the audio track) and `clip` (frame-accurate
+      segment extraction; `extract` split into these two non-overlapping tools)
+- [x] Re-encode trim option for frame-accurate cuts (delivered as `clip`; `trim`
+      stays the fast stream-copy single cut)
+- [ ] `redact_region` safety redaction (declared regions, irreversible solid box)
+- [ ] System audio capture (dshow loopback) - the clean seam is already in place.
+      Microphone capture is deferred indefinitely.
 
 ## Phase 3 -- Produce / trailer layer
 

@@ -8,6 +8,7 @@
  */
 import { spawn, spawnSync } from "node:child_process";
 import { ScreencastError } from "./errors.js";
+import { buildProbeArgs, parseMediaInfo, type MediaInfo } from "./media.js";
 
 const INSTALL_HINT =
   "ffmpeg and ffprobe must be installed and on PATH (or set FFMPEG_PATH / " +
@@ -114,4 +115,17 @@ export async function runFfmpeg(
     const tail = res.stderr.trim().split("\n").slice(-6).join("\n");
     throw new ScreencastError(`ffmpeg failed (exit ${res.code}):\n${tail}`);
   }
+}
+
+/** Probe a media file with ffprobe and return its flattened MediaInfo. Shared by
+ * tools that need source dimensions or stream presence before building an edit. */
+export async function probeMedia(input: string): Promise<MediaInfo> {
+  const { ffprobe } = requireFfmpeg();
+  const res = await runCapture(ffprobe, buildProbeArgs(input), 30_000);
+  if (res.code !== 0) {
+    throw new ScreencastError(
+      `ffprobe failed (exit ${res.code}): ${res.stderr.trim().slice(-400)}`,
+    );
+  }
+  return parseMediaInfo(JSON.parse(res.stdout));
 }
