@@ -121,8 +121,26 @@ export function resolveQuality(quality: Quality): string[] {
     "-pix_fmt", "yuv420p"];
 }
 
+/** Largest even integer <= n. libx264 + yuv420p requires even W/H. */
+function evenDown(n: number): number {
+  return n - (n % 2);
+}
+
+export interface InputArgsOptions {
+  /**
+   * Round the capture width/height down to even. Required for the recording
+   * path (libx264 + yuv420p rejects odd dimensions); the screenshot path (PNG)
+   * leaves dimensions untouched so it can grab an exact odd-sized rectangle.
+   */
+  evenSize?: boolean;
+}
+
 /** The gdigrab input args (offset/size/input) for a target. */
-export function targetInputArgs(target: Target, monitors: Monitor[]): string[] {
+export function targetInputArgs(
+  target: Target,
+  monitors: Monitor[],
+  opts: InputArgsOptions = {},
+): string[] {
   switch (target.kind) {
     case "full":
       return ["-i", "desktop"];
@@ -134,19 +152,34 @@ export function targetInputArgs(target: Target, monitors: Monitor[]): string[] {
         "Internal: a window target must be resolved to a region before " +
           "building capture args. Call resolveCaptureTarget().",
       );
-    case "region":
+    case "region": {
+      let { w, h } = target;
+      if (opts.evenSize) {
+        w = evenDown(w);
+        h = evenDown(h);
+        if (w <= 0 || h <= 0) {
+          throw new ScreencastError(
+            `region ${target.w}x${target.h} is too small to record: width and ` +
+              `height must each be at least 2px (the video encoder needs even ` +
+              `dimensions). Use a larger region, or take a screenshot instead.`,
+          );
+        }
+      }
       return [
         "-offset_x", String(target.x),
         "-offset_y", String(target.y),
-        "-video_size", `${target.w}x${target.h}`,
+        "-video_size", `${w}x${h}`,
         "-i", "desktop",
       ];
+    }
     case "monitor": {
       const m = resolveMonitor(target.index, monitors);
+      const w = opts.evenSize ? evenDown(m.width) : m.width;
+      const h = opts.evenSize ? evenDown(m.height) : m.height;
       return [
         "-offset_x", String(m.x),
         "-offset_y", String(m.y),
-        "-video_size", `${m.width}x${m.height}`,
+        "-video_size", `${w}x${h}`,
         "-i", "desktop",
       ];
     }
@@ -177,7 +210,7 @@ export function buildCaptureArgs(target: Target, opts: CaptureOptions): string[]
     "-y",
     "-f", "gdigrab",
     "-framerate", String(fps),
-    ...targetInputArgs(target, monitors),
+    ...targetInputArgs(target, monitors, { evenSize: true }),
     ...buildAudioInputArgs(opts.audio),
     ...resolveQuality(quality),
     ...(opts.audio ? ["-c:a", "aac", "-b:a", "160k"] : []),

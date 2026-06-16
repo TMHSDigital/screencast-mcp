@@ -8,7 +8,7 @@ This file provides guidance for Claude Code when working in this repository.
 
 Screencast MCP -- MCP server for Windows screen recording, frame sampling, and minimal ffmpeg edits
 
-**Version:** 0.1.0
+**Version:** see `package.json` (the source of truth)
 **License:** CC-BY-NC-ND-4.0
 **Author:** TMHSDigital
 
@@ -25,7 +25,8 @@ Screencast MCP -- MCP server for Windows screen recording, frame sampling, and m
 ## Conventions
 
 - Use conventional commits (`feat:`, `fix:`, `chore:`, `docs:`)
-- Bump the version in `package.json` in your PR (`npm version`, keeps the lockfile in sync); `release.yml` tags and publishes that version on merge
+- Bump the version in `package.json` in your PR (`npm version <patch|minor|major> --no-git-tag-version`, keeps the lockfile in sync and avoids a stray tag); `release.yml` tags and publishes that version on merge
+- Add a matching entry to `CHANGELOG.md` under the new version heading
 - Provider adapters live in `src/providers/` and implement the `Provider` interface, wired into `ProviderManager`; tools live in `src/tools/`
 - Keep `mcp-tools.json` in sync with the registered tools
 

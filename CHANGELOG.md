@@ -12,6 +12,19 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - ESLint (flat config, typescript-eslint recommended) with a `lint` script, run
   in CI (#23). Tooling only; not part of the published package.
 
+## [0.8.9]
+
+### Fixed
+
+- **Odd-sized region recordings no longer fail with a cryptic encoder error**
+  (#34). libx264 with `yuv420p` requires even width and height, but a raw
+  `region:<x>,<y>,<w>,<h>` could pass odd dimensions straight to the encoder
+  (`start_recording { "target": "region:0,0,101,101" }` failed with a "width
+  not divisible by 2" ffmpeg tail). The recording path now rounds capture
+  width/height down to even, matching what `selectWindow` already does for
+  window targets; a region too small to record after rounding returns a clear
+  error. Screenshots (PNG) still capture the exact requested rectangle.
+
 ## [0.8.8]
 
 ### Fixed
