@@ -13,9 +13,9 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      # Empty until the maintainer provisions the NPM_TOKEN secret (or wires
-      # npm trusted publishing). Until then the publish step skips cleanly so a
-      # tokenless repo never carries a perpetually-red post-merge workflow.
+      # NPM_TOKEN is provisioned, so the publish step runs. The guard remains so
+      # that if the secret is ever rotated out or removed, the publish step skips
+      # cleanly rather than leaving a perpetually-red post-merge workflow.
       HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v6
