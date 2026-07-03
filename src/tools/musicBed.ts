@@ -15,6 +15,7 @@ const inputSchema = {
   fadeOut: z.number().nonnegative().optional().describe("Music fade-out seconds (default 2)."),
   duck: z.boolean().optional().describe("Duck the music under the original audio via a sidechain (default false)."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -36,7 +37,7 @@ export function register(server: McpServer): void {
           throw new ScreencastError(`Could not read duration of ${args.video}.`);
         }
         const ext = extname(args.video) || ".mp4";
-        const output = resolveOutput(args.output, subdir("edits"), `music-${stamp()}-${rand()}${ext}`);
+        const output = resolveOutput(args.output, subdir("edits"), `music-${stamp()}-${rand()}${ext}`, args.overwrite);
         const ffArgs = buildMusicBedArgs(
           args.video,
           args.music,

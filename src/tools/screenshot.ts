@@ -22,6 +22,7 @@ const inputSchema = {
     .describe(
       "Optional output .png path. Defaults to a file under SCREENCAST_HOME/screenshots.",
     ),
+  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -38,6 +39,7 @@ export function register(server: McpServer): void {
           args.output,
           subdir("screenshots"),
           `shot-${stamp()}-${rand()}.png`,
+          args.overwrite,
         );
         await runFfmpeg(buildScreenshotArgs(target, output, monitors), 60_000);
         return okResponse({

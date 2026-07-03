@@ -11,6 +11,7 @@ const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
   factor: z.number().positive().describe("Speed multiplier: >1 is faster, <1 is slower (e.g. 2 = double speed)."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -31,6 +32,7 @@ export function register(server: McpServer): void {
           args.output,
           subdir("edits"),
           `speed-${stamp()}-${rand()}${ext}`,
+          args.overwrite,
         );
         const ffArgs = buildSpeedArgs(args.input, output, args.factor, audioCodec !== null);
         await runFfmpeg(ffArgs, 10 * 60_000);

@@ -22,6 +22,7 @@ const inputSchema = {
     .string()
     .optional()
     .describe("Optional output path. Only honored for a single segment; multi-segment output lands under SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -46,6 +47,7 @@ export function register(server: McpServer): void {
             single ? args.output : undefined,
             subdir("edits"),
             `clip-${stamp()}-${rand()}-${String(i).padStart(2, "0")}${ext}`,
+            args.overwrite,
           );
           await runFfmpeg(buildClipArgs(args.input, output, seg), 10 * 60_000);
           outputs.push(output);

@@ -24,6 +24,7 @@ const inputSchema = {
   height: z.number().int().positive().optional().describe("Common output height (default 1080)."),
   fps: z.number().int().positive().optional().describe("Common output fps (default 30)."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -46,6 +47,7 @@ export function register(server: McpServer): void {
           args.output,
           subdir("edits"),
           `highlights-${stamp()}-${rand()}.mp4`,
+          args.overwrite,
         );
         const ffArgs = buildAssembleArgs(
           args.clips,

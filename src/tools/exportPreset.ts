@@ -21,6 +21,7 @@ const inputSchema = {
     .optional()
     .describe("How to fit the source into the platform aspect: pad (default) or crop."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -37,7 +38,7 @@ export function register(server: McpServer): void {
           throw new ScreencastError(`Input file not found: ${args.input}`);
         }
         const platform = args.platform as Platform;
-        const output = resolveOutput(args.output, subdir("edits"), `${platform}-${stamp()}-${rand()}.mp4`);
+        const output = resolveOutput(args.output, subdir("edits"), `${platform}-${stamp()}-${rand()}.mp4`, args.overwrite);
         const ffArgs = buildExportPresetArgs(
           args.input,
           output,

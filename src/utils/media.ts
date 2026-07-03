@@ -6,7 +6,7 @@
  */
 import { ScreencastError } from "./errors.js";
 import { resolveQuality, type Quality } from "./targets.js";
-import { validateColor } from "./validate.js";
+import { validateColor, validateEvenDimension } from "./validate.js";
 
 /** Edit re-encodes default to the same preset as a standard capture. */
 const DEFAULT_EDIT_QUALITY: Quality = "standard";
@@ -238,8 +238,8 @@ export function buildCropArgs(
 ): string[] {
   const x = requireNonNegativeInt(rect.x, "crop x");
   const y = requireNonNegativeInt(rect.y, "crop y");
-  const w = requirePositiveInt(rect.width, "crop width");
-  const h = requirePositiveInt(rect.height, "crop height");
+  const w = validateEvenDimension(requirePositiveInt(rect.width, "crop width"), "crop width");
+  const h = validateEvenDimension(requirePositiveInt(rect.height, "crop height"), "crop height");
   if (dims && dims.width != null && dims.height != null) {
     if (x + w > dims.width || y + h > dims.height) {
       throw new ScreencastError(
@@ -268,8 +268,12 @@ export function buildScaleArgs(
   if (opts.width === undefined && opts.height === undefined) {
     throw new ScreencastError("scale requires width or height (or both).");
   }
-  if (opts.width !== undefined) requirePositiveInt(opts.width, "scale width");
-  if (opts.height !== undefined) requirePositiveInt(opts.height, "scale height");
+  if (opts.width !== undefined) {
+    validateEvenDimension(requirePositiveInt(opts.width, "scale width"), "scale width");
+  }
+  if (opts.height !== undefined) {
+    validateEvenDimension(requirePositiveInt(opts.height, "scale height"), "scale height");
+  }
   const w = opts.width ?? -2;
   const h = opts.height ?? -2;
   return [
@@ -404,6 +408,28 @@ const AUDIO_CODEC: Record<AudioFormat, string[]> = {
 };
 
 /** Strip video and write the audio track on its own (mp3 / aac / wav / copy). */
+/** Container extension that can hold a stream-copied audio codec. m4a (the old
+ * blanket choice) rejects opus/vorbis/etc at header-write time, leaving a
+ * broken file; Matroska audio (.mka) is the catch-all that accepts nearly any
+ * codec. Pure so the mapping is unit-tested. */
+export function copyAudioExtension(codec: string | null): string {
+  switch (codec) {
+    case "aac":
+    case "alac":
+      return "m4a";
+    case "mp3":
+      return "mp3";
+    case "opus":
+    case "vorbis":
+      return "ogg";
+    case "flac":
+      return "flac";
+    default:
+      if (codec && codec.startsWith("pcm_")) return "wav";
+      return "mka";
+  }
+}
+
 export function buildExtractAudioArgs(
   input: string,
   output: string,

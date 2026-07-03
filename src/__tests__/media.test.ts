@@ -18,6 +18,7 @@ import {
   buildCompressArgs,
   buildExtractAudioArgs,
   buildClipArgs,
+  copyAudioExtension,
 } from "../utils/media.js";
 
 describe("parseFrameRate", () => {
@@ -168,6 +169,10 @@ describe("buildCropArgs", () => {
     expect(() => buildCropArgs("i", "o", { x: 0, y: 0, width: 0, height: 50 })).toThrow();
     expect(() => buildCropArgs("i", "o", { x: -1, y: 0, width: 10, height: 10 })).toThrow();
   });
+  it("rejects odd dimensions with a clear error (yuv420p needs even)", () => {
+    expect(() => buildCropArgs("i", "o", { x: 0, y: 0, width: 101, height: 100 })).toThrow(/even/);
+    expect(() => buildCropArgs("i", "o", { x: 0, y: 0, width: 100, height: 101 })).toThrow(/even/);
+  });
 });
 
 describe("buildScaleArgs", () => {
@@ -177,6 +182,27 @@ describe("buildScaleArgs", () => {
   });
   it("requires at least one side", () => {
     expect(() => buildScaleArgs("i", "o", {})).toThrow();
+  });
+  it("rejects an explicit odd dimension (the omitted side is safe via -2)", () => {
+    expect(() => buildScaleArgs("i", "o", { width: 101, height: 101 })).toThrow(/even/);
+    expect(() => buildScaleArgs("i", "o", { width: 101 })).toThrow(/even/);
+    expect(buildScaleArgs("i", "o", { width: 100 }).join(" ")).toContain("scale=100:-2");
+  });
+});
+
+describe("copyAudioExtension", () => {
+  it("maps each codec family to a container that can hold it", () => {
+    expect(copyAudioExtension("aac")).toBe("m4a");
+    expect(copyAudioExtension("alac")).toBe("m4a");
+    expect(copyAudioExtension("mp3")).toBe("mp3");
+    expect(copyAudioExtension("opus")).toBe("ogg");
+    expect(copyAudioExtension("vorbis")).toBe("ogg");
+    expect(copyAudioExtension("flac")).toBe("flac");
+    expect(copyAudioExtension("pcm_s16le")).toBe("wav");
+  });
+  it("falls back to Matroska audio for anything unrecognized", () => {
+    expect(copyAudioExtension("ac3")).toBe("mka");
+    expect(copyAudioExtension(null)).toBe("mka");
   });
 });
 

@@ -13,6 +13,7 @@ const inputSchema = {
   end: z.number().positive().optional().describe("End time in seconds. Use end OR duration."),
   duration: z.number().positive().optional().describe("Clip length in seconds. Use end OR duration."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -32,6 +33,7 @@ export function register(server: McpServer): void {
           args.output,
           subdir("edits"),
           `trim-${stamp()}-${rand()}${ext}`,
+          args.overwrite,
         );
         const ffArgs = buildTrimArgs(args.input, output, {
           start: args.start,

@@ -188,3 +188,21 @@ describe("buildExportPresetArgs / PLATFORM_PRESETS", () => {
     expect(() => buildExportPresetArgs("i", "o", "myspace")).toThrow();
   });
 });
+
+describe("odd output dimensions are rejected (yuv420p needs even)", () => {
+  it("buildXfadeArgs", () => {
+    expect(() => buildXfadeArgs("a.mp4", "b.mp4", 5, "o.mp4", { width: 101 })).toThrow(/even/);
+    expect(() => buildXfadeArgs("a.mp4", "b.mp4", 5, "o.mp4", { height: 719 })).toThrow(/even/);
+  });
+  it("buildAssembleArgs", () => {
+    expect(() =>
+      buildAssembleArgs(["a.mp4", "b.mp4"], [5, 5], "o.mp4", { width: 1279 }),
+    ).toThrow(/even/);
+  });
+  it("buildTitleCardArgs", () => {
+    expect(() => buildTitleCardArgs("t.txt", "f.ttf", "o.mp4", { height: 1079 })).toThrow(/even/);
+  });
+  it("defaults remain accepted", () => {
+    expect(buildTitleCardArgs("t.txt", "f.ttf", "o.mp4").join(" ")).toContain("1920x1080");
+  });
+});

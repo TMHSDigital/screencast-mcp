@@ -17,6 +17,7 @@ const inputSchema = {
     .optional()
     .describe("pad (default): scale to fit and letterbox, no content lost. crop: scale to fill and center-crop."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -33,7 +34,7 @@ export function register(server: McpServer): void {
           throw new ScreencastError(`Input file not found: ${args.input}`);
         }
         const ext = extname(args.input) || ".mp4";
-        const output = resolveOutput(args.output, subdir("edits"), `reframe-${stamp()}-${rand()}${ext}`);
+        const output = resolveOutput(args.output, subdir("edits"), `reframe-${stamp()}-${rand()}${ext}`, args.overwrite);
         const ffArgs = buildReframeArgs(
           args.input,
           output,

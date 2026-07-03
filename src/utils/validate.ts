@@ -22,6 +22,21 @@ export function validateTransition(name: string): string {
   return name;
 }
 
+/** Reject an odd output dimension with a clear message instead of letting
+ * libx264 + yuv420p fail with a cryptic "not divisible by 2" tail. Used by the
+ * re-encode builders where the caller asked for an exact size (scale, crop,
+ * xfade_transition, assemble_highlights, title_card); the capture path rounds
+ * down instead because there the size comes from screen geometry. */
+export function validateEvenDimension(value: number, label: string): number {
+  if (value % 2 !== 0) {
+    throw new ScreencastError(
+      `${label} must be even, got ${value}: H.264 output with yuv420p cannot ` +
+        `encode odd dimensions. Use ${value - 1} or ${value + 1}.`,
+    );
+  }
+  return value;
+}
+
 // Characters that would break out of a filtergraph option value.
 const COLOR_META = /[:,;=[\]'"\\\s]/;
 
