@@ -12,6 +12,31 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - ESLint (flat config, typescript-eslint recommended) with a `lint` script, run
   in CI (#23). Tooling only; not part of the published package.
 
+## [0.8.13]
+
+### Fixed
+
+- **A recording whose ffmpeg crashes mid-run is now recorded as `failed`** with
+  the last lines of encoder stderr, instead of an indistinguishable clean
+  `stopped`. A deliberate `stop_recording` still finishes as `stopped`.
+- **`concat` works with relative input paths.** The concat demuxer resolves
+  relative list entries against the list file's directory (the OS temp dir),
+  not the server cwd; inputs are now made absolute before the list is written.
+- **The server advertises its real version.** `src/index.ts` reads the version
+  from `package.json` at runtime instead of a hardcoded string that had fallen
+  behind (it said 0.8.0 while the package was at 0.8.12).
+- **A corrupt `sessions.json` is backed up to `sessions.json.bak`** before the
+  registry starts fresh, instead of being silently discarded along with any
+  live-recording entries it held.
+- **`stop_recording` no longer sleeps a blind 400 ms** before probing the
+  finalized file; it polls for process exit (kill paths) or probes immediately
+  (graceful path).
+
+### Changed
+
+- CLAUDE.md no longer references a `src/providers/` layer that does not exist
+  in this codebase.
+
 ## [0.8.12]
 
 ### Fixed
