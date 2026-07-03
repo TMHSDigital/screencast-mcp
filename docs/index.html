@@ -3,57 +3,249 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Screencast MCP</title>
+  <title>Screencast MCP — give your agent eyes on the screen</title>
   <meta name="description" content="A Windows-first MCP server for screen recording, frame sampling, and minimal ffmpeg edits.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127916;</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
   <meta property="og:title" content="Screencast MCP">
   <meta property="og:description" content="A Windows-first MCP server for screen recording, frame sampling, and minimal ffmpeg edits.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/">
   <meta name="twitter:card" content="summary">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    :root { color-scheme: dark; }
+    :root {
+      color-scheme: dark;
+      --desktop: #0A0D12;
+      --panel: #11161E;
+      --line: #232B36;
+      --ink: #EAF0F6;
+      --dim: #93A0AE;
+      --amber: #FFB454;
+      --rec: #FF4545;
+      --display: "Bricolage Grotesque", system-ui, sans-serif;
+      --body: "Figtree", system-ui, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
     * { box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; background: #0d1117; color: #e6edf3; margin: 0; line-height: 1.6; }
-    .wrap { max-width: 860px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
-    h1 { color: #a78bfa; font-size: 2.2rem; margin-bottom: 0.25rem; }
-    h2 { color: #c4b5fd; border-bottom: 1px solid #21262d; padding-bottom: 0.3rem; margin-top: 2.5rem; }
-    .tag { display: inline-block; background: #161b22; border: 1px solid #30363d; color: #8b949e; border-radius: 999px; padding: 0.15rem 0.7rem; font-size: 0.8rem; margin-right: 0.4rem; }
-    a { color: #a78bfa; }
-    code { background: #161b22; border: 1px solid #21262d; border-radius: 4px; padding: 0.1rem 0.35rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
-    pre { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 1rem; overflow-x: auto; }
-    pre code { border: 0; padding: 0; background: none; }
-    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
-    th, td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid #21262d; vertical-align: top; }
-    th { color: #c9d1d9; }
-    td code { white-space: nowrap; }
-    .note { background: #161b22; border-left: 3px solid #a78bfa; border-radius: 0 8px 8px 0; padding: 0.8rem 1rem; margin: 1rem 0; }
-    footer { margin-top: 3rem; color: #8b949e; font-size: 0.85rem; }
+    html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
+    body {
+      font-family: var(--body);
+      background: var(--desktop);
+      color: var(--ink);
+      margin: 0;
+      line-height: 1.65;
+      font-size: 1.0625rem;
+    }
+    a { color: var(--amber); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a:hover { color: var(--ink); }
+    :focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 2px; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.875em;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 0.1rem 0.35rem;
+    }
+    pre {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1rem 1.2rem;
+      overflow-x: auto;
+      font-size: 0.95rem;
+    }
+    pre code { border: 0; padding: 0; background: none; font-size: 0.875em; }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 0 1.5rem; }
+
+    /* ---- HUD: the fixed recording chrome ---- */
+    .hud {
+      position: fixed; inset: 0 0 auto 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.65rem 1.25rem;
+      font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.04em;
+      color: var(--dim);
+      background: color-mix(in srgb, var(--desktop) 82%, transparent);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line);
+    }
+    .hud-left { display: flex; align-items: center; gap: 0.6rem; }
+    .rec-dot {
+      width: 0.65rem; height: 0.65rem; border-radius: 50%;
+      background: var(--rec);
+      animation: rec-pulse 1.6s ease-in-out infinite;
+    }
+    .rec-label { color: var(--rec); font-weight: 500; }
+    .hud #tc { color: var(--ink); font-variant-numeric: tabular-nums; }
+    .hud-right { display: flex; align-items: center; gap: 1.1rem; }
+    .hud-right a { color: var(--dim); text-decoration: none; }
+    .hud-right a:hover { color: var(--amber); }
+    @keyframes rec-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+    /* ---- Hero: headline inside a capture marquee ---- */
+    .hero { padding: 9.5rem 0 5rem; }
+    .eyebrow {
+      font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.14em;
+      color: var(--dim); margin: 0 0 1.6rem;
+    }
+    .marquee {
+      position: relative;
+      display: inline-block;
+      padding: clamp(1.4rem, 4vw, 2.6rem) clamp(1.2rem, 4.5vw, 3rem);
+      border: 1px dashed color-mix(in srgb, var(--dim) 55%, transparent);
+      animation: marquee-in 0.7s ease-out 0.15s backwards;
+    }
+    .marquee .handle {
+      position: absolute; width: 9px; height: 9px;
+      background: var(--desktop); border: 1.5px solid var(--ink);
+    }
+    .handle.tl { top: -5px; left: -5px; }
+    .handle.tr { top: -5px; right: -5px; }
+    .handle.bl { bottom: -5px; left: -5px; }
+    .handle.br { bottom: -5px; right: -5px; }
+    .marquee .dims {
+      position: absolute; right: 0; bottom: -1.7rem;
+      font-family: var(--mono); font-size: 0.72rem; color: var(--dim);
+    }
+    @keyframes marquee-in {
+      from { opacity: 0; transform: scale(0.985); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    h1 {
+      font-family: var(--display);
+      font-weight: 800;
+      font-size: clamp(2.1rem, 6.2vw, 4.2rem);
+      line-height: 1.04;
+      letter-spacing: -0.015em;
+      margin: 0;
+    }
+    h1 .amber { color: var(--amber); }
+    .sub {
+      max-width: 44rem; color: var(--dim); font-size: 1.125rem;
+      margin: 2.6rem 0 2rem;
+    }
+    .sub strong { color: var(--ink); font-weight: 600; }
+    .cta-row { display: flex; flex-wrap: wrap; gap: 0.9rem; align-items: center; }
+    .install-cmd {
+      display: flex; align-items: center; gap: 0.9rem;
+      font-family: var(--mono); font-size: 0.95rem;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+      padding: 0.7rem 1.1rem;
+    }
+    .install-cmd .dollar { color: var(--dim); user-select: none; }
+    .install-cmd button {
+      font-family: var(--mono); font-size: 0.78rem;
+      color: var(--amber); background: none;
+      border: 1px solid var(--line); border-radius: 5px;
+      padding: 0.25rem 0.6rem; cursor: pointer;
+    }
+    .install-cmd button:hover { border-color: var(--amber); }
+    .gh-link { font-family: var(--mono); font-size: 0.9rem; }
+
+    /* ---- Chapters ---- */
+    .chapter { padding: 3.6rem 0 0.4rem; }
+    .tc-mark {
+      display: flex; align-items: baseline; gap: 0.8rem;
+      font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.1em;
+      color: var(--dim);
+      border-top: 1px solid var(--line); padding-top: 1.1rem;
+    }
+    .tc-mark .tc { color: var(--amber); }
+    h2 {
+      font-family: var(--display); font-weight: 700;
+      font-size: clamp(1.5rem, 3.4vw, 2.1rem);
+      letter-spacing: -0.01em;
+      margin: 0.9rem 0 0.7rem;
+    }
+    .chapter > p { max-width: 46rem; color: var(--dim); margin-top: 0; }
+    .chapter > p strong, .chapter > p code { color: var(--ink); }
+
+    /* ---- Tool tables ---- */
+    table { width: 100%; border-collapse: collapse; margin: 1.4rem 0 0.6rem; }
+    th, td { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th {
+      font-family: var(--mono); font-weight: 500; font-size: 0.75rem;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim);
+    }
+    td:first-child { white-space: nowrap; }
+    td code { background: none; border: 0; padding: 0; color: var(--amber); font-size: 0.85rem; }
+    td:last-child { color: var(--dim); font-size: 0.95rem; }
+
+    /* ---- Prose sections ---- */
+    ul { padding-left: 1.2rem; color: var(--dim); }
+    ul li { margin: 0.5rem 0; }
+    ul li code { color: var(--ink); }
+    .note {
+      background: var(--panel);
+      border-left: 3px solid var(--rec);
+      border-radius: 0 8px 8px 0;
+      padding: 1rem 1.2rem;
+      margin: 1.4rem 0;
+      color: var(--dim);
+      max-width: 46rem;
+    }
+    .note strong { color: var(--ink); }
+
+    footer {
+      margin-top: 5rem; padding: 2rem 0 3rem;
+      border-top: 1px solid var(--line);
+      font-family: var(--mono); font-size: 0.8rem; color: var(--dim);
+      display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between;
+    }
+
+    @media (max-width: 640px) {
+      .hud { font-size: 0.72rem; padding: 0.55rem 1rem; }
+      .hud-right .pkg { display: none; }
+      .hero { padding-top: 7.5rem; }
+      .install-cmd { font-size: 0.8rem; width: 100%; justify-content: space-between; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .rec-dot { animation: none; }
+      .marquee { animation: none; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Screencast MCP</h1>
-    <p>
-      <span class="tag">MCP server</span>
-      <span class="tag">TypeScript</span>
-      <span class="tag">Windows-first</span>
-      <span class="tag">ffmpeg</span>
-    </p>
-    <p>A Model Context Protocol server that lets an agent record the screen, take
-    screenshots, "watch" footage by sampling frames into viewable images, and run
-    a small set of ffmpeg edits. It speaks MCP over stdio.</p>
-    <p><a href="https://github.com/TMHSDigital/screencast-mcp">View on GitHub</a></p>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <span class="pkg">@tmhs/screencast-mcp</span>
+      <a href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
 
-    <h2 id="prerequisites">Prerequisites</h2>
-    <p><code>ffmpeg</code> and <code>ffprobe</code> must be installed and on
-    <code>PATH</code> (or set via <code>FFMPEG_PATH</code> /
-    <code>FFPROBE_PATH</code>). Screen capture uses <code>gdigrab</code>, which is
-    Windows-only; the watch and edit tools run anywhere ffmpeg runs.</p>
-
-    <h2 id="install">Install</h2>
-    <pre><code>npm install -g @tmhs/screencast-mcp</code></pre>
-    <pre><code>{
+  <main class="wrap">
+    <section class="hero">
+      <p class="eyebrow">MCP SERVER &middot; WINDOWS CAPTURE &middot; FFMPEG</p>
+      <div class="marquee">
+        <span class="handle tl" aria-hidden="true"></span>
+        <span class="handle tr" aria-hidden="true"></span>
+        <span class="handle bl" aria-hidden="true"></span>
+        <span class="handle br" aria-hidden="true"></span>
+        <h1>Give your agent<br>eyes on <span class="amber">the screen</span>.</h1>
+        <span class="dims" aria-hidden="true">1920 &times; 1080 @ 30fps</span>
+      </div>
+      <p class="sub"><strong>screencast-mcp</strong> records the Windows screen, samples
+      footage into frames an agent can actually look at, and cuts the result with
+      ffmpeg &mdash; from a quick trim to a platform-ready export. It speaks MCP
+      over stdio, so it plugs into any MCP client.</p>
+      <div class="cta-row" id="install">
+        <span class="install-cmd"><span class="dollar">$</span><span id="cmd">npm install -g @tmhs/screencast-mcp</span><button id="copy" type="button" aria-label="Copy install command">copy</button></span>
+        <a class="gh-link" href="https://github.com/TMHSDigital/screencast-mcp">View source &nearr;</a>
+      </div>
+      <p id="prerequisites" class="sub" style="font-size: 0.95rem; margin-top: 1.6rem;">
+      Needs <code>ffmpeg</code> and <code>ffprobe</code> on <code>PATH</code>
+      (or <code>FFMPEG_PATH</code> / <code>FFPROBE_PATH</code>). Capture uses
+      <code>gdigrab</code>, which is Windows-only; the watch and edit tools run
+      anywhere ffmpeg runs. Add it to an MCP client with:</p>
+      <pre><code>{
   "mcpServers": {
     "screencast": {
       "command": "npx",
@@ -61,68 +253,159 @@
     }
   }
 }</code></pre>
+    </section>
 
-    <h2 id="tools">Tools</h2>
-    <p>Tools that write a file refuse to replace an existing file at a
-    caller-supplied <code>output</code> path unless <code>overwrite: true</code>
-    is passed; auto-generated default paths are always unique.</p>
-    <table>
-      <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
-      <tbody>
-        <tr><td><code>start_recording</code></td><td>Start a background recording. Target = full, a monitor, a window by title, or a region. Optional fps and quality preset.</td></tr>
-        <tr><td><code>stop_recording</code></td><td>Stop a session by id with a graceful quit so the file is finalized, not truncated.</td></tr>
-        <tr><td><code>list_sessions</code></td><td>List active and finished recording sessions.</td></tr>
-        <tr><td><code>get_session</code></td><td>Inspect a single session by id.</td></tr>
-        <tr><td><code>screenshot</code></td><td>Capture a single PNG of a target.</td></tr>
-        <tr><td><code>sample_frames</code></td><td>Extract frames at a fixed fps or at explicit timestamps so the agent can view what happened.</td></tr>
-        <tr><td><code>get_media_info</code></td><td>ffprobe wrapper: duration, resolution, fps, codecs, format, size.</td></tr>
-        <tr><td><code>trim</code></td><td>Cut a sub-clip by start + end or duration.</td></tr>
-        <tr><td><code>concat</code></td><td>Join two or more videos into one.</td></tr>
-        <tr><td><code>convert</code></td><td>Convert between mp4, gif, and webm.</td></tr>
-        <tr><td><code>crop</code></td><td>Crop to a pixel rectangle; an off-frame rectangle is rejected.</td></tr>
-        <tr><td><code>scale</code></td><td>Resize to a width and/or height, keeping aspect when one side is given.</td></tr>
-        <tr><td><code>speed</code></td><td>Change playback speed by a factor; audio is retempo'd when present.</td></tr>
-        <tr><td><code>overlay</code></td><td>Composite a logo, watermark, or picture-in-picture, optionally scaled and time-limited.</td></tr>
-        <tr><td><code>compress</code></td><td>Re-encode smaller with a CRF ladder and an optional width cap.</td></tr>
-        <tr><td><code>extract_audio</code></td><td>Write the audio track to its own file (mp3, aac, wav, or copy).</td></tr>
-        <tr><td><code>clip</code></td><td>Extract one or more frame-accurate sub-segments to separate files.</td></tr>
-        <tr><td><code>redact_region</code></td><td>Cover declared rectangles (solid box, blur, or pixelate) to hide on-screen secrets. Declared regions only, not automatic detection.</td></tr>
-        <tr><td><code>list_audio_devices</code></td><td>List DirectShow audio devices and flag a likely system-audio loopback device for start_recording.</td></tr>
-        <tr><td><code>xfade_transition</code></td><td>Crossfade two videos into one with an xfade transition. Inputs are auto-normalized first.</td></tr>
-        <tr><td><code>assemble_highlights</code></td><td>Stitch two or more clips into one with hard cuts or an xfade transition between each.</td></tr>
-        <tr><td><code>title_card</code></td><td>Generate a standalone title card with centered text on a solid background. Uses a bundled font.</td></tr>
-        <tr><td><code>music_bed</code></td><td>Lay a music track under a video: looped/trimmed, faded, leveled, and mixed with any existing audio.</td></tr>
-        <tr><td><code>reframe</code></td><td>Re-aspect to 16:9, 9:16, 1:1, or 4:5 with pad (letterbox) or crop (fill).</td></tr>
-        <tr><td><code>export_preset</code></td><td>Encode a platform-ready file (youtube, instagram_reel, tiktok, x, square) at the right aspect, fps, and bitrate.</td></tr>
-      </tbody>
-    </table>
+    <div id="tools">
+      <section class="chapter" id="capture">
+        <div class="tc-mark"><span class="tc">00:02</span><span>CHAPTER 1 / CAPTURE</span></div>
+        <h2>Point it at anything on screen.</h2>
+        <p>Record the whole desktop, one monitor, a window by title, or an exact
+        pixel region &mdash; with optional system audio through a loopback device.
+        Recordings run as background sessions you stop by id; screenshots are one
+        call. Every capture is an explicit tool call: nothing records on its own.</p>
+        <table>
+          <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>start_recording</code></td><td>Start a background recording. Target = full, a monitor, a window by title, or a region. Optional fps, quality preset, and system audio.</td></tr>
+            <tr><td><code>stop_recording</code></td><td>Stop a session by id with a graceful quit so the file is finalized, not truncated.</td></tr>
+            <tr><td><code>screenshot</code></td><td>Capture a single PNG of a target.</td></tr>
+            <tr><td><code>list_sessions</code></td><td>List active and finished recording sessions.</td></tr>
+            <tr><td><code>get_session</code></td><td>Inspect a single session by id.</td></tr>
+            <tr><td><code>list_audio_devices</code></td><td>List DirectShow audio devices and flag a likely system-audio loopback device for start_recording.</td></tr>
+          </tbody>
+        </table>
+      </section>
 
-    <h2 id="windows-notes">Windows notes</h2>
-    <ul>
-      <li>Monitor targets crop the virtual desktop to a display's real pixel
-      bounds, so <code>monitor:1</code> grabs the second display at its true
-      offset; <code>monitor:0</code> is primary.</li>
-      <li>Window capture matches a case-insensitive exact title first, then
-      falls back to a substring match; with several matches the topmost window
-      wins.</li>
-      <li>Fullscreen-exclusive apps can produce black frames under gdigrab; use
-      borderless-windowed mode.</li>
-      <li>System audio capture (<code>start_recording</code> with
-      <code>audio.source</code> = system) needs a virtual-audio loopback device,
-      since gdigrab is video-only and Windows has no native loopback. Use
-      <code>list_audio_devices</code> to find one. Microphone capture is not
-      supported.</li>
-    </ul>
+      <section class="chapter" id="watch">
+        <div class="tc-mark"><span class="tc">00:14</span><span>CHAPTER 2 / WATCH</span></div>
+        <h2>Video a model can read.</h2>
+        <p>A video file is opaque to a language model. <code>sample_frames</code>
+        turns footage into PNGs an agent can actually view &mdash; at a fixed rate
+        for a full pass, or at exact timestamps to check one moment.</p>
+        <table>
+          <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>sample_frames</code></td><td>Extract frames at a fixed fps or at explicit timestamps so the agent can view what happened.</td></tr>
+            <tr><td><code>get_media_info</code></td><td>ffprobe wrapper: duration, resolution, fps, codecs, format, size.</td></tr>
+          </tbody>
+        </table>
+      </section>
 
-    <h2 id="threat-model">Threat model</h2>
-    <div class="note">
-      Screen capture can record anything on screen, including secrets. Capture is
-      always explicit (a tool call, never automatic), output stays on the local
-      filesystem, and this public repo ignores captured media so test recordings
-      cannot be committed by accident. Review frames before sharing a file.
+      <section class="chapter" id="edit">
+        <div class="tc-mark"><span class="tc">00:26</span><span>CHAPTER 3 / EDIT</span></div>
+        <h2>Small cuts, clean errors.</h2>
+        <p>Composable ffmpeg edits with validated inputs &mdash; a bad rectangle,
+        an odd dimension, or a wrong duration is rejected with a message that says
+        how to fix it, not an encoder stack trace. Tools that write a file refuse
+        to replace an existing file at a caller-supplied <code>output</code> path
+        unless <code>overwrite: true</code> is passed; auto-generated default
+        paths are always unique.</p>
+        <table>
+          <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>trim</code></td><td>Cut a sub-clip by start + end or duration. Stream copy, snaps to keyframes.</td></tr>
+            <tr><td><code>clip</code></td><td>Extract one or more frame-accurate sub-segments to separate files.</td></tr>
+            <tr><td><code>concat</code></td><td>Join two or more videos into one.</td></tr>
+            <tr><td><code>convert</code></td><td>Convert between mp4, gif, and webm.</td></tr>
+            <tr><td><code>crop</code></td><td>Crop to a pixel rectangle; an off-frame rectangle is rejected.</td></tr>
+            <tr><td><code>scale</code></td><td>Resize to a width and/or height, keeping aspect when one side is given.</td></tr>
+            <tr><td><code>speed</code></td><td>Change playback speed by a factor; audio is retempo'd when present.</td></tr>
+            <tr><td><code>overlay</code></td><td>Composite a logo, watermark, or picture-in-picture, optionally scaled and time-limited.</td></tr>
+            <tr><td><code>compress</code></td><td>Re-encode smaller with a CRF ladder and an optional width cap.</td></tr>
+            <tr><td><code>extract_audio</code></td><td>Write the audio track to its own file (mp3, aac, wav, or copy &mdash; copy picks a container that fits the source codec).</td></tr>
+            <tr><td><code>redact_region</code></td><td>Cover declared rectangles (solid box, blur, or pixelate) to hide on-screen secrets. Declared regions only, not automatic detection.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="chapter" id="produce">
+        <div class="tc-mark"><span class="tc">00:41</span><span>CHAPTER 4 / PRODUCE</span></div>
+        <h2>From raw capture to something you&rsquo;d publish.</h2>
+        <p>Assembly, titles, music, and platform-shaped exports. Mixed inputs are
+        normalized to a common resolution, fps, and audio rate before they are
+        combined, so heterogeneous clips compose cleanly.</p>
+        <table>
+          <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>assemble_highlights</code></td><td>Stitch two or more clips into one with hard cuts or an xfade transition between each.</td></tr>
+            <tr><td><code>xfade_transition</code></td><td>Crossfade two videos into one with an xfade transition. Inputs are auto-normalized first.</td></tr>
+            <tr><td><code>title_card</code></td><td>Generate a standalone title card with centered text on a solid background. Uses a bundled font.</td></tr>
+            <tr><td><code>music_bed</code></td><td>Lay a music track under a video: looped/trimmed, faded, leveled, and mixed with any existing audio.</td></tr>
+            <tr><td><code>reframe</code></td><td>Re-aspect to 16:9, 9:16, 1:1, or 4:5 with pad (letterbox) or crop (fill).</td></tr>
+            <tr><td><code>export_preset</code></td><td>Encode a platform-ready file (youtube, instagram_reel, tiktok, x, square) at the right aspect, fps, and bitrate.</td></tr>
+          </tbody>
+        </table>
+      </section>
     </div>
 
-    <footer>Built by TMHSDigital &middot; CC-BY-NC-ND-4.0</footer>
-  </div>
+    <section class="chapter" id="windows-notes">
+      <div class="tc-mark"><span class="tc">00:52</span><span>APPENDIX / WINDOWS NOTES</span></div>
+      <h2>Know your capture surface.</h2>
+      <ul>
+        <li>Monitor targets crop the virtual desktop to a display&rsquo;s real pixel
+        bounds, so <code>monitor:1</code> grabs the second display at its true
+        offset; <code>monitor:0</code> is primary.</li>
+        <li>Window capture matches a case-insensitive exact title first, then
+        falls back to a substring match; with several matches the topmost window
+        wins.</li>
+        <li>Fullscreen-exclusive apps can produce black frames under gdigrab; use
+        borderless-windowed mode.</li>
+        <li>System audio capture (<code>start_recording</code> with
+        <code>audio.source</code> = system) needs a virtual-audio loopback device,
+        since gdigrab is video-only and Windows has no native loopback. Use
+        <code>list_audio_devices</code> to find one. Microphone capture is not
+        supported.</li>
+      </ul>
+    </section>
+
+    <section class="chapter" id="threat-model">
+      <div class="tc-mark"><span class="tc">00:55</span><span>APPENDIX / SAFETY</span></div>
+      <h2>The screen is sensitive. Treat it that way.</h2>
+      <div class="note">
+        <strong>Screen capture can record anything on screen, including secrets.</strong>
+        Capture is always explicit (a tool call, never automatic), output stays on
+        the local filesystem, and this public repo ignores captured media so test
+        recordings cannot be committed by accident. Review frames before sharing
+        a file, and use <code>redact_region</code> before anything leaves the
+        machine.
+      </div>
+    </section>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>CC-BY-NC-ND-4.0</span>
+    </footer>
+  </main>
+
+  <script>
+    (function () {
+      var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var tc = document.getElementById("tc");
+      if (!reduced && tc) {
+        var start = performance.now();
+        var pad = function (n) { return String(n).padStart(2, "0"); };
+        var tick = function (now) {
+          var s = (now - start) / 1000;
+          tc.textContent =
+            pad(Math.floor(s / 3600)) + ":" +
+            pad(Math.floor(s / 60) % 60) + ":" +
+            pad(Math.floor(s) % 60) + ";" +
+            pad(Math.floor((s % 1) * 30));
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+      var copy = document.getElementById("copy");
+      var cmd = document.getElementById("cmd");
+      if (copy && cmd && navigator.clipboard) {
+        copy.addEventListener("click", function () {
+          navigator.clipboard.writeText(cmd.textContent).then(function () {
+            copy.textContent = "copied";
+            setTimeout(function () { copy.textContent = "copy"; }, 1500);
+          });
+        });
+      }
+    })();
+  </script>
 </body>
 </html>
