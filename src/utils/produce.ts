@@ -10,7 +10,11 @@
 import { ScreencastError } from "./errors.js";
 import { resolveQuality, type Quality } from "./targets.js";
 import { escapeFilterPath } from "./fonts.js";
-import { validateTransition, validateColor } from "./validate.js";
+import {
+  validateTransition,
+  validateColor,
+  validateEvenDimension,
+} from "./validate.js";
 
 export const DEFAULT_PRODUCE_WIDTH = 1920;
 export const DEFAULT_PRODUCE_HEIGHT = 1080;
@@ -29,6 +33,20 @@ export interface NormalizeOpts {
 
 function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
+}
+
+/** Output W/H for a produce builder: explicit values must be even (H.264 +
+ * yuv420p rejects odd dimensions); the defaults already are. */
+function producedDims(opts: { width?: number; height?: number }): {
+  w: number;
+  h: number;
+} {
+  if (opts.width !== undefined) validateEvenDimension(opts.width, "width");
+  if (opts.height !== undefined) validateEvenDimension(opts.height, "height");
+  return {
+    w: opts.width ?? DEFAULT_PRODUCE_WIDTH,
+    h: opts.height ?? DEFAULT_PRODUCE_HEIGHT,
+  };
 }
 
 /** Video normalization chain: fit inside WxH, letterbox, square pixels, fixed
@@ -79,8 +97,7 @@ export function buildXfadeArgs(
   opts: XfadeOptions = {},
   hasAudio = false,
 ): string[] {
-  const w = opts.width ?? DEFAULT_PRODUCE_WIDTH;
-  const h = opts.height ?? DEFAULT_PRODUCE_HEIGHT;
+  const { w, h } = producedDims(opts);
   const fps = opts.fps ?? DEFAULT_PRODUCE_FPS;
   const rate = opts.audioRate ?? DEFAULT_AUDIO_RATE;
   const transition = validateTransition(opts.transition ?? "fade");
@@ -138,8 +155,7 @@ export function buildAssembleArgs(
   if (inputs.length < 2) {
     throw new ScreencastError("assemble_highlights requires at least two clips.");
   }
-  const w = opts.width ?? DEFAULT_PRODUCE_WIDTH;
-  const h = opts.height ?? DEFAULT_PRODUCE_HEIGHT;
+  const { w, h } = producedDims(opts);
   const fps = opts.fps ?? DEFAULT_PRODUCE_FPS;
   const rate = opts.audioRate ?? DEFAULT_AUDIO_RATE;
   const transition = opts.transition ?? "cut";
@@ -256,8 +272,7 @@ export function buildTitleCardArgs(
   output: string,
   opts: TitleCardOptions = {},
 ): string[] {
-  const w = opts.width ?? DEFAULT_PRODUCE_WIDTH;
-  const h = opts.height ?? DEFAULT_PRODUCE_HEIGHT;
+  const { w, h } = producedDims(opts);
   const dur = opts.duration ?? 3;
   const fps = opts.fps ?? DEFAULT_PRODUCE_FPS;
   const bg = validateColor(opts.bg ?? "black", "bg");
