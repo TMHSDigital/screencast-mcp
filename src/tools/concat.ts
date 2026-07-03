@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { extname } from "node:path";
+import { extname, resolve } from "node:path";
 import { existsSync, writeFileSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
@@ -24,19 +24,23 @@ export function register(server: McpServer): void {
     async (args) => {
       try {
         requireFfmpeg();
-        for (const f of args.inputs) {
+        // The concat demuxer resolves relative list entries against the list
+        // file's directory (the OS temp dir), not our cwd, so inputs must be
+        // absolute by the time they are written to the list.
+        const inputs = args.inputs.map((f) => resolve(f));
+        for (const f of inputs) {
           if (!existsSync(f)) throw new ScreencastError(`Input file not found: ${f}`);
         }
-        const ext = extname(args.inputs[0]) || ".mp4";
+        const ext = extname(inputs[0]) || ".mp4";
         const output = resolveOutput(args.output, subdir("edits"), `concat-${stamp()}-${rand()}${ext}`);
         const listFile = tempPath(".txt");
-        writeFileSync(listFile, buildConcatListContent(args.inputs));
+        writeFileSync(listFile, buildConcatListContent(inputs));
         try {
           await runFfmpeg(buildConcatArgs(listFile, output), 10 * 60_000);
         } finally {
           rmSync(listFile, { force: true });
         }
-        return okResponse({ outputPath: output, inputCount: args.inputs.length });
+        return okResponse({ outputPath: output, inputCount: inputs.length });
       } catch (error) {
         return errorResponse(error);
       }
