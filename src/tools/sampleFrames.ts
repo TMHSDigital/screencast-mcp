@@ -53,10 +53,14 @@ export function register(server: McpServer): void {
 
         let frames: string[] = [];
         if (hasFps) {
-          const pattern = join(dir, "frame_%05d.png");
+          // A reused outputDir may already contain frames from a previous run;
+          // a per-run prefix keeps runs apart so only THIS run's frames are
+          // reported (and older ones are never silently overwritten).
+          const runPrefix = `frame_${stamp()}-${rand()}_`;
+          const pattern = join(dir, `${runPrefix}%05d.png`);
           await runFfmpeg(buildSampleByFpsArgs(args.input, args.fps!, pattern), 5 * 60_000);
           frames = readdirSync(dir)
-            .filter((f) => f.endsWith(".png"))
+            .filter((f) => f.startsWith(runPrefix) && f.endsWith(".png"))
             .sort()
             .map((f) => join(dir, f));
         } else {
