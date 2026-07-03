@@ -159,16 +159,47 @@ function validateFps(fps: number): number {
   return fps;
 }
 
+/**
+ * Round a capture target's dimensions down to even for video encoding.
+ * libx264 + yuv420p rejects odd dimensions; the window path already enforces
+ * this (windows.ts), but a raw region:/monitor: spec can be odd-sized. A
+ * monitor becomes an equivalent region so its size can be adjusted. Screenshot
+ * (PNG) output has no such constraint and must NOT go through this.
+ */
+export function evenizeForVideo(target: Target, monitors: Monitor[]): Target {
+  if (target.kind === "region") {
+    const w = target.w - (target.w % 2);
+    const h = target.h - (target.h % 2);
+    if (w <= 0 || h <= 0) {
+      throw new ScreencastError(
+        "region is too small to record (needs at least 2x2 pixels).",
+      );
+    }
+    return { ...target, w, h };
+  }
+  if (target.kind === "monitor") {
+    const m = resolveMonitor(target.index, monitors);
+    const w = m.width - (m.width % 2);
+    const h = m.height - (m.height % 2);
+    if (w <= 0 || h <= 0) {
+      throw new ScreencastError(`monitor:${target.index} is too small to record.`);
+    }
+    return { kind: "region", x: m.x, y: m.y, w, h };
+  }
+  return target;
+}
+
 /** Build the full ffmpeg argument vector for a recording (gdigrab -> mp4). */
 export function buildCaptureArgs(target: Target, opts: CaptureOptions): string[] {
   const fps = validateFps(opts.fps ?? DEFAULT_FPS);
   const quality = opts.quality ?? DEFAULT_QUALITY;
   const monitors = opts.monitors ?? [];
+  const video = evenizeForVideo(target, monitors);
   return [
     "-y",
     "-f", "gdigrab",
     "-framerate", String(fps),
-    ...targetInputArgs(target, monitors),
+    ...targetInputArgs(video, monitors),
     ...buildAudioInputArgs(),
     ...resolveQuality(quality),
     // Fragmented mp4: keeps the file playable even if the process is killed

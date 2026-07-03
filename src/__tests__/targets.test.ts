@@ -131,6 +131,39 @@ describe("buildCaptureArgs", () => {
     ).toThrow();
   });
 
+  it("floors an odd-sized region down to even for libx264/yuv420p", () => {
+    const s = buildCaptureArgs(
+      { kind: "region", x: 0, y: 0, w: 101, h: 101 },
+      { output: "odd.mp4" },
+    ).join(" ");
+    expect(s).toContain("-video_size 100x100");
+  });
+
+  it("floors an odd-sized monitor down to even", () => {
+    const oddMonitor: Monitor[] = [
+      { index: 0, x: 0, y: 0, width: 1361, height: 769, primary: true },
+    ];
+    const s = buildCaptureArgs(
+      { kind: "monitor", index: 0 },
+      { output: "odd.mp4", monitors: oddMonitor },
+    ).join(" ");
+    expect(s).toContain("-video_size 1360x768");
+  });
+
+  it("rejects a region too small to encode", () => {
+    expect(() =>
+      buildCaptureArgs({ kind: "region", x: 0, y: 0, w: 1, h: 100 }, { output: "x.mp4" }),
+    ).toThrow();
+  });
+
+  it("does not evenize screenshots (PNG has no dimension constraint)", () => {
+    const s = buildScreenshotArgs(
+      { kind: "region", x: 0, y: 0, w: 101, h: 101 },
+      "shot.png",
+    ).join(" ");
+    expect(s).toContain("-video_size 101x101");
+  });
+
   it("does not wire any audio input in Phase 1", () => {
     const s = buildCaptureArgs({ kind: "full" }, { output: "x.mp4" }).join(" ");
     expect(s).not.toContain("dshow");
