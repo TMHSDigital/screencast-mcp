@@ -12,6 +12,29 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - ESLint (flat config, typescript-eslint recommended) with a `lint` script, run
   in CI (#23). Tooling only; not part of the published package.
 
+## [0.9.0]
+
+### Changed
+
+- **Tools no longer silently overwrite an existing file at a caller-supplied
+  `output` path** (#37). Every tool with an `output` parameter now refuses an
+  existing path with a clear error unless the new optional `overwrite: true`
+  is passed. Auto-generated default paths (unique names under
+  `SCREENCAST_HOME`) are unaffected.
+
+### Fixed
+
+- **`extract_audio` with `format: "copy"` picks a container that matches the
+  source codec** (#36). The blanket `.m4a` broke for opus/vorbis/etc; the
+  source is now probed and mapped (aac/alac → m4a, mp3 → mp3, opus/vorbis →
+  ogg, flac → flac, pcm → wav, anything else → mka), and an input with no
+  audio stream errors up front. The response includes `sourceAudioCodec`.
+- **Odd output dimensions are rejected with a clear error in the re-encode
+  tools** (#47). `scale`, `crop`, `xfade_transition`, `assemble_highlights`,
+  and `title_card` now reject an explicit odd `width`/`height` (H.264 +
+  yuv420p cannot encode them) instead of failing with a cryptic
+  "not divisible by 2" encoder tail.
+
 ## [0.8.13]
 
 ### Fixed
