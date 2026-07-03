@@ -22,7 +22,7 @@ jobs:
       # release. main is protected and is NEVER written to by CI; bump the
       # version in your PR. A GITHUB_TOKEN release does not trigger publish.yml,
       # so this job dispatches it explicitly afterward.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
