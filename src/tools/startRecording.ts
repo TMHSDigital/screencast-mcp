@@ -136,11 +136,27 @@ export function register(server: McpServer): void {
         const store = getStore();
         store.create(record);
         store.attachChild(id, child);
-        // Keep the on-disk record consistent if the child dies on its own.
-        child.on("exit", () => {
+        // Keep the on-disk record consistent if the child dies on its own. A
+        // non-zero exit is a crash (disk full, encoder failure), not a clean
+        // stop - record it as "failed" with the stderr tail so the caller can
+        // tell the two apart. stop_recording's own update runs after this and
+        // overrides for deliberate stops.
+        child.on("exit", (code) => {
           const cur = store.get(id);
           if (cur && cur.status === "recording") {
-            store.update(id, { status: "stopped", stoppedAt: new Date().toISOString() });
+            if (code !== 0 && code !== null) {
+              store.update(id, {
+                status: "failed",
+                stoppedAt: new Date().toISOString(),
+                error: `ffmpeg exited with code ${code}:\n${stderrTail
+                  .trim()
+                  .split("\n")
+                  .slice(-6)
+                  .join("\n")}`,
+              });
+            } else {
+              store.update(id, { status: "stopped", stoppedAt: new Date().toISOString() });
+            }
           }
           store.detachChild(id);
         });

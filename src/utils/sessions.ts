@@ -11,7 +11,13 @@
  * logic (classifyOrphan) is pure so it is unit-tested without real processes.
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync, renameSync, existsSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  renameSync,
+  existsSync,
+  copyFileSync,
+} from "node:fs";
 import type { ChildProcess } from "node:child_process";
 import type { Quality } from "./targets.js";
 
@@ -131,13 +137,24 @@ export class SessionStore {
 
   constructor(private readonly path: string) {}
 
-  /** Read the on-disk records, tolerating a missing or corrupt file. */
+  /** Read the on-disk records, tolerating a missing or corrupt file. A corrupt
+   * registry is copied to .bak for inspection instead of silently discarded -
+   * it may hold "recording" entries whose ffmpeg would otherwise never be
+   * reaped. */
   private readDisk(): Map<string, SessionRecord> {
     if (!existsSync(this.path)) return new Map();
     try {
       const data = JSON.parse(readFileSync(this.path, "utf8")) as SessionRecord[];
       return new Map(data.map((r) => [r.id, r]));
     } catch {
+      try {
+        copyFileSync(this.path, `${this.path}.bak`);
+        process.stderr.write(
+          `Session registry was unreadable; saved a copy to ${this.path}.bak and starting fresh.\n`,
+        );
+      } catch {
+        /* best effort */
+      }
       return new Map();
     }
   }

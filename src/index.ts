@@ -8,6 +8,7 @@
  * can contain anything on screen, including secrets. See the README threat
  * model.
  */
+import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
@@ -38,9 +39,16 @@ import { register as registerMusicBed } from "./tools/musicBed.js";
 import { register as registerReframe } from "./tools/reframe.js";
 import { register as registerExportPreset } from "./tools/exportPreset.js";
 
+// Resolves from src/ in dev and dist/ in the published package alike; keeps
+// the advertised version from drifting from package.json (the hardcoded
+// string here had already fallen behind twice).
+const { version } = createRequire(import.meta.url)("../package.json") as {
+  version: string;
+};
+
 const server = new McpServer({
   name: "screencast-mcp",
-  version: "0.8.0",
+  version,
 });
 
 registerStartRecording(server);

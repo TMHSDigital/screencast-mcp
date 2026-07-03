@@ -144,6 +144,16 @@ describe("SessionStore", () => {
     expect(finalIds).toEqual(["a", "b"]);
   });
 
+  it("backs up a corrupt registry to .bak instead of silently discarding it", () => {
+    const p = newPath();
+    writeFileSync(p, "{ not json");
+    const store = new SessionStore(p);
+    store.load();
+    expect(store.list()).toEqual([]);
+    expect(existsSync(`${p}.bak`)).toBe(true);
+    rmSync(`${p}.bak`, { force: true });
+  });
+
   it("reaps a dead recording into a stopped state at boot", () => {
     const p = newPath();
     const a = new SessionStore(p);
