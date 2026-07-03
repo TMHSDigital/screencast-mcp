@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Screencast MCP</title>
   <meta name="description" content="A Windows-first MCP server for screen recording, frame sampling, and minimal ffmpeg edits.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127916;</text></svg>">
+  <meta property="og:title" content="Screencast MCP">
+  <meta property="og:description" content="A Windows-first MCP server for screen recording, frame sampling, and minimal ffmpeg edits.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -39,13 +45,13 @@
     a small set of ffmpeg edits. It speaks MCP over stdio.</p>
     <p><a href="https://github.com/TMHSDigital/screencast-mcp">View on GitHub</a></p>
 
-    <h2>Prerequisites</h2>
+    <h2 id="prerequisites">Prerequisites</h2>
     <p><code>ffmpeg</code> and <code>ffprobe</code> must be installed and on
     <code>PATH</code> (or set via <code>FFMPEG_PATH</code> /
     <code>FFPROBE_PATH</code>). Screen capture uses <code>gdigrab</code>, which is
     Windows-only; the watch and edit tools run anywhere ffmpeg runs.</p>
 
-    <h2>Install</h2>
+    <h2 id="install">Install</h2>
     <pre><code>npm install -g @tmhs/screencast-mcp</code></pre>
     <pre><code>{
   "mcpServers": {
@@ -56,7 +62,10 @@
   }
 }</code></pre>
 
-    <h2>Tools</h2>
+    <h2 id="tools">Tools</h2>
+    <p>Tools that write a file refuse to replace an existing file at a
+    caller-supplied <code>output</code> path unless <code>overwrite: true</code>
+    is passed; auto-generated default paths are always unique.</p>
     <table>
       <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
       <tbody>
@@ -88,12 +97,14 @@
       </tbody>
     </table>
 
-    <h2>Windows notes</h2>
+    <h2 id="windows-notes">Windows notes</h2>
     <ul>
       <li>Monitor targets crop the virtual desktop to a display's real pixel
       bounds, so <code>monitor:1</code> grabs the second display at its true
       offset; <code>monitor:0</code> is primary.</li>
-      <li>Window capture matches by exact title.</li>
+      <li>Window capture matches a case-insensitive exact title first, then
+      falls back to a substring match; with several matches the topmost window
+      wins.</li>
       <li>Fullscreen-exclusive apps can produce black frames under gdigrab; use
       borderless-windowed mode.</li>
       <li>System audio capture (<code>start_recording</code> with
@@ -103,7 +114,7 @@
       supported.</li>
     </ul>
 
-    <h2>Threat model</h2>
+    <h2 id="threat-model">Threat model</h2>
     <div class="note">
       Screen capture can record anything on screen, including secrets. Capture is
       always explicit (a tool call, never automatic), output stays on the local
