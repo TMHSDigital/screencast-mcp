@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { rmSync, existsSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { rmSync, existsSync, writeFileSync } from "node:fs";
 import {
   classifyOrphan,
   isAlive,
@@ -34,6 +35,18 @@ describe("classifyOrphan", () => {
     expect(classifyOrphan(record({ status: "stopped" }), true)).toEqual({
       status: "stopped",
       reaped: false,
+    });
+  });
+  it("leaves a recording alone when its owning server is still alive", () => {
+    expect(classifyOrphan(record(), true, true)).toEqual({
+      status: "recording",
+      reaped: false,
+    });
+  });
+  it("reaps a live recording whose owning server is dead", () => {
+    expect(classifyOrphan(record(), true, false)).toEqual({
+      status: "orphaned",
+      reaped: true,
     });
   });
 });
@@ -94,5 +107,48 @@ describe("SessionStore", () => {
     const reaped = b.reapOrphans();
     expect(reaped).not.toContain("dead");
     expect(b.get("dead")?.status).toBe("stopped");
+  });
+
+  it("does not touch a recording owned by another still-running process", () => {
+    // A real live process stands in for the other server instance.
+    const owner = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      stdio: "ignore",
+    });
+    try {
+      const p = newPath();
+      const a = new SessionStore(p);
+      a.load();
+      a.create(record({ id: "owned", pid: 2_000_000_000, serverPid: owner.pid }));
+      const b = new SessionStore(p);
+      b.load();
+      expect(b.reapOrphans()).toEqual([]);
+      expect(b.get("owned")?.status).toBe("recording");
+    } finally {
+      owner.kill();
+    }
+  });
+
+  it("backs up a corrupt registry instead of silently discarding it", () => {
+    const p = newPath();
+    writeFileSync(p, "{ not json");
+    const store = new SessionStore(p);
+    store.load();
+    expect(store.list()).toEqual([]);
+    expect(existsSync(`${p}.bak`)).toBe(true);
+    rmSync(`${p}.bak`, { force: true });
+  });
+
+  it("merges concurrently persisted records instead of clobbering them", () => {
+    const p = newPath();
+    const a = new SessionStore(p);
+    a.load();
+    const b = new SessionStore(p);
+    b.load();
+    a.create(record({ id: "from-a" }));
+    b.create(record({ id: "from-b" }));
+    const c = new SessionStore(p);
+    c.load();
+    expect(c.get("from-a")?.id).toBe("from-a");
+    expect(c.get("from-b")?.id).toBe("from-b");
   });
 });

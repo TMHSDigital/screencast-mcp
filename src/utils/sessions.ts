@@ -11,7 +11,13 @@
  * logic (classifyOrphan) is pure so it is unit-tested without real processes.
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  renameSync,
+  copyFileSync,
+} from "node:fs";
 import type { ChildProcess } from "node:child_process";
 import type { Quality } from "./targets.js";
 
@@ -24,6 +30,9 @@ export interface SessionRecord {
   fps: number;
   quality: Quality;
   pid: number | null;
+  /** Pid of the server instance that owns this recording. Another instance's
+   * boot must not reap a recording whose owning server is still alive. */
+  serverPid?: number;
   status: SessionStatus;
   startedAt: string;
   stoppedAt?: string;
@@ -32,13 +41,19 @@ export interface SessionRecord {
 }
 
 /** Decide what an in-progress session becomes at boot, given liveness.
- * Pure: a still-alive pid is an orphan to be reaped; a dead one simply ended. */
+ * Pure: a still-alive pid is an orphan to be reaped; a dead one simply ended.
+ * A record whose owning server instance is still alive stays "recording" -
+ * it belongs to a concurrently running server and must be left alone. */
 export function classifyOrphan(
   record: SessionRecord,
   alive: boolean,
+  ownerAlive = false,
 ): { status: SessionStatus; reaped: boolean } {
   if (record.status !== "recording") {
     return { status: record.status, reaped: false };
+  }
+  if (ownerAlive) {
+    return { status: "recording", reaped: false };
   }
   return alive
     ? { status: "orphaned", reaped: true }
@@ -85,6 +100,9 @@ export function killPid(pid: number): void {
   }
 }
 
+/** Terminal (non-"recording") records kept in the registry, newest first. */
+const MAX_TERMINAL_RECORDS = 200;
+
 export class SessionStore {
   private records = new Map<string, SessionRecord>();
   private children = new Map<string, ChildProcess>();
@@ -97,12 +115,48 @@ export class SessionStore {
       const data = JSON.parse(readFileSync(this.path, "utf8")) as SessionRecord[];
       this.records = new Map(data.map((r) => [r.id, r]));
     } catch {
+      // Keep the unreadable file for inspection instead of silently losing
+      // every record (including "recording" ones we could otherwise reap).
+      try {
+        copyFileSync(this.path, `${this.path}.bak`);
+        process.stderr.write(
+          `Session registry was unreadable; saved a copy to ${this.path}.bak and starting fresh.\n`,
+        );
+      } catch {
+        /* best effort */
+      }
       this.records = new Map();
     }
   }
 
   persist(): void {
-    writeFileSync(this.path, JSON.stringify([...this.records.values()], null, 2));
+    // Merge with what is on disk so a concurrently running server instance's
+    // records (ids we do not track) are not clobbered. Our in-memory view wins
+    // for ids we do track. This narrows, but does not eliminate, the
+    // last-write-wins window - there is no cross-process lock.
+    const merged = new Map<string, SessionRecord>();
+    if (existsSync(this.path)) {
+      try {
+        const disk = JSON.parse(readFileSync(this.path, "utf8")) as SessionRecord[];
+        for (const r of disk) merged.set(r.id, r);
+      } catch {
+        /* corrupt on disk; our in-memory view wins */
+      }
+    }
+    for (const [id, r] of this.records) merged.set(id, r);
+
+    // Cap terminal records so the registry does not grow without bound.
+    const all = [...merged.values()];
+    const active = all.filter((r) => r.status === "recording");
+    const terminal = all
+      .filter((r) => r.status !== "recording")
+      .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))
+      .slice(0, MAX_TERMINAL_RECORDS);
+
+    // Atomic write: a crash mid-write must not leave a half-written registry.
+    const tmp = `${this.path}.tmp`;
+    writeFileSync(tmp, JSON.stringify([...active, ...terminal], null, 2));
+    renameSync(tmp, this.path);
   }
 
   create(record: SessionRecord): void {
@@ -150,8 +204,14 @@ export class SessionStore {
     const reaped: string[] = [];
     for (const record of this.records.values()) {
       if (record.status !== "recording") continue;
+      const ownerAlive =
+        record.serverPid !== undefined &&
+        record.serverPid !== process.pid &&
+        isAlive(record.serverPid);
       const alive = isAlive(record.pid);
-      const verdict = classifyOrphan(record, alive);
+      const verdict = classifyOrphan(record, alive, ownerAlive);
+      // Owned by a still-running server instance: not ours to touch.
+      if (verdict.status === "recording") continue;
       if (verdict.reaped && record.pid !== null) {
         if (isFfmpegProcess(record.pid)) killPid(record.pid);
         reaped.push(record.id);
