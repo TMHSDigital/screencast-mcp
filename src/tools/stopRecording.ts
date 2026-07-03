@@ -12,6 +12,14 @@ const inputSchema = {
   sessionId: z.string().min(1).describe("Session id returned by start_recording."),
 };
 
+/** Poll until a pid is gone (process fully exited, file handles released). */
+async function waitForPidExit(pid: number, ms: number): Promise<void> {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline && isAlive(pid)) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
+
 /** Wait up to ms for a child to exit; resolve true if it did. */
 function waitForExit(child: ChildProcess, ms: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -69,22 +77,29 @@ export function register(server: McpServer): void {
           child.stdin.write("q\n");
           child.stdin.end();
           graceful = await waitForExit(child, 8000);
-          if (!graceful && record.pid !== null) killPid(record.pid);
+          if (!graceful && record.pid !== null) {
+            killPid(record.pid);
+            await waitForPidExit(record.pid, 2000);
+          }
         } else if (record.pid !== null && isAlive(record.pid)) {
           // Cross-restart stop: no stdin handle. Terminate by pid. The
           // fragmented-mp4 muxing keeps the partial file playable.
-          if (isFfmpegProcess(record.pid)) killPid(record.pid);
+          if (isFfmpegProcess(record.pid)) {
+            killPid(record.pid);
+            await waitForPidExit(record.pid, 2000);
+          }
         }
         store.detachChild(record.id);
 
-        // Give the muxer a moment to flush the trailer.
-        await new Promise((r) => setTimeout(r, 400));
         const durationSec = await probeDuration(ffprobe, record.outputPath);
 
         const updated = store.update(record.id, {
           status: "stopped",
           stoppedAt: new Date().toISOString(),
           durationSec: durationSec ?? undefined,
+          // A forced kill can transiently mark the record failed via the
+          // child-exit handler; a deliberate stop is not a failure.
+          error: undefined,
         });
 
         return okResponse({
