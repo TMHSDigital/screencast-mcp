@@ -18,6 +18,7 @@ const inputSchema = {
   fontSize: z.number().int().positive().optional().describe("Text size in px (default 96)."),
   bold: z.boolean().optional().describe("Use the bold weight (default true)."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -31,7 +32,7 @@ export function register(server: McpServer): void {
     async (args) => {
       try {
         requireFfmpeg();
-        const output = resolveOutput(args.output, subdir("edits"), `title-${stamp()}-${rand()}.mp4`);
+        const output = resolveOutput(args.output, subdir("edits"), `title-${stamp()}-${rand()}.mp4`, args.overwrite);
         const fontFile = bundledFontPath(args.bold === false ? "regular" : "bold");
         // Write the text to a temp file so arbitrary content (quotes, colons,
         // percent signs) needs no inline filtergraph escaping.

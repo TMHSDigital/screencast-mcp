@@ -60,6 +60,7 @@ const inputSchema = {
     .describe(
       "Optional output .mp4 path. Defaults to a file under SCREENCAST_HOME/recordings.",
     ),
+  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -81,6 +82,7 @@ export function register(server: McpServer): void {
           args.output,
           subdir("recordings"),
           `rec-${stamp()}-${rand()}.mp4`,
+          args.overwrite,
         );
 
         // Resolve a loopback device up front so a missing one fails before the

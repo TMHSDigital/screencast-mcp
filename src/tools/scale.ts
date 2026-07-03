@@ -12,6 +12,7 @@ const inputSchema = {
   width: z.number().int().positive().optional().describe("Target width in px. Omit to derive from height (keeps aspect)."),
   height: z.number().int().positive().optional().describe("Target height in px. Omit to derive from width (keeps aspect)."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -31,6 +32,7 @@ export function register(server: McpServer): void {
           args.output,
           subdir("edits"),
           `scale-${stamp()}-${rand()}${ext}`,
+          args.overwrite,
         );
         const ffArgs = buildScaleArgs(args.input, output, {
           width: args.width,

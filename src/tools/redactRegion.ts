@@ -34,6 +34,7 @@ const inputSchema = {
     .describe("Optional pixels to expand each region by, to cover anti-aliased edges (default 0)."),
   color: z.string().optional().describe("Fill color for box style (default black)."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -57,6 +58,7 @@ export function register(server: McpServer): void {
           args.output,
           subdir("edits"),
           `redact-${stamp()}-${rand()}${ext}`,
+          args.overwrite,
         );
         const ffArgs = buildRedactArgs(
           args.input,

@@ -17,7 +17,8 @@
           },
           "required": ["source"]
         },
-        "output": { "type": "string", "description": "Optional output .mp4 path (defaults under SCREENCAST_HOME/recordings)" }
+        "output": { "type": "string", "description": "Optional output .mp4 path (defaults under SCREENCAST_HOME/recordings)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["target"]
     }
@@ -56,7 +57,8 @@
       "type": "object",
       "properties": {
         "target": { "type": "string", "description": "full | monitor:<index> | window:<title> | region:<x>,<y>,<w>,<h>. window: captures the rectangle the window occupies as displayed (case-insensitive exact title, else substring; topmost match)" },
-        "output": { "type": "string", "description": "Optional output .png path (defaults under SCREENCAST_HOME/screenshots)" }
+        "output": { "type": "string", "description": "Optional output .png path (defaults under SCREENCAST_HOME/screenshots)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["target"]
     }
@@ -96,7 +98,8 @@
         "start": { "type": "number", "description": "Start time in seconds" },
         "end": { "type": "number", "description": "End time in seconds (use end OR duration)" },
         "duration": { "type": "number", "description": "Clip length in seconds (use end OR duration)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input", "start"]
     }
@@ -108,7 +111,8 @@
       "type": "object",
       "properties": {
         "inputs": { "type": "array", "items": { "type": "string" }, "minItems": 2, "description": "Two or more video paths to join, in order" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["inputs"]
     }
@@ -123,7 +127,8 @@
         "format": { "type": "string", "enum": ["mp4", "gif", "webm"], "description": "Target format" },
         "fps": { "type": "number", "description": "Output fps (gif only; default 12)" },
         "width": { "type": "number", "description": "Output width in px, height auto (gif only; default 720)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input", "format"]
     }
@@ -139,7 +144,8 @@
         "y": { "type": "integer", "minimum": 0, "description": "Top edge of the crop in pixels" },
         "width": { "type": "integer", "minimum": 1, "description": "Crop width in pixels" },
         "height": { "type": "integer", "minimum": 1, "description": "Crop height in pixels" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input", "x", "y", "width", "height"]
     }
@@ -153,7 +159,8 @@
         "input": { "type": "string", "description": "Path to the source video" },
         "width": { "type": "integer", "minimum": 1, "description": "Target width in px (omit to derive from height)" },
         "height": { "type": "integer", "minimum": 1, "description": "Target height in px (omit to derive from width)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input"]
     }
@@ -166,7 +173,8 @@
       "properties": {
         "input": { "type": "string", "description": "Path to the source video" },
         "factor": { "type": "number", "exclusiveMinimum": 0, "description": "Speed multiplier: >1 faster, <1 slower (2 = double speed)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input", "factor"]
     }
@@ -185,7 +193,8 @@
         "height": { "type": "integer", "minimum": 1, "description": "Optional overlay height in px (width auto)" },
         "start": { "type": "number", "minimum": 0, "description": "Optional second to show the overlay from" },
         "end": { "type": "number", "exclusiveMinimum": 0, "description": "Optional second to hide the overlay after" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input", "overlay", "x", "y"]
     }
@@ -199,7 +208,8 @@
         "input": { "type": "string", "description": "Path to the source video" },
         "level": { "type": "string", "enum": ["light", "medium", "heavy"], "description": "Compression strength (CRF 23 / 28 / 32; default medium)" },
         "maxWidth": { "type": "integer", "minimum": 1, "description": "Optional width cap in px; only ever downscales" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input"]
     }
@@ -212,7 +222,8 @@
       "properties": {
         "input": { "type": "string", "description": "Path to the source media" },
         "format": { "type": "string", "enum": ["mp3", "aac", "wav", "copy"], "description": "Audio output codec; copy keeps the source codec without re-encoding" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input", "format"]
     }
@@ -237,7 +248,8 @@
           },
           "description": "One or more {start, end} segments; each becomes its own output file"
         },
-        "output": { "type": "string", "description": "Optional output path (single segment only; multi-segment lands under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (single segment only; multi-segment lands under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input", "segments"]
     }
@@ -269,7 +281,8 @@
         "style": { "type": "string", "enum": ["box", "blur", "pixelate"], "description": "box (default) draws an irreversible solid fill; blur and pixelate are softer but partially recoverable" },
         "pad": { "type": "integer", "minimum": 0, "description": "Optional pixels to expand each region by, to cover anti-aliased edges (default 0)" },
         "color": { "type": "string", "description": "Fill color for box style (default black)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input", "regions"]
     }
@@ -289,7 +302,8 @@
         "inputB": { "type": "string", "description": "Path to the second (incoming) video" },
         "transition": { "type": "string", "description": "xfade transition name (default fade): fade, wipeleft, slideup, circleopen, dissolve, ..." },
         "duration": { "type": "number", "exclusiveMinimum": 0, "description": "Transition length in seconds (default 1)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["inputA", "inputB"]
     }
@@ -306,7 +320,8 @@
         "width": { "type": "integer", "minimum": 1, "description": "Common output width (default 1920)" },
         "height": { "type": "integer", "minimum": 1, "description": "Common output height (default 1080)" },
         "fps": { "type": "integer", "minimum": 1, "description": "Common output fps (default 30)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["clips"]
     }
@@ -326,7 +341,8 @@
         "fontColor": { "type": "string", "description": "Text color (default white)" },
         "fontSize": { "type": "integer", "minimum": 1, "description": "Text size in px (default 96)" },
         "bold": { "type": "boolean", "description": "Use the bold weight (default true)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["text"]
     }
@@ -343,7 +359,8 @@
         "fadeIn": { "type": "number", "minimum": 0, "description": "Music fade-in seconds (default 1)" },
         "fadeOut": { "type": "number", "minimum": 0, "description": "Music fade-out seconds (default 2)" },
         "duck": { "type": "boolean", "description": "Duck the music under the original audio via a sidechain (default false)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["video", "music"]
     }
@@ -357,7 +374,8 @@
         "input": { "type": "string", "description": "Path to the source video" },
         "aspect": { "type": "string", "enum": ["16:9", "9:16", "1:1", "4:5"], "description": "Target aspect ratio" },
         "fit": { "type": "string", "enum": ["pad", "crop"], "description": "pad (default): scale to fit and letterbox. crop: scale to fill and center-crop." },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input", "aspect"]
     }
@@ -371,7 +389,8 @@
         "input": { "type": "string", "description": "Path to the source video" },
         "platform": { "type": "string", "enum": ["youtube", "instagram_reel", "tiktok", "x", "square"], "description": "Target platform (sets aspect, resolution, fps, bitrate)" },
         "fit": { "type": "string", "enum": ["pad", "crop"], "description": "How to fit the source into the platform aspect: pad (default) or crop" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" }
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input", "platform"]
     }

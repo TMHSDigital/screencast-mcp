@@ -14,6 +14,7 @@ const inputSchema = {
   fps: z.number().positive().optional().describe("Output fps (gif only; default 12)."),
   width: z.number().positive().optional().describe("Output width in px, height auto (gif only; default 720)."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -33,6 +34,7 @@ export function register(server: McpServer): void {
           args.output,
           subdir("edits"),
           `convert-${stamp()}-${rand()}.${format}`,
+          args.overwrite,
         );
         const ffArgs = buildConvertArgs(args.input, output, format, {
           fps: args.fps,

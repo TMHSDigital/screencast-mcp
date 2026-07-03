@@ -17,6 +17,7 @@ const inputSchema = {
   start: z.number().nonnegative().optional().describe("Optional second to show the overlay from."),
   end: z.number().positive().optional().describe("Optional second to hide the overlay after."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -39,6 +40,7 @@ export function register(server: McpServer): void {
           args.output,
           subdir("edits"),
           `overlay-${stamp()}-${rand()}${ext}`,
+          args.overwrite,
         );
         const scale =
           args.width !== undefined || args.height !== undefined

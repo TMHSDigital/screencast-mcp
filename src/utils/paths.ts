@@ -9,7 +9,8 @@
  */
 import { homedir, tmpdir } from "node:os";
 import { join, isAbsolute, resolve } from "node:path";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, existsSync } from "node:fs";
+import { ScreencastError } from "./errors.js";
 
 export function homeRoot(): string {
   const override = process.env.SCREENCAST_HOME;
@@ -49,14 +50,27 @@ export function tempPath(suffix = ""): string {
   return join(tmpdir(), `screencast-${stamp()}-${rand()}${suffix}`);
 }
 
-/** Resolve a caller-supplied output path, or build a default under a subdir. */
+/** Resolve a caller-supplied output path, or build a default under a subdir.
+ *
+ * A caller-supplied path that already exists is refused unless the caller
+ * passed overwrite: true - every ffmpeg builder runs with -y, so this is the
+ * one place that stands between a reused path and a silently clobbered file.
+ * Auto-generated default names are unique and skip the check. */
 export function resolveOutput(
   provided: string | undefined,
   defaultDir: string,
   defaultName: string,
+  overwrite = false,
 ): string {
   if (provided && provided.trim().length > 0) {
-    return isAbsolute(provided) ? provided : resolve(provided);
+    const path = isAbsolute(provided) ? provided : resolve(provided);
+    if (!overwrite && existsSync(path)) {
+      throw new ScreencastError(
+        `Output already exists: ${path}. Pass overwrite: true to replace it, ` +
+          `or choose a different path.`,
+      );
+    }
+    return path;
   }
   return join(defaultDir, defaultName);
 }
