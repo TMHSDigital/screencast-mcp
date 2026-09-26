@@ -2,8 +2,9 @@
 
 # Roadmap
 
-**Current:** v0.8.8 shipped (Phase 3 complete; hardening rounds underway, see
-CHANGELOG). Cross-platform capture is the next feature phase.
+**Current:** v0.9.0 shipped (Phase 3 complete; a second hardening round is
+underway, see below and CHANGELOG). Cross-platform capture is the next feature
+phase.
 
 Screencast MCP ships in phases. Phase 1 is the capture / watch / minimal-edit
 core. Phase 2 adds the full edit surface, safety redaction, and system audio.
@@ -59,14 +60,33 @@ in CHANGELOG; representative items:
       of a 30s hang (#40)
 - [x] Filter-string validation up front (#22); temp working files written to the
       OS temp dir (#24); ESLint + Windows CI + typecheck in CI (#21, #23)
-- [ ] Open: odd output dimensions in edit/produce tools (#47), `concat` relative
-      input paths (#48), `extract_audio` `copy` container mismatch (#36),
-      overwrite protection for explicit output paths (#37)
+- [x] Odd output dimensions in edit/produce tools rejected clearly (#47),
+      `concat` relative input paths (#48), `extract_audio` `copy` container
+      mismatch (#36), overwrite protection for explicit output paths (#37)
 
-## Phase 4 -- Cross-platform capture (next)
+## Hardening round 2 (v0.9.1+)
 
-Capture today is Windows-only (gdigrab). Generalize the capture backend behind
-the existing `Provider` interface so the same tools work on macOS and Linux.
+From the September 2026 end-to-end review. Tracked as issues; high priority first.
+
+- [ ] Edit correctness: `trim` end/duration (#75), `music_bed` loudness (#77),
+      `title_card` path escaping (#87), and an ffmpeg-backed integration suite in
+      CI so builders are tested against real output (#78)
+- [ ] Recording lifecycle: finalize recordings and exit on client disconnect
+      (#76); default `maxDurationSec` cap (#82); cross-process registry locking (#55)
+- [ ] Watching: return frames as MCP image content (#79); cap `sample_frames`
+      output (#80)
+- [ ] Long jobs: duration-scaled timeouts, no partial outputs, progress
+      notifications (#81)
+- [ ] Capture: exact / reported window matching (#89); non-blocking, cached
+      target resolution (#88)
+- [ ] Runtime and deps: drop EOL Node 20, test Node 24, clean `npm audit` (#86)
+- [ ] Reach: MCP Registry listing and a README demo (#90)
+
+## Phase 4 -- Cross-platform capture (next, #15)
+
+Capture today is Windows-only: gdigrab is hard-wired in `src/utils/targets.ts`.
+The first step is to introduce a capture-backend interface (gdigrab as its first
+implementation), then add backends so the same tools work on macOS and Linux.
 
 - [ ] macOS capture via avfoundation (screen + window + region)
 - [ ] Linux capture via x11grab, plus a PipeWire/Wayland path where X11 is absent
@@ -102,8 +122,6 @@ Screencast-native polish that turns a raw capture into something watchable.
 
 Not tied to a single phase; pull in opportunistically.
 
-- [ ] Overwrite protection: refuse to clobber an existing explicit `output`
-      unless `overwrite: true` (#37)
-- [ ] Node `engines` already declared; document the supported range in
-      CONTRIBUTING
-- [ ] Consistent input-path resolution (absolute) across all tools (see #48)
+- [ ] Document the supported Node range in CONTRIBUTING once #86 settles it
+- [ ] Consistent input-path resolution (absolute) across all tools (#48 fixed
+      `concat`; the other tools still pass paths through as given)

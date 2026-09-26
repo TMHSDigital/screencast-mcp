@@ -21,22 +21,25 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 - `chore:` -- maintenance, dependency updates
 - `refactor:` -- code restructuring
 
-### Provider adapters
-
-- Implement the `Provider` interface in `src/providers/`
-- Register the adapter in `ProviderManager`
-
 ### Tools
 
-- Register the tool in `src/tools/`
-- Add it to `mcp-tools.json`
-- Add vitest tests
+- One tool per file in `src/tools/`, exporting `register(server)`; wire it up in `src/index.ts`
+- Keep ffmpeg argument building in pure helpers under `src/utils/` (string in, args out) so it is unit-testable without ffmpeg
+- Add it to `mcp-tools.json` (a test checks the manifest matches the registered tools)
+- Add vitest tests: unit tests for the builder, plus an ffmpeg-backed case in `src/__tests__/integration/` for anything that produces media
+
+Capture is Windows-only today (gdigrab, see `src/utils/targets.ts`); there is no capture-backend abstraction yet. Cross-platform capture is tracked in #15.
+
+### Tests
+
+- `npm test` runs the unit tests, plus the ffmpeg integration suite when ffmpeg is on PATH (it skips otherwise; set `REQUIRE_FFMPEG=1` to make a missing ffmpeg fail, as CI's Linux job does)
+- `RUN_LOCAL_CAPTURE_TESTS=1 npm test` (after `npm run build`) drives the built server through real gdigrab capture; Windows with a display only
 
 Bump the version in `package.json` in your PR (e.g. `npm version <patch|minor|major> --no-git-tag-version`); CI tags and publishes it on merge.
 
 ## Pull Request Process
 
-1. Ensure CI passes (`npm run build`, `npm test`, `npm run typecheck`)
+1. Ensure CI passes (`npm run lint`, `npm run build`, `npm run typecheck`, `npm test`)
 2. Update `CHANGELOG.md` if the change is user-facing
 3. Use a descriptive PR title following conventional commit format
 
