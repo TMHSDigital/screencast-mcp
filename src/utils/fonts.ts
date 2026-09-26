@@ -28,7 +28,17 @@ export function bundledFontPath(weight: FontWeight = "bold"): string {
  * drawtext fontfile / textfile). The value passes through two unescaping
  * stages, so on Windows the drive colon must be double-escaped: forward slashes
  * and `\\:`, turning `C:\Fonts\x.ttf` into `C\\:/Fonts/x.ttf`. This is the
- * documented Windows incantation and is verified against ffmpeg. */
+ * documented Windows incantation and is verified against ffmpeg.
+ *
+ * The same two stages apply to the other specials a real path can contain
+ * (#87): a quote needs `\\\'` (option-level `\'`, whose backslash the graph
+ * level also escapes), and the graph delimiters `, ; [ ]` need one backslash.
+ * Without this, a Windows username like O'Brien (temp dir, npx cache) broke
+ * title_card. */
 export function escapeFilterPath(p: string): string {
-  return p.replace(/\\/g, "/").replace(/:/g, "\\\\:");
+  return p
+    .replace(/\\/g, "/")
+    .replace(/:/g, "\\\\:")
+    .replace(/'/g, "\\\\\\'")
+    .replace(/([,;[\]])/g, "\\$1");
 }

@@ -24,8 +24,16 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
+      # The ffmpeg-backed integration suite (src/__tests__/integration) needs
+      # ffmpeg; install it on the Linux leg and make its absence a failure there.
+      # The Windows leg skips that suite.
+      - name: Install ffmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - run: npm ci
       - run: npm run lint
       - run: npm run build
       - run: npm run typecheck
       - run: npm test
+        env:
+          REQUIRE_FFMPEG: ${{ runner.os == 'Linux' && '1' || '' }}

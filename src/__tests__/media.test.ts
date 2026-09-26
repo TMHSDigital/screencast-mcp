@@ -98,7 +98,9 @@ describe("buildTrimArgs", () => {
   it("trims by start + end", () => {
     const a = buildTrimArgs("in.mp4", "out.mp4", { start: 2, end: 6 });
     expect(a.join(" ")).toContain("-ss 2");
-    expect(a.join(" ")).toContain("-to 6");
+    // -to after an input -ss acts as a duration; the builder emits end - start.
+    expect(a.join(" ")).toContain("-t 4");
+    expect(a).not.toContain("-to");
     expect(a.join(" ")).toContain("-c copy");
   });
   it("trims by start + duration", () => {

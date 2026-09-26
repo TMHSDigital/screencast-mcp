@@ -7,8 +7,29 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.9.1]
+
+### Fixed
+
+- **`trim` with `end` now produces `end - start` seconds** (#75). The builder
+  put `-ss` before the input and `-to <end>` after it. Input-side seeking resets
+  output timestamps, so `-to` was read as a duration: `start: 10, end: 15` gave
+  a 15 s clip. It now emits `-t <end - start>`.
+- **`music_bed` no longer makes the original audio about 6 dB quieter** (#77).
+  `amix` scales each input by 1/N by default; both mix paths now pass
+  `normalize=0`, so the original stays at unity and `musicVolume` alone sets
+  the music level.
+- **`title_card` works when the temp or install path contains `'`, `,`, `;`,
+  `[` or `]`** (#87). `escapeFilterPath` only escaped `\` and `:`, so a Windows
+  username like `O'Brien` broke drawtext's font or text-file path.
+
 ### Added
 
+- An ffmpeg-backed integration suite (`src/__tests__/integration`) that runs
+  the real edit and produce builders against lavfi-generated fixtures and
+  checks the probed output: durations, dimensions, streams, loudness, and
+  redaction pixels (#78). CI installs ffmpeg on the Linux job and requires the
+  suite there (`REQUIRE_FFMPEG=1`); elsewhere it skips when ffmpeg is missing.
 - ESLint (flat config, typescript-eslint recommended) with a `lint` script, run
   in CI (#23). Tooling only; not part of the published package.
 

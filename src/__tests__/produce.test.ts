@@ -128,6 +128,8 @@ describe("buildMusicBedArgs", () => {
     expect(s).toContain("afade=t=out:st=8:d=2");
     expect(s).toContain("volume=0.3");
     expect(s).toContain("amix=inputs=2");
+    // Without normalize=0 amix halves the original track (#77).
+    expect(s).toContain("normalize=0");
     expect(s).toContain("-c:v copy");
     expect(s).toContain("-t 10");
   });

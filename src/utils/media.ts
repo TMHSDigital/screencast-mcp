@@ -126,7 +126,9 @@ export function buildTrimArgs(
     if (opts.end <= start) {
       throw new ScreencastError("end must be greater than start.");
     }
-    args.push("-to", String(opts.end));
+    // Input-side -ss resets output timestamps to 0, so an output -to would be
+    // read as a duration (#75). Emit the real length instead.
+    args.push("-t", String(Math.round((opts.end - start) * 1000) / 1000));
   } else {
     args.push("-t", String(validatePositive(opts.duration!, "duration")));
   }

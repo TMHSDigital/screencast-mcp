@@ -338,14 +338,17 @@ export function buildMusicBedArgs(
   const musicChain =
     `[1:a]afade=t=in:st=0:d=${fin},afade=t=out:st=${fadeOutStart}:d=${fout},volume=${vol}`;
 
+  // normalize=0: amix otherwise scales every input by 1/N, dropping the
+  // original track ~6 dB (#77). The music level is set by musicVolume alone.
+  const mix = "amix=inputs=2:duration=first:dropout_transition=0:normalize=0";
   const parts: string[] = [];
   if (hasVideoAudio) {
     parts.push(`${musicChain}[music]`);
     if (duck) {
       parts.push("[music][0:a]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=300[ducked]");
-      parts.push("[0:a][ducked]amix=inputs=2:duration=first:dropout_transition=0[aout]");
+      parts.push(`[0:a][ducked]${mix}[aout]`);
     } else {
-      parts.push("[0:a][music]amix=inputs=2:duration=first:dropout_transition=0[aout]");
+      parts.push(`[0:a][music]${mix}[aout]`);
     }
   } else {
     parts.push(`${musicChain}[aout]`);

@@ -11,6 +11,12 @@ describe("escapeFilterPath", () => {
   it("leaves a colon-free posix path with only slash normalization", () => {
     expect(escapeFilterPath("/home/u/x.ttf")).toBe("/home/u/x.ttf");
   });
+  it("escapes a quote at both unescaping levels (#87)", () => {
+    expect(escapeFilterPath("/Users/O'Brien/t.txt")).toBe("/Users/O\\\\\\'Brien/t.txt");
+  });
+  it("escapes the filtergraph delimiters and leaves spaces alone", () => {
+    expect(escapeFilterPath("/a,b;c[d] e/t.txt")).toBe("/a\\,b\\;c\\[d\\] e/t.txt");
+  });
 });
 
 describe("bundledFontPath", () => {
