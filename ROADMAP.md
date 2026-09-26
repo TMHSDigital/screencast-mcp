@@ -2,7 +2,7 @@
 
 # Roadmap
 
-**Current:** v0.9.0 shipped (Phase 3 complete; a second hardening round is
+**Current:** v0.10.0 shipped (Phase 3 complete; a second hardening round is
 underway, see below and CHANGELOG). Cross-platform capture is the next feature
 phase.
 
@@ -68,11 +68,12 @@ in CHANGELOG; representative items:
 
 From the September 2026 end-to-end review. Tracked as issues; high priority first.
 
-- [ ] Edit correctness: `trim` end/duration (#75), `music_bed` loudness (#77),
+- [x] Edit correctness: `trim` end/duration (#75), `music_bed` loudness (#77),
       `title_card` path escaping (#87), and an ffmpeg-backed integration suite in
-      CI so builders are tested against real output (#78)
-- [ ] Recording lifecycle: finalize recordings and exit on client disconnect
-      (#76); default `maxDurationSec` cap (#82); cross-process registry locking (#55)
+      CI so builders are tested against real output (#78) -- v0.9.1
+- [x] Recording lifecycle: finalize recordings and exit on client disconnect
+      (#76); default `maxDurationSec` cap (#82) -- v0.10.0
+- [ ] Cross-process session-registry locking (#55)
 - [ ] Watching: return frames as MCP image content (#79); cap `sample_frames`
       output (#80)
 - [ ] Long jobs: duration-scaled timeouts, no partial outputs, progress
