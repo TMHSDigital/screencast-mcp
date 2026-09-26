@@ -13,6 +13,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import { getStore } from "./context.js";
+import { requireFfmpeg } from "./utils/ffmpeg.js";
+import { probeDuration, stopAll } from "./utils/lifecycle.js";
 import { register as registerStartRecording } from "./tools/startRecording.js";
 import { register as registerStopRecording } from "./tools/stopRecording.js";
 import { register as registerListSessions } from "./tools/listSessions.js";
@@ -93,6 +95,45 @@ async function main(): Promise<void> {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
+
+  // Without this, a client that disconnects mid-recording leaves the server
+  // and its ffmpeg child running (the child's pipes keep the event loop
+  // alive), so the screen keeps being recorded (#76). stdin EOF is the stdio
+  // transport's disconnect signal; signals cover a client that kills us.
+  process.stdin.on("end", () => void shutdown("client disconnected"));
+  process.stdin.on("close", () => void shutdown("client disconnected"));
+  server.server.onclose = () => void shutdown("transport closed");
+  for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+    process.on(sig, () => void shutdown(sig));
+  }
+}
+
+let shuttingDown = false;
+
+/** Finalize every active recording, then exit. Idempotent and never throws. */
+async function shutdown(reason: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  try {
+    const store = getStore();
+    if (store.activeIds().length > 0) {
+      let ffprobe: string | null = null;
+      try {
+        ffprobe = requireFfmpeg().ffprobe;
+      } catch {
+        /* duration stays unknown */
+      }
+      const stopped = await stopAll(store, (path) =>
+        ffprobe ? probeDuration(ffprobe, path) : Promise.resolve(null),
+      );
+      process.stderr.write(`Shutdown (${reason}): stopped ${stopped.length} recording(s).\n`);
+    }
+  } catch (err) {
+    process.stderr.write(
+      `Shutdown cleanup failed: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
+  process.exit(0);
 }
 
 main().catch((error: unknown) => {

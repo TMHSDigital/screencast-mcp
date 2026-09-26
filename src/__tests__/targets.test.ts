@@ -9,6 +9,8 @@ import {
   virtualDesktopBounds,
   validateRegionOnDesktop,
   QUALITY_PRESETS,
+  resolveMaxDuration,
+  DEFAULT_MAX_RECORDING_SEC,
 } from "../utils/targets.js";
 import type { Monitor } from "../utils/monitors.js";
 
@@ -251,5 +253,37 @@ describe("buildScreenshotArgs", () => {
       "odd.png",
     ).join(" ");
     expect(s).toContain("-video_size 101x101");
+  });
+});
+
+describe("buildCaptureArgs maxDurationSec (#82)", () => {
+  it("puts an output-side -t before the output path", () => {
+    const args = buildCaptureArgs({ kind: "full" }, { output: "out.mp4", maxDurationSec: 90 });
+    expect(args.slice(-3)).toEqual(["-t", "90", "out.mp4"]);
+    // Output-side: after the gdigrab input, not before it.
+    expect(args.indexOf("-t")).toBeGreaterThan(args.indexOf("desktop"));
+  });
+  it("omits -t when the cap is 0 or absent", () => {
+    expect(buildCaptureArgs({ kind: "full" }, { output: "o.mp4", maxDurationSec: 0 })).not.toContain("-t");
+    expect(buildCaptureArgs({ kind: "full" }, { output: "o.mp4" })).not.toContain("-t");
+  });
+  it("rejects a negative or fractional cap", () => {
+    expect(() => buildCaptureArgs({ kind: "full" }, { output: "o.mp4", maxDurationSec: -1 })).toThrow();
+    expect(() => buildCaptureArgs({ kind: "full" }, { output: "o.mp4", maxDurationSec: 1.5 })).toThrow();
+  });
+});
+
+describe("resolveMaxDuration", () => {
+  it("prefers an explicit per-call value, including 0 (no cap)", () => {
+    expect(resolveMaxDuration(120, { SCREENCAST_MAX_RECORDING_SEC: "60" })).toBe(120);
+    expect(resolveMaxDuration(0, { SCREENCAST_MAX_RECORDING_SEC: "60" })).toBe(0);
+  });
+  it("falls back to SCREENCAST_MAX_RECORDING_SEC, then the default", () => {
+    expect(resolveMaxDuration(undefined, { SCREENCAST_MAX_RECORDING_SEC: "60" })).toBe(60);
+    expect(resolveMaxDuration(undefined, {})).toBe(DEFAULT_MAX_RECORDING_SEC);
+    expect(resolveMaxDuration(undefined, { SCREENCAST_MAX_RECORDING_SEC: " " })).toBe(DEFAULT_MAX_RECORDING_SEC);
+  });
+  it("rejects a malformed env value with a clear error", () => {
+    expect(() => resolveMaxDuration(undefined, { SCREENCAST_MAX_RECORDING_SEC: "1h" })).toThrow(/SCREENCAST_MAX_RECORDING_SEC/);
   });
 });

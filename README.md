@@ -39,7 +39,7 @@ The design choices are deliberate rather than incidental:
 - **Footage is made viewable.** `sample_frames` turns a video into images an agent can open, so "watch what happened" is a first-class operation, not an afterthought.
 - **Presets over raw flags.** Quality is `draft` / `standard` / `high`; the agent never reasons about codecs, CRF, or pixel formats.
 - **Safe by default.** Output lands under `SCREENCAST_HOME`, never inside a project checkout, and the public repo's `.gitignore` blocks captured media from being committed.
-- **Crash-safe sessions.** A recording interrupted by a crash is reconciled on the next start (orphan reaping), so no ffmpeg child silently outlives the server.
+- **Recordings end.** When the client disconnects (or the server gets SIGINT/SIGTERM), every active recording is finalized and the server exits. Every recording also has a `maxDurationSec` cap (default one hour). A recording interrupted by a hard crash is reconciled on the next start (orphan reaping).
 
 ## Tools
 
@@ -49,7 +49,7 @@ Twenty-five tools across four concerns. The manifest in [`mcp-tools.json`](mcp-t
 
 | Tool | Purpose |
 | --- | --- |
-| `start_recording` | Start a background recording. `target` = `full` \| `monitor:<index>` \| `window:<title>` \| `region:<x>,<y>,<w>,<h>`; optional `fps`, `quality`, and `audio` (set `audio.source` = `system` to also capture loopback audio). Returns a session id and output path. |
+| `start_recording` | Start a background recording. `target` = `full` \| `monitor:<index>` \| `window:<title>` \| `region:<x>,<y>,<w>,<h>`; optional `fps`, `quality`, `audio` (set `audio.source` = `system` to also capture loopback audio), and `maxDurationSec` (auto-stop cap, default 3600; `0` = none). Returns a session id and output path. |
 | `stop_recording` | Stop a session by id. Sends ffmpeg a graceful quit so the file is **finalized, not truncated**. Returns the final path and duration. |
 | `list_sessions` | List active and finished sessions. |
 | `get_session` | Inspect a single session by id. |
@@ -117,6 +117,8 @@ Every capture tool takes a single `target` string, so an agent never has to jugg
 | `monitor:<index>` | One display; `0` is always primary |
 | `window:<title>` | The on-screen rectangle a window occupies (case-insensitive exact title, else substring; topmost wins) |
 | `region:<x>,<y>,<w>,<h>` | An absolute pixel rectangle |
+
+Set `SCREENCAST_MAX_RECORDING_SEC` to change the default recording cap (`0` disables it).
 
 Output is written under `SCREENCAST_HOME` (default `<homedir>/.screencast-mcp`) into `recordings/`, `frames/`, `screenshots/`, and `edits/`. Any tool also accepts an explicit output path.
 
