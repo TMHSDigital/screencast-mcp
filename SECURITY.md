@@ -6,7 +6,9 @@ If you discover a security vulnerability in Screencast MCP, please report it res
 
 **Do not** open a public issue for security vulnerabilities.
 
-Instead, email contact@users.noreply.github.com with:
+Instead, report it privately through GitHub:
+**[Report a vulnerability](https://github.com/TMHSDigital/screencast-mcp/security/advisories/new)**
+(Security tab → "Report a vulnerability"). Include:
 
 1. Description of the vulnerability
 2. Steps to reproduce
@@ -16,7 +18,9 @@ We will acknowledge receipt within 48 hours and provide a timeline for resolutio
 
 ## Supported Versions
 
-Only the latest release is supported with security updates.
+Only the latest release (currently the 0.x line published as
+`@tmhs/screencast-mcp` on npm) receives security fixes. Upgrade to the newest
+version before reporting.
 
 ## Redaction guarantees
 

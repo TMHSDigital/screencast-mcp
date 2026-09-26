@@ -15,9 +15,15 @@ jobs:
     steps:
       - uses: actions/stale@v10
         with:
-          stale-issue-message: "This issue has been automatically marked as stale due to inactivity. It will be closed in 7 days if no further activity occurs."
+          # Issues are the backlog: they are labelled stale as a nudge but never
+          # auto-closed (this previously closed an unfixed bug, #55, and the
+          # Phase 4 tracker, #15). Triaged issues are exempt from the label too.
+          # Stale PRs still close.
+          stale-issue-message: "This issue has had no activity for 30 days. It will stay open; comment or add a label if it is still relevant."
           stale-pr-message: "This PR has been automatically marked as stale due to inactivity. It will be closed in 7 days if no further activity occurs."
           days-before-stale: 30
           days-before-close: 7
+          days-before-issue-close: -1
+          exempt-issue-labels: "bug,enhancement,security,documentation,testing,performance,dependencies,priority: high,priority: medium,priority: low,pinned"
           stale-issue-label: stale
           stale-pr-label: stale
