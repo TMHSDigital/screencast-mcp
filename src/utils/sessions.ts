@@ -27,6 +27,10 @@ export const MAX_FINISHED_RECORDS = 100;
 
 export type SessionStatus = "recording" | "stopped" | "failed" | "orphaned";
 
+/** Why a recording ended: an explicit stop_recording, the maxDurationSec cap,
+ * an ffmpeg crash, or the server shutting down (client disconnect / signal). */
+export type EndReason = "stopped" | "max_duration" | "crashed" | "shutdown";
+
 export interface SessionRecord {
   id: string;
   target: string;
@@ -41,6 +45,9 @@ export interface SessionRecord {
   startedAt: string;
   stoppedAt?: string;
   durationSec?: number;
+  /** Capture cap passed to ffmpeg as -t (0 / absent = unlimited). */
+  maxDurationSec?: number;
+  endReason?: EndReason;
   error?: string;
 }
 
@@ -134,6 +141,9 @@ export function pruneRecords(records: SessionRecord[]): SessionRecord[] {
 export class SessionStore {
   private records = new Map<string, SessionRecord>();
   private children = new Map<string, ChildProcess>();
+  /** Ids with a deliberate stop in flight, so the child's exit handler does not
+   * misread the clean exit as the maxDurationSec cap firing. */
+  private stopping = new Set<string>();
 
   constructor(private readonly path: string) {}
 
@@ -211,6 +221,23 @@ export class SessionStore {
 
   detachChild(id: string): void {
     this.children.delete(id);
+  }
+
+  /** Ids of recordings this instance owns a live child handle for. */
+  activeIds(): string[] {
+    return [...this.children.keys()].filter((id) => this.records.get(id)?.status === "recording");
+  }
+
+  markStopping(id: string): void {
+    this.stopping.add(id);
+  }
+
+  isStopping(id: string): boolean {
+    return this.stopping.has(id);
+  }
+
+  clearStopping(id: string): void {
+    this.stopping.delete(id);
   }
 
   /**

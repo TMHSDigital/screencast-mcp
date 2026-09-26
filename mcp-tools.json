@@ -18,7 +18,8 @@
           "required": ["source"]
         },
         "output": { "type": "string", "description": "Optional output .mp4 path (defaults under SCREENCAST_HOME/recordings)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
+        "maxDurationSec": { "type": "integer", "minimum": 0, "description": "Stop automatically after this many seconds, finalizing the file (default 3600, or SCREENCAST_MAX_RECORDING_SEC). 0 = no cap" }
       },
       "required": ["target"]
     }

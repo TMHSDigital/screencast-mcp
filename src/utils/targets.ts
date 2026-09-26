@@ -236,6 +236,41 @@ export interface CaptureOptions {
   output: string;
   monitors?: Monitor[];
   audio?: AudioCaptureOptions;
+  /** Stop capturing after this many seconds (ffmpeg -t). 0 / absent = no cap. */
+  maxDurationSec?: number;
+}
+
+/** Default recording cap when start_recording is given none (#82): one hour. */
+export const DEFAULT_MAX_RECORDING_SEC = 3600;
+
+/**
+ * Resolve the effective recording cap: an explicit per-call value, else
+ * SCREENCAST_MAX_RECORDING_SEC, else DEFAULT_MAX_RECORDING_SEC. 0 means no cap.
+ * Pure (env is passed in) so the precedence is unit-tested.
+ */
+export function resolveMaxDuration(
+  explicit: number | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  if (explicit !== undefined) return validateMaxDuration(explicit);
+  const raw = env.SCREENCAST_MAX_RECORDING_SEC;
+  if (raw !== undefined && raw.trim() !== "") {
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 0) {
+      throw new ScreencastError(
+        `SCREENCAST_MAX_RECORDING_SEC must be a non-negative integer (0 = no cap), got "${raw}".`,
+      );
+    }
+    return n;
+  }
+  return DEFAULT_MAX_RECORDING_SEC;
+}
+
+function validateMaxDuration(n: number): number {
+  if (!Number.isInteger(n) || n < 0) {
+    throw new ScreencastError("maxDurationSec must be a non-negative integer (0 = no cap).");
+  }
+  return n;
 }
 
 function validateFps(fps: number): number {
@@ -250,6 +285,7 @@ export function buildCaptureArgs(target: Target, opts: CaptureOptions): string[]
   const fps = validateFps(opts.fps ?? DEFAULT_FPS);
   const quality = opts.quality ?? DEFAULT_QUALITY;
   const monitors = opts.monitors ?? [];
+  const cap = validateMaxDuration(opts.maxDurationSec ?? 0);
   return [
     "-y",
     "-f", "gdigrab",
@@ -261,6 +297,8 @@ export function buildCaptureArgs(target: Target, opts: CaptureOptions): string[]
     // Fragmented mp4: keeps the file playable even if the process is killed
     // before the trailing moov atom would normally be written.
     "-movflags", "+frag_keyframe+empty_moov+default_base_moof",
+    // Output-side -t: ffmpeg stops and finalizes the file cleanly at the cap.
+    ...(cap > 0 ? ["-t", String(cap)] : []),
     opts.output,
   ];
 }

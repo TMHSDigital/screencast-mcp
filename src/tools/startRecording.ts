@@ -7,6 +7,8 @@ import {
   buildCaptureArgs,
   DEFAULT_FPS,
   DEFAULT_QUALITY,
+  DEFAULT_MAX_RECORDING_SEC,
+  resolveMaxDuration,
   type Quality,
 } from "../utils/targets.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
@@ -61,6 +63,16 @@ const inputSchema = {
       "Optional output .mp4 path. Defaults to a file under SCREENCAST_HOME/recordings.",
     ),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  maxDurationSec: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe(
+      `Stop automatically after this many seconds, finalizing the file (default ` +
+        `${DEFAULT_MAX_RECORDING_SEC}, or SCREENCAST_MAX_RECORDING_SEC). 0 = no cap. ` +
+        "A safety net against a recording that is never stopped.",
+    ),
 };
 
 export function register(server: McpServer): void {
@@ -78,6 +90,7 @@ export function register(server: McpServer): void {
         const { target, monitors } = resolveCaptureTarget(args.target);
         const fps = args.fps ?? DEFAULT_FPS;
         const quality: Quality = (args.quality as Quality) ?? DEFAULT_QUALITY;
+        const maxDurationSec = resolveMaxDuration(args.maxDurationSec);
         const output = resolveOutput(
           args.output,
           subdir("recordings"),
@@ -92,7 +105,14 @@ export function register(server: McpServer): void {
             ? { device: await resolveLoopbackDevice(args.audio.device) }
             : undefined;
 
-        const ffArgs = buildCaptureArgs(target, { fps, quality, output, monitors, audio });
+        const ffArgs = buildCaptureArgs(target, {
+          fps,
+          quality,
+          output,
+          monitors,
+          audio,
+          maxDurationSec,
+        });
         const child = spawn(ffmpeg, ffArgs, {
           stdio: ["pipe", "ignore", "pipe"],
           windowsHide: true,
@@ -134,6 +154,7 @@ export function register(server: McpServer): void {
           serverPid: process.pid,
           status: "recording",
           startedAt: new Date().toISOString(),
+          ...(maxDurationSec > 0 ? { maxDurationSec } : {}),
         };
         const store = getStore();
         store.create(record);
@@ -141,14 +162,17 @@ export function register(server: McpServer): void {
         // Keep the on-disk record consistent if the child dies on its own. A
         // non-zero exit is a crash (disk full, encoder failure), not a clean
         // stop - record it as "failed" with the stderr tail so the caller can
-        // tell the two apart. stop_recording's own update runs after this and
-        // overrides for deliberate stops.
+        // tell the two apart. A clean exit nobody requested is the
+        // maxDurationSec cap.
         child.on("exit", (code) => {
           const cur = store.get(id);
-          if (cur && cur.status === "recording") {
+          // A deliberate stop (stop_recording / shutdown) records its own final
+          // state; only an exit nobody asked for is classified here.
+          if (cur && cur.status === "recording" && !store.isStopping(id)) {
             if (code !== 0 && code !== null) {
               store.update(id, {
                 status: "failed",
+                endReason: "crashed",
                 stoppedAt: new Date().toISOString(),
                 error: `ffmpeg exited with code ${code}:\n${stderrTail
                   .trim()
@@ -157,7 +181,12 @@ export function register(server: McpServer): void {
                   .join("\n")}`,
               });
             } else {
-              store.update(id, { status: "stopped", stoppedAt: new Date().toISOString() });
+              // A clean exit with no stop in flight is the -t cap firing (#82).
+              store.update(id, {
+                status: "stopped",
+                endReason: maxDurationSec > 0 ? "max_duration" : "stopped",
+                stoppedAt: new Date().toISOString(),
+              });
             }
           }
           store.detachChild(id);
@@ -171,7 +200,12 @@ export function register(server: McpServer): void {
           fps,
           quality,
           audioDevice: audio?.device ?? null,
-          note: "Call stop_recording with this sessionId to finalize the file.",
+          maxDurationSec: maxDurationSec > 0 ? maxDurationSec : null,
+          note:
+            "Call stop_recording with this sessionId to finalize the file." +
+            (maxDurationSec > 0
+              ? ` It stops on its own after ${maxDurationSec}s (maxDurationSec).`
+              : ""),
         });
       } catch (error) {
         return errorResponse(error);

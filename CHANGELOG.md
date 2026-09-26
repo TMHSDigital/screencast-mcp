@@ -7,6 +7,36 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.10.0]
+
+### Fixed
+
+- **A recording no longer keeps capturing after the MCP client disconnects**
+  (#76). The server had no shutdown path. The ffmpeg child's pipes kept the
+  event loop alive, so on a client disconnect both the server and ffmpeg kept
+  running and the screen kept being recorded. The next server start also
+  skipped reaping it, because the old server still looked alive. The server now
+  finalizes every active recording (a graceful `q`, falling back to a kill)
+  and exits when stdin ends, the transport closes, or it receives SIGINT,
+  SIGTERM, or SIGHUP. The whole pass is capped at 10 s.
+
+### Added
+
+- **`start_recording` `maxDurationSec`** (#82). This is an auto-stop cap
+  passed to ffmpeg as `-t`, so the file finalizes cleanly. The default is 3600 s
+  (override with `SCREENCAST_MAX_RECORDING_SEC`); `0` disables it.
+- Session records carry `endReason` (`stopped` | `max_duration` | `crashed`
+  | `shutdown`), shown by `get_session`, `list_sessions`, and
+  `stop_recording`.
+
+### Changed
+
+- Recordings are now capped at one hour by default. Pass `maxDurationSec: 0`
+  (or set `SCREENCAST_MAX_RECORDING_SEC=0`) to restore unlimited capture.
+- The graceful-stop sequence moved from `stop_recording` into
+  `src/utils/lifecycle.ts` (`stopSession` / `stopAll`) and is shared with
+  server shutdown.
+
 ## [0.9.1]
 
 ### Fixed

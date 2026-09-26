@@ -119,6 +119,29 @@ describe("SessionStore", () => {
     expect(store.get("a")?.durationSec).toBe(4);
   });
 
+  it("activeIds lists only recording sessions with an attached child", () => {
+    const store = new SessionStore(newPath());
+    store.load();
+    store.create(record({ id: "live" }));
+    store.create(record({ id: "noHandle" }));
+    store.create(record({ id: "done", status: "stopped" }));
+    const fake = {} as unknown as import("node:child_process").ChildProcess;
+    store.attachChild("live", fake);
+    store.attachChild("done", fake);
+    expect(store.activeIds()).toEqual(["live"]);
+    store.detachChild("live");
+    expect(store.activeIds()).toEqual([]);
+  });
+
+  it("tracks stops in flight", () => {
+    const store = new SessionStore(newPath());
+    expect(store.isStopping("a")).toBe(false);
+    store.markStopping("a");
+    expect(store.isStopping("a")).toBe(true);
+    store.clearStopping("a");
+    expect(store.isStopping("a")).toBe(false);
+  });
+
   it("persists across reloads", () => {
     const p = newPath();
     const a = new SessionStore(p);
