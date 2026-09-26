@@ -170,9 +170,11 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     // Raw stdio (not StdioClientTransport, whose close() kills the child and
     // would hide the bug): end the server's stdin like a client going away.
     const h = mkdtempSync(join(tmpdir(), "screencast-disconnect-"));
-    const srv = spawn(process.execPath, [SERVER], { env: { ...process.env, SCREENCAST_HOME: h }, stdio: ["pipe", "pipe", "ignore"] });
+    const srv = spawn(process.execPath, [SERVER], { env: { ...process.env, SCREENCAST_HOME: h }, stdio: ["pipe", "pipe", "pipe"] });
     let buf = "";
+    let errBuf = "";
     srv.stdout.on("data", (d) => (buf += d));
+    srv.stderr.on("data", (d) => (errBuf += d));
     const send = (m: object) => srv.stdin.write(JSON.stringify(m) + "\n");
     send({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "disconnect", version: "0" } } });
     send({ jsonrpc: "2.0", method: "notifications/initialized" });
@@ -180,7 +182,7 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     const t0 = Date.now();
     while (!buf.includes('"id":2') && Date.now() - t0 < 45_000) await sleep(100);
     const line = buf.split("\n").find((l) => l.includes('"id":2'));
-    expect(line, "start_recording never answered").toBeDefined();
+    expect(line, `start_recording never answered. stdout: ${buf.slice(0, 400)} stderr: ${errBuf.slice(0, 400)}`).toBeDefined();
     const started = JSON.parse(JSON.parse(line!).result.content[0].text);
     await sleep(1500);
 
