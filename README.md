@@ -222,9 +222,11 @@ sample_frames { "input": "…/recordings/rec-….mp4", "timestamps": [0.5, 2, 3.
 ```bash
 npm install
 npm run build      # tsc -> dist/
-npm test           # vitest (pure unit tests; no ffmpeg or display required)
+npm test           # vitest: unit tests, plus the ffmpeg integration suite when ffmpeg is on PATH
 npm run dev        # tsx watch
 ```
+
+The integration suite (`src/__tests__/integration`) runs the real edit and produce builders through ffmpeg against lavfi-generated fixtures and checks the probed result (durations, dimensions, streams, loudness). It skips when ffmpeg is missing; set `REQUIRE_FFMPEG=1` to make a missing ffmpeg fail instead, as CI's Linux job does.
 
 The capture path can't be exercised on CI's headless Linux runners, so an end-to-end harness lives behind a flag and is skipped by default:
 
