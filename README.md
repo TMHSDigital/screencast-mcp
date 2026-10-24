@@ -146,6 +146,10 @@ Edit and produce tools write to a `<name>.partial.<ext>` file next to the output
 
 ## Installation
 
+**Claude Desktop (one click):** download `screencast-mcp-<version>.mcpb` from the [latest release](https://github.com/TMHSDigital/screencast-mcp/releases/latest) and open it, or drag it into Settings > Extensions. Claude Desktop installs it with its own Node runtime. You can optionally pick an output folder, and point at `ffmpeg.exe` / `ffprobe.exe` if they are not on `PATH`.
+
+**Any MCP client (npm):**
+
 ```bash
 npm install -g @tmhs/screencast-mcp
 ```

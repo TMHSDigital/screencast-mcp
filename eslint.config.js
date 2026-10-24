@@ -22,4 +22,9 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Plain-JS build scripts run under Node.
+    files: ["scripts/**/*.mjs"],
+    languageOptions: { globals: { process: "readonly", console: "readonly", URL: "readonly" } },
+  },
 );

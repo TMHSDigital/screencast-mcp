@@ -83,3 +83,7 @@ Desktop.ini
 .idea/
 *.swp
 *~
+
+# Claude Desktop bundle build output (scripts/build-mcpb.mjs)
+mcpb-out/
+*.mcpb

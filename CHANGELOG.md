@@ -7,6 +7,22 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.24.0]
+
+### Added
+
+- **One-click Claude Desktop bundle** (#127). Each GitHub release now has a
+  `screencast-mcp-<version>.mcpb` attached. Open it, or drag it into Claude
+  Desktop's Settings > Extensions, to install with no JSON editing.
+  `scripts/build-mcpb.mjs` stages the same files the npm package ships plus
+  production dependencies, generates `manifest.json` (MCPB spec 0.3) from
+  `package.json` and `mcp-tools.json`, and packs it with a pinned
+  `@anthropic-ai/mcpb`. Optional settings: output folder, `ffmpeg.exe`, and
+  `ffprobe.exe` (if they are not on PATH). A missing ffmpeg already returns an
+  install hint (`winget install Gyan.FFmpeg`). The bundle is attached by the
+  release workflow and doesn't depend on npm publishing. CI builds it on every
+  PR.
+
 ## [0.23.0]
 
 ### Added
