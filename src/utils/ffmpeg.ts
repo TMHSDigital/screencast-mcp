@@ -86,6 +86,28 @@ export function wgcAvailable(): boolean {
   return wgc;
 }
 
+const filterCache = new Map<string, boolean>();
+
+/** True when this ffmpeg build has the named filter (e.g. whisper needs
+ * --enable-whisper, subtitles needs libass). Probed once per name. */
+export function hasFilter(name: string): boolean {
+  const cached = filterCache.get(name);
+  if (cached !== undefined) return cached;
+  let found: boolean;
+  try {
+    const res = spawnSync(requireFfmpeg().ffmpeg, ["-hide_banner", "-h", `filter=${name}`], {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 10_000,
+    });
+    found = new RegExp(`^Filter ${name}\\b`, "m").test(res.stdout ?? "");
+  } catch {
+    found = false;
+  }
+  filterCache.set(name, found);
+  return found;
+}
+
 export interface RunResult {
   code: number | null;
   stdout: string;

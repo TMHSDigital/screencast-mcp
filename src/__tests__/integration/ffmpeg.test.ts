@@ -15,7 +15,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { binaryWorks, runCapture, runFfmpeg, runFfmpegBuffer, probeMedia } from "../../utils/ffmpeg.js";
 import {
   buildTrimArgs,
@@ -43,6 +43,7 @@ import { bundledFontPath } from "../../utils/fonts.js";
 import { encodeInlineImages } from "../../utils/images.js";
 import { animLadder, buildAnimArgs } from "../../utils/anim.js";
 import { buildArrowImageArgs, buildCalloutArgs } from "../../utils/callout.js";
+import { buildBurnSubtitlesArgs, buildTranscribeArgs, parseSrt, normalizeCues } from "../../utils/captions.js";
 import { loudnessTarget, buildLoudnessMeasureArgs, buildLoudnessApplyArgs, parseLoudnorm, buildDenoiseArgs, buildNoiseFloorArgs, parseNoiseFloor } from "../../utils/audio.js";
 import { analysisSize, diffFrames, buildRawFrameArgs, buildSsimArgs, parseSsim } from "../../utils/diff.js";
 import { evenTimes, formatTimecode, sheetGrid, buildTileArgs, buildSheetArgs, buildPosterArgs } from "../../utils/sheet.js";
@@ -67,14 +68,27 @@ async function meanVolume(path: string): Promise<number> {
   return Number(m[1]);
 }
 
-/** Average luma (0-255) of a rectangle of the frame at `t` seconds. */
-function regionLuma(path: string, t: number, x: number, y: number, w: number, h: number): number {
+/** Raw gray pixels of a rectangle of the frame at `t` seconds. */
+function regionPixels(path: string, t: number, x: number, y: number, w: number, h: number): Buffer {
   const res = spawnSync(FFMPEG, [
     "-v", "error", "-ss", String(t), "-i", path, "-frames:v", "1",
-    "-vf", `crop=${w}:${h}:${x}:${y},scale=1:1,format=gray`,
+    "-vf", `crop=${w}:${h}:${x}:${y},format=gray`,
     "-f", "rawvideo", "-",
   ]);
-  return res.stdout && res.stdout.length > 0 ? res.stdout[0] : -1;
+  return res.stdout ?? Buffer.alloc(0);
+}
+
+/** Average luma (0-255) of a rectangle of the frame at `t` seconds. (A true
+ * average: scale=1:1's default scaler samples sparsely and misses thin text.) */
+function regionLuma(path: string, t: number, x: number, y: number, w: number, h: number): number {
+  const px = regionPixels(path, t, x, y, w, h);
+  return px.length > 0 ? px.reduce((s, v) => s + v, 0) / px.length : -1;
+}
+
+/** Brightest pixel in a rectangle: answers "is any text drawn here". */
+function regionMaxLuma(path: string, t: number, x: number, y: number, w: number, h: number): number {
+  const px = regionPixels(path, t, x, y, w, h);
+  return px.length > 0 ? Math.max(...px) : -1;
 }
 
 describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { timeout: 120_000 }, () => {
@@ -226,6 +240,30 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     await runFfmpeg(buildDenoiseArgs(noise, quiet, "strong", floor));
     // Steady noise near the floor is cut hard (measured ~20 dB at strong).
     expect(await meanVolume(quiet)).toBeLessThan((await meanVolume(noise)) - 10);
+  });
+
+  it("burn_subtitles draws the cue text only while the cue is on (#120)", async () => {
+    const srt = p("cues.srt");
+    writeFileSync(srt, "1\n00:00:01,000 --> 00:00:03,000\nHELLO WORLD CAPTION\n");
+    const plain = p("plain.mp4");
+    await runFfmpeg(["-y", "-f", "lavfi", "-i", "color=c=black:s=640x360:d=4", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", plain]);
+    const out = p("captioned.mp4");
+    await runFfmpeg(buildBurnSubtitlesArgs(plain, srt, out, dirname(bundledFontPath("regular")), "social", "draft"));
+    // White text on black in the bottom band during the cue, nothing outside it.
+    expect(regionMaxLuma(out, 2, 60, 240, 520, 110)).toBeGreaterThan(200);
+    expect(regionMaxLuma(out, 0.5, 60, 240, 520, 110)).toBeLessThan(30);
+  });
+
+  it.runIf(!!process.env.SCREENCAST_WHISPER_MODEL)("transcribe writes recognisable text with the whisper filter (#120)", async () => {
+    const speech = p("speech.wav");
+    // TTS is not available in CI, so this runs only where a model is set up locally.
+    const { spawnSync } = await import("node:child_process");
+    spawnSync("powershell", ["-NoProfile", "-Command",
+      `Add-Type -AssemblyName System.Speech;$s=New-Object System.Speech.Synthesis.SpeechSynthesizer;$s.SetOutputToWaveFile('${speech.replace(/'/g, "''")}');$s.Speak('Open the settings page');$s.Dispose()`]);
+    const raw = p("raw.srt");
+    await runFfmpeg(buildTranscribeArgs(speech, process.env.SCREENCAST_WHISPER_MODEL!, raw, "en"));
+    const cues = normalizeCues(parseSrt(readFileSync(raw, "utf8")));
+    expect(cues.map((c) => c.text).join(" ").toLowerCase()).toContain("settings");
   });
 
   it("callout draws a box, a text label with a %, and an arrow, each only in its window (#121)", async () => {
