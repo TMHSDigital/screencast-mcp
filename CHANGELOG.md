@@ -7,6 +7,27 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.22.0]
+
+### Added
+
+- **`normalize_audio` tool** (#123). It brings a recording's loudness to a
+  delivery target with two-pass EBU R128 `loudnorm` (measure, then a linear
+  correction from the measurement): `youtube` (−14 LUFS, default), `podcast`
+  (−16), `broadcast` (−23), or any LUFS value. Video is stream-copied, and
+  the output codec follows the container (PCM for `.wav`, MP3 for `.mp3`,
+  else AAC at 48 kHz). The result reports loudness before and after; in
+  testing every target was hit within 0.05 LU. Silent or audio-less inputs
+  get a clear error.
+- **`denoise` tool** (#123). It reduces steady background noise (fan, hum,
+  hiss) with `afftdn` at `light` / `medium` / `strong`. afftdn only removes
+  noise it thinks is below its noise floor, so a fixed floor left real noise
+  untouched (white noise at −25 dBFS: no change). The tool measures the
+  file's floor first (10th-percentile RMS of 100 ms windows) and sets afftdn
+  5 dB above it. Measured: steady noise cut 12–20 dB, a tone mixed with noise
+  kept within 0.3 dB. Larger offsets removed a little more pink noise but
+  started eating the wanted signal.
+
 ## [0.21.0]
 
 ### Added

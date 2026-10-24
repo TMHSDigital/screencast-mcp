@@ -43,7 +43,7 @@ The design choices are deliberate rather than incidental:
 
 ## Tools
 
-Thirty-one tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
+Thirty-three tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
 
 ### Capture
 
@@ -89,6 +89,8 @@ These tools re-encode (a filter rewrites pixels, so stream copy does not apply).
 | `callout` | **Timed annotations**: boxes, text labels, and arrows at any angle, each shown between two timestamps. Mark the bug, point at the button, caption a step. |
 | `compress` | Re-encode smaller with a `light`/`medium`/`heavy` CRF ladder and an optional `maxWidth` that only downscales. |
 | `extract_audio` | Write the audio track to its own file (`mp3`, `aac`, `wav`, or `copy`). |
+| `normalize_audio` | **Loudness to a delivery target** (two-pass EBU R128 `loudnorm`): `youtube` −14 LUFS, `podcast` −16, `broadcast` −23, or any LUFS value. Video is copied; reports loudness before and after. |
+| `denoise` | Reduce **steady** background noise (fan, hum, hiss) with `afftdn`, tuned to the file's measured noise floor. Video is copied. |
 | `clip` | Extract one or more frame-accurate sub-segments to separate files. Unlike `trim`, it re-encodes so cuts land exactly on the given times. |
 
 ### Redact

@@ -347,6 +347,34 @@
     }
   },
   {
+    "name": "normalize_audio",
+    "description": "Normalize a recording's loudness to a delivery target (EBU R128, two-pass loudnorm) so narration and system audio are neither too quiet nor clipping. Video is copied untouched. Reports the loudness before and after.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video or audio file" },
+        "target": { "description": "youtube (-14 LUFS, default), podcast (-16), broadcast (EBU R128, -23), or a LUFS number such as -18", "anyOf": [{"type": "string", "enum": ["youtube", "podcast", "broadcast"]},{"type": "number"}] },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+      },
+      "required": ["input"]
+    }
+  },
+  {
+    "name": "denoise",
+    "description": "Reduce steady background noise (fan, hum, hiss) in a recording's audio with an adaptive FFT denoiser tuned to the file's measured noise floor. Video is copied untouched.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video or audio file" },
+        "strength": { "type": "string", "enum": ["light", "medium", "strong"], "description": "How hard to reduce noise: light (6 dB), medium (12 dB, default), strong (20 dB)" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+      },
+      "required": ["input"]
+    }
+  },
+  {
     "name": "clip",
     "description": "Extract one or more frame-accurate sub-segments to separate files. Unlike trim (fast stream copy that snaps to a keyframe), clip re-encodes so cuts land exactly on the given times.",
     "inputSchema": {
