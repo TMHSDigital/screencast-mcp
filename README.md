@@ -43,7 +43,7 @@ The design choices are deliberate rather than incidental:
 
 ## Tools
 
-Twenty-nine tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
+Thirty tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
 
 ### Capture
 
@@ -64,6 +64,7 @@ Twenty-nine tools across four concerns. The manifest in [`mcp-tools.json`](mcp-t
 | `contact_sheet` | Tile timestamped frames into **one** image (evenly spaced, or at the scene changes) so the agent sees a whole recording in a single look; returned inline. `poster: true` writes one representative frame instead. |
 | `screen_diff` | Compare two screenshots/frames: SSIM score, share changed, and **bounding boxes of what changed**, with the changes outlined in an inline image. Verify a UI change happened, and only where expected. |
 | `wait_for_change` | Watch a target and return when it **changes** (a dialog opened) or **settles** (a build or page finished), instead of guessing a sleep. Reports elapsed time, changed regions, and the final state inline. |
+| `find_text` | **Read text** on screen or in a frame with the OCR engine built into Windows (no install): every line and match with its bounding box. Locate a button by its label, check what the screen says, or find secrets (`regex: "sk-|ghp_"`) and get `redact_region` rectangles with `redact: true`. Best-effort; review before relying on it. |
 | `get_media_info` | ffprobe wrapper: duration, resolution, fps, codecs, container format, and size. |
 
 ### Minimal edit
@@ -214,7 +215,7 @@ Inline images are downscaled JPEGs (`maxImageWidth`, default 1280) and capped pe
 - **Output stays local.** Files are written to the local filesystem only — never uploaded, streamed, or transmitted anywhere.
 - **Public repo, private captures.** The `.gitignore` blocks recordings, frames, screenshots, and common video/image output so test media cannot be committed by accident.
 - **Review before sharing.** Sample frames or inspect a recording before handing a file to another tool or person, so you know what it contains.
-- **Redaction is declared, not detected.** `redact_region` covers only the rectangles you specify, so it depends on you (or the agent) having found the secret first. Use the default `box` style for a solid irreversible fill, and still review the output before sharing.
+- **Redaction covers what you declare.** `redact_region` covers only the rectangles you specify. `find_text` can help find them: OCR with a query such as `regex: "sk-|ghp_|api.?key"` and `redact: true` returns ready-made rectangles. But OCR is best-effort; it can miss small or stylised text, so treat it as an aid, not a guarantee. Use the default `box` style for a solid irreversible fill, and still review the output before sharing.
 - **System audio is sensitive too.** When `audio.source` = `system`, the recording captures everything playing on the machine (call audio, notifications, media). Treat audio-bearing recordings with the same care as the video.
 
 ## Project structure

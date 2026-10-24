@@ -7,6 +7,27 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.19.0]
+
+### Added
+
+- **`find_text` tool** (#117). It reads text on screen (`target`) or in an
+  image or video frame (`input`, `timestamp`) with the OCR engine built into
+  Windows (`Windows.Media.Ocr`), with nothing to install. It returns every
+  line with its bounding box, and with a `query` (plain or `regex`), each
+  match boxed and the image inline with the matches outlined.
+  `redact: true` adds padded rectangles to pass straight to `redact_region`.
+  In testing, it found both secrets in a frame, `redact_region` covered them,
+  and a re-check found nothing.
+- Recognition runs two passes (2× and 4× upscales, capped at the engine's
+  10,000 px limit) in one PowerShell process and merges them. Testing showed
+  Windows OCR drops ALL_CAPS words joined by underscores (e.g.
+  `OPENAI_API_KEY=sk-…`) at normal sizes and only reads them at 4×. Plain
+  queries also tolerate the engine's usual misreads (`_` read as `-`, `I` as
+  `l`, `O` as `0`), so `OPENAI_API_KEY` still matches `OPENAI-APl-KEY`.
+- The threat model now points to `find_text` as an aid for finding secrets,
+  and says plainly that OCR is best-effort.
+
 ## [0.18.0]
 
 ### Added
