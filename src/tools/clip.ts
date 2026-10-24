@@ -3,7 +3,8 @@ import { extname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
+import { requireFfmpeg } from "../utils/ffmpeg.js";
+import { runEditJob } from "../utils/jobs.js";
 import { buildClipArgs } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
@@ -32,7 +33,7 @@ export function register(server: McpServer): void {
       "trim (fast stream copy that snaps to a keyframe), clip re-encodes so cuts " +
       "land exactly on the given times.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         if (!existsSync(args.input)) {
@@ -49,7 +50,7 @@ export function register(server: McpServer): void {
             `clip-${stamp()}-${rand()}-${String(i).padStart(2, "0")}${ext}`,
             args.overwrite,
           );
-          await runFfmpeg(buildClipArgs(args.input, output, seg), 10 * 60_000);
+          await runEditJob(buildClipArgs(args.input, output, seg), { output, durationSec: seg.end - seg.start, extra });
           outputs.push(output);
         }
         return okResponse({ outputs, count: outputs.length });

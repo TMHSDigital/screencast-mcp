@@ -2,8 +2,9 @@ import { z } from "zod";
 import { writeFileSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
-import { buildTitleCardArgs } from "../utils/produce.js";
+import { requireFfmpeg } from "../utils/ffmpeg.js";
+import { runEditJob } from "../utils/jobs.js";
+import { buildTitleCardArgs, DEFAULT_TITLE_DURATION } from "../utils/produce.js";
 import { bundledFontPath } from "../utils/fonts.js";
 import { resolveOutput, subdir, stamp, rand, tempPath } from "../utils/paths.js";
 
@@ -29,7 +30,7 @@ export function register(server: McpServer): void {
       "assemble_highlights to stitch it in). Text is rendered with a bundled " +
       "font, so no system font is required.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         const output = resolveOutput(args.output, subdir("edits"), `title-${stamp()}-${rand()}.mp4`, args.overwrite);
@@ -48,7 +49,7 @@ export function register(server: McpServer): void {
             fontColor: args.fontColor,
             fontSize: args.fontSize,
           });
-          await runFfmpeg(ffArgs, 5 * 60_000);
+          await runEditJob(ffArgs, { output, durationSec: args.duration ?? DEFAULT_TITLE_DURATION, extra });
         } finally {
           rmSync(textFile, { force: true });
         }

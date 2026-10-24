@@ -80,6 +80,10 @@ export interface RunCaptureOptions {
    * (which is every short job that goes through runCapture).
    */
   closeStdin?: boolean;
+  /** Called with each stdout chunk as it arrives (e.g. `-progress pipe:1`). */
+  onStdout?: (chunk: string) => void;
+  /** Kill the child and reject when this signal aborts (a cancelled request). */
+  signal?: AbortSignal;
 }
 
 /** Run a binary to completion, capturing stdout/stderr. Used for ffprobe and
@@ -95,23 +99,44 @@ export function runCapture(
     if (opts.closeStdin) child.stdin?.end();
     let stdout = "";
     let stderr = "";
-    const timer = setTimeout(() => {
+    // On a timeout or cancel, settle only once the child has actually exited:
+    // on Windows a file the dying process still holds open cannot be deleted
+    // yet, so a caller cleaning up its output would hit EPERM. A short grace
+    // timer still settles if 'close' never arrives.
+    let killError: ScreencastError | null = null;
+    let graceTimer: NodeJS.Timeout | undefined;
+    const kill = (error: ScreencastError) => {
+      if (killError) return;
+      killError = error;
       child.kill("SIGKILL");
-      reject(
-        new ScreencastError(
-          `${bin} timed out after ${Math.round(timeoutMs / 1000)}s.`,
-        ),
-      );
-    }, timeoutMs);
-    child.stdout?.on("data", (d) => (stdout += d.toString()));
+      graceTimer = setTimeout(() => reject(error), 5_000);
+    };
+    const onAbort = () => kill(new ScreencastError(`${bin} was cancelled.`));
+    const timer = setTimeout(
+      () => kill(new ScreencastError(`${bin} timed out after ${Math.round(timeoutMs / 1000)}s.`)),
+      timeoutMs,
+    );
+    const cleanup = () => {
+      clearTimeout(timer);
+      clearTimeout(graceTimer);
+      opts.signal?.removeEventListener("abort", onAbort);
+    };
+    if (opts.signal?.aborted) onAbort();
+    else opts.signal?.addEventListener("abort", onAbort, { once: true });
+    child.stdout?.on("data", (d) => {
+      const s = d.toString();
+      stdout += s;
+      opts.onStdout?.(s);
+    });
     child.stderr?.on("data", (d) => (stderr += d.toString()));
     child.on("error", (err) => {
-      clearTimeout(timer);
+      cleanup();
       reject(err);
     });
     child.on("close", (code) => {
-      clearTimeout(timer);
-      resolve({ code, stdout, stderr });
+      cleanup();
+      if (killError) reject(killError);
+      else resolve({ code, stdout, stderr });
     });
   });
 }
@@ -120,9 +145,10 @@ export function runCapture(
 export async function runFfmpeg(
   args: string[],
   timeoutMs?: number,
+  opts: RunCaptureOptions = {},
 ): Promise<void> {
   const { ffmpeg } = requireFfmpeg();
-  const res = await runCapture(ffmpeg, args, timeoutMs);
+  const res = await runCapture(ffmpeg, args, timeoutMs, opts);
   if (res.code !== 0) {
     const tail = res.stderr.trim().split("\n").slice(-6).join("\n");
     throw new ScreencastError(`ffmpeg failed (exit ${res.code}):\n${tail}`);

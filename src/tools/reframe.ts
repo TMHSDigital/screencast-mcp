@@ -3,7 +3,8 @@ import { extname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
+import { requireFfmpeg } from "../utils/ffmpeg.js";
+import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildReframeArgs, type Aspect, type ReframeFit } from "../utils/produce.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
@@ -27,7 +28,7 @@ export function register(server: McpServer): void {
       "letterboxes so nothing is lost; 'crop' fills the frame and trims the " +
       "overflow. Returns the output path.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         if (!existsSync(args.input)) {
@@ -41,7 +42,7 @@ export function register(server: McpServer): void {
           args.aspect as Aspect,
           (args.fit as ReframeFit | undefined) ?? "pad",
         );
-        await runFfmpeg(ffArgs, 15 * 60_000);
+        await runEditJob(ffArgs, { output, durationSec: await probeDuration(args.input), extra });
         return okResponse({ outputPath: output, aspect: args.aspect, fit: args.fit ?? "pad" });
       } catch (error) {
         return errorResponse(error);

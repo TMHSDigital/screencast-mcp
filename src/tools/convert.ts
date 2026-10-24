@@ -2,7 +2,8 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
+import { requireFfmpeg } from "../utils/ffmpeg.js";
+import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildConvertArgs, type ConvertFormat } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
@@ -23,7 +24,7 @@ export function register(server: McpServer): void {
     "Convert a video between mp4, gif, and webm. mp4 uses H.264, webm uses VP9, " +
       "and gif uses a palette filter for quality. Returns the output path.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         if (!existsSync(args.input)) {
@@ -40,7 +41,7 @@ export function register(server: McpServer): void {
           fps: args.fps,
           width: args.width,
         });
-        await runFfmpeg(ffArgs, 10 * 60_000);
+        await runEditJob(ffArgs, { output, durationSec: await probeDuration(args.input), extra });
         return okResponse({ outputPath: output, format });
       } catch (error) {
         return errorResponse(error);

@@ -3,7 +3,8 @@ import { extname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg, probeMedia } from "../utils/ffmpeg.js";
+import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
+import { runEditJob } from "../utils/jobs.js";
 import { buildMusicBedArgs } from "../utils/produce.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
@@ -26,7 +27,7 @@ export function register(server: McpServer): void {
       "the two are mixed, optionally ducking the music under the original. The " +
       "video stream is copied; only audio is re-encoded.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         for (const f of [args.video, args.music]) {
@@ -51,7 +52,7 @@ export function register(server: McpServer): void {
             duck: args.duck,
           },
         );
-        await runFfmpeg(ffArgs, 15 * 60_000);
+        await runEditJob(ffArgs, { output, durationSec: info.durationSec, extra });
         return okResponse({ outputPath: output, mixedWithOriginal: info.audioCodec !== null });
       } catch (error) {
         return errorResponse(error);

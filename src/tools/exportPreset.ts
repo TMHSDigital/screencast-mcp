@@ -2,7 +2,8 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
+import { requireFfmpeg } from "../utils/ffmpeg.js";
+import { runEditJob, probeDuration } from "../utils/jobs.js";
 import {
   buildExportPresetArgs,
   PLATFORM_PRESETS,
@@ -31,7 +32,7 @@ export function register(server: McpServer): void {
       "square. Reframes to the platform aspect, caps fps, and encodes H.264 at " +
       "the platform bitrate with faststart. Returns the output path.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         if (!existsSync(args.input)) {
@@ -45,7 +46,7 @@ export function register(server: McpServer): void {
           platform,
           (args.fit as ReframeFit | undefined) ?? "pad",
         );
-        await runFfmpeg(ffArgs, 20 * 60_000);
+        await runEditJob(ffArgs, { output, durationSec: await probeDuration(args.input), extra });
         const spec = PLATFORM_PRESETS[platform];
         return okResponse({ outputPath: output, platform, aspect: spec.aspect, fps: spec.fps });
       } catch (error) {

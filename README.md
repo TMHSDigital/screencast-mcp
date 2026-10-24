@@ -122,6 +122,8 @@ Set `SCREENCAST_MAX_RECORDING_SEC` to change the default recording cap (`0` disa
 
 Output is written under `SCREENCAST_HOME` (default `<homedir>/.screencast-mcp`) into `recordings/`, `frames/`, `screenshots/`, and `edits/`. Any tool also accepts an explicit output path.
 
+Edit and produce tools write to a `<name>.partial.<ext>` file next to the output and rename it into place only when ffmpeg succeeds, so a failed, timed-out, or cancelled job never leaves a truncated file at `output`. The job timeout scales with the media's length (at least 10 minutes, or 4x the duration); set `SCREENCAST_JOB_TIMEOUT_MS` to override it. Clients that send a progress token get `notifications/progress` updates while a job runs, and cancelling the request stops ffmpeg.
+
 ## Prerequisites
 
 `ffmpeg` and `ffprobe` are external dependencies and must be on `PATH` (or pointed at via the `FFMPEG_PATH` / `FFPROBE_PATH` environment variables). The server detects them per call and returns a clear error with an install hint if either is missing.

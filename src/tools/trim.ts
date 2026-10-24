@@ -3,7 +3,8 @@ import { extname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
+import { requireFfmpeg } from "../utils/ffmpeg.js";
+import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildTrimArgs } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
@@ -22,7 +23,7 @@ export function register(server: McpServer): void {
     "Trim a video to a sub-clip by start + (end or duration). Uses stream copy " +
       "for speed; cut points snap to the nearest keyframe.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         if (!existsSync(args.input)) {
@@ -40,7 +41,11 @@ export function register(server: McpServer): void {
           end: args.end,
           duration: args.duration,
         });
-        await runFfmpeg(ffArgs, 5 * 60_000);
+        // Length of the trimmed clip, which sizes the job's timeout and progress.
+        const start = args.start ?? 0;
+        const end = args.end ?? (await probeDuration(args.input));
+        const durationSec = args.duration ?? (end !== null ? end - start : null);
+        await runEditJob(ffArgs, { output, durationSec, extra });
         return okResponse({ outputPath: output });
       } catch (error) {
         return errorResponse(error);

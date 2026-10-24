@@ -3,7 +3,8 @@ import { extname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
+import { requireFfmpeg } from "../utils/ffmpeg.js";
+import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildCompressArgs, type CompressLevel } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
@@ -29,7 +30,7 @@ export function register(server: McpServer): void {
     "Re-encode a video to a smaller file with a CRF quality ladder and an " +
       "optional width cap. Returns the output path.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         if (!existsSync(args.input)) {
@@ -46,7 +47,7 @@ export function register(server: McpServer): void {
           level: args.level as CompressLevel | undefined,
           maxWidth: args.maxWidth,
         });
-        await runFfmpeg(ffArgs, 15 * 60_000);
+        await runEditJob(ffArgs, { output, durationSec: await probeDuration(args.input), extra });
         return okResponse({ outputPath: output, level: args.level ?? "medium" });
       } catch (error) {
         return errorResponse(error);

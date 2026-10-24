@@ -2,7 +2,8 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg, probeMedia } from "../utils/ffmpeg.js";
+import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
+import { runEditJob } from "../utils/jobs.js";
 import { buildAssembleArgs, DEFAULT_TRANSITION_DUR } from "../utils/produce.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
@@ -34,7 +35,7 @@ export function register(server: McpServer): void {
       "transition between each. Clips are auto-normalized to a common " +
       "resolution, fps, and audio rate, so they need not match.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         for (const f of args.clips) {
@@ -62,7 +63,7 @@ export function register(server: McpServer): void {
           },
           clipHasAudio,
         );
-        await runFfmpeg(ffArgs, 20 * 60_000);
+        await runEditJob(ffArgs, { output, durationSec: durations.reduce((a, d) => a + d, 0) || null, extra });
         return okResponse({
           outputPath: output,
           clips: args.clips.length,

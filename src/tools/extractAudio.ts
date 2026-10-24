@@ -2,7 +2,8 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg, runCapture } from "../utils/ffmpeg.js";
+import { requireFfmpeg, runCapture } from "../utils/ffmpeg.js";
+import { runEditJob, probeDuration } from "../utils/jobs.js";
 import {
   buildExtractAudioArgs,
   buildProbeArgs,
@@ -36,7 +37,7 @@ export function register(server: McpServer): void {
     "Extract the audio track of a media file to its own file (mp3, aac, wav, " +
       "or copy). Returns the output path.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         const { ffprobe } = requireFfmpeg();
         if (!existsSync(args.input)) {
@@ -69,7 +70,7 @@ export function register(server: McpServer): void {
           `audio-${stamp()}-${rand()}.${ext}`,
           args.overwrite,
         );
-        await runFfmpeg(buildExtractAudioArgs(args.input, output, format), 10 * 60_000);
+        await runEditJob(buildExtractAudioArgs(args.input, output, format), { output, durationSec: await probeDuration(args.input), extra });
         return okResponse({
           outputPath: output,
           format,

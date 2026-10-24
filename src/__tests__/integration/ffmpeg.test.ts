@@ -11,9 +11,9 @@
  * Set REQUIRE_FFMPEG=1 (CI's ubuntu leg does) to turn a missing ffmpeg into a
  * failure instead of a silent skip.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { binaryWorks, runCapture, runFfmpeg, probeMedia } from "../../utils/ffmpeg.js";
@@ -38,6 +38,7 @@ import {
 } from "../../utils/produce.js";
 import { bundledFontPath } from "../../utils/fonts.js";
 import { encodeInlineImages } from "../../utils/images.js";
+import { runEditJob, partialPath, type ToolExtra } from "../../utils/jobs.js";
 
 const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
 const FFPROBE = process.env.FFPROBE_PATH || "ffprobe";
@@ -220,6 +221,40 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     mkdirSync(backstopDir);
     await runFfmpeg(buildSampleByFpsArgs(av, 30, join(backstopDir, "f_%05d.png"), 3));
     expect(readdirSync(backstopDir)).toHaveLength(3);
+  });
+
+  it("runEditJob writes the output atomically and reports progress (#81)", async () => {
+    const out = p("job-ok.mp4");
+    const sendNotification = vi.fn().mockResolvedValue(undefined);
+    const extra = { _meta: { progressToken: "t" }, sendNotification, signal: new AbortController().signal } as unknown as ToolExtra;
+    await runEditJob(buildScaleArgs(av, out, { width: 160 }), { output: out, durationSec: 10, extra });
+    expect(existsSync(out)).toBe(true);
+    expect(existsSync(partialPath(out))).toBe(false);
+    const percents = sendNotification.mock.calls.map((c) => c[0].params.progress);
+    expect(percents.at(-1)).toBe(100);
+    expect(percents.length).toBeGreaterThan(1);
+  });
+
+  it("a failed runEditJob leaves no file at the output (#81)", async () => {
+    const out = p("job-fail.mp4");
+    // An unknown filter makes ffmpeg exit non-zero after opening the input.
+    const bad = ["-y", "-i", av, "-vf", "nosuchfilter", out];
+    await expect(runEditJob(bad, { output: out, durationSec: 10 })).rejects.toThrow(/ffmpeg failed/);
+    expect(existsSync(out)).toBe(false);
+    expect(existsSync(partialPath(out))).toBe(false);
+  });
+
+  it("a cancelled runEditJob kills ffmpeg and leaves no partial file (#81)", async () => {
+    const out = p("job-cancel.mp4");
+    const ac = new AbortController();
+    const extra = { signal: ac.signal, sendNotification: vi.fn() } as unknown as ToolExtra;
+    // A long lavfi source keeps ffmpeg busy until it is cancelled.
+    const slow = ["-y", "-f", "lavfi", "-i", "testsrc=duration=600:size=1280x720:rate=30", "-c:v", "libx264", "-preset", "veryslow", out];
+    const job = runEditJob(slow, { output: out, durationSec: 600, extra });
+    setTimeout(() => ac.abort(), 500);
+    await expect(job).rejects.toThrow(/cancelled/);
+    expect(existsSync(out)).toBe(false);
+    expect(existsSync(partialPath(out))).toBe(false);
   });
 
   it("inline images are downscaled JPEGs and capped by count (#79)", async () => {
