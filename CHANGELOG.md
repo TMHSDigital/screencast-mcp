@@ -7,6 +7,31 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.14.3]
+
+### Fixed
+
+- **One server instance could undo another's session updates** (#55).
+  `persist()` merged with the registry on disk, but every record in memory
+  won, including other instances' records loaded at boot and never touched
+  since. So if instance A had loaded B's live recording, and B then stopped
+  it, A's next unrelated write flipped it back to "recording". Only records
+  this instance created or changed now override the disk copy; everything
+  else is taken from disk, and the in-memory view is refreshed after each
+  write.
+- **Registry writes are now locked across processes** (#55). Read-merge-write
+  runs under an `O_EXCL` lockfile (`sessions.json.lock`, holding the owner's
+  pid and a timestamp). A stale lock (dead owner, or older than 10 s) is taken
+  over, and after 2 s of contention the write goes ahead with a warning rather
+  than failing a recording. A test runs six processes writing 25 records each
+  to one registry and checks none are lost.
+- **Windows: registry writes could crash with `EPERM`.** Renaming the temp
+  file over `sessions.json` failed while another process had it open. Reads
+  now also take the lock, and the rename retries briefly on
+  `EPERM`/`EBUSY`/`EACCES` (antivirus and indexers can hold the file
+  momentarily). Re-creating a lock that is still "delete pending" (`EPERM`) is
+  treated as busy rather than as a reason to write unlocked.
+
 ## [0.14.2]
 
 ### Fixed
