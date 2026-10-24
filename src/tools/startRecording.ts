@@ -95,7 +95,7 @@ export function register(server: McpServer): void {
     async (args) => {
       try {
         const { ffmpeg } = requireFfmpeg();
-        const { target, monitors, window } = resolveCaptureTarget(args.target, {
+        const { target, monitors, window } = await resolveCaptureTarget(args.target, {
           exactTitle: args.exactTitle,
         });
         const fps = args.fps ?? DEFAULT_FPS;

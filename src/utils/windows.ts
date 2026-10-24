@@ -13,8 +13,8 @@
  * aware). The matching, clamping, and even-dimension math (selectWindow) is
  * pure so it is unit-tested without Windows.
  */
-import { spawnSync } from "node:child_process";
 import { ScreencastError } from "./errors.js";
+import { runPowerShell } from "./monitors.js";
 
 export interface RawWindow {
   title: string;
@@ -191,24 +191,15 @@ $v=[pscustomobject]@{x=[WinShim]::SM(76);y=[WinShim]::SM(77);w=[WinShim]::SM(78)
 `;
 
 /** Enumerate live windows on Windows. Throws on non-Windows or failure. */
-export function getRawWindows(): WindowQuery {
+export async function getRawWindows(): Promise<WindowQuery> {
   if (process.platform !== "win32") {
     throw new ScreencastError("Window capture is implemented for Windows (gdigrab) only.");
   }
-  const encoded = Buffer.from(PS_ENUM, "utf16le").toString("base64");
-  const res = spawnSync(
-    "powershell",
-    ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
-    { encoding: "utf8", windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
-  );
-  if (res.status !== 0 || !res.stdout) {
-    throw new ScreencastError(
-      `Could not enumerate windows: ${res.stderr?.trim() || "powershell failed"}`,
-    );
-  }
+  // Not cached: windows move and restack between calls, unlike monitors.
+  const stdout = await runPowerShell(PS_ENUM, "windows");
   let parsed: unknown;
   try {
-    parsed = JSON.parse(res.stdout);
+    parsed = JSON.parse(stdout);
   } catch (err) {
     throw new ScreencastError(`Could not parse window geometry: ${(err as Error).message}`);
   }
@@ -219,6 +210,9 @@ export function getRawWindows(): WindowQuery {
 }
 
 /** Resolve a window title to its current on-screen rectangle (Windows). */
-export function resolveWindowBounds(title: string, opts: SelectWindowOptions = {}): WindowBounds {
-  return selectWindow(getRawWindows(), title, opts);
+export async function resolveWindowBounds(
+  title: string,
+  opts: SelectWindowOptions = {},
+): Promise<WindowBounds> {
+  return selectWindow(await getRawWindows(), title, opts);
 }

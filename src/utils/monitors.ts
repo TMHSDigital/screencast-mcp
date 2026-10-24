@@ -15,7 +15,7 @@
  *
  * `parseMonitors` is pure so the offset math is unit-tested without Windows.
  */
-import { spawnSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { ScreencastError } from "./errors.js";
 
 export interface Monitor {
@@ -69,29 +69,63 @@ Add-Type -AssemblyName System.Windows.Forms
 } | ConvertTo-Json -Compress
 `;
 
-/** Query live monitor geometry on Windows. Throws on non-Windows or failure. */
-export function getMonitors(): Monitor[] {
-  if (process.platform !== "win32") {
-    throw new ScreencastError(
-      "Monitor enumeration is implemented for Windows (gdigrab) only.",
+/** How long a monitor layout is reused before it is queried again (#88). The
+ * layout changes only when a display is plugged in or rearranged, while an
+ * agent's screenshot loop can call this every few seconds. */
+export const MONITOR_CACHE_MS = 5_000;
+
+let cache: { at: number; monitors: Promise<Monitor[]> } | null = null;
+
+/** Run a base64-encoded PowerShell script without blocking the event loop and
+ * return its stdout. Shared with the window enumeration in windows.ts. */
+export function runPowerShell(script: string, what: string): Promise<string> {
+  const encoded = Buffer.from(script, "utf16le").toString("base64");
+  return new Promise((resolve, reject) => {
+    execFile(
+      "powershell",
+      ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+      { encoding: "utf8", windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
+      (err, stdout, stderr) => {
+        if (err || !stdout) {
+          reject(new ScreencastError(`Could not enumerate ${what}: ${stderr?.trim() || err?.message || "powershell failed"}`));
+        } else {
+          resolve(stdout);
+        }
+      },
     );
-  }
-  const encoded = Buffer.from(PS_SCRIPT, "utf16le").toString("base64");
-  const res = spawnSync(
-    "powershell",
-    ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
-    { encoding: "utf8", windowsHide: true },
-  );
-  if (res.status !== 0 || !res.stdout) {
-    throw new ScreencastError(
-      `Could not enumerate monitors: ${res.stderr || "powershell failed"}`,
-    );
-  }
+  });
+}
+
+async function queryMonitors(): Promise<Monitor[]> {
+  const stdout = await runPowerShell(PS_SCRIPT, "monitors");
   try {
-    return parseMonitors(JSON.parse(res.stdout));
+    return parseMonitors(JSON.parse(stdout));
   } catch (err) {
     throw new ScreencastError(
       `Could not parse monitor geometry: ${(err as Error).message}`,
     );
   }
+}
+
+/** Query live monitor geometry on Windows, reusing a result from the last
+ * MONITOR_CACHE_MS. Concurrent callers share one query; a failure is not
+ * cached. Throws on non-Windows or failure. */
+export function getMonitors(now: number = Date.now()): Promise<Monitor[]> {
+  if (process.platform !== "win32") {
+    return Promise.reject(
+      new ScreencastError("Monitor enumeration is implemented for Windows (gdigrab) only."),
+    );
+  }
+  if (cache && now - cache.at < MONITOR_CACHE_MS) return cache.monitors;
+  const entry = { at: now, monitors: queryMonitors() };
+  cache = entry;
+  entry.monitors.catch(() => {
+    if (cache === entry) cache = null;
+  });
+  return entry.monitors;
+}
+
+/** Drop the cached layout (tests, or after a capture failure). */
+export function clearMonitorCache(): void {
+  cache = null;
 }
