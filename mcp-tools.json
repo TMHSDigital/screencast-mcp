@@ -431,6 +431,23 @@
     }
   },
   {
+    "name": "cut_idle",
+    "description": "Remove dead air: cut stretches where the screen is frozen (and, if there is audio, silent), keeping a short pad at each edge. Agent recordings are full of these pauses. dryRun reports what would be cut first. Returns the output path and the time saved.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "minIdleSec": { "type": "number", "description": "Only cut still stretches at least this long (default 2)" },
+        "keepSec": { "type": "number", "description": "Keep this much of each stretch at both edges (default 0.4)" },
+        "useAudio": { "type": "boolean", "description": "Idle only if the audio is also silent (default true when there is audio)" },
+        "dryRun": { "type": "boolean", "description": "Only report the stretches that would be cut" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+      },
+      "required": ["input"]
+    }
+  },
+  {
     "name": "redact_region",
     "description": "Redact declared rectangles in a video so on-screen secrets are covered. This covers regions you specify; it is NOT automatic secret detection. The default style is a solid box, which is irreversible (a blur or mosaic can be partially recovered). A region that falls outside the frame is rejected rather than silently doing nothing.",
     "inputSchema": {
