@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { binaryWorks, runCapture, runFfmpeg, probeMedia } from "../../utils/ffmpeg.js";
@@ -25,6 +25,8 @@ import {
   buildScaleArgs,
   buildExtractAudioArgs,
   buildRedactArgs,
+  buildSampleByFpsArgs,
+  planFpsSampling,
 } from "../../utils/media.js";
 import {
   buildXfadeArgs,
@@ -201,6 +203,23 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     // testsrc is bright/colourful in the top-left; a solid black box reads ~0.
     expect(regionLuma(out, 1, 8, 8, 48, 48)).toBeLessThan(10);
     expect(regionLuma(av, 1, 8, 8, 48, 48)).toBeGreaterThan(20);
+  });
+
+  it("fps sampling honours a clamped plan and the -frames:v backstop (#80)", async () => {
+    const plan = planFpsSampling((await probeMedia(av)).durationSec, 30, 5);
+    expect(plan.clamped).toBe(true);
+    const framesDir = p("capped");
+    mkdirSync(framesDir);
+    await runFfmpeg(buildSampleByFpsArgs(av, plan.fps, join(framesDir, "f_%05d.png"), 5));
+    const n = readdirSync(framesDir).length;
+    expect(n).toBeGreaterThan(0);
+    expect(n).toBeLessThanOrEqual(5);
+
+    // Backstop alone: an unclamped 30 fps request still stops at the cap.
+    const backstopDir = p("backstop");
+    mkdirSync(backstopDir);
+    await runFfmpeg(buildSampleByFpsArgs(av, 30, join(backstopDir, "f_%05d.png"), 3));
+    expect(readdirSync(backstopDir)).toHaveLength(3);
   });
 
   it("inline images are downscaled JPEGs and capped by count (#79)", async () => {

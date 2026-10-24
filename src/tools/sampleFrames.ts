@@ -3,10 +3,13 @@ import { join } from "node:path";
 import { mkdirSync, readdirSync, existsSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
+import { requireFfmpeg, runFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import {
   buildSampleByFpsArgs,
   buildSampleAtTimestampArgs,
+  planFpsSampling,
+  DEFAULT_MAX_FRAMES,
+  MAX_FRAMES_CEILING,
 } from "../utils/media.js";
 import { subdir, stamp, rand } from "../utils/paths.js";
 import {
@@ -32,6 +35,16 @@ const inputSchema = {
     .string()
     .optional()
     .describe("Optional folder for the frames. Defaults to SCREENCAST_HOME/frames/<id>."),
+  maxFrames: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_FRAMES_CEILING)
+    .optional()
+    .describe(
+      `Most frames this call may write (default ${DEFAULT_MAX_FRAMES}, max ${MAX_FRAMES_CEILING}). ` +
+        "In fps mode a rate that would exceed it is lowered so the frames still span the whole video.",
+    ),
   returnImages: z
     .boolean()
     .optional()
@@ -79,18 +92,31 @@ export function register(server: McpServer): void {
           );
         }
 
+        const maxFrames = args.maxFrames ?? DEFAULT_MAX_FRAMES;
+        if (hasTs && args.timestamps!.length > maxFrames) {
+          throw new ScreencastError(
+            `${args.timestamps!.length} timestamps exceeds maxFrames (${maxFrames}). ` +
+              `Pass fewer timestamps, or raise maxFrames (up to ${MAX_FRAMES_CEILING}).`,
+          );
+        }
+        // Size an fps request against the video's length before writing
+        // anything, so a high rate on a long recording cannot fill the disk (#80).
+        const plan = hasFps
+          ? planFpsSampling((await probeMedia(args.input)).durationSec, args.fps!, maxFrames)
+          : null;
+
         const dir = args.outputDir ?? join(subdir("frames"), `sample-${stamp()}-${rand()}`);
         mkdirSync(dir, { recursive: true });
 
         let frames: string[] = [];
         const skipped: number[] = [];
-        if (hasFps) {
+        if (plan) {
           const isPng = (f: string) => f.endsWith(".png");
           // Snapshot any pre-existing PNGs so a reused outputDir does not
           // contaminate the result; return only the frames this run wrote.
           const before = new Set(readdirSync(dir).filter(isPng));
           const pattern = join(dir, "frame_%05d.png");
-          await runFfmpeg(buildSampleByFpsArgs(args.input, args.fps!, pattern), 5 * 60_000);
+          await runFfmpeg(buildSampleByFpsArgs(args.input, plan.fps, pattern, maxFrames), 5 * 60_000);
           frames = readdirSync(dir)
             .filter(isPng)
             .filter((f) => !before.has(f))
@@ -125,7 +151,19 @@ export function register(server: McpServer): void {
             frameDir: dir,
             frameCount: frames.length,
             frames,
-            mode: hasFps ? `fps=${args.fps}` : `timestamps=[${args.timestamps!.join(", ")}]`,
+            mode: plan ? `fps=${plan.fps}` : `timestamps=[${args.timestamps!.join(", ")}]`,
+            ...(plan?.clamped
+              ? {
+                  requestedFps: args.fps,
+                  capNote:
+                    `fps=${args.fps} would write about ${plan.requestedFrames} frames, over ` +
+                    `maxFrames (${maxFrames}); sampled at fps=${plan.fps} instead so the ` +
+                    `frames still span the whole video. Raise maxFrames or use timestamps for more detail.`,
+                }
+              : {}),
+            ...(plan && !plan.clamped && frames.length >= maxFrames
+              ? { capNote: `Stopped at maxFrames (${maxFrames}); the video's length could not be probed in advance.` }
+              : {}),
             inlineImages: inline.images.length,
             ...(inline.omitted > 0
               ? {

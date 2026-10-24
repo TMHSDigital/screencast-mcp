@@ -106,6 +106,13 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     expect(sf.images.map((i) => i.mimeType)).toEqual(["image/jpeg", "image/jpeg"]);
     const noImg = await call("sample_frames", { input: rec.json.outputPath, timestamps: [0.5], returnImages: false });
     expect(noImg.images).toHaveLength(0);
+    // #80: a rate that would exceed maxFrames is lowered, and says so.
+    const capped = await call("sample_frames", { input: rec.json.outputPath, fps: 30, maxFrames: 5, returnImages: false });
+    expect(capped.json.frameCount).toBeLessThanOrEqual(5);
+    expect(capped.json.requestedFps).toBe(30);
+    expect(capped.json.capNote).toMatch(/maxFrames \(5\)/);
+    const tooMany = await call("sample_frames", { input: rec.json.outputPath, timestamps: [0, 1, 2], maxFrames: 2 });
+    expect(tooMany.isError).toBe(true);
   }, 30_000);
 
   it("screenshot returns the image inline by default (#79)", async () => {

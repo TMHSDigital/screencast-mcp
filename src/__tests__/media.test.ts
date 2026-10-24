@@ -4,6 +4,8 @@ import {
   parseMediaInfo,
   buildProbeArgs,
   buildSampleByFpsArgs,
+  planFpsSampling,
+  DEFAULT_MAX_FRAMES,
   buildSampleAtTimestampArgs,
   buildTrimArgs,
   buildConcatListContent,
@@ -77,12 +79,28 @@ describe("probe and sample arg builders", () => {
     expect(buildProbeArgs("a.mp4")).toContain("-show_streams");
     expect(buildProbeArgs("a.mp4")[buildProbeArgs("a.mp4").length - 1]).toBe("a.mp4");
   });
-  it("samples by fps", () => {
+  it("samples by fps with a -frames:v backstop", () => {
     const a = buildSampleByFpsArgs("in.mp4", 2, "out/frame_%05d.png");
     expect(a.join(" ")).toContain("-vf fps=2");
+    expect(a.join(" ")).toContain(`-frames:v ${DEFAULT_MAX_FRAMES}`);
+    expect(buildSampleByFpsArgs("in.mp4", 2, "p.png", 7).join(" ")).toContain("-frames:v 7");
   });
   it("rejects a non-positive fps", () => {
     expect(() => buildSampleByFpsArgs("in.mp4", 0, "p.png")).toThrow();
+  });
+  it("planFpsSampling keeps a rate that fits under the cap (#80)", () => {
+    expect(planFpsSampling(10, 2, 100)).toEqual({ fps: 2, requestedFrames: 20, clamped: false });
+  });
+  it("planFpsSampling lowers a rate that would exceed the cap, spanning the video (#80)", () => {
+    // 30 fps on a 1-hour recording would be 108,000 frames.
+    const plan = planFpsSampling(3600, 30, 100);
+    expect(plan.clamped).toBe(true);
+    expect(plan.requestedFrames).toBe(108_000);
+    expect(Math.ceil(3600 * plan.fps)).toBeLessThanOrEqual(100);
+    expect(plan.fps).toBeGreaterThan(0.027);
+  });
+  it("planFpsSampling leaves the rate alone when the duration is unknown", () => {
+    expect(planFpsSampling(null, 30, 100)).toEqual({ fps: 30, requestedFrames: null, clamped: false });
   });
   it("samples at a timestamp", () => {
     const a = buildSampleAtTimestampArgs("in.mp4", 3.5, "f.png");
