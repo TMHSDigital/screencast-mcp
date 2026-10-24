@@ -122,9 +122,71 @@ export function buildSampleByFpsArgs(
   fps: number,
   outputPattern: string,
   maxFrames: number = DEFAULT_MAX_FRAMES,
+  dedupe = false,
 ): string[] {
   validatePositive(fps, "fps");
-  return ["-y", "-i", input, "-vf", `fps=${fps}`, "-frames:v", String(maxFrames), outputPattern];
+  // dedupe (#114): mpdecimate drops frames nearly identical to the previous
+  // kept one, and -fps_mode vfr stops the muxer re-inserting them.
+  const vf = dedupe ? `fps=${fps},mpdecimate` : `fps=${fps}`;
+  return [
+    "-y", "-i", input, "-vf", vf,
+    ...(dedupe ? ["-fps_mode", "vfr"] : []),
+    "-frames:v", String(maxFrames), outputPattern,
+  ];
+}
+
+/** Default scene-change threshold for UI content (#114). Screen recordings
+ * change in small regions, so this is lower than the 0.3-0.4 usual for film. */
+export const DEFAULT_SCENE_THRESHOLD = 0.1;
+
+/** Scan a video for scene changes: a cheap pass on a 320 px-wide copy that
+ * prints each frame whose scene score exceeds `threshold` (pts_time + score)
+ * to stdout. Frames are then grabbed at full size at those timestamps. */
+export function buildSceneScanArgs(input: string, threshold: number = DEFAULT_SCENE_THRESHOLD): string[] {
+  if (!Number.isFinite(threshold) || threshold <= 0 || threshold >= 1) {
+    throw new ScreencastError("sceneThreshold must be between 0 and 1 (exclusive).");
+  }
+  return [
+    "-v", "error", "-i", input, "-an",
+    "-vf", `scale=320:-2,select='gt(scene\\,${threshold})',metadata=print:file=-`,
+    "-f", "null", "-",
+  ];
+}
+
+export interface SceneChange {
+  timeSec: number;
+  score: number;
+}
+
+/** Parse `metadata=print` output into (time, score) pairs. Pure. */
+export function parseSceneScan(stdout: string): SceneChange[] {
+  const out: SceneChange[] = [];
+  let time: number | null = null;
+  for (const line of stdout.split(/\r?\n/)) {
+    const t = line.match(/pts_time:\s*(-?[\d.]+)/);
+    if (t) {
+      time = Number(t[1]);
+      continue;
+    }
+    const s = line.match(/lavfi\.scene_score=([\d.]+)/);
+    if (s && time !== null) {
+      out.push({ timeSec: time, score: Number(s[1]) });
+      time = null;
+    }
+  }
+  return out;
+}
+
+/** Choose which frames to keep: always the opening frame (t=0), then the
+ * strongest scene changes up to maxFrames total, returned in time order.
+ * Pure. */
+export function pickSceneFrames(changes: SceneChange[], maxFrames: number): number[] {
+  const strongest = [...changes]
+    .filter((c) => c.timeSec > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, Math.max(0, maxFrames - 1))
+    .map((c) => c.timeSec);
+  return [0, ...strongest].sort((a, b) => a - b);
 }
 
 /** Build one ffmpeg invocation per timestamp (accurate single-frame seek). */

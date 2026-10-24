@@ -60,7 +60,7 @@ Twenty-five tools across four concerns. The manifest in [`mcp-tools.json`](mcp-t
 
 | Tool | Purpose |
 | --- | --- |
-| `sample_frames` | Extract frames from a video — at a fixed `fps` or at explicit `timestamps` — so the agent can view what happened. Returns the frame paths, with the first few frames inline as images. |
+| `sample_frames` | Extract frames from a video — at a fixed `fps`, at explicit `timestamps`, or only where the screen changed (`mode: "scenes"`) — so the agent can view what happened. Returns the frame paths, with the first few frames inline as images. |
 | `get_media_info` | ffprobe wrapper: duration, resolution, fps, codecs, container format, and size. |
 
 ### Minimal edit
@@ -185,6 +185,8 @@ sample_frames { "input": "…/recordings/rec-….mp4", "timestamps": [0.5, 2, 3.
 //    -> { "frames": ["…/frames/…/frame_000_0.5s.png", …], "inlineImages": 3 }
 //       + 3 image blocks the client shows to the model
 ```
+
+Don't know where to look? `sample_frames { "input": "…", "mode": "scenes" }` returns only the frames where the screen actually changed (plus the opening frame), with their `frameTimes`. Screen recordings are mostly static, so this is usually far cheaper than a fixed rate. `sceneThreshold` (default 0.1) sets how big a change counts, and in `fps` mode `dedupe: true` drops near-identical frames.
 
 `screenshot { "target": "window:My App" }` is the one-shot equivalent for a still, and also returns the image inline.
 

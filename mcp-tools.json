@@ -70,13 +70,16 @@
   },
   {
     "name": "sample_frames",
-    "description": "Sample frames from a video so the agent can view what happened: either at a fixed rate (fps) or at explicit timestamps. Writes PNG frames to a folder and returns their paths, plus the first few frames inline so the model can view them directly.",
+    "description": "Sample frames from a video so the agent can view what happened: at a fixed rate (fps), at explicit timestamps, or only where the screen changed (mode scenes). Writes PNG frames to a folder and returns their paths, plus the first few frames inline so the model can view them directly.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "input": { "type": "string", "description": "Path to the source video file" },
-        "fps": { "type": "number", "description": "Sample this many frames per second (mutually exclusive with timestamps)" },
-        "timestamps": { "type": "array", "items": { "type": "number" }, "description": "Explicit second offsets to grab one frame at each (mutually exclusive with fps)" },
+        "mode": { "type": "string", "enum": ["fps", "timestamps", "scenes"], "description": "How to pick frames; scenes returns only frames where the screen changed (plus the first), strongest first up to maxFrames. Defaults to fps or timestamps, whichever is given" },
+        "fps": { "type": "number", "description": "Sample this many frames per second (mode fps)" },
+        "timestamps": { "type": "array", "items": { "type": "number" }, "description": "Explicit second offsets to grab one frame at each (mode timestamps)" },
+        "sceneThreshold": { "type": "number", "description": "Mode scenes: how much a frame must change to count, 0-1 (default 0.1)" },
+        "dedupe": { "type": "boolean", "description": "Mode fps: drop frames nearly identical to the previous one (default false)" },
         "outputDir": { "type": "string", "description": "Optional folder for the frames (defaults under SCREENCAST_HOME/frames)" },
         "maxFrames": { "type": "integer", "description": "Most frames this call may write (default 100, max 1000); in fps mode a rate that would exceed it is lowered so frames still span the whole video" },
         "returnImages": { "type": "boolean", "description": "Also return frames inline as downscaled JPEG images (default true)" },

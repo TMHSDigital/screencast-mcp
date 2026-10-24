@@ -27,6 +27,9 @@ import {
   buildRedactArgs,
   buildSampleByFpsArgs,
   planFpsSampling,
+  buildSceneScanArgs,
+  parseSceneScan,
+  pickSceneFrames,
 } from "../../utils/media.js";
 import {
   buildXfadeArgs,
@@ -221,6 +224,38 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     mkdirSync(backstopDir);
     await runFfmpeg(buildSampleByFpsArgs(av, 30, join(backstopDir, "f_%05d.png"), 3));
     expect(readdirSync(backstopDir)).toHaveLength(3);
+  });
+
+  it("a scene scan finds each cut in a three-scene clip (#114)", async () => {
+    // red (0-2s) -> blue (2-4s) -> testsrc (4-6s)
+    const scenes = p("scenes.mp4");
+    await runFfmpeg([
+      "-y",
+      "-f", "lavfi", "-i", "color=c=red:s=320x240:d=2,format=yuv420p",
+      "-f", "lavfi", "-i", "color=c=blue:s=320x240:d=2,format=yuv420p",
+      "-f", "lavfi", "-i", "testsrc=s=320x240:d=2,format=yuv420p",
+      "-filter_complex", "[0][1][2]concat=n=3:v=1:a=0", "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", scenes,
+    ]);
+    const scan = await runCapture(FFMPEG, buildSceneScanArgs(scenes, 0.1));
+    expect(scan.code).toBe(0);
+    const times = pickSceneFrames(parseSceneScan(scan.stdout), 10);
+    expect(times).toHaveLength(3);
+    expect(times[0]).toBe(0);
+    expect(times[1]).toBeCloseTo(2, 1);
+    expect(times[2]).toBeCloseTo(4, 1);
+  });
+
+  it("dedupe drops repeated frames from a static clip (#114)", async () => {
+    const still = p("still.mp4");
+    await runFfmpeg(["-y", "-f", "lavfi", "-i", "color=c=gray:s=320x240:d=4", "-c:v", "libx264", "-preset", "ultrafast", still]);
+    const plain = p("plain");
+    const deduped = p("deduped");
+    mkdirSync(plain);
+    mkdirSync(deduped);
+    await runFfmpeg(buildSampleByFpsArgs(still, 2, join(plain, "f_%05d.png"), 100));
+    await runFfmpeg(buildSampleByFpsArgs(still, 2, join(deduped, "f_%05d.png"), 100, true));
+    expect(readdirSync(plain).length).toBeGreaterThanOrEqual(7);
+    expect(readdirSync(deduped).length).toBe(1);
   });
 
   it("runEditJob writes the output atomically and reports progress (#81)", async () => {
