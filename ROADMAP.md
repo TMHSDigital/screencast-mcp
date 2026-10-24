@@ -2,7 +2,7 @@
 
 # Roadmap
 
-**Current:** v0.21.0 shipped (Phase 3 complete; a second hardening round is
+**Current:** v0.22.0 shipped (Phase 3 complete; a second hardening round is
 underway, see below and CHANGELOG). Cross-platform capture is the next feature
 phase.
 
@@ -114,8 +114,8 @@ Screencast-native polish that turns a raw capture into something watchable.
 
 ## Phase 6 -- Audio polish and delivery (proposed)
 
-- [ ] `normalize_audio` -- EBU R128 loudness normalization (`loudnorm`)
-- [ ] `denoise` -- background-noise reduction for narration
+- [x] `normalize_audio` -- EBU R128 loudness normalization (`loudnorm`) (#123) -- v0.22.0
+- [x] `denoise` -- background-noise reduction for narration (#123) -- v0.22.0
 - [x] `thumbnail` / `contact_sheet` -- single poster frame or a grid of frames
       (#115) -- v0.16.0
 - [x] Optimized GIF/WebP export (palette tuning, size budget) beyond `convert`

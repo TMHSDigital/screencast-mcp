@@ -43,6 +43,7 @@ import { bundledFontPath } from "../../utils/fonts.js";
 import { encodeInlineImages } from "../../utils/images.js";
 import { animLadder, buildAnimArgs } from "../../utils/anim.js";
 import { buildArrowImageArgs, buildCalloutArgs } from "../../utils/callout.js";
+import { loudnessTarget, buildLoudnessMeasureArgs, buildLoudnessApplyArgs, parseLoudnorm, buildDenoiseArgs, buildNoiseFloorArgs, parseNoiseFloor } from "../../utils/audio.js";
 import { analysisSize, diffFrames, buildRawFrameArgs, buildSsimArgs, parseSsim } from "../../utils/diff.js";
 import { evenTimes, formatTimecode, sheetGrid, buildTileArgs, buildSheetArgs, buildPosterArgs } from "../../utils/sheet.js";
 import { runEditJob, partialPath, type ToolExtra } from "../../utils/jobs.js";
@@ -206,6 +207,25 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     // The text must actually be drawn: a "%" used to make drawtext render
     // nothing at all (it expands %{...} sequences), leaving a blank card.
     expect(regionLuma(out, 0.5, 20, 100, 280, 40)).toBeGreaterThan(15);
+  });
+
+  it("two-pass loudnorm lands on the target, and denoise lowers steady noise (#123)", async () => {
+    const t = loudnessTarget("podcast");
+    const measured = parseLoudnorm((await runCapture(FFMPEG, buildLoudnessMeasureArgs(av, t))).stderr);
+    const out = p("loudnorm.mp4");
+    await runFfmpeg(buildLoudnessApplyArgs(av, out, t, measured));
+    const after = parseLoudnorm((await runCapture(FFMPEG, buildLoudnessMeasureArgs(out, t))).stderr);
+    expect(Math.abs(after.input_i - t.i)).toBeLessThan(1);
+    expect((await probeMedia(out)).videoCodec).toBe("h264"); // copied, still there
+
+    const noise = p("noise.wav");
+    await runFfmpeg(["-y", "-f", "lavfi", "-i", "anoisesrc=d=3:c=white:a=0.1", noise]);
+    const quiet = p("denoised.wav");
+    const floor = parseNoiseFloor((await runCapture(FFMPEG, buildNoiseFloorArgs(noise))).stdout);
+    expect(floor!).toBeCloseTo(-24.8, 0);
+    await runFfmpeg(buildDenoiseArgs(noise, quiet, "strong", floor));
+    // Steady noise near the floor is cut hard (measured ~20 dB at strong).
+    expect(await meanVolume(quiet)).toBeLessThan((await meanVolume(noise)) - 10);
   });
 
   it("callout draws a box, a text label with a %, and an arrow, each only in its window (#121)", async () => {
