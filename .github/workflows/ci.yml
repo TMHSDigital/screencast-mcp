@@ -38,6 +38,11 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       - run: npm run build
+      # The release attaches a Claude Desktop bundle; build it here too so a
+      # packaging break shows up on the PR, not at release time.
+      - name: Build the .mcpb bundle (smoke)
+        if: runner.os == 'Linux' && matrix.node-version == 22
+        run: node scripts/build-mcpb.mjs mcpb-out
       - run: npm run typecheck
       - run: npm test
         env:

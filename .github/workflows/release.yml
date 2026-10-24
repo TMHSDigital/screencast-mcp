@@ -63,3 +63,23 @@ jobs:
           # publish.yml is idempotent (skips an already-published version), so a
           # duplicate dispatch is harmless.
           gh workflow run publish.yml --ref main
+
+      # Attach a one-click Claude Desktop bundle (.mcpb) to the release (#127).
+      # It does not depend on npm, so it ships even if the npm publish fails.
+      - name: Set up Node for the bundle
+        if: steps.check.outputs.skip == 'false'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build and attach the .mcpb bundle
+        if: steps.check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          node scripts/build-mcpb.mjs mcpb-out
+          gh release upload "v${{ steps.ver.outputs.version }}" mcpb-out/*.mcpb --clobber
