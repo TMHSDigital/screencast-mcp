@@ -268,7 +268,7 @@
           <tbody>
             <tr><td><code>start_recording</code></td><td>Start a background recording. Target = full, a monitor, a window by title, or a region. Optional fps, quality preset, and system audio.</td></tr>
             <tr><td><code>stop_recording</code></td><td>Stop a session by id with a graceful quit so the file is finalized, not truncated.</td></tr>
-            <tr><td><code>screenshot</code></td><td>Capture a single PNG of a target.</td></tr>
+            <tr><td><code>screenshot</code></td><td>Capture a single PNG of a target, returned inline for the model to view.</td></tr>
             <tr><td><code>list_sessions</code></td><td>List active and finished recording sessions.</td></tr>
             <tr><td><code>get_session</code></td><td>Inspect a single session by id.</td></tr>
             <tr><td><code>list_audio_devices</code></td><td>List DirectShow audio devices and flag a likely system-audio loopback device for start_recording.</td></tr>
@@ -285,7 +285,7 @@
         <table>
           <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td><code>sample_frames</code></td><td>Extract frames at a fixed fps or at explicit timestamps so the agent can view what happened.</td></tr>
+            <tr><td><code>sample_frames</code></td><td>Extract frames at a fixed fps or at explicit timestamps; the first few come back inline so the agent sees what happened.</td></tr>
             <tr><td><code>get_media_info</code></td><td>ffprobe wrapper: duration, resolution, fps, codecs, format, size.</td></tr>
           </tbody>
         </table>

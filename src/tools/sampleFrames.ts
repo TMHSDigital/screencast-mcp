@@ -9,6 +9,13 @@ import {
   buildSampleAtTimestampArgs,
 } from "../utils/media.js";
 import { subdir, stamp, rand } from "../utils/paths.js";
+import {
+  encodeInlineImages,
+  clampInlineCount,
+  DEFAULT_MAX_IMAGE_WIDTH,
+  DEFAULT_MAX_INLINE_IMAGES,
+  MAX_INLINE_IMAGES,
+} from "../utils/images.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video file."),
@@ -25,6 +32,29 @@ const inputSchema = {
     .string()
     .optional()
     .describe("Optional folder for the frames. Defaults to SCREENCAST_HOME/frames/<id>."),
+  returnImages: z
+    .boolean()
+    .optional()
+    .describe(
+      "Also return the frames inline as images the model can view directly " +
+        "(default true). Only the first maxInlineImages frames are embedded.",
+    ),
+  maxInlineImages: z
+    .number()
+    .int()
+    .min(0)
+    .max(MAX_INLINE_IMAGES)
+    .optional()
+    .describe(
+      `How many frames to embed inline (default ${DEFAULT_MAX_INLINE_IMAGES}, max ${MAX_INLINE_IMAGES}). ` +
+        "Every frame is still written to disk and listed by path.",
+    ),
+  maxImageWidth: z
+    .number()
+    .int()
+    .min(16)
+    .optional()
+    .describe(`Downscale inline images to at most this width (default ${DEFAULT_MAX_IMAGE_WIDTH}).`),
 };
 
 export function register(server: McpServer): void {
@@ -32,7 +62,8 @@ export function register(server: McpServer): void {
     "sample_frames",
     "Sample frames from a video so the agent can actually view what happened: " +
       "either at a fixed rate (fps) or at explicit timestamps. Writes PNG frames " +
-      "to a folder and returns their paths.",
+      "to a folder and returns their paths, plus the first few frames inline so " +
+      "the model can view them directly (disable with returnImages: false).",
     inputSchema,
     async (args) => {
       try {
@@ -80,20 +111,40 @@ export function register(server: McpServer): void {
           }
         }
 
-        return okResponse({
-          frameDir: dir,
-          frameCount: frames.length,
-          frames,
-          mode: hasFps ? `fps=${args.fps}` : `timestamps=[${args.timestamps!.join(", ")}]`,
-          ...(skipped.length > 0
-            ? {
-                skippedTimestamps: skipped,
-                note:
-                  `No frame was written for ${skipped.length} timestamp(s) past the ` +
-                  `end of the video: [${skipped.join(", ")}].`,
-              }
-            : {}),
-        });
+        const inline =
+          args.returnImages === false
+            ? { images: [], omitted: 0 }
+            : await encodeInlineImages(
+                frames,
+                args.maxImageWidth ?? DEFAULT_MAX_IMAGE_WIDTH,
+                clampInlineCount(args.maxInlineImages),
+              );
+
+        return okResponse(
+          {
+            frameDir: dir,
+            frameCount: frames.length,
+            frames,
+            mode: hasFps ? `fps=${args.fps}` : `timestamps=[${args.timestamps!.join(", ")}]`,
+            inlineImages: inline.images.length,
+            ...(inline.omitted > 0
+              ? {
+                  inlineNote:
+                    `Embedded the first ${inline.images.length} of ${frames.length} frames inline; ` +
+                    `the other ${inline.omitted} are on disk at the listed paths.`,
+                }
+              : {}),
+            ...(skipped.length > 0
+              ? {
+                  skippedTimestamps: skipped,
+                  note:
+                    `No frame was written for ${skipped.length} timestamp(s) past the ` +
+                    `end of the video: [${skipped.join(", ")}].`,
+                }
+              : {}),
+          },
+          inline.images,
+        );
       } catch (error) {
         return errorResponse(error);
       }

@@ -1,9 +1,9 @@
 /**
  * Shared error type and MCP response helpers.
  *
- * Every tool returns the same content shape: a single text block. Errors are
- * surfaced as `isError: true` so an agent sees an actionable message instead of
- * a transport-level failure.
+ * Every tool returns a JSON text block first; tools that produce frames may
+ * append image blocks after it (#79). Errors are surfaced as `isError: true` so
+ * an agent sees an actionable message instead of a transport-level failure.
  */
 
 export class ScreencastError extends Error {
@@ -17,19 +17,32 @@ export class ScreencastError extends Error {
   }
 }
 
+export interface TextContent {
+  type: "text";
+  text: string;
+}
+
+/** A base64-encoded image block, shown to the model by MCP clients. */
+export interface ImageContent {
+  type: "image";
+  data: string;
+  mimeType: string;
+}
+
 export interface ToolResult {
-  content: Array<{ type: "text"; text: string }>;
+  content: Array<TextContent | ImageContent>;
   isError?: true;
   // The MCP SDK's CallToolResult carries an index signature; mirror it so our
   // helpers are structurally assignable to a tool callback's return type.
   [key: string]: unknown;
 }
 
-/** Wrap a JSON-serializable value as a successful tool result. */
-export function okResponse(value: unknown): ToolResult {
+/** Wrap a JSON-serializable value as a successful tool result, optionally
+ * followed by image blocks. */
+export function okResponse(value: unknown, images: ImageContent[] = []): ToolResult {
   const text =
     typeof value === "string" ? value : JSON.stringify(value, null, 2);
-  return { content: [{ type: "text", text }] };
+  return { content: [{ type: "text", text }, ...images] };
 }
 
 /** Wrap any thrown value as an error tool result, appending a hint if present. */

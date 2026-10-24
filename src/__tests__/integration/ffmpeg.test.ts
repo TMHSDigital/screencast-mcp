@@ -35,6 +35,7 @@ import {
   buildExportPresetArgs,
 } from "../../utils/produce.js";
 import { bundledFontPath } from "../../utils/fonts.js";
+import { encodeInlineImages } from "../../utils/images.js";
 
 const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
 const FFPROBE = process.env.FFPROBE_PATH || "ffprobe";
@@ -200,5 +201,18 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     // testsrc is bright/colourful in the top-left; a solid black box reads ~0.
     expect(regionLuma(out, 1, 8, 8, 48, 48)).toBeLessThan(10);
     expect(regionLuma(av, 1, 8, 8, 48, 48)).toBeGreaterThan(20);
+  });
+
+  it("inline images are downscaled JPEGs and capped by count (#79)", async () => {
+    const frame = p("frame.png");
+    await runFfmpeg(["-y", "-f", "lavfi", "-i", "testsrc=size=640x480", "-frames:v", "1", frame]);
+    const { images, omitted } = await encodeInlineImages([frame, frame, frame], 200, 2);
+    expect(images).toHaveLength(2);
+    expect(omitted).toBe(1);
+    expect(images[0].mimeType).toBe("image/jpeg");
+    const decoded = p("decoded.jpg");
+    writeFileSync(decoded, Buffer.from(images[0].data, "base64"));
+    const info = await probeMedia(decoded);
+    expect([info.width, info.height]).toEqual([200, 150]);
   });
 });

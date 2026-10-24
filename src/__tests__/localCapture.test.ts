@@ -65,12 +65,14 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
 
   async function call(name: string, args: Record<string, unknown> = {}) {
     const res = await client.callTool({ name, arguments: args });
-    const text = (res.content as Array<{ text: string }>)?.map((c) => c.text).join("\n") ?? "";
+    const blocks = (res.content as Array<{ type: string; text?: string; mimeType?: string }>) ?? [];
+    const text = blocks.filter((c) => c.type === "text").map((c) => c.text).join("\n");
+    const images = blocks.filter((c) => c.type === "image");
     // The parsed JSON shape varies per tool; this test helper handles all of them.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let json: any = null;
     try { json = JSON.parse(text); } catch { /* plain text */ }
-    return { isError: !!res.isError, text, json };
+    return { isError: !!res.isError, text, json, images };
   }
 
   it("exposes exactly the tools declared in mcp-tools.json", async () => {
@@ -99,6 +101,19 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     const sf = await call("sample_frames", { input: rec.json.outputPath, timestamps: [0.5, 1.5] });
     expect(sf.json.frameCount).toBe(2);
     for (const f of sf.json.frames) expect(existsSync(f)).toBe(true);
+    // #79: the frames also come back inline for the model to view.
+    expect(sf.json.inlineImages).toBe(2);
+    expect(sf.images.map((i) => i.mimeType)).toEqual(["image/jpeg", "image/jpeg"]);
+    const noImg = await call("sample_frames", { input: rec.json.outputPath, timestamps: [0.5], returnImages: false });
+    expect(noImg.images).toHaveLength(0);
+  }, 30_000);
+
+  it("screenshot returns the image inline by default (#79)", async () => {
+    const shot = await call("screenshot", { target: "region:0,0,320,200" });
+    expect(shot.isError).toBe(false);
+    expect(shot.json.inlineImages).toBe(1);
+    expect(shot.images).toHaveLength(1);
+    expect(shot.images[0].mimeType).toBe("image/jpeg");
   }, 30_000);
 
   it("monitor:0 captures physical pixels, matching full on a single-monitor host (#39)", async () => {
