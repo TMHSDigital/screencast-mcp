@@ -7,6 +7,22 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.23.0]
+
+### Added
+
+- **MCP prompts** (#126). Four ready-made workflows that clients show as slash
+  commands: `bug-repro-clip`, `demo-gif`, `verify-ui-change`, and
+  `review-recording`. Each spells out the tool sequence for the job (for
+  example: wait for the screen to settle before diffing). A test checks that
+  every tool a prompt names exists.
+- **MCP resources** (#126). `screencast://sessions`,
+  `screencast://sessions/{id}`, and `screencast://sessions/{id}/poster` (a
+  JPEG frame from the middle of the recording), so clients can list, read,
+  and attach recordings without a filesystem tool. The session store now
+  notifies listeners after each write, and the server sends
+  `resources/list_changed` when a recording starts or stops.
+
 ## [0.22.0]
 
 ### Added

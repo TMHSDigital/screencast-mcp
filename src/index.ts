@@ -48,6 +48,8 @@ import { register as registerTitleCard } from "./tools/titleCard.js";
 import { register as registerMusicBed } from "./tools/musicBed.js";
 import { register as registerReframe } from "./tools/reframe.js";
 import { register as registerExportPreset } from "./tools/exportPreset.js";
+import { registerResources } from "./resources.js";
+import { registerPrompts } from "./prompts.js";
 
 // Resolves from src/ in dev and dist/ in the published package alike; keeps
 // the advertised version from drifting from package.json (the hardcoded
@@ -94,6 +96,8 @@ registerTitleCard(server);
 registerMusicBed(server);
 registerReframe(server);
 registerExportPreset(server);
+registerResources(server);
+registerPrompts(server);
 
 async function main(): Promise<void> {
   // Reconcile any sessions interrupted by a previous crash and kill ffmpeg

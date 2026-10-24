@@ -115,6 +115,18 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     expect(tooMany.isError).toBe(true);
   }, 30_000);
 
+  it("a finished recording is readable as a session resource with a JPEG poster (#126)", async () => {
+    const rec = await call("start_recording", { target: "region:0,0,320,240", quality: "draft", fps: 10 });
+    await sleep(2000);
+    await call("stop_recording", { sessionId: rec.json.sessionId });
+    const uris = (await client.listResources()).resources.map((r) => r.uri);
+    expect(uris).toContain(`screencast://sessions/${rec.json.sessionId}`);
+    const poster = await client.readResource({ uri: `screencast://sessions/${rec.json.sessionId}/poster` });
+    const c = poster.contents[0] as { mimeType?: string; blob?: string };
+    expect(c.mimeType).toBe("image/jpeg");
+    expect(Buffer.from(c.blob!, "base64").subarray(0, 2).toString("hex")).toBe("ffd8");
+  }, 30_000);
+
   it("screenshot returns the image inline by default (#79)", async () => {
     const shot = await call("screenshot", { target: "region:0,0,320,200" });
     expect(shot.isError).toBe(false);

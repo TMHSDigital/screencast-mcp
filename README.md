@@ -202,6 +202,19 @@ Inline images are downscaled JPEGs (`maxImageWidth`, default 1280) and capped pe
 
 `sample_frames` writes at most `maxFrames` frames per call (default 100, max 1000). In `fps` mode it probes the video first; if the rate would exceed the cap, it samples at a lower rate so the frames still span the whole video, and the result's `capNote` says what it did.
 
+## Prompts and resources
+
+Beyond tools, the server offers **prompts**: ready-made workflows that clients such as Claude Code and VS Code show as slash commands.
+
+| Prompt | What it does |
+| --- | --- |
+| `bug-repro-clip` | Record, find the bug moment, check for secrets, trim, annotate, and export a GIF for an issue. |
+| `demo-gif` | Record a feature walkthrough and export a GIF small enough for a README or PR. |
+| `verify-ui-change` | Screenshot before, make the change, wait for the screen to settle, diff, and confirm the text. |
+| `review-recording` | Summarize what happens in a recording, with timestamps. |
+
+It also offers **resources**, so a client can list and attach recordings without a filesystem tool: `screencast://sessions` (every session), `screencast://sessions/{id}` (one session), and `screencast://sessions/{id}/poster` (a JPEG preview frame). Clients are notified when a recording starts or stops.
+
 ## Windows notes
 
 - **Multi-monitor offsets.** `gdigrab` has no "capture monitor N" selector, so a monitor target captures the whole virtual desktop and crops to that display's pixel bounds (from `System.Windows.Forms.Screen.AllScreens`). `monitor:1` grabs the second display at its real offset; `monitor:0` is always primary.
