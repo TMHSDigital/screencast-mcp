@@ -7,6 +7,29 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.25.0]
+
+### Added
+
+- **`transcribe` tool** (#120). It transcribes a recording's speech to an
+  SRT file locally with FFmpeg 8's `whisper` filter (whisper.cpp; nothing
+  leaves the machine). Pass a whisper.cpp model file as `model` or set
+  `SCREENCAST_WHISPER_MODEL`; no model is bundled. Whisper's raw SRT numbers
+  cues from 0 and lets them overlap, so cues are renumbered from 1, sorted,
+  and clipped to end when the next begins. Builds without `whisper`, a missing
+  model, and silent input each get a clear message with what to do.
+- **`burn_subtitles` tool** (#120). It burns an SRT or ASS file into the video
+  with libass and the bundled Inter font. Styles: `clean` (an outlined line)
+  and `social` (large bold text on a dark box, raised clear of app UI).
+
+### Changed
+
+- Internal: `hasFilter()` probes once whether ffmpeg has a filter (`whisper`,
+  `subtitles`), so tools can explain a missing capability up front.
+- Tests: the integration helper `regionLuma` now takes a true average. Its
+  1×1 downscale used ffmpeg's default scaler, which samples sparsely and
+  missed thin text.
+
 ## [0.24.0]
 
 ### Added

@@ -2,7 +2,7 @@
 
 # Roadmap
 
-**Current:** v0.24.0 shipped (Phase 3 complete; a second hardening round is
+**Current:** v0.25.0 shipped (Phase 3 complete; a second hardening round is
 underway, see below and CHANGELOG). Cross-platform capture is the next feature
 phase.
 
@@ -103,9 +103,9 @@ implementation), then add backends so the same tools work on macOS and Linux.
 
 Screencast-native polish that turns a raw capture into something watchable.
 
-- [ ] `burn_subtitles` -- burn an SRT/ASS track into the video (styleable)
-- [ ] `transcribe` -- optional speech-to-text to an SRT sidecar (pluggable
-      engine; opt-in, no bundled model), feeding `burn_subtitles`
+- [x] `burn_subtitles` -- burn an SRT/ASS track into the video (styleable) (#120) -- v0.25.0
+- [x] `transcribe` -- optional speech-to-text to an SRT sidecar (FFmpeg 8 whisper,
+      opt-in, no bundled model), feeding `burn_subtitles` (#120) -- v0.25.0
 - [ ] `zoom_to` / cursor emphasis -- animated zoom-and-pan to a region, and a
       cursor highlight/spotlight, the highest-value screencast affordance
 - [x] `callout` -- timed text/arrow/box annotations over the video (#121) -- v0.21.0

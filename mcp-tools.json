@@ -375,6 +375,36 @@
     }
   },
   {
+    "name": "transcribe",
+    "description": "Transcribe a recording's speech to an SRT subtitle file, locally, with FFmpeg 8's whisper filter (needs a whisper.cpp model file). Returns the SRT path and the text. Pair with burn_subtitles to caption the video.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the video or audio to transcribe" },
+        "model": { "type": "string", "description": "Path to a whisper.cpp model file (ggml-*.bin); defaults to SCREENCAST_WHISPER_MODEL" },
+        "language": { "type": "string", "description": "Spoken language code, e.g. en, or auto (default)" },
+        "output": { "type": "string", "description": "Optional output .srt path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+      },
+      "required": ["input"]
+    }
+  },
+  {
+    "name": "burn_subtitles",
+    "description": "Burn subtitles (an SRT from transcribe, or any SRT/ASS) permanently into a video, in the bundled font, in a clean or social-media style. Returns the output path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "subtitles": { "type": "string", "description": "Path to an .srt or .ass subtitle file" },
+        "style": { "type": "string", "enum": ["clean", "social"], "description": "clean (default): a modest outlined line; social: large bold text on a dark box" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+      },
+      "required": ["input", "subtitles"]
+    }
+  },
+  {
     "name": "clip",
     "description": "Extract one or more frame-accurate sub-segments to separate files. Unlike trim (fast stream copy that snaps to a keyframe), clip re-encodes so cuts land exactly on the given times.",
     "inputSchema": {
