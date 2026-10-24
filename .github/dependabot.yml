@@ -9,15 +9,16 @@ updates:
     schedule:
       interval: "weekly"
     ignore:
-      # zod 3 -> 4 is a deliberate, manual upgrade: the MCP SDK turns these
+      # A zod major is a deliberate, manual upgrade: the MCP SDK turns these
       # schemas into each tool's inputSchema JSON, so a major bump can change
-      # the emitted schema without failing the test suite.
+      # the emitted schema without failing the test suite (3 -> 4 was done by
+      # diffing every tool's tools/list schema before and after, #86).
       - dependency-name: "zod"
         update-types: ["version-update:semver-major"]
       # Hold the TypeScript 5.x line; 6.x is a transitional major.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
-      # engines is >=20 and CI runs Node 20/22; do not pull @types/node ahead
-      # of the supported runtimes.
+      # engines is >=22 and CI runs Node 22/24; keep @types/node on the oldest
+      # supported runtime so code cannot use APIs Node 22 lacks.
       - dependency-name: "@types/node"
         versions: [">=23"]

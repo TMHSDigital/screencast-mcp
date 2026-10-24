@@ -4,6 +4,9 @@ Thank you for your interest in contributing.
 
 ## Getting Started
 
+You need **Node.js 22 or newer** (CI tests the 22 and 24 LTS lines) and, for
+the integration suite, `ffmpeg` and `ffprobe` on `PATH`.
+
 1. Fork the repository
 2. Create a feature branch from `main`
 3. Make your changes following the conventions below
