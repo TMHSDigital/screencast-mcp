@@ -1,11 +1,15 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { spawn } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { rmSync, existsSync, writeFileSync, readFileSync } from "node:fs";
+import { rmSync, existsSync, writeFileSync, readFileSync, mkdtempSync } from "node:fs";
 import {
   classifyOrphan,
   isAlive,
   isForeignLiveRecording,
+  isLockStale,
+  LOCK_STALE_MS,
   pruneRecords,
   MAX_FINISHED_RECORDS,
   SessionStore,
@@ -167,6 +171,38 @@ describe("SessionStore", () => {
     expect(finalIds).toEqual(["a", "b"]);
   });
 
+  it("does not overwrite another instance's newer record with a stale loaded copy (#55)", () => {
+    const p = newPath();
+    const b = new SessionStore(p);
+    b.load();
+    b.create(record({ id: "b-rec", status: "recording" }));
+    // A boots and loads B's live recording.
+    const a = new SessionStore(p);
+    a.load();
+    // B stops its recording after A loaded it.
+    b.update("b-rec", { status: "stopped", durationSec: 9 });
+    // A writes something unrelated; its stale "recording" copy must not win.
+    a.create(record({ id: "a-rec" }));
+    const onDisk = new Map((JSON.parse(readFileSync(p, "utf8")) as SessionRecord[]).map((r) => [r.id, r]));
+    expect(onDisk.get("b-rec")?.status).toBe("stopped");
+    expect(onDisk.get("b-rec")?.durationSec).toBe(9);
+    expect(onDisk.get("a-rec")).toBeDefined();
+    // A's in-memory view picks up B's change too.
+    expect(a.get("b-rec")?.status).toBe("stopped");
+  });
+
+  it("releases its lockfile after writing, and steals a stale one (#55)", () => {
+    const p = newPath();
+    paths.push(`${p}.lock`);
+    // A lock left by a dead process (pid 0 is never a live user process).
+    writeFileSync(`${p}.lock`, JSON.stringify({ pid: 0, at: Date.now() }));
+    const store = new SessionStore(p);
+    store.load();
+    store.create(record({ id: "x" }));
+    expect(existsSync(`${p}.lock`)).toBe(false);
+    expect((JSON.parse(readFileSync(p, "utf8")) as SessionRecord[]).map((r) => r.id)).toEqual(["x"]);
+  });
+
   it("backs up a corrupt registry to .bak instead of silently discarding it", () => {
     const p = newPath();
     writeFileSync(p, "{ not json");
@@ -189,4 +225,61 @@ describe("SessionStore", () => {
     expect(reaped).not.toContain("dead");
     expect(b.get("dead")?.status).toBe("stopped");
   });
+});
+
+describe("isLockStale (#55)", () => {
+  it("is stale when the holder is dead, the lock is old, or it is unreadable", () => {
+    expect(isLockStale({ pid: 1, at: 1_000 }, 1_500, false)).toBe(true);
+    expect(isLockStale({ pid: 1, at: 1_000 }, 1_000 + LOCK_STALE_MS + 1, true)).toBe(true);
+    expect(isLockStale(null, 0, true)).toBe(true);
+  });
+  it("is held when the holder is alive and the lock is fresh", () => {
+    expect(isLockStale({ pid: 1, at: 1_000 }, 1_500, true)).toBe(false);
+  });
+  it("judges a fresh lock with no readable pid (still being written) by age only", () => {
+    expect(isLockStale({ at: 1_000 }, 1_500, false)).toBe(false);
+    expect(isLockStale({ at: 1_000 }, 1_000 + LOCK_STALE_MS + 1, false)).toBe(true);
+  });
+});
+
+describe("SessionStore across processes (#55)", () => {
+  it("loses no record when several server processes write at once", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sc-lock-"));
+    const registry = join(dir, "sessions.json");
+    const sessionsModule = pathToFileURL(join(process.cwd(), "src", "utils", "sessions.ts")).href;
+    const worker = join(dir, "worker.mts");
+    writeFileSync(
+      worker,
+      `const { SessionStore } = await import(${JSON.stringify(sessionsModule)});
+       const [registry, tag] = process.argv.slice(2);
+       const store = new SessionStore(registry);
+       store.load();
+       for (let i = 0; i < 25; i++) {
+         store.create({ id: tag + "-" + i, target: "full", outputPath: "o.mp4", fps: 30,
+           quality: "standard", pid: null, status: "recording", startedAt: new Date().toISOString() });
+       }`,
+    );
+    const stderr: string[] = [];
+    const run = (tag: string) =>
+      new Promise<number | null>((resolve) => {
+        const child = spawn(process.execPath, ["--import", "tsx", worker, registry, tag], { stdio: ["ignore", "ignore", "pipe"] });
+        let err = "";
+        child.stderr.on("data", (d) => (err += d));
+        child.on("exit", (code) => {
+          if (err) stderr.push(`${tag} (exit ${code}): ${err}`);
+          resolve(code);
+        });
+      });
+    const tags = ["p0", "p1", "p2", "p3", "p4", "p5"];
+    try {
+      const codes = await Promise.all(tags.map(run));
+      expect(codes, stderr.join("\n")).toEqual([0, 0, 0, 0, 0, 0]);
+      const ids = new Set((JSON.parse(readFileSync(registry, "utf8")) as SessionRecord[]).map((r) => r.id));
+      const missing = tags.flatMap((t) => Array.from({ length: 25 }, (_, i) => `${t}-${i}`)).filter((id) => !ids.has(id));
+      expect(missing, `missing ${missing.join(", ")}\n${stderr.join("\n")}`).toEqual([]);
+      expect(existsSync(`${registry}.lock`)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
 });

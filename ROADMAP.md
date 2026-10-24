@@ -2,7 +2,7 @@
 
 # Roadmap
 
-**Current:** v0.14.2 shipped (Phase 3 complete; a second hardening round is
+**Current:** v0.14.3 shipped (Phase 3 complete; a second hardening round is
 underway, see below and CHANGELOG). Cross-platform capture is the next feature
 phase.
 
@@ -73,7 +73,7 @@ From the September 2026 end-to-end review. Tracked as issues; high priority firs
       CI so builders are tested against real output (#78) -- v0.9.1
 - [x] Recording lifecycle: finalize recordings and exit on client disconnect
       (#76); default `maxDurationSec` cap (#82) -- v0.10.0
-- [ ] Cross-process session-registry locking (#55)
+- [x] Cross-process session-registry locking (#55) -- v0.14.3
 - [x] Watching: return frames as MCP image content (#79) -- v0.11.0; cap
       `sample_frames` output (#80) -- v0.11.1
 - [x] Long jobs: duration-scaled timeouts, no partial outputs, progress
