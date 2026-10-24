@@ -143,6 +143,24 @@
     }
   },
   {
+    "name": "find_text",
+    "description": "Read text on screen or in an image/video frame with the OCR engine built into Windows (no install), with each line's and match's bounding box. Find where a label or button is, check what the screen says, or locate secrets and get redact_region rectangles for them. Best-effort detection: always review.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "target": { "type": "string", "description": "Read live from the screen: full | monitor:<index> | window:<title> | region:<x>,<y>,<w>,<h> (one of target / input)" },
+        "input": { "type": "string", "description": "Or read from an image or video file" },
+        "timestamp": { "type": "number", "description": "For a video input: the second to read (default 0)" },
+        "exactTitle": { "type": "boolean", "description": "For window: targets, match the title exactly (default false)" },
+        "query": { "type": "string", "description": "Text to look for; case-insensitive and tolerant of OCR misreads (_ vs -, I vs l, O vs 0)" },
+        "regex": { "type": "boolean", "description": "Treat query as a regular expression" },
+        "redact": { "type": "boolean", "description": "Also return padded rectangles around matches, ready for redact_region" },
+        "returnImage": { "type": "boolean", "description": "Return the image inline with matches outlined (default true when there is a query)" }
+      },
+      "required": []
+    }
+  },
+  {
     "name": "get_media_info",
     "description": "Probe a media file with ffprobe and return duration, resolution, frame rate, codecs, container format, and size.",
     "inputSchema": {

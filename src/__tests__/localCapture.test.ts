@@ -194,6 +194,32 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     }
   }, 30_000);
 
+  it("find_text locates secrets with Windows OCR, and redacting them removes them (#117)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "screencast-ocr-it-"));
+    try {
+      const txt = join(dir, "t.txt");
+      writeFileSync(txt, "Settings  >  API keys\nOPENAI_API_KEY=sk-proj-Abc123XyZ987\nghp_9f8e7d6c5b4a3210fedcba\n");
+      const font = join(process.cwd(), "assets", "fonts", "Inter-Regular.ttf");
+      const esc = (p: string) => p.replace(/\\/g, "/").replace(/:/g, "\\\\:");
+      const img = join(dir, "secret.png");
+      const r = spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "color=c=white:s=640x120", "-vf",
+        `drawtext=fontfile=${esc(font)}:textfile=${esc(txt)}:fontsize=18:fontcolor=0x222222:x=10:y=10:line_spacing=8`, "-frames:v", "1", img]);
+      expect(r.status).toBe(0);
+      const found = await call("find_text", { input: img, query: "sk-|ghp_", regex: true, redact: true, returnImage: false });
+      expect(found.isError).toBe(false);
+      expect(found.json.matchCount).toBe(2);
+      const env = await call("find_text", { input: img, query: "OPENAI_API_KEY", returnImage: false });
+      expect(env.json.matchCount).toBe(1);
+      const redacted = await call("redact_region", { input: img, regions: found.json.redactRegions, output: join(dir, "r.png") });
+      expect(redacted.isError).toBe(false);
+      const after = await call("find_text", { input: join(dir, "r.png"), query: "sk-|ghp_", regex: true, returnImage: false });
+      expect(after.json.matchCount).toBe(0);
+      expect(after.json.text).toContain("Settings");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   it("screen_diff reports identical screenshots as unchanged (#116)", async () => {
     const a = await call("screenshot", { target: "region:0,0,64,64", returnImage: false });
     const d = await call("screen_diff", { a: a.json.outputPath, b: a.json.outputPath, returnImage: false });
