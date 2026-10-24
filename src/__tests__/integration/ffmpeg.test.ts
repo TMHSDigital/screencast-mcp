@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { binaryWorks, runCapture, runFfmpeg, probeMedia } from "../../utils/ffmpeg.js";
@@ -41,6 +41,7 @@ import {
 } from "../../utils/produce.js";
 import { bundledFontPath } from "../../utils/fonts.js";
 import { encodeInlineImages } from "../../utils/images.js";
+import { animLadder, buildAnimArgs } from "../../utils/anim.js";
 import { evenTimes, formatTimecode, sheetGrid, buildTileArgs, buildSheetArgs, buildPosterArgs } from "../../utils/sheet.js";
 import { runEditJob, partialPath, type ToolExtra } from "../../utils/jobs.js";
 
@@ -251,6 +252,23 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     await runFfmpeg(buildPosterArgs(av, 10, poster, 200));
     const info = await probeMedia(poster);
     expect([info.width, info.height]).toEqual([200, 150]);
+  });
+
+  it("GIF and WebP exports come out as animated images, smaller down the ladder (#124)", async () => {
+    const ladder = animLadder("gif", 12, 320);
+    const big = p("big.gif");
+    const small = p("small.gif");
+    await runFfmpeg(buildAnimArgs(av, big, "gif", ladder[0], { duration: 3 }));
+    await runFfmpeg(buildAnimArgs(av, small, "gif", ladder.at(-1)!, { duration: 3 }));
+    const bigInfo = await probeMedia(big);
+    expect(bigInfo.videoCodec).toBe("gif");
+    expect(bigInfo.width).toBe(320);
+    expect(statSync(small).size).toBeLessThan(statSync(big).size / 2);
+
+    const webp = p("anim.webp");
+    await runFfmpeg(buildAnimArgs(av, webp, "webp", animLadder("webp", 12, 320)[0], { duration: 3 }));
+    expect(readFileSync(webp).subarray(8, 12).toString("ascii")).toBe("WEBP");
+    expect(statSync(webp).size).toBeGreaterThan(1000);
   });
 
   it("a scene scan finds each cut in a three-scene clip (#114)", async () => {

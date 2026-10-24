@@ -43,7 +43,7 @@ The design choices are deliberate rather than incidental:
 
 ## Tools
 
-Twenty-six tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
+Twenty-seven tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
 
 ### Capture
 
@@ -71,6 +71,7 @@ Twenty-six tools across four concerns. The manifest in [`mcp-tools.json`](mcp-to
 | `trim` | Cut a sub-clip by `start` + (`end` or `duration`). Stream-copy for speed. |
 | `concat` | Join two or more videos into one. |
 | `convert` | Convert between `mp4`, `gif`, and `webm`. |
+| `export_gif` | Animated **GIF or WebP that fits a size budget** (default: GitHub's 10 MB image limit) for PRs, issues, and READMEs. Two-stage palette for GIF; steps fps, width, and palette/quality down until it fits, and reports the settings used. |
 
 ### Edit surface
 

@@ -2,7 +2,7 @@
 
 # Roadmap
 
-**Current:** v0.16.0 shipped (Phase 3 complete; a second hardening round is
+**Current:** v0.17.0 shipped (Phase 3 complete; a second hardening round is
 underway, see below and CHANGELOG). Cross-platform capture is the next feature
 phase.
 
@@ -118,7 +118,8 @@ Screencast-native polish that turns a raw capture into something watchable.
 - [ ] `denoise` -- background-noise reduction for narration
 - [x] `thumbnail` / `contact_sheet` -- single poster frame or a grid of frames
       (#115) -- v0.16.0
-- [ ] Optimized GIF/WebP export (palette tuning, size budget) beyond `convert`
+- [x] Optimized GIF/WebP export (palette tuning, size budget) beyond `convert`
+      (#124, `export_gif`) -- v0.17.0
 - [ ] Chapter markers / cue points written into the container
 - [ ] `pipeline` -- chain several edits in one call to avoid intermediate files
 

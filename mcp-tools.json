@@ -167,6 +167,25 @@
     }
   },
   {
+    "name": "export_gif",
+    "description": "Export a video as an optimized animated GIF or WebP that fits a file-size budget (default: GitHub's 10 MB image limit), for PRs, issues, and READMEs. Steps fps, width, and palette/quality down until it fits and reports the settings used.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "format": { "type": "string", "enum": ["gif", "webp"], "description": "gif (default) or webp (animated WebP, usually much smaller)" },
+        "maxBytes": { "type": "integer", "description": "File-size budget in bytes (default 10000000)" },
+        "fps": { "type": "number", "description": "Starting frame rate (default 12)" },
+        "width": { "type": "integer", "description": "Starting width in px (default 960)" },
+        "start": { "type": "number", "description": "Start at this many seconds into the video" },
+        "duration": { "type": "number", "description": "Export only this many seconds (default: to the end)" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+      },
+      "required": ["input"]
+    }
+  },
+  {
     "name": "crop",
     "description": "Crop a video to a pixel rectangle (x, y, width, height) and re-encode. A rectangle that runs off the source frame is rejected rather than silently clamped.",
     "inputSchema": {

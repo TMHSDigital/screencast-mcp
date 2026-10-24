@@ -7,6 +7,21 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.17.0]
+
+### Added
+
+- **`export_gif` tool** (#124). It exports an animated GIF or WebP that fits
+  a file-size budget (`maxBytes`, default 10,000,000 bytes, under GitHub's
+  10 MB image limit), for PRs, issues, and READMEs. GIF uses a two-stage
+  palette tuned for screen content (`stats_mode=diff`, sierra dithering,
+  rectangle diff mode); WebP uses `libwebp_anim`. If an attempt is over
+  budget, fps, width, and palette size / quality step down, skipping ahead
+  in proportion to how far over it was (at most 5 encodes, never past the
+  smallest step). The result reports the settings used and every attempt's
+  size. If nothing fits, the smallest attempt is kept with a note.
+  `start` / `duration` export just part of the video.
+
 ## [0.16.0]
 
 ### Added
