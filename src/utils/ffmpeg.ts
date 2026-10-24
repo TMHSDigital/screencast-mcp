@@ -66,6 +66,26 @@ export function requireFfmpeg(): FfmpegTools {
   return cached;
 }
 
+let wgc: boolean | null = null;
+
+/** True when this ffmpeg has the gfxcapture source (Windows Graphics Capture,
+ * FFmpeg 8+ on Windows). Probed once. */
+export function wgcAvailable(): boolean {
+  if (wgc !== null) return wgc;
+  if (process.platform !== "win32") return (wgc = false);
+  try {
+    const res = spawnSync(requireFfmpeg().ffmpeg, ["-hide_banner", "-h", "filter=gfxcapture"], {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 10_000,
+    });
+    wgc = /gfxcapture AVOptions/.test(res.stdout ?? "");
+  } catch {
+    wgc = false;
+  }
+  return wgc;
+}
+
 export interface RunResult {
   code: number | null;
   stdout: string;

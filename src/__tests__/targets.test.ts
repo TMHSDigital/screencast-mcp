@@ -11,6 +11,7 @@ import {
   QUALITY_PRESETS,
   resolveMaxDuration,
   DEFAULT_MAX_RECORDING_SEC,
+  buildWgcScreenshotArgs,
 } from "../utils/targets.js";
 import type { Monitor } from "../utils/monitors.js";
 
@@ -285,5 +286,17 @@ describe("resolveMaxDuration", () => {
   });
   it("rejects a malformed env value with a clear error", () => {
     expect(() => resolveMaxDuration(undefined, { SCREENCAST_MAX_RECORDING_SEC: "1h" })).toThrow(/SCREENCAST_MAX_RECORDING_SEC/);
+  });
+});
+
+describe("buildWgcScreenshotArgs (#113)", () => {
+  it("captures one frame of a window by handle through gfxcapture", () => {
+    const a = buildWgcScreenshotArgs(132456, "w.png");
+    expect(a[a.indexOf("-filter_complex") + 1]).toBe("gfxcapture=hwnd=132456:max_framerate=30,hwdownload,format=bgra");
+    expect(a.slice(-3)).toEqual(["-frames:v", "1", "w.png"]);
+  });
+  it("rejects an invalid handle", () => {
+    expect(() => buildWgcScreenshotArgs(0, "w.png")).toThrow(/handle/);
+    expect(() => buildWgcScreenshotArgs(1.5, "w.png")).toThrow(/handle/);
   });
 });

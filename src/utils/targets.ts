@@ -308,6 +308,19 @@ export function buildCaptureArgs(target: Target, opts: CaptureOptions): string[]
  * frame; at 30 fps the same still takes ~0.2 s and is pixel-identical (#88). */
 export const SCREENSHOT_GRAB_FPS = 30;
 
+/** A still of one window's own surface through Windows Graphics Capture
+ * (FFmpeg 8's gfxcapture), selected by handle (#113). Unlike gdigrab, it
+ * captures the window even when other windows cover it. */
+export function buildWgcScreenshotArgs(hwnd: number, output: string): string[] {
+  if (!Number.isSafeInteger(hwnd) || hwnd <= 0) throw new ScreencastError("Invalid window handle.");
+  return [
+    "-y", "-v", "error",
+    "-filter_complex", `gfxcapture=hwnd=${hwnd}:max_framerate=30,hwdownload,format=bgra`,
+    "-frames:v", "1",
+    output,
+  ];
+}
+
 /** Build ffmpeg args for a single-frame screenshot (gdigrab -> png). */
 export function buildScreenshotArgs(
   target: Target,

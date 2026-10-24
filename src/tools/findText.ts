@@ -6,7 +6,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg, runFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
-import { buildScreenshotArgs } from "../utils/targets.js";
+import { captureStill } from "../utils/still.js";
 import { buildHighlightArgs } from "../utils/diff.js";
 import { recognize, mergePasses, findMatches, redactionRects, passScales } from "../utils/ocr.js";
 import { windowMatchReport } from "../utils/windows.js";
@@ -24,6 +24,13 @@ const inputSchema = {
   input: z.string().optional().describe("Or read text from an image or video file (one of target / input)."),
   timestamp: z.number().nonnegative().optional().describe("For a video input: the second to read (default 0)."),
   exactTitle: z.boolean().optional().describe("For window: targets, match the title exactly (default false)."),
+  backend: z
+    .enum(["gdigrab", "wgc"])
+    .optional()
+    .describe(
+      "For a live target: gdigrab (default) reads what is visible; 'wgc' (window: targets, FFmpeg 8+) " +
+        "reads the window's own surface even when other windows cover it.",
+    ),
   query: z
     .string()
     .optional()
@@ -65,10 +72,10 @@ export function register(server: McpServer): void {
           let source: string;
           let windowReport: Record<string, unknown> = {};
           if (args.target !== undefined) {
-            const { target, monitors, window } = await resolveCaptureTarget(args.target, { exactTitle: args.exactTitle });
+            const resolved = await resolveCaptureTarget(args.target, { exactTitle: args.exactTitle });
             source = join(subdir("screenshots"), `ocr-${stamp()}-${rand()}.png`);
-            await runFfmpeg(buildScreenshotArgs(target, source, monitors), 60_000);
-            if (window) windowReport = windowMatchReport(window);
+            await captureStill(resolved, source, args.backend ?? "gdigrab");
+            if (resolved.window) windowReport = windowMatchReport(resolved.window);
           } else {
             if (!existsSync(args.input!)) throw new ScreencastError(`Input file not found: ${args.input}`);
             const isImage = IMAGE_EXTENSIONS.has(extname(args.input!).toLowerCase());

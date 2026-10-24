@@ -1,8 +1,8 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
-import { buildScreenshotArgs } from "../utils/targets.js";
+import { requireFfmpeg } from "../utils/ffmpeg.js";
+import { captureStill } from "../utils/still.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js";
@@ -24,6 +24,14 @@ const inputSchema = {
     .describe(
       "For window: targets, match only a window whose title equals the given " +
         "title (case-insensitive); never fall back to a substring match. Default false.",
+    ),
+  backend: z
+    .enum(["gdigrab", "wgc"])
+    .optional()
+    .describe(
+      "gdigrab (default, ~0.2 s) captures what is visible on screen. 'wgc' (window: targets " +
+        "only, FFmpeg 8+) captures the window's own surface through Windows Graphics Capture, " +
+        "even when other windows cover it; slower (~1-2 s).",
     ),
   output: z
     .string()
@@ -57,16 +65,16 @@ export function register(server: McpServer): void {
     async (args) => {
       try {
         requireFfmpeg();
-        const { target, monitors, window } = await resolveCaptureTarget(args.target, {
-          exactTitle: args.exactTitle,
-        });
+        const resolved = await resolveCaptureTarget(args.target, { exactTitle: args.exactTitle });
+        const { window } = resolved;
         const output = resolveOutput(
           args.output,
           subdir("screenshots"),
           `shot-${stamp()}-${rand()}.png`,
           args.overwrite,
         );
-        await runFfmpeg(buildScreenshotArgs(target, output, monitors), 60_000);
+        const backend = args.backend ?? "gdigrab";
+        await captureStill(resolved, output, backend);
         const images =
           args.returnImage === false
             ? []
@@ -75,6 +83,7 @@ export function register(server: McpServer): void {
           {
             outputPath: output,
             target: args.target,
+            backend,
             ...(window ? windowMatchReport(window) : {}),
             inlineImages: images.length,
           },

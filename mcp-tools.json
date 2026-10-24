@@ -60,6 +60,7 @@
       "properties": {
         "target": { "type": "string", "description": "full | monitor:<index> | window:<title> | region:<x>,<y>,<w>,<h>. window: captures the rectangle the window occupies as displayed (case-insensitive exact title, else substring; topmost match)" },
         "exactTitle": { "type": "boolean", "description": "For window: targets, match only a window whose title equals the given title (case-insensitive); never fall back to a substring (default false)" },
+        "backend": { "type": "string", "enum": ["gdigrab", "wgc"], "description": "gdigrab (default) captures what is visible; wgc (window: targets, FFmpeg 8+) captures the window itself even when covered, via Windows Graphics Capture" },
         "output": { "type": "string", "description": "Optional output .png path (defaults under SCREENCAST_HOME/screenshots)" },
         "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
         "returnImage": { "type": "boolean", "description": "Also return the screenshot inline as a downscaled JPEG image (default true)" },
@@ -152,6 +153,7 @@
         "input": { "type": "string", "description": "Or read from an image or video file" },
         "timestamp": { "type": "number", "description": "For a video input: the second to read (default 0)" },
         "exactTitle": { "type": "boolean", "description": "For window: targets, match the title exactly (default false)" },
+        "backend": { "type": "string", "enum": ["gdigrab", "wgc"], "description": "For a live target: gdigrab (default) reads what is visible; wgc (window: targets, FFmpeg 8+) reads the window itself even when covered" },
         "query": { "type": "string", "description": "Text to look for; case-insensitive and tolerant of OCR misreads (_ vs -, I vs l, O vs 0)" },
         "regex": { "type": "boolean", "description": "Treat query as a regular expression" },
         "redact": { "type": "boolean", "description": "Also return padded rectangles around matches, ready for redact_region" },
