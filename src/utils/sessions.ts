@@ -260,8 +260,16 @@ export class SessionStore {
   /** Ids with a deliberate stop in flight, so the child's exit handler does not
    * misread the clean exit as the maxDurationSec cap firing. */
   private stopping = new Set<string>();
+  /** Called after every write, e.g. to tell MCP clients the session
+   * resources changed (#126). */
+  private listeners: Array<() => void> = [];
 
   constructor(private readonly path: string) {}
+
+  /** Run `cb` after each registry write. A throwing listener is ignored. */
+  onChange(cb: () => void): void {
+    this.listeners.push(cb);
+  }
 
   /** Read the on-disk records, tolerating a missing or corrupt file. A corrupt
    * registry is copied to .bak for inspection instead of silently discarded -
@@ -310,6 +318,13 @@ export class SessionStore {
       this.records = new Map(pruned.map((r) => [r.id, r]));
       this.dirty.clear();
     });
+    for (const cb of this.listeners) {
+      try {
+        cb();
+      } catch {
+        /* a listener must not break a registry write */
+      }
+    }
   }
 
   create(record: SessionRecord): void {
