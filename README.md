@@ -43,7 +43,7 @@ The design choices are deliberate rather than incidental:
 
 ## Tools
 
-Thirty tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
+Thirty-one tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
 
 ### Capture
 
@@ -86,6 +86,7 @@ These tools re-encode (a filter rewrites pixels, so stream copy does not apply).
 | `scale` | Resize to a `width` and/or `height`. One side keeps the aspect ratio; both set an exact size. |
 | `speed` | Change playback speed by a `factor` (>1 faster, <1 slower). Audio is retempo'd when present. |
 | `overlay` | Composite a logo, watermark, or picture-in-picture onto a base video at a position, optionally scaled and time-limited. |
+| `callout` | **Timed annotations**: boxes, text labels, and arrows at any angle, each shown between two timestamps. Mark the bug, point at the button, caption a step. |
 | `compress` | Re-encode smaller with a `light`/`medium`/`heavy` CRF ladder and an optional `maxWidth` that only downscales. |
 | `extract_audio` | Write the audio track to its own file (`mp3`, `aac`, `wav`, or `copy`). |
 | `clip` | Extract one or more frame-accurate sub-segments to separate files. Unlike `trim`, it re-encodes so cuts land exactly on the given times. |

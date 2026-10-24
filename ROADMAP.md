@@ -2,7 +2,7 @@
 
 # Roadmap
 
-**Current:** v0.20.0 shipped (Phase 3 complete; a second hardening round is
+**Current:** v0.21.0 shipped (Phase 3 complete; a second hardening round is
 underway, see below and CHANGELOG). Cross-platform capture is the next feature
 phase.
 
@@ -108,7 +108,7 @@ Screencast-native polish that turns a raw capture into something watchable.
       engine; opt-in, no bundled model), feeding `burn_subtitles`
 - [ ] `zoom_to` / cursor emphasis -- animated zoom-and-pan to a region, and a
       cursor highlight/spotlight, the highest-value screencast affordance
-- [ ] `callout` -- timed text/arrow/box annotations over the video
+- [x] `callout` -- timed text/arrow/box annotations over the video (#121) -- v0.21.0
 - [ ] `keystroke_overlay` -- render captured keystrokes/clicks as on-screen badges
       (requires a capture-time input hook; scope TBD)
 

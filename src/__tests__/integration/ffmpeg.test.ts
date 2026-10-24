@@ -42,6 +42,7 @@ import {
 import { bundledFontPath } from "../../utils/fonts.js";
 import { encodeInlineImages } from "../../utils/images.js";
 import { animLadder, buildAnimArgs } from "../../utils/anim.js";
+import { buildArrowImageArgs, buildCalloutArgs } from "../../utils/callout.js";
 import { analysisSize, diffFrames, buildRawFrameArgs, buildSsimArgs, parseSsim } from "../../utils/diff.js";
 import { evenTimes, formatTimecode, sheetGrid, buildTileArgs, buildSheetArgs, buildPosterArgs } from "../../utils/sheet.js";
 import { runEditJob, partialPath, type ToolExtra } from "../../utils/jobs.js";
@@ -202,6 +203,29 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     await runFfmpeg(buildTitleCardArgs(textFile, bundledFontPath("bold"), out, { width: 320, height: 240, duration: 1, quality: "draft" }));
     const info = await probeMedia(out);
     expect([info.width, info.height]).toEqual([320, 240]);
+    // The text must actually be drawn: a "%" used to make drawtext render
+    // nothing at all (it expands %{...} sequences), leaving a blank card.
+    expect(regionLuma(out, 0.5, 20, 100, 280, 40)).toBeGreaterThan(15);
+  });
+
+  it("callout draws a box, a text label with a %, and an arrow, each only in its window (#121)", async () => {
+    const arrow = p("arrow.png");
+    const items = [
+      { type: "box" as const, x: 10, y: 10, width: 60, height: 40, fill: true, color: "white", from: 1, to: 3 },
+      { type: "text" as const, x: 120, y: 150, text: "100% done", size: 24, from: 1, to: 3 },
+      { type: "arrow" as const, x1: 200, y1: 60, x2: 300, y2: 60, color: "white", thickness: 10, from: 1, to: 3 },
+    ];
+    await runFfmpeg(buildArrowImageArgs(items[2], arrow));
+    const label = p("label.txt");
+    writeFileSync(label, items[1].text);
+    const out = p("callout.mp4");
+    await runFfmpeg(buildCalloutArgs(vOnly, out, items, { fontFile: bundledFontPath("bold"), textFiles: [null, label, null], arrowFiles: [null, null, arrow] }, "draft"));
+    // Inside the window every annotation is visible ...
+    expect(regionLuma(out, 2, 20, 20, 40, 20)).toBeGreaterThan(220); // filled white box
+    expect(regionLuma(out, 2, 240, 55, 30, 10)).toBeGreaterThan(200); // arrow shaft at y=60
+    // ... and the source shows through before it starts.
+    expect(regionLuma(out, 0.3, 20, 20, 40, 20)).toBeLessThan(220);
+    expect((await probeMedia(out)).durationSec!).toBeCloseTo(4, 0);
   });
 
   it("redact_region box fills the region solid", async () => {

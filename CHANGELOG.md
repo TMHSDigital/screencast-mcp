@@ -7,6 +7,27 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.21.0]
+
+### Added
+
+- **`callout` tool** (#121). It draws timed annotations over a video: boxes
+  (outlined or filled), text labels (bundled font, optional dark panel), and
+  arrows at any angle, each shown between `from` and `to` seconds, with later
+  items on top. ffmpeg cannot draw lines, so each arrow is rendered as a
+  transparent shaft-plus-head image (`geq`), rotated to its angle, and
+  overlaid centred on its midpoint.
+
+### Fixed
+
+- **`title_card` drew a blank card when the text contained `%`.**
+  `drawtext` treats `%` as the start of an expansion sequence (`%{…}`); a
+  stray one made it draw nothing at all, with only a warning. All user text
+  (title cards, callout labels, contact-sheet timecodes) now renders with
+  `expansion=none`. The #87 title-card test checked only the output's size
+  even though its text contained `100%`; it now checks that text is actually
+  drawn, and fails without this fix.
+
 ## [0.20.0]
 
 ### Added
