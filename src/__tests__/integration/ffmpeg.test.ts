@@ -44,6 +44,7 @@ import { encodeInlineImages } from "../../utils/images.js";
 import { animLadder, buildAnimArgs } from "../../utils/anim.js";
 import { buildArrowImageArgs, buildCalloutArgs } from "../../utils/callout.js";
 import { buildBurnSubtitlesArgs, buildTranscribeArgs, parseSrt, normalizeCues } from "../../utils/captions.js";
+import { buildIdleScanArgs, parseFreezes, parseSilences, intersect, cutsFor, buildCutIdleArgs } from "../../utils/idle.js";
 import { loudnessTarget, buildLoudnessMeasureArgs, buildLoudnessApplyArgs, parseLoudnorm, buildDenoiseArgs, buildNoiseFloorArgs, parseNoiseFloor } from "../../utils/audio.js";
 import { analysisSize, diffFrames, buildRawFrameArgs, buildSsimArgs, parseSsim } from "../../utils/diff.js";
 import { evenTimes, formatTimecode, sheetGrid, buildTileArgs, buildSheetArgs, buildPosterArgs } from "../../utils/sheet.js";
@@ -240,6 +241,26 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     await runFfmpeg(buildDenoiseArgs(noise, quiet, "strong", floor));
     // Steady noise near the floor is cut hard (measured ~20 dB at strong).
     expect(await meanVolume(quiet)).toBeLessThan((await meanVolume(noise)) - 10);
+  });
+
+  it("cut_idle removes a frozen, silent stretch and keeps audio in sync (#122)", async () => {
+    const idle = p("idle.mp4");
+    await runFfmpeg([
+      "-y",
+      "-f", "lavfi", "-i", "testsrc2=s=160x120:d=2", "-f", "lavfi", "-i", "color=c=gray:s=160x120:d=3", "-f", "lavfi", "-i", "testsrc2=s=160x120:d=2",
+      "-f", "lavfi", "-i", "sine=f=440:d=2", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono:d=3", "-f", "lavfi", "-i", "sine=f=660:d=2",
+      "-filter_complex", "[0][1][2]concat=n=3:v=1:a=0[v];[3][4][5]concat=n=3:v=0:a=1[a]",
+      "-map", "[v]", "-map", "[a]", "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", idle,
+    ]);
+    const scan = await runCapture(FFMPEG, buildIdleScanArgs(idle, 1.5, true));
+    const cuts = cutsFor(intersect(parseFreezes(scan.stderr, 7), parseSilences(scan.stderr, 7)), 1.5, 0.3);
+    expect(cuts).toHaveLength(1);
+    expect(cuts[0].start).toBeCloseTo(2.3, 1);
+    expect(cuts[0].end).toBeCloseTo(4.7, 1);
+    const out = p("idle-cut.mp4");
+    await runFfmpeg(buildCutIdleArgs(idle, out, cuts, true, "draft"));
+    const info = await probeMedia(out);
+    expect(Math.abs(info.durationSec! - 4.6)).toBeLessThan(0.2);
   });
 
   it("burn_subtitles draws the cue text only while the cue is on (#120)", async () => {

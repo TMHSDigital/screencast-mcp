@@ -7,6 +7,19 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.26.0]
+
+### Added
+
+- **`cut_idle` tool** (#122). It removes dead air: stretches where the
+  screen is frozen (`freezedetect`) and, when there is audio, also silent
+  (`silencedetect`). Only stretches of at least `minIdleSec` (default 2) are
+  cut, with `keepSec` (default 0.4) kept at each edge, in one
+  `select`/`aselect` pass with regenerated timestamps. Speech over a still
+  screen is kept unless `useAudio: false`. `dryRun` reports the cuts and the
+  time saved without writing anything. Measured: a 4 s frozen, silent gap in
+  an 8 s clip became 4.8 s, with audio and video ending within one frame.
+
 ## [0.25.0]
 
 ### Added

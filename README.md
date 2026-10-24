@@ -43,7 +43,7 @@ The design choices are deliberate rather than incidental:
 
 ## Tools
 
-Thirty-five tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
+Thirty-six tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
 
 ### Capture
 
@@ -94,6 +94,7 @@ These tools re-encode (a filter rewrites pixels, so stream copy does not apply).
 | `transcribe` | **Speech to an SRT file, locally**, with FFmpeg 8's `whisper` filter (needs a whisper.cpp model: pass `model` or set `SCREENCAST_WHISPER_MODEL`). Cues are renumbered and de-overlapped. |
 | `burn_subtitles` | Burn an SRT/ASS into the video in the bundled font: `clean` (outlined line) or `social` (big bold text on a dark box, for muted autoplay). |
 | `clip` | Extract one or more frame-accurate sub-segments to separate files. Unlike `trim`, it re-encodes so cuts land exactly on the given times. |
+| `cut_idle` | **Remove dead air**: cut stretches where the screen is frozen and (when there is audio) silent, keeping a short pad at each edge. `dryRun` reports first; speech over a still screen is kept unless `useAudio: false`. |
 
 ### Redact
 
