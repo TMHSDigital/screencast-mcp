@@ -27,10 +27,13 @@ export interface ResolveOptions {
 }
 
 /** Resolve a raw target spec into builder-ready (target, monitors). */
-export function resolveCaptureTarget(spec: string, opts: ResolveOptions = {}): ResolvedTarget {
+export async function resolveCaptureTarget(
+  spec: string,
+  opts: ResolveOptions = {},
+): Promise<ResolvedTarget> {
   const parsed = parseTarget(spec);
   if (parsed.kind === "window") {
-    const w = resolveWindowBounds(parsed.title, { exactOnly: opts.exactTitle });
+    const w = await resolveWindowBounds(parsed.title, { exactOnly: opts.exactTitle });
     return {
       target: { kind: "region", x: w.x, y: w.y, w: w.width, h: w.height },
       monitors: [],
@@ -38,13 +41,13 @@ export function resolveCaptureTarget(spec: string, opts: ResolveOptions = {}): R
     };
   }
   if (parsed.kind === "monitor") {
-    return { target: parsed, monitors: getMonitors() };
+    return { target: parsed, monitors: await getMonitors() };
   }
   if (parsed.kind === "region") {
     // A window resolves to a region already clamped to the desktop; a raw
     // region does not, so validate it against the live desktop bounds before
     // gdigrab fails cryptically on an off-desktop rectangle.
-    validateRegionOnDesktop(parsed, getMonitors());
+    validateRegionOnDesktop(parsed, await getMonitors());
     return { target: parsed, monitors: [] };
   }
   return { target: parsed, monitors: [] };

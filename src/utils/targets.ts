@@ -303,6 +303,11 @@ export function buildCaptureArgs(target: Target, opts: CaptureOptions): string[]
   ];
 }
 
+/** gdigrab rate for a still. gdigrab paces grabs at the input rate, so at 1
+ * fps ffmpeg waits about two frame intervals (~2 s) before writing a single
+ * frame; at 30 fps the same still takes ~0.2 s and is pixel-identical (#88). */
+export const SCREENSHOT_GRAB_FPS = 30;
+
 /** Build ffmpeg args for a single-frame screenshot (gdigrab -> png). */
 export function buildScreenshotArgs(
   target: Target,
@@ -312,7 +317,7 @@ export function buildScreenshotArgs(
   return [
     "-y",
     "-f", "gdigrab",
-    "-framerate", "1",
+    "-framerate", String(SCREENSHOT_GRAB_FPS),
     ...targetInputArgs(target, monitors),
     "-frames:v", "1",
     output,

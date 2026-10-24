@@ -7,6 +7,24 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.14.2]
+
+### Fixed
+
+- **`screenshot` is about 10x faster** (#88). A repeat screenshot went from
+  about 2.6 s to about 0.25 s. Most of the time was not the PowerShell shim the
+  issue suspected but gdigrab itself: stills were grabbed at `-framerate 1`,
+  which makes ffmpeg wait about two frame intervals (~2 s) before writing the
+  single frame. Stills now grab at 30 fps, which is pixel-identical and takes
+  ~0.2 s.
+- **Target resolution no longer blocks the server** (#88). The monitor and
+  window queries ran PowerShell synchronously, so no other MCP message
+  (including a cancellation or `list_sessions`) was handled meanwhile. They now
+  run asynchronously; a `list_sessions` sent during a screenshot returns in
+  ~1 ms instead of waiting. The monitor layout is also cached for 5 s
+  (concurrent callers share one query; failures are not cached). Window
+  positions are always queried fresh.
+
 ## [0.14.1]
 
 ### Added
