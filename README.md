@@ -118,6 +118,8 @@ Every capture tool takes a single `target` string, so an agent never has to jugg
 | `window:<title>` | The on-screen rectangle a window occupies (case-insensitive exact title, else substring; topmost wins) |
 | `region:<x>,<y>,<w>,<h>` | An absolute pixel rectangle |
 
+For `window:` targets, `screenshot` and `start_recording` both report `matchedWindow`, `matchCount`, `matchKind` (`exact` or `substring`), and the captured `region`. When the title matched only as a substring, or several windows matched, the result carries a `windowWarning` listing the candidate titles, so a generic title like `window:Code` cannot quietly record a different window. Pass `exactTitle: true` to refuse the substring fallback entirely.
+
 Set `SCREENCAST_MAX_RECORDING_SEC` to change the default recording cap (`0` disables it).
 
 Output is written under `SCREENCAST_HOME` (default `<homedir>/.screencast-mcp`) into `recordings/`, `frames/`, `screenshots/`, and `edits/`. Any tool also accepts an explicit output path.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { selectWindow, type WindowQuery } from "../utils/windows.js";
+import { selectWindow, windowMatchReport, MAX_CANDIDATES, type WindowQuery } from "../utils/windows.js";
 
 // A 3840x1080 dual-monitor virtual desktop (two 1920x1080; second at x=1920).
 const VIRTUAL = { x: 0, y: 0, w: 3840, h: 1080 };
@@ -101,5 +101,43 @@ describe("selectWindow", () => {
         "Notepad",
       ),
     ).toThrow(/minimized/i);
+  });
+});
+
+describe("window match reporting (#89)", () => {
+  const W = (title: string, left = 0) => ({ title, left, top: 0, right: left + 200, bottom: 200, minimized: false });
+
+  it("reports an exact single match without a warning", () => {
+    const r = selectWindow(q([W("Code"), W("Visual Studio Code", 300)]), "code");
+    expect(r.matchKind).toBe("exact");
+    const report = windowMatchReport(r);
+    expect(report.matchedWindow).toBe("Code");
+    expect(report.region).toEqual({ x: 0, y: 0, width: 200, height: 200 });
+    expect(report.windowWarning).toBeUndefined();
+  });
+
+  it("warns on a substring match and lists the candidates", () => {
+    const r = selectWindow(q([W("1Password - Vault"), W("Pass the salt", 300)]), "pass");
+    expect(r.matchKind).toBe("substring");
+    expect(r.candidates).toEqual(["1Password - Vault", "Pass the salt"]);
+    const warning = String(windowMatchReport(r).windowWarning);
+    expect(warning).toMatch(/substring/);
+    expect(warning).toMatch(/2 windows matched/);
+    expect(warning).toContain('"1Password - Vault"');
+  });
+
+  it("exactOnly refuses the substring fallback and names the near misses", () => {
+    expect(() => selectWindow(q([W("Demo - Google Chrome")]), "Chrome", { exactOnly: true })).toThrow(
+      /titled exactly "Chrome".*"Demo - Google Chrome"/,
+    );
+    const r = selectWindow(q([W("Chrome"), W("Demo - Google Chrome", 300)]), "chrome", { exactOnly: true });
+    expect(r.matchedTitle).toBe("Chrome");
+  });
+
+  it("caps the candidate list", () => {
+    const many = Array.from({ length: 9 }, (_, i) => W(`Editor ${i}`, i * 210));
+    const r = selectWindow({ virtual: { x: 0, y: 0, w: 4000, h: 1080 }, windows: many }, "Editor");
+    expect(r.matchCount).toBe(9);
+    expect(r.candidates).toHaveLength(MAX_CANDIDATES);
   });
 });

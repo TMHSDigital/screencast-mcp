@@ -21,11 +21,16 @@ export interface ResolvedTarget {
   window?: WindowBounds;
 }
 
+export interface ResolveOptions {
+  /** For window: targets, refuse the substring fallback (#89). */
+  exactTitle?: boolean;
+}
+
 /** Resolve a raw target spec into builder-ready (target, monitors). */
-export function resolveCaptureTarget(spec: string): ResolvedTarget {
+export function resolveCaptureTarget(spec: string, opts: ResolveOptions = {}): ResolvedTarget {
   const parsed = parseTarget(spec);
   if (parsed.kind === "window") {
-    const w = resolveWindowBounds(parsed.title);
+    const w = resolveWindowBounds(parsed.title, { exactOnly: opts.exactTitle });
     return {
       target: { kind: "region", x: w.x, y: w.y, w: w.width, h: w.height },
       monitors: [],
