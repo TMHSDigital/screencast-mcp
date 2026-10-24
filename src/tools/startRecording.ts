@@ -12,6 +12,7 @@ import {
   type Quality,
 } from "../utils/targets.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
+import { windowMatchReport } from "../utils/windows.js";
 import { resolveLoopbackDevice } from "../utils/audioDevices.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { getStore } from "../context.js";
@@ -26,6 +27,13 @@ const inputSchema = {
         "window: records the on-screen rectangle the window occupies, resolved " +
         "ONCE at start (it must be visible, on top, not minimized); it does not " +
         "follow a window moved or resized mid-recording.",
+    ),
+  exactTitle: z
+    .boolean()
+    .optional()
+    .describe(
+      "For window: targets, match only a window whose title equals the given " +
+        "title (case-insensitive); never fall back to a substring match. Default false.",
     ),
   fps: z
     .number()
@@ -87,7 +95,9 @@ export function register(server: McpServer): void {
     async (args) => {
       try {
         const { ffmpeg } = requireFfmpeg();
-        const { target, monitors } = resolveCaptureTarget(args.target);
+        const { target, monitors, window } = resolveCaptureTarget(args.target, {
+          exactTitle: args.exactTitle,
+        });
         const fps = args.fps ?? DEFAULT_FPS;
         const quality: Quality = (args.quality as Quality) ?? DEFAULT_QUALITY;
         const maxDurationSec = resolveMaxDuration(args.maxDurationSec);
@@ -155,6 +165,7 @@ export function register(server: McpServer): void {
           status: "recording",
           startedAt: new Date().toISOString(),
           ...(maxDurationSec > 0 ? { maxDurationSec } : {}),
+          ...(window ? { matchedWindow: window.matchedTitle } : {}),
         };
         const store = getStore();
         store.create(record);
@@ -201,6 +212,7 @@ export function register(server: McpServer): void {
           quality,
           audioDevice: audio?.device ?? null,
           maxDurationSec: maxDurationSec > 0 ? maxDurationSec : null,
+          ...(window ? windowMatchReport(window) : {}),
           note:
             "Call stop_recording with this sessionId to finalize the file." +
             (maxDurationSec > 0

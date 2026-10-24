@@ -149,6 +149,27 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     expect(meanLuma(shot.json.outputPath)).toBeGreaterThan(8);
   }, 30_000);
 
+  it("start_recording reports which window it matched, and exactTitle refuses substrings (#89)", async () => {
+    const title = openWindows()[0];
+    if (!title) return;
+    const rec = await call("start_recording", { target: `window:${title}`, quality: "draft", fps: 5, exactTitle: true });
+    expect(rec.isError).toBe(false);
+    expect(rec.json.matchedWindow).toBe(title);
+    expect(rec.json.matchKind).toBe("exact");
+    expect(rec.json.region.width).toBeGreaterThan(0);
+    await call("stop_recording", { sessionId: rec.json.sessionId });
+    const sess = await call("get_session", { sessionId: rec.json.sessionId });
+    expect(sess.json.matchedWindow).toBe(title);
+
+    // A strict prefix of the title is only a substring match: refused when exact.
+    const partial = title.slice(0, Math.max(1, title.length - 1));
+    if (partial.toLowerCase() !== title.toLowerCase()) {
+      const strict = await call("screenshot", { target: `window:${partial}`, exactTitle: true, returnImage: false });
+      expect(strict.isError).toBe(true);
+      expect(strict.text).toMatch(/titled exactly/);
+    }
+  }, 30_000);
+
   it("reaps a live orphaned ffmpeg on startup", async () => {
     const h = mkdtempSync(join(tmpdir(), "screencast-reap-"));
     mkdirSync(join(h, "recordings"), { recursive: true });

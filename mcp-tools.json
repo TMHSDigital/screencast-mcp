@@ -6,6 +6,7 @@
       "type": "object",
       "properties": {
         "target": { "type": "string", "description": "full | monitor:<index> (0 = primary) | window:<title> | region:<x>,<y>,<w>,<h>. window: captures the rectangle the window occupies as displayed (case-insensitive exact title, else substring; topmost match)" },
+        "exactTitle": { "type": "boolean", "description": "For window: targets, match only a window whose title equals the given title (case-insensitive); never fall back to a substring (default false)" },
         "fps": { "type": "integer", "minimum": 1, "maximum": 120, "description": "Frames per second (default 30)" },
         "quality": { "type": "string", "enum": ["draft", "standard", "high"], "description": "Encoder preset (default standard)" },
         "audio": {
@@ -58,6 +59,7 @@
       "type": "object",
       "properties": {
         "target": { "type": "string", "description": "full | monitor:<index> | window:<title> | region:<x>,<y>,<w>,<h>. window: captures the rectangle the window occupies as displayed (case-insensitive exact title, else substring; topmost match)" },
+        "exactTitle": { "type": "boolean", "description": "For window: targets, match only a window whose title equals the given title (case-insensitive); never fall back to a substring (default false)" },
         "output": { "type": "string", "description": "Optional output .png path (defaults under SCREENCAST_HOME/screenshots)" },
         "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
         "returnImage": { "type": "boolean", "description": "Also return the screenshot inline as a downscaled JPEG image (default true)" },

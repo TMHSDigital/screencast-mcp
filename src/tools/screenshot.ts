@@ -6,6 +6,7 @@ import { buildScreenshotArgs } from "../utils/targets.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js";
+import { windowMatchReport } from "../utils/windows.js";
 
 const inputSchema = {
   target: z
@@ -16,6 +17,13 @@ const inputSchema = {
         "window occupies as currently displayed - it must be visible, on top, " +
         "and not minimized (case-insensitive exact title, else substring; " +
         "topmost match wins).",
+    ),
+  exactTitle: z
+    .boolean()
+    .optional()
+    .describe(
+      "For window: targets, match only a window whose title equals the given " +
+        "title (case-insensitive); never fall back to a substring match. Default false.",
     ),
   output: z
     .string()
@@ -49,7 +57,9 @@ export function register(server: McpServer): void {
     async (args) => {
       try {
         requireFfmpeg();
-        const { target, monitors, window } = resolveCaptureTarget(args.target);
+        const { target, monitors, window } = resolveCaptureTarget(args.target, {
+          exactTitle: args.exactTitle,
+        });
         const output = resolveOutput(
           args.output,
           subdir("screenshots"),
@@ -65,7 +75,7 @@ export function register(server: McpServer): void {
           {
             outputPath: output,
             target: args.target,
-            ...(window ? { matchedWindow: window.matchedTitle, region: window } : {}),
+            ...(window ? windowMatchReport(window) : {}),
             inlineImages: images.length,
           },
           images,

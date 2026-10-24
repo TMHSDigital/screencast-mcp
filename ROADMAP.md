@@ -2,7 +2,7 @@
 
 # Roadmap
 
-**Current:** v0.13.0 shipped (Phase 3 complete; a second hardening round is
+**Current:** v0.14.0 shipped (Phase 3 complete; a second hardening round is
 underway, see below and CHANGELOG). Cross-platform capture is the next feature
 phase.
 
@@ -78,8 +78,8 @@ From the September 2026 end-to-end review. Tracked as issues; high priority firs
       `sample_frames` output (#80) -- v0.11.1
 - [x] Long jobs: duration-scaled timeouts, no partial outputs, progress
       notifications (#81) -- v0.13.0
-- [ ] Capture: exact / reported window matching (#89); non-blocking, cached
-      target resolution (#88)
+- [ ] Capture: exact / reported window matching (#89, done in v0.14.0);
+      non-blocking, cached target resolution (#88)
 - [x] Runtime and deps: drop EOL Node 20, test Node 24, clean `npm audit` (#86)
       -- v0.12.0
 - [ ] Reach: MCP Registry listing and a README demo (#90)

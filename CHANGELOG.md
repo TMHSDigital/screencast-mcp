@@ -7,6 +7,32 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.14.0]
+
+### Added
+
+- **`exactTitle` for window targets** (#89). `screenshot` and
+  `start_recording` accept `exactTitle: true`, which matches only a window
+  whose title equals the given title (case-insensitive) and never falls back
+  to a substring match. When nothing matches exactly, the error lists the
+  windows that contain the title.
+
+### Fixed
+
+- **`start_recording` now reports which window it is recording** (#89). It
+  used to drop the match, so an agent recording `window:Code` never learned it
+  had matched, say, a chat window titled "Code review". Both capture tools now
+  return `matchedWindow`, `matchCount`, `matchKind` (`exact` / `substring`),
+  and the captured `region`, and add a `windowWarning` listing the candidate
+  titles when the match was only a substring or several windows matched. The
+  session record keeps `matchedWindow`, so `get_session` shows it too.
+
+### Changed
+
+- `screenshot`'s `region` for a window target is now just the rectangle
+  (`x`, `y`, `width`, `height`); the match details moved to the top-level
+  fields above.
+
 ## [0.13.0]
 
 ### Added

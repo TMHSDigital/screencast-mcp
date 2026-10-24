@@ -49,6 +49,8 @@ export interface SessionRecord {
   maxDurationSec?: number;
   endReason?: EndReason;
   error?: string;
+  /** For window: targets, the title of the window actually recorded (#89). */
+  matchedWindow?: string;
 }
 
 /** Decide what an in-progress session becomes at boot, given liveness.

@@ -41,23 +41,48 @@ export interface WindowBounds {
   matchedTitle: string;
   /** How many windows matched the requested title (>1 => topmost was chosen). */
   matchCount: number;
+  /** Whether the title matched exactly or only as a substring (#89). */
+  matchKind: "exact" | "substring";
+  /** Titles of every matching window, topmost first (at most MAX_CANDIDATES). */
+  candidates: string[];
 }
+
+export interface SelectWindowOptions {
+  /** Refuse the substring fallback: only a case-insensitive exact title matches. */
+  exactOnly?: boolean;
+}
+
+/** How many candidate titles a match reports. */
+export const MAX_CANDIDATES = 5;
 
 /**
  * Choose a window by title and reduce it to a clamped, even-sized rectangle.
  *
  * Matching: a case-insensitive EXACT title match wins; if none, a
- * case-insensitive SUBSTRING match is used. With several matches the topmost
- * (first in Z-order) is chosen. Pure: takes the enumerated query, returns the
- * rectangle or throws a ScreencastError the caller can surface verbatim.
+ * case-insensitive SUBSTRING match is used (unless exactOnly). With several
+ * matches the topmost (first in Z-order) is chosen. Pure: takes the enumerated
+ * query, returns the rectangle or throws a ScreencastError the caller can
+ * surface verbatim.
  */
-export function selectWindow(query: WindowQuery, wanted: string): WindowBounds {
+export function selectWindow(
+  query: WindowQuery,
+  wanted: string,
+  opts: SelectWindowOptions = {},
+): WindowBounds {
   const all = Array.isArray(query.windows) ? query.windows : [];
   const needle = wanted.trim().toLowerCase();
   const exact = all.filter((w) => w.title.toLowerCase() === needle);
-  const matches = exact.length > 0
-    ? exact
-    : all.filter((w) => w.title.toLowerCase().includes(needle));
+  const substring = all.filter((w) => w.title.toLowerCase().includes(needle));
+  const quote = (ws: RawWindow[]) => ws.slice(0, MAX_CANDIDATES).map((w) => `"${w.title}"`).join(", ");
+
+  if (exact.length === 0 && opts.exactOnly) {
+    throw new ScreencastError(
+      `No visible window titled exactly "${wanted}" (exactTitle is on).` +
+        (substring.length > 0 ? ` Windows containing it: ${quote(substring)}.` : ""),
+    );
+  }
+  const matchKind = exact.length > 0 ? "exact" : "substring";
+  const matches = exact.length > 0 ? exact : substring;
 
   if (matches.length === 0) {
     throw new ScreencastError(
@@ -92,7 +117,36 @@ export function selectWindow(query: WindowQuery, wanted: string): WindowBounds {
   if (width <= 0 || height <= 0) {
     throw new ScreencastError(`Window "${chosen.title}" is too small to capture.`);
   }
-  return { x, y, width, height, matchedTitle: chosen.title, matchCount: matches.length };
+  return {
+    x, y, width, height,
+    matchedTitle: chosen.title,
+    matchCount: matches.length,
+    matchKind,
+    candidates: matches.slice(0, MAX_CANDIDATES).map((w) => w.title),
+  };
+}
+
+/** The window-match fields a capture tool returns, with a warning when the
+ * match was ambiguous or only a substring, so an agent notices before it
+ * records the wrong window (#89). Pure. */
+export function windowMatchReport(w: WindowBounds): Record<string, unknown> {
+  const reasons: string[] = [];
+  if (w.matchKind === "substring") reasons.push("the title matched only as a substring");
+  if (w.matchCount > 1) reasons.push(`${w.matchCount} windows matched and the topmost was used`);
+  return {
+    matchedWindow: w.matchedTitle,
+    matchCount: w.matchCount,
+    matchKind: w.matchKind,
+    region: { x: w.x, y: w.y, width: w.width, height: w.height },
+    ...(reasons.length > 0
+      ? {
+          windowWarning:
+            `Check this is the intended window: ${reasons.join(", and ")}. ` +
+            `Candidates: ${w.candidates.map((t) => `"${t}"`).join(", ")}. ` +
+            "Pass the full title with exactTitle: true to match only that window.",
+        }
+      : {}),
+  };
 }
 
 // Per-monitor-DPI-aware enumeration of top-level windows + virtual screen
@@ -165,6 +219,6 @@ export function getRawWindows(): WindowQuery {
 }
 
 /** Resolve a window title to its current on-screen rectangle (Windows). */
-export function resolveWindowBounds(title: string): WindowBounds {
-  return selectWindow(getRawWindows(), title);
+export function resolveWindowBounds(title: string, opts: SelectWindowOptions = {}): WindowBounds {
+  return selectWindow(getRawWindows(), title, opts);
 }
