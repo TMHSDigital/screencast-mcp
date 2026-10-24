@@ -83,14 +83,48 @@ function validatePositive(value: number, label: string): number {
   return value;
 }
 
-/** Sample frames at a fixed rate: ffmpeg -i in -vf fps=N outdir/frame_%05d.png */
+/** Default and ceiling for how many frames one sample_frames call may write. */
+export const DEFAULT_MAX_FRAMES = 100;
+export const MAX_FRAMES_CEILING = 1000;
+
+export interface FpsPlan {
+  /** The rate actually used; lower than requested when clamped. */
+  fps: number;
+  /** Frames the requested rate would have written, or null when the duration is unknown. */
+  requestedFrames: number | null;
+  clamped: boolean;
+}
+
+/** Fit a requested sampling rate under a frame cap (#80). When duration * fps
+ * would exceed maxFrames, lower the rate so the frames still span the whole
+ * video instead of stopping partway. An unknown duration leaves the rate as
+ * asked; the -frames:v backstop in buildSampleByFpsArgs still applies. */
+export function planFpsSampling(
+  durationSec: number | null,
+  fps: number,
+  maxFrames: number,
+): FpsPlan {
+  validatePositive(fps, "fps");
+  if (durationSec === null || !(durationSec > 0)) {
+    return { fps, requestedFrames: null, clamped: false };
+  }
+  const requested = Math.ceil(durationSec * fps);
+  if (requested <= maxFrames) return { fps, requestedFrames: requested, clamped: false };
+  // Round down to 4 decimals so the clamped rate never overshoots the cap.
+  const clampedFps = Math.max(1e-4, Math.floor((maxFrames / durationSec) * 10_000) / 10_000);
+  return { fps: clampedFps, requestedFrames: requested, clamped: true };
+}
+
+/** Sample frames at a fixed rate: ffmpeg -i in -vf fps=N -frames:v MAX
+ * outdir/frame_%05d.png. -frames:v is a hard backstop on the frame count. */
 export function buildSampleByFpsArgs(
   input: string,
   fps: number,
   outputPattern: string,
+  maxFrames: number = DEFAULT_MAX_FRAMES,
 ): string[] {
   validatePositive(fps, "fps");
-  return ["-y", "-i", input, "-vf", `fps=${fps}`, outputPattern];
+  return ["-y", "-i", input, "-vf", `fps=${fps}`, "-frames:v", String(maxFrames), outputPattern];
 }
 
 /** Build one ffmpeg invocation per timestamp (accurate single-frame seek). */

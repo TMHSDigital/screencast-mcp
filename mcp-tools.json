@@ -76,6 +76,7 @@
         "fps": { "type": "number", "description": "Sample this many frames per second (mutually exclusive with timestamps)" },
         "timestamps": { "type": "array", "items": { "type": "number" }, "description": "Explicit second offsets to grab one frame at each (mutually exclusive with fps)" },
         "outputDir": { "type": "string", "description": "Optional folder for the frames (defaults under SCREENCAST_HOME/frames)" },
+        "maxFrames": { "type": "integer", "description": "Most frames this call may write (default 100, max 1000); in fps mode a rate that would exceed it is lowered so frames still span the whole video" },
         "returnImages": { "type": "boolean", "description": "Also return frames inline as downscaled JPEG images (default true)" },
         "maxInlineImages": { "type": "integer", "description": "How many frames to embed inline (default 8, max 20); every frame is still listed by path" },
         "maxImageWidth": { "type": "integer", "description": "Downscale inline images to at most this width (default 1280)" }

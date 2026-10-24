@@ -7,6 +7,20 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.11.1]
+
+### Fixed
+
+- **`sample_frames` can no longer write an unbounded number of frames** (#80).
+  `fps: 30` on a 1-hour recording used to write about 108,000 full-resolution
+  PNGs and list every path in one response. A new `maxFrames` limit (default
+  100, max 1000) now applies. In `fps` mode the video is probed first; when the
+  rate would exceed the cap, it is lowered so the frames still span the whole
+  video, and the result reports `requestedFps` and a `capNote`. ffmpeg also
+  gets `-frames:v <maxFrames>` as a backstop for videos whose length cannot be
+  probed. In `timestamps` mode, more timestamps than `maxFrames` is rejected
+  with a clear error.
+
 ## [0.11.0]
 
 ### Added
