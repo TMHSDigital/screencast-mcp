@@ -36,7 +36,7 @@ Screencast MCP gives an agent a screen recorder it can drive and reason about. I
 The design choices are deliberate rather than incidental:
 
 - **Capture is always explicit.** A recording or screenshot happens only on a tool call — nothing auto-fires and there is no background or scheduled capture.
-- **Footage is made viewable.** `sample_frames` turns a video into images an agent can open, so "watch what happened" is a first-class operation, not an afterthought.
+- **Footage is made viewable.** `sample_frames` turns a video into images returned straight to the model, so "watch what happened" is a first-class operation, not an afterthought.
 - **Presets over raw flags.** Quality is `draft` / `standard` / `high`; the agent never reasons about codecs, CRF, or pixel formats.
 - **Safe by default.** Output lands under `SCREENCAST_HOME`, never inside a project checkout, and the public repo's `.gitignore` blocks captured media from being committed.
 - **Recordings end.** When the client disconnects (or the server gets SIGINT/SIGTERM), every active recording is finalized and the server exits. Every recording also has a `maxDurationSec` cap (default one hour). A recording interrupted by a hard crash is reconciled on the next start (orphan reaping).
@@ -53,14 +53,14 @@ Twenty-five tools across four concerns. The manifest in [`mcp-tools.json`](mcp-t
 | `stop_recording` | Stop a session by id. Sends ffmpeg a graceful quit so the file is **finalized, not truncated**. Returns the final path and duration. |
 | `list_sessions` | List active and finished sessions. |
 | `get_session` | Inspect a single session by id. |
-| `screenshot` | Capture a single PNG of a `target`. |
+| `screenshot` | Capture a single PNG of a `target`, and return it inline as an image the model can view. |
 | `list_audio_devices` | List the DirectShow audio devices ffmpeg can see and flag a likely system-audio loopback device for `start_recording`. |
 
 ### Watch
 
 | Tool | Purpose |
 | --- | --- |
-| `sample_frames` | Extract frames from a video — at a fixed `fps` or at explicit `timestamps` — so the agent can view what happened. Returns the frame paths. |
+| `sample_frames` | Extract frames from a video — at a fixed `fps` or at explicit `timestamps` — so the agent can view what happened. Returns the frame paths, with the first few frames inline as images. |
 | `get_media_info` | ffprobe wrapper: duration, resolution, fps, codecs, container format, and size. |
 
 ### Minimal edit
@@ -176,12 +176,15 @@ start_recording { "target": "region:0,0,1280,720", "quality": "draft" }
 stop_recording { "sessionId": "rec-…" }
 //    -> { "durationSec": 4.2, "finalizedGracefully": true }
 
-// 3. turn it into frames the agent can view
+// 3. look at it: the frames come back inline, so the model sees them directly
 sample_frames { "input": "…/recordings/rec-….mp4", "timestamps": [0.5, 2, 3.5] }
-//    -> { "frames": ["…/frames/…/frame_000_0.5s.png", …] }
+//    -> { "frames": ["…/frames/…/frame_000_0.5s.png", …], "inlineImages": 3 }
+//       + 3 image blocks the client shows to the model
 ```
 
-`screenshot { "target": "window:My App" }` is the one-shot equivalent for a still.
+`screenshot { "target": "window:My App" }` is the one-shot equivalent for a still, and also returns the image inline.
+
+Inline images are downscaled JPEGs (`maxImageWidth`, default 1280) and capped per call (`maxInlineImages`, default 8, max 20); the full-resolution PNGs stay on disk. Pass `returnImage: false` / `returnImages: false` to get paths only.
 
 ## Windows notes
 

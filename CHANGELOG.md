@@ -7,6 +7,20 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.11.0]
+
+### Added
+
+- **Frames come back inline as images** (#79). `screenshot` and
+  `sample_frames` now append MCP `image` blocks after the JSON result, so a
+  client shows the frames to the model directly and no filesystem or
+  image-reading tool is needed. Inline images are downscaled JPEGs
+  (`maxImageWidth`, default 1280). `sample_frames` embeds at most
+  `maxInlineImages` frames (default 8, max 20) and says how many it left out;
+  every frame is still written to disk at full resolution and listed by path.
+  Pass `returnImage: false` / `returnImages: false` to get paths only. The JSON
+  result reports the embedded count as `inlineImages`.
+
 ## [0.10.0]
 
 ### Fixed

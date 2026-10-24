@@ -53,27 +53,32 @@
   },
   {
     "name": "screenshot",
-    "description": "Capture a single still frame (PNG) of a target (full screen, a monitor, a window, or a region). Returns the image path. A window: target captures the on-screen rectangle the window occupies as currently displayed (it must be visible, on top, and not minimized).",
+    "description": "Capture a single still frame (PNG) of a target (full screen, a monitor, a window, or a region). Returns the image path, plus the image inline so the model can view it directly. A window: target captures the on-screen rectangle the window occupies as currently displayed (it must be visible, on top, and not minimized).",
     "inputSchema": {
       "type": "object",
       "properties": {
         "target": { "type": "string", "description": "full | monitor:<index> | window:<title> | region:<x>,<y>,<w>,<h>. window: captures the rectangle the window occupies as displayed (case-insensitive exact title, else substring; topmost match)" },
         "output": { "type": "string", "description": "Optional output .png path (defaults under SCREENCAST_HOME/screenshots)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
+        "returnImage": { "type": "boolean", "description": "Also return the screenshot inline as a downscaled JPEG image (default true)" },
+        "maxImageWidth": { "type": "integer", "description": "Downscale the inline image to at most this width (default 1280)" }
       },
       "required": ["target"]
     }
   },
   {
     "name": "sample_frames",
-    "description": "Sample frames from a video so the agent can view what happened: either at a fixed rate (fps) or at explicit timestamps. Writes PNG frames to a folder and returns their paths.",
+    "description": "Sample frames from a video so the agent can view what happened: either at a fixed rate (fps) or at explicit timestamps. Writes PNG frames to a folder and returns their paths, plus the first few frames inline so the model can view them directly.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "input": { "type": "string", "description": "Path to the source video file" },
         "fps": { "type": "number", "description": "Sample this many frames per second (mutually exclusive with timestamps)" },
         "timestamps": { "type": "array", "items": { "type": "number" }, "description": "Explicit second offsets to grab one frame at each (mutually exclusive with fps)" },
-        "outputDir": { "type": "string", "description": "Optional folder for the frames (defaults under SCREENCAST_HOME/frames)" }
+        "outputDir": { "type": "string", "description": "Optional folder for the frames (defaults under SCREENCAST_HOME/frames)" },
+        "returnImages": { "type": "boolean", "description": "Also return frames inline as downscaled JPEG images (default true)" },
+        "maxInlineImages": { "type": "integer", "description": "How many frames to embed inline (default 8, max 20); every frame is still listed by path" },
+        "maxImageWidth": { "type": "integer", "description": "Downscale inline images to at most this width (default 1280)" }
       },
       "required": ["input"]
     }
