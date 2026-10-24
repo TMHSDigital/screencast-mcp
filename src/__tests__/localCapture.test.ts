@@ -172,15 +172,22 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
 
   it("wait_for_change sees a window repaint, then settles (#116)", async () => {
     // A small topmost window at a fixed spot that turns from red to blue after
-    // 1.5 s. The watched region sits well inside it even at 150% DPI scaling.
+    // 3 s. The watched region sits well inside it even at 150% DPI scaling.
     const ps = spawn("powershell", ["-NoProfile", "-Command",
       "Add-Type -AssemblyName System.Windows.Forms;" +
       "$f=New-Object Windows.Forms.Form;$f.StartPosition='Manual';$f.Location='60,60';$f.Size='320,240';" +
       "$f.TopMost=$true;$f.FormBorderStyle='None';$f.BackColor='Red';" +
-      "$t=New-Object Windows.Forms.Timer;$t.Interval=1500;$t.Add_Tick({$f.BackColor='Blue';$t.Stop()});$t.Start();" +
+      "$t=New-Object Windows.Forms.Timer;$t.Interval=3000;$t.Add_Tick({$f.BackColor='Blue';$t.Stop()});$t.Start();" +
       "$f.ShowDialog()"], { windowsHide: false });
+    const isRed = async () => {
+      const s = await call("screenshot", { target: "region:110,110,120,80", returnImage: false });
+      const [r, g, b] = [...spawnSync("ffmpeg", ["-v", "error", "-i", s.json.outputPath, "-vf", "scale=1:1,format=rgb24", "-f", "rawvideo", "-"]).stdout];
+      return r > 200 && g < 60 && b < 60;
+    };
     try {
-      await sleep(1000); // window up and red
+      // PowerShell + WinForms startup time varies; wait until the window is
+      // actually up and red rather than sleeping a fixed time.
+      for (let i = 0; i < 40 && !(await isRed()); i++) await sleep(100);
       const changed = await call("wait_for_change", { target: "region:110,110,120,80", timeoutSec: 10, returnImage: false });
       expect(changed.isError).toBe(false);
       expect(changed.json.outcome).toBe("changed");
@@ -219,6 +226,38 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   }, 60_000);
+
+  it("backend 'wgc' captures a window's own pixels even when another window covers it (#113)", async () => {
+    // Target: a lime window. Cover: a topmost magenta window fully over it.
+    const ps = spawn("powershell", ["-NoProfile", "-Command",
+      "Add-Type -AssemblyName System.Windows.Forms;" +
+      "$f=New-Object Windows.Forms.Form;$f.Text='SC-WGC-TARGET';$f.StartPosition='Manual';$f.Location='100,100';$f.Size='400,300';$f.BackColor='Lime';" +
+      "$c=New-Object Windows.Forms.Form;$c.Text='SC-WGC-COVER';$c.StartPosition='Manual';$c.Location='80,80';$c.Size='460,360';$c.BackColor='Magenta';$c.TopMost=$true;" +
+      "$f.Show();$c.Show();[Windows.Forms.Application]::Run($c)"], { windowsHide: false });
+    const meanRgb = (path: string) => [...spawnSync("ffmpeg", ["-v", "error", "-i", path, "-vf", "scale=1:1,format=rgb24", "-f", "rawvideo", "-"]).stdout];
+    try {
+      await sleep(2000);
+      const wgc = await call("screenshot", { target: "window:SC-WGC-TARGET", exactTitle: true, backend: "wgc", returnImage: false });
+      const probe = spawnSync("ffmpeg", ["-hide_banner", "-h", "filter=gfxcapture"], { encoding: "utf8" });
+      if (!/gfxcapture AVOptions/.test(probe.stdout)) {
+        expect(wgc.isError).toBe(true); // older ffmpeg: a clear error, not a hang
+        return;
+      }
+      expect(wgc.isError).toBe(false);
+      expect(wgc.json.backend).toBe("wgc");
+      const [r, g, b] = meanRgb(wgc.json.outputPath);
+      expect(g).toBeGreaterThan(200); // lime: the covered window itself
+      expect(r + b).toBeLessThan(80);
+      const gdi = await call("screenshot", { target: "window:SC-WGC-TARGET", exactTitle: true, returnImage: false });
+      const [r2, , b2] = meanRgb(gdi.json.outputPath);
+      expect(r2 + b2).toBeGreaterThan(400); // gdigrab sees the magenta cover
+      const region = await call("screenshot", { target: "region:0,0,50,50", backend: "wgc" });
+      expect(region.isError).toBe(true);
+      expect(region.text).toMatch(/window:<title>/);
+    } finally {
+      ps.kill();
+    }
+  }, 40_000);
 
   it("screen_diff reports identical screenshots as unchanged (#116)", async () => {
     const a = await call("screenshot", { target: "region:0,0,64,64", returnImage: false });

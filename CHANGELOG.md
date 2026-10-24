@@ -7,6 +7,25 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.20.0]
+
+### Added
+
+- **`backend: "wgc"` for window stills** (#113). `screenshot` and
+  `find_text` can capture a `window:` target's own surface through Windows
+  Graphics Capture (FFmpeg 8+ `gfxcapture`), selected by window handle, so a
+  window covered by another one still comes out as itself. (Tested: a
+  window fully covered by another came out as its own colour with `wgc`, and
+  as the cover with gdigrab.) The window enumeration now records each
+  window's handle. Without `gfxcapture`, the call fails with a clear message.
+
+### Notes
+
+- Recordings and `wait_for_change` stay on gdigrab. `gfxcapture` only emits
+  a frame when the window repaints. On a static window, a recording stalls:
+  ffmpeg ignores the graceful-stop `q` and the file comes out empty. Stills
+  are also slower (1-2 s against ~0.2 s), which is why `wgc` is opt-in.
+
 ## [0.19.0]
 
 ### Added

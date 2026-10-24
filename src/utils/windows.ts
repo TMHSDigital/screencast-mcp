@@ -23,6 +23,8 @@ export interface RawWindow {
   right: number;
   bottom: number;
   minimized: boolean;
+  /** The window handle, for capturing the window itself (WGC backend, #113). */
+  hwnd?: number;
 }
 
 export interface WindowQuery {
@@ -45,6 +47,8 @@ export interface WindowBounds {
   matchKind: "exact" | "substring";
   /** Titles of every matching window, topmost first (at most MAX_CANDIDATES). */
   candidates: string[];
+  /** The matched window handle, when enumeration provided one. */
+  hwnd?: number;
 }
 
 export interface SelectWindowOptions {
@@ -120,6 +124,7 @@ export function selectWindow(
   return {
     x, y, width, height,
     matchedTitle: chosen.title,
+    ...(chosen.hwnd !== undefined ? { hwnd: chosen.hwnd } : {}),
     matchCount: matches.length,
     matchKind,
     candidates: matches.slice(0, MAX_CANDIDATES).map((w) => w.title),
@@ -184,7 +189,7 @@ foreach($h in [WinShim]::Z()){
  $t=[WinShim]::T($h)
  if([string]::IsNullOrEmpty($t)){continue}
  $r=[WinShim]::R($h)
- [void]$ws.Add([pscustomobject]@{title=$t;left=$r[0];top=$r[1];right=$r[2];bottom=$r[3];minimized=[bool][WinShim]::Ic($h)})
+ [void]$ws.Add([pscustomobject]@{title=$t;left=$r[0];top=$r[1];right=$r[2];bottom=$r[3];minimized=[bool][WinShim]::Ic($h);hwnd=[int64]$h})
 }
 $v=[pscustomobject]@{x=[WinShim]::SM(76);y=[WinShim]::SM(77);w=[WinShim]::SM(78);h=[WinShim]::SM(79)}
 [pscustomobject]@{virtual=$v;windows=@($ws)}|ConvertTo-Json -Compress -Depth 4
