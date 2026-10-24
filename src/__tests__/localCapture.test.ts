@@ -170,6 +170,38 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     }
   }, 30_000);
 
+  it("wait_for_change sees a window repaint, then settles (#116)", async () => {
+    // A small topmost window at a fixed spot that turns from red to blue after
+    // 1.5 s. The watched region sits well inside it even at 150% DPI scaling.
+    const ps = spawn("powershell", ["-NoProfile", "-Command",
+      "Add-Type -AssemblyName System.Windows.Forms;" +
+      "$f=New-Object Windows.Forms.Form;$f.StartPosition='Manual';$f.Location='60,60';$f.Size='320,240';" +
+      "$f.TopMost=$true;$f.FormBorderStyle='None';$f.BackColor='Red';" +
+      "$t=New-Object Windows.Forms.Timer;$t.Interval=1500;$t.Add_Tick({$f.BackColor='Blue';$t.Stop()});$t.Start();" +
+      "$f.ShowDialog()"], { windowsHide: false });
+    try {
+      await sleep(1000); // window up and red
+      const changed = await call("wait_for_change", { target: "region:110,110,120,80", timeoutSec: 10, returnImage: false });
+      expect(changed.isError).toBe(false);
+      expect(changed.json.outcome).toBe("changed");
+      expect(changed.json.elapsedSec).toBeLessThan(5);
+      expect(changed.json.regions.length).toBeGreaterThan(0);
+      const settled = await call("wait_for_change", { target: "region:110,110,120,80", mode: "settle", settleSec: 0.75, timeoutSec: 10 });
+      expect(settled.json.outcome).toBe("settled");
+      expect(settled.images).toHaveLength(1);
+    } finally {
+      ps.kill();
+    }
+  }, 30_000);
+
+  it("screen_diff reports identical screenshots as unchanged (#116)", async () => {
+    const a = await call("screenshot", { target: "region:0,0,64,64", returnImage: false });
+    const d = await call("screen_diff", { a: a.json.outputPath, b: a.json.outputPath, returnImage: false });
+    expect(d.isError).toBe(false);
+    expect(d.json.identical).toBe(true);
+    expect(d.json.ssim).toBeCloseTo(1, 5);
+  }, 30_000);
+
   it("reaps a live orphaned ffmpeg on startup", async () => {
     const h = mkdtempSync(join(tmpdir(), "screencast-reap-"));
     mkdirSync(join(h, "recordings"), { recursive: true });

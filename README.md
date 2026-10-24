@@ -43,7 +43,7 @@ The design choices are deliberate rather than incidental:
 
 ## Tools
 
-Twenty-seven tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
+Twenty-nine tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
 
 ### Capture
 
@@ -62,6 +62,8 @@ Twenty-seven tools across four concerns. The manifest in [`mcp-tools.json`](mcp-
 | --- | --- |
 | `sample_frames` | Extract frames from a video — at a fixed `fps`, at explicit `timestamps`, or only where the screen changed (`mode: "scenes"`) — so the agent can view what happened. Returns the frame paths, with the first few frames inline as images. |
 | `contact_sheet` | Tile timestamped frames into **one** image (evenly spaced, or at the scene changes) so the agent sees a whole recording in a single look; returned inline. `poster: true` writes one representative frame instead. |
+| `screen_diff` | Compare two screenshots/frames: SSIM score, share changed, and **bounding boxes of what changed**, with the changes outlined in an inline image. Verify a UI change happened, and only where expected. |
+| `wait_for_change` | Watch a target and return when it **changes** (a dialog opened) or **settles** (a build or page finished), instead of guessing a sleep. Reports elapsed time, changed regions, and the final state inline. |
 | `get_media_info` | ffprobe wrapper: duration, resolution, fps, codecs, container format, and size. |
 
 ### Minimal edit

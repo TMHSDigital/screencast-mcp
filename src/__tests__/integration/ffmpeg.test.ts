@@ -16,7 +16,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { binaryWorks, runCapture, runFfmpeg, probeMedia } from "../../utils/ffmpeg.js";
+import { binaryWorks, runCapture, runFfmpeg, runFfmpegBuffer, probeMedia } from "../../utils/ffmpeg.js";
 import {
   buildTrimArgs,
   buildClipArgs,
@@ -42,6 +42,7 @@ import {
 import { bundledFontPath } from "../../utils/fonts.js";
 import { encodeInlineImages } from "../../utils/images.js";
 import { animLadder, buildAnimArgs } from "../../utils/anim.js";
+import { analysisSize, diffFrames, buildRawFrameArgs, buildSsimArgs, parseSsim } from "../../utils/diff.js";
 import { evenTimes, formatTimecode, sheetGrid, buildTileArgs, buildSheetArgs, buildPosterArgs } from "../../utils/sheet.js";
 import { runEditJob, partialPath, type ToolExtra } from "../../utils/jobs.js";
 
@@ -269,6 +270,29 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     await runFfmpeg(buildAnimArgs(av, webp, "webp", animLadder("webp", 12, 320)[0], { duration: 3 }));
     expect(readFileSync(webp).subarray(8, 12).toString("ascii")).toBe("WEBP");
     expect(statSync(webp).size).toBeGreaterThan(1000);
+  });
+
+  it("screen diff finds a box drawn onto an image, in its pixel coordinates (#116)", async () => {
+    const a = p("diff-a.png");
+    const b = p("diff-b.png");
+    await runFfmpeg(["-y", "-f", "lavfi", "-i", "color=c=gray:s=640x360", "-frames:v", "1", a]);
+    await runFfmpeg(["-y", "-i", a, "-vf", "drawbox=x=400:y=100:w=80:h=60:color=white:t=fill", "-frames:v", "1", b]);
+    const size = analysisSize(640, 360);
+    const [ra, rb] = await Promise.all([runFfmpegBuffer(buildRawFrameArgs(a, size)), runFfmpegBuffer(buildRawFrameArgs(b, size))]);
+    expect(ra.length).toBe(size.width * size.height);
+    const d = diffFrames(ra, rb, size.width, size.height, { scale: 640 / size.width });
+    expect(d.regions).toHaveLength(1);
+    const r = d.regions[0];
+    // The box (400,100)-(480,160) must lie inside the reported region, give or take one cell.
+    expect(r.x).toBeLessThanOrEqual(400);
+    expect(r.y).toBeLessThanOrEqual(100);
+    expect(r.x + r.width).toBeGreaterThanOrEqual(480);
+    expect(r.y + r.height).toBeGreaterThanOrEqual(160);
+    expect(r.width).toBeLessThan(80 + 2 * 16);
+
+    const ssim = await runCapture(FFMPEG, buildSsimArgs(a, b, size));
+    expect(parseSsim(ssim.stderr)).toBeLessThan(1);
+    expect(parseSsim((await runCapture(FFMPEG, buildSsimArgs(a, a, size))).stderr)).toBeCloseTo(1, 5);
   });
 
   it("a scene scan finds each cut in a three-scene clip (#114)", async () => {

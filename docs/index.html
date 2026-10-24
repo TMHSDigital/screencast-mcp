@@ -287,6 +287,8 @@
           <tbody>
             <tr><td><code>sample_frames</code></td><td>Extract frames at a fixed fps, at explicit timestamps, or only where the screen changed; the first few come back inline so the agent sees what happened.</td></tr>
             <tr><td><code>contact_sheet</code></td><td>Tile timestamped frames into one image, evenly spaced or at the scene changes, so the agent sees a whole recording at a glance.</td></tr>
+            <tr><td><code>screen_diff</code></td><td>Compare two screenshots: SSIM score and boxes around what changed.</td></tr>
+            <tr><td><code>wait_for_change</code></td><td>Return when the screen changes or settles, instead of guessing a sleep.</td></tr>
             <tr><td><code>get_media_info</code></td><td>ffprobe wrapper: duration, resolution, fps, codecs, format, size.</td></tr>
           </tbody>
         </table>
