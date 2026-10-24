@@ -223,6 +223,7 @@ Inline images are downscaled JPEGs (`maxImageWidth`, default 1280) and capped pe
 │   └── __tests__/        # vitest unit tests + guarded local-capture harness
 ├── docs/                 # GitHub Pages documentation site
 ├── mcp-tools.json        # canonical tool manifest (kept in sync with src/tools)
+├── server.json           # MCP Registry listing (name matches package.json mcpName)
 ├── .github/workflows/    # CI, release, npm publish, Pages, ecosystem drift check
 ├── ROADMAP.md · CONTRIBUTING.md · SECURITY.md · LICENSE
 └── package.json
