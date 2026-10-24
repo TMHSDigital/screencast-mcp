@@ -7,6 +7,17 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.14.1]
+
+### Added
+
+- **MCP Registry listing** (#90). A `server.json` describes the server for the
+  official MCP Registry, `package.json` gains the matching `mcpName`
+  (`io.github.TMHSDigital/screencast-mcp`), and the publish workflow lists each
+  new release in the registry right after the npm publish. It authenticates
+  with GitHub OIDC (no secret) and uses a pinned, checksum-verified
+  `mcp-publisher`. A test keeps `server.json` and `package.json` in sync.
+
 ## [0.14.0]
 
 ### Added

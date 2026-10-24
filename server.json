@@ -1,0 +1,42 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.TMHSDigital/screencast-mcp",
+  "title": "Screencast MCP",
+  "description": "MCP server for Windows screen recording, frame sampling, and minimal ffmpeg edits",
+  "repository": {
+    "url": "https://github.com/TMHSDigital/screencast-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://tmhsdigital.github.io/screencast-mcp/",
+  "version": "0.14.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@tmhs/screencast-mcp",
+      "version": "0.14.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "SCREENCAST_HOME",
+          "description": "Where recordings, frames, screenshots, and edits are written (default <homedir>/.screencast-mcp)",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "FFMPEG_PATH",
+          "description": "Path to ffmpeg if it is not on PATH (ffmpeg and ffprobe are required)",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "FFPROBE_PATH",
+          "description": "Path to ffprobe if it is not on PATH",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

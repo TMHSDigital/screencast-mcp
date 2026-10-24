@@ -55,3 +55,25 @@ jobs:
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # List the release in the official MCP Registry (#90). The registry checks
+      # that the npm package's mcpName matches server.json, so this runs only
+      # right after a fresh npm publish. Auth is GitHub OIDC (id-token: write),
+      # which grants the io.github.TMHSDigital/* namespace; no secret needed.
+      # mcp-publisher is pinned and checksum-verified.
+      - name: Publish to the MCP Registry
+        if: steps.pub.outputs.skip == 'false' && env.HAS_NPM_TOKEN == 'true'
+        env:
+          MCP_PUBLISHER_VERSION: "1.8.1"
+          MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+        run: |
+          set -euo pipefail
+          v=$(node -p "require('./package.json').version")
+          jq --arg v "$v" '.version = $v | .packages[0].version = $v' server.json > server.tmp
+          mv server.tmp server.json
+          tarball=mcp-publisher_linux_amd64.tar.gz
+          curl -fsSL -o "$tarball" "https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/${tarball}"
+          echo "${MCP_PUBLISHER_SHA256}  ${tarball}" | sha256sum -c -
+          tar xzf "$tarball" mcp-publisher
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
