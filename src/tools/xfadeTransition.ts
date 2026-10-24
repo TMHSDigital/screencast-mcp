@@ -2,7 +2,8 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg, probeMedia } from "../utils/ffmpeg.js";
+import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
+import { runEditJob } from "../utils/jobs.js";
 import { buildXfadeArgs, DEFAULT_TRANSITION_DUR } from "../utils/produce.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
@@ -29,7 +30,7 @@ export function register(server: McpServer): void {
       "auto-normalized to a common resolution, fps, and audio rate first, so " +
       "they need not match. Audio is crossfaded when both clips have a track.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         for (const f of [args.inputA, args.inputB]) {
@@ -54,7 +55,7 @@ export function register(server: McpServer): void {
           { transition: args.transition, duration: args.duration },
           hasAudio,
         );
-        await runFfmpeg(ffArgs, 15 * 60_000);
+        await runEditJob(ffArgs, { output, durationSec: a.durationSec + (b.durationSec ?? 0), extra });
         return okResponse({ outputPath: output, audio: hasAudio });
       } catch (error) {
         return errorResponse(error);

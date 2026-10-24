@@ -3,7 +3,8 @@ import { extname, resolve } from "node:path";
 import { existsSync, writeFileSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
+import { requireFfmpeg } from "../utils/ffmpeg.js";
+import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildConcatArgs, buildConcatListContent } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand, tempPath } from "../utils/paths.js";
 
@@ -22,7 +23,7 @@ export function register(server: McpServer): void {
     "Concatenate two or more videos into a single file using the ffmpeg concat " +
       "demuxer (stream copy). Inputs should share the same codec and format.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         // The concat demuxer resolves relative list entries against the list
@@ -37,7 +38,9 @@ export function register(server: McpServer): void {
         const listFile = tempPath(".txt");
         writeFileSync(listFile, buildConcatListContent(inputs));
         try {
-          await runFfmpeg(buildConcatArgs(listFile, output), 10 * 60_000);
+          const durations = await Promise.all(inputs.map((f) => probeDuration(f)));
+          const durationSec = durations.every((d) => d !== null) ? durations.reduce((a, d) => a + d!, 0) : null;
+          await runEditJob(buildConcatArgs(listFile, output), { output, durationSec, extra });
         } finally {
           rmSync(listFile, { force: true });
         }

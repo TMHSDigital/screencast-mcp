@@ -3,7 +3,8 @@ import { extname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
+import { requireFfmpeg } from "../utils/ffmpeg.js";
+import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildOverlayArgs } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
@@ -26,7 +27,7 @@ export function register(server: McpServer): void {
     "Composite an image or video (logo, watermark, picture-in-picture) onto a " +
       "base video at a pixel position, optionally scaled and time-limited.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         if (!existsSync(args.input)) {
@@ -53,7 +54,7 @@ export function register(server: McpServer): void {
           end: args.end,
           scale,
         });
-        await runFfmpeg(ffArgs, 10 * 60_000);
+        await runEditJob(ffArgs, { output, durationSec: await probeDuration(args.input), extra });
         return okResponse({ outputPath: output });
       } catch (error) {
         return errorResponse(error);

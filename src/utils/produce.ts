@@ -266,6 +266,8 @@ export interface TitleCardOptions {
  * a font file and a temp text file (so arbitrary text needs no inline
  * escaping), plus a silent stereo track so it composes with audio-bearing
  * clips. Caller resolves fontFile (a bundled weight) and writes textFile. */
+export const DEFAULT_TITLE_DURATION = 3;
+
 export function buildTitleCardArgs(
   textFile: string,
   fontFile: string,
@@ -273,7 +275,7 @@ export function buildTitleCardArgs(
   opts: TitleCardOptions = {},
 ): string[] {
   const { w, h } = producedDims(opts);
-  const dur = opts.duration ?? 3;
+  const dur = opts.duration ?? DEFAULT_TITLE_DURATION;
   const fps = opts.fps ?? DEFAULT_PRODUCE_FPS;
   const bg = validateColor(opts.bg ?? "black", "bg");
   const fontColor = validateColor(opts.fontColor ?? "white", "fontColor");

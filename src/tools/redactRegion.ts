@@ -3,7 +3,8 @@ import { extname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg, probeMedia } from "../utils/ffmpeg.js";
+import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
+import { runEditJob } from "../utils/jobs.js";
 import { buildRedactArgs, type RedactStyle } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
@@ -46,13 +47,13 @@ export function register(server: McpServer): void {
       "can be partially recovered). A region that falls outside the frame is " +
       "rejected rather than silently doing nothing.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         if (!existsSync(args.input)) {
           throw new ScreencastError(`Input file not found: ${args.input}`);
         }
-        const { width, height } = await probeMedia(args.input);
+        const { width, height, durationSec } = await probeMedia(args.input);
         const ext = extname(args.input) || ".mp4";
         const output = resolveOutput(
           args.output,
@@ -71,7 +72,7 @@ export function register(server: McpServer): void {
           },
           { width, height },
         );
-        await runFfmpeg(ffArgs, 15 * 60_000);
+        await runEditJob(ffArgs, { output, durationSec, extra });
         return okResponse({
           outputPath: output,
           regions: args.regions.length,

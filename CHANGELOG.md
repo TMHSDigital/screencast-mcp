@@ -7,6 +7,32 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.13.0]
+
+### Added
+
+- **Progress notifications and cancellation for edit jobs** (#81). Every edit
+  and produce tool now runs ffmpeg with `-progress pipe:1`. When the request
+  carries a `progressToken`, progress is sent as MCP `notifications/progress`
+  (0-100, whole-percent steps). Cancelling the request stops ffmpeg.
+
+### Fixed
+
+- **Long edits no longer hit a fixed timeout** (#81). Jobs used a hardcoded
+  5-20 minute limit, so compressing or exporting a long recording could fail
+  partway. The timeout now scales with the media's length (at least 10
+  minutes, or 4x the duration; 30 minutes when the length is unknown), and
+  `SCREENCAST_JOB_TIMEOUT_MS` overrides it.
+- **A failed edit no longer leaves a truncated file behind** (#81). ffmpeg
+  now writes `<name>.partial.<ext>`, which is renamed onto the output only on
+  success and deleted on any failure, timeout, or cancellation. Before, the
+  leftover file also made a retry to the same path fail with "Output already
+  exists".
+- **A killed ffmpeg is waited on before the call returns.** On a timeout or
+  cancellation, `runCapture` rejected as soon as it sent the kill; on Windows
+  the dying process still held its output open, so cleanup failed with
+  `EPERM`. It now settles after the process exits (5 s grace).
+
 ## [0.12.0]
 
 ### Changed
