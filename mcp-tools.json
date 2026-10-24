@@ -304,6 +304,20 @@
     }
   },
   {
+    "name": "callout",
+    "description": "Annotate a video with timed boxes, text labels, and arrows (e.g. a box around the bug, 'click here'), each shown between two timestamps. Returns the output path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "items": { "type": "array", "description": "Annotations drawn in order (later on top). box: {type, x, y, width, height, thickness?, fill?}; text: {type, x, y, text, size?, background?}; arrow: {type, x1, y1, x2, y2 (head), thickness?}. All take from?, to? (seconds) and color?", "items": {"type": "object"} },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+      },
+      "required": ["input", "items"]
+    }
+  },
+  {
     "name": "compress",
     "description": "Re-encode a video to a smaller file with a CRF quality ladder (light/medium/heavy) and an optional width cap that only downscales.",
     "inputSchema": {

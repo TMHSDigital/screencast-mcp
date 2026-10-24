@@ -53,7 +53,7 @@ export function buildTileArgs(
   }
   const fontSize = Math.max(12, Math.round(tileWidth / 16));
   const label =
-    `drawtext=fontfile=${escapeFilterPath(fontFile)}:textfile=${escapeFilterPath(labelFile)}:` +
+    `drawtext=fontfile=${escapeFilterPath(fontFile)}:textfile=${escapeFilterPath(labelFile)}:expansion=none:` +
     `fontcolor=white:fontsize=${fontSize}:x=6:y=h-text_h-6:box=1:boxcolor=black@0.6:boxborderw=4`;
   return [
     "-y", "-v", "error", "-ss", String(timeSec), "-i", input,

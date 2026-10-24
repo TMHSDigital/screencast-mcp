@@ -288,7 +288,7 @@ export function buildTitleCardArgs(
   }
   const draw =
     `drawtext=fontfile=${escapeFilterPath(fontFile)}:` +
-    `textfile=${escapeFilterPath(textFile)}:` +
+    `textfile=${escapeFilterPath(textFile)}:expansion=none:` +
     `fontcolor=${fontColor}:fontsize=${fontSize}:` +
     `x=(w-text_w)/2:y=(h-text_h)/2:` +
     `shadowcolor=black@0.5:shadowx=2:shadowy=2`;
