@@ -7,6 +7,24 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.15.0]
+
+### Added
+
+- **Scene-change sampling** (#114). `sample_frames { mode: "scenes" }` returns
+  only the frames where the screen changed, plus the opening frame, so an agent
+  can review a mostly static recording without paging through identical frames.
+  A fast pass on a 320 px copy scores every frame (`select='gt(scene,T)'`); the
+  strongest changes, up to `maxFrames`, are then grabbed at full resolution and
+  reported with their `frameTimes`. `sceneThreshold` (default 0.1, tuned for UI
+  content) sets how big a change counts, and a `capNote` explains when changes
+  were left out.
+- **`dedupe` for fps sampling** (#114). `dedupe: true` runs `mpdecimate` so
+  frames nearly identical to the previous one are dropped.
+- `sample_frames` accepts an explicit `mode` (`fps` / `timestamps` /
+  `scenes`). It defaults to whichever of `fps` or `timestamps` is given, so
+  existing calls are unchanged.
+
 ## [0.14.3]
 
 ### Fixed

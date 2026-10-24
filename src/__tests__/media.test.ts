@@ -5,6 +5,9 @@ import {
   buildProbeArgs,
   buildSampleByFpsArgs,
   planFpsSampling,
+  buildSceneScanArgs,
+  parseSceneScan,
+  pickSceneFrames,
   DEFAULT_MAX_FRAMES,
   buildSampleAtTimestampArgs,
   buildTrimArgs,
@@ -293,5 +296,33 @@ describe("buildClipArgs", () => {
   });
   it("rejects end <= start", () => {
     expect(() => buildClipArgs("i", "o", { start: 5, end: 5 })).toThrow();
+  });
+});
+
+describe("scene sampling (#114)", () => {
+  it("builds a low-res scene scan with the threshold escaped for the filtergraph", () => {
+    const a = buildSceneScanArgs("in.mp4", 0.2);
+    expect(a[a.indexOf("-vf") + 1]).toBe(String.raw`scale=320:-2,select='gt(scene\,0.2)',metadata=print:file=-`);
+    expect(() => buildSceneScanArgs("in.mp4", 0)).toThrow(/between 0 and 1/);
+    expect(() => buildSceneScanArgs("in.mp4", 1)).toThrow(/between 0 and 1/);
+  });
+  it("parses metadata=print output into time/score pairs", () => {
+    const out = "frame:0    pts:30720   pts_time:2\nlavfi.scene_score=0.400000\r\nframe:1    pts:61440   pts_time:4.5\nlavfi.scene_score=0.906905\n";
+    expect(parseSceneScan(out)).toEqual([{ timeSec: 2, score: 0.4 }, { timeSec: 4.5, score: 0.906905 }]);
+    expect(parseSceneScan("")).toEqual([]);
+  });
+  it("keeps the opening frame plus the strongest changes, in time order", () => {
+    const changes = [
+      { timeSec: 1, score: 0.2 }, { timeSec: 2, score: 0.9 }, { timeSec: 3, score: 0.5 }, { timeSec: 4, score: 0.1 },
+    ];
+    expect(pickSceneFrames(changes, 3)).toEqual([0, 2, 3]);
+    expect(pickSceneFrames(changes, 100)).toEqual([0, 1, 2, 3, 4]);
+    expect(pickSceneFrames([], 10)).toEqual([0]);
+    expect(pickSceneFrames(changes, 1)).toEqual([0]);
+  });
+  it("dedupe adds mpdecimate and variable-rate output", () => {
+    const a = buildSampleByFpsArgs("in.mp4", 2, "p_%05d.png", 50, true).join(" ");
+    expect(a).toContain("-vf fps=2,mpdecimate");
+    expect(a).toContain("-fps_mode vfr");
   });
 });

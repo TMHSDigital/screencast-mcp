@@ -3,11 +3,17 @@ import { join } from "node:path";
 import { mkdirSync, readdirSync, existsSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg, probeMedia } from "../utils/ffmpeg.js";
+import { requireFfmpeg, runFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
+import { jobTimeoutMs } from "../utils/jobs.js";
 import {
   buildSampleByFpsArgs,
   buildSampleAtTimestampArgs,
   planFpsSampling,
+  buildSceneScanArgs,
+  parseSceneScan,
+  pickSceneFrames,
+  DEFAULT_SCENE_THRESHOLD,
+  type SceneChange,
   DEFAULT_MAX_FRAMES,
   MAX_FRAMES_CEILING,
 } from "../utils/media.js";
@@ -22,15 +28,37 @@ import {
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video file."),
+  mode: z
+    .enum(["fps", "timestamps", "scenes"])
+    .optional()
+    .describe(
+      "How to pick frames. 'scenes' returns only frames where the screen changed " +
+        "(plus the first frame), strongest changes first up to maxFrames, which is " +
+        "usually the cheapest way to review a recording. Defaults to 'fps' or " +
+        "'timestamps' depending on which of those is given.",
+    ),
   fps: z
     .number()
     .positive()
     .optional()
-    .describe("Sample this many frames per second. Mutually exclusive with timestamps."),
+    .describe("Sample this many frames per second (mode 'fps')."),
   timestamps: z
     .array(z.number().nonnegative())
     .optional()
-    .describe("Explicit second offsets to grab one frame at each. Mutually exclusive with fps."),
+    .describe("Explicit second offsets to grab one frame at each (mode 'timestamps')."),
+  sceneThreshold: z
+    .number()
+    .gt(0)
+    .lt(1)
+    .optional()
+    .describe(
+      `Mode 'scenes': how much the frame must change to count, 0-1 (default ${DEFAULT_SCENE_THRESHOLD}; ` +
+        "raise it to keep only big changes).",
+    ),
+  dedupe: z
+    .boolean()
+    .optional()
+    .describe("Mode 'fps': drop frames that are nearly identical to the previous one (default false)."),
   outputDir: z
     .string()
     .optional()
@@ -86,9 +114,15 @@ export function register(server: McpServer): void {
         }
         const hasFps = args.fps !== undefined;
         const hasTs = args.timestamps !== undefined && args.timestamps.length > 0;
-        if (hasFps === hasTs) {
+        const mode = args.mode ?? (hasTs ? "timestamps" : "fps");
+        const valid =
+          mode === "scenes" ? !hasFps && !hasTs
+          : mode === "fps" ? hasFps && !hasTs
+          : hasTs && !hasFps;
+        if (!valid) {
           throw new ScreencastError(
-            "Provide exactly one of: fps (fixed rate) or timestamps (explicit offsets).",
+            "Use exactly one way to pick frames: fps (fixed rate), timestamps " +
+              "(explicit offsets), or mode: 'scenes' (with neither fps nor timestamps).",
           );
         }
 
@@ -101,9 +135,26 @@ export function register(server: McpServer): void {
         }
         // Size an fps request against the video's length before writing
         // anything, so a high rate on a long recording cannot fill the disk (#80).
-        const plan = hasFps
-          ? planFpsSampling((await probeMedia(args.input)).durationSec, args.fps!, maxFrames)
-          : null;
+        const durationSec = mode === "timestamps" ? null : (await probeMedia(args.input)).durationSec;
+        const plan = mode === "fps" ? planFpsSampling(durationSec, args.fps!, maxFrames) : null;
+
+        // Scenes (#114): a cheap low-res pass finds where the screen changed;
+        // the chosen moments are then grabbed at full size like timestamps.
+        let scenes: SceneChange[] | null = null;
+        let sceneTimes: number[] = [];
+        if (mode === "scenes") {
+          const { ffmpeg } = requireFfmpeg();
+          const scan = await runCapture(
+            ffmpeg,
+            buildSceneScanArgs(args.input, args.sceneThreshold ?? DEFAULT_SCENE_THRESHOLD),
+            jobTimeoutMs(durationSec),
+          );
+          if (scan.code !== 0) {
+            throw new ScreencastError(`Scene scan failed (exit ${scan.code}): ${scan.stderr.trim().slice(-400)}`);
+          }
+          scenes = parseSceneScan(scan.stdout);
+          sceneTimes = pickSceneFrames(scenes, maxFrames);
+        }
 
         const dir = args.outputDir ?? join(subdir("frames"), `sample-${stamp()}-${rand()}`);
         mkdirSync(dir, { recursive: true });
@@ -116,14 +167,17 @@ export function register(server: McpServer): void {
           // contaminate the result; return only the frames this run wrote.
           const before = new Set(readdirSync(dir).filter(isPng));
           const pattern = join(dir, "frame_%05d.png");
-          await runFfmpeg(buildSampleByFpsArgs(args.input, plan.fps, pattern, maxFrames), 5 * 60_000);
+          await runFfmpeg(
+            buildSampleByFpsArgs(args.input, plan.fps, pattern, maxFrames, args.dedupe === true),
+            5 * 60_000,
+          );
           frames = readdirSync(dir)
             .filter(isPng)
             .filter((f) => !before.has(f))
             .sort()
             .map((f) => join(dir, f));
         } else {
-          const ts = args.timestamps!;
+          const ts = mode === "scenes" ? sceneTimes : args.timestamps!;
           for (let i = 0; i < ts.length; i++) {
             const out = join(dir, `frame_${String(i).padStart(3, "0")}_${ts[i]}s.png`);
             // Clear any stale file at this path (reused outputDir) so existence
@@ -151,7 +205,25 @@ export function register(server: McpServer): void {
             frameDir: dir,
             frameCount: frames.length,
             frames,
-            mode: plan ? `fps=${plan.fps}` : `timestamps=[${args.timestamps!.join(", ")}]`,
+            mode: plan
+              ? `fps=${plan.fps}${args.dedupe ? " (deduped)" : ""}`
+              : scenes
+                ? `scenes (threshold ${args.sceneThreshold ?? DEFAULT_SCENE_THRESHOLD})`
+                : `timestamps=[${args.timestamps!.join(", ")}]`,
+            ...(scenes
+              ? {
+                  frameTimes: sceneTimes,
+                  sceneChangesFound: scenes.length,
+                  ...(scenes.length + 1 > maxFrames
+                    ? {
+                        capNote:
+                          `Found ${scenes.length} scene changes; kept the opening frame and the ` +
+                          `${maxFrames - 1} strongest (maxFrames ${maxFrames}). Raise sceneThreshold ` +
+                          "to keep only bigger changes, or raise maxFrames.",
+                      }
+                    : {}),
+                }
+              : {}),
             ...(plan?.clamped
               ? {
                   requestedFps: args.fps,
