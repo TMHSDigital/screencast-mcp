@@ -141,6 +141,34 @@ export function runCapture(
   });
 }
 
+/** Run ffmpeg and return its stdout as raw bytes (e.g. `-f rawvideo -`), which
+ * runCapture's text decoding would corrupt. Rejects on a non-zero exit. */
+export function runFfmpegBuffer(args: string[], timeoutMs = 30_000): Promise<Buffer> {
+  const { ffmpeg } = requireFfmpeg();
+  return new Promise((resolve, reject) => {
+    const child = spawn(ffmpeg, args, { windowsHide: true });
+    const chunks: Buffer[] = [];
+    let stderr = "";
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, timeoutMs);
+    child.stdout?.on("data", (d: Buffer) => chunks.push(d));
+    child.stderr?.on("data", (d) => (stderr += d.toString()));
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve(Buffer.concat(chunks));
+      else if (timedOut) reject(new ScreencastError(`ffmpeg timed out after ${Math.round(timeoutMs / 1000)}s.`));
+      else reject(new ScreencastError(`ffmpeg failed (exit ${code}):\n${stderr.trim().split("\n").slice(-6).join("\n")}`));
+    });
+  });
+}
+
 /** Run an ffmpeg edit job and reject with the tail of stderr on non-zero exit. */
 export async function runFfmpeg(
   args: string[],

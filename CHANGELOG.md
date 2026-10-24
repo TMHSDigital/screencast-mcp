@@ -7,6 +7,24 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.18.0]
+
+### Added
+
+- **`wait_for_change` tool** (#116). Instead of guessing a sleep, an agent
+  can wait until a target changes (`mode: "change"`: a dialog opened, a page
+  responded) or stops changing (`mode: "settle"`: a build finished, a page
+  finished loading). Each check is a ~0.2 s low-resolution grab, compared cell
+  by cell. The result reports the outcome (`changed` / `settled` / `timeout` /
+  `cancelled`), elapsed time, and the changed regions in screen coordinates,
+  plus a screenshot of the final state inline. A timeout is a normal result,
+  not an error, and cancelling the request stops the wait.
+- **`screen_diff` tool** (#116). It compares two screenshots or frames and
+  returns an SSIM score, the share of the image that changed, and bounding
+  boxes of the changed areas in `b`'s pixel coordinates, plus `b` inline with
+  those areas outlined in red. Useful for checking that a UI change happened,
+  and only where expected.
+
 ## [0.17.0]
 
 ### Added
