@@ -41,6 +41,7 @@ import {
 } from "../../utils/produce.js";
 import { bundledFontPath } from "../../utils/fonts.js";
 import { encodeInlineImages } from "../../utils/images.js";
+import { evenTimes, formatTimecode, sheetGrid, buildTileArgs, buildSheetArgs, buildPosterArgs } from "../../utils/sheet.js";
 import { runEditJob, partialPath, type ToolExtra } from "../../utils/jobs.js";
 
 const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
@@ -224,6 +225,32 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     mkdirSync(backstopDir);
     await runFfmpeg(buildSampleByFpsArgs(av, 30, join(backstopDir, "f_%05d.png"), 3));
     expect(readdirSync(backstopDir)).toHaveLength(3);
+  });
+
+  it("a contact sheet tiles labelled frames into one image of the expected size (#115)", async () => {
+    const work = p("sheet-work");
+    mkdirSync(work);
+    const times = evenTimes(10, 6);
+    for (let i = 0; i < times.length; i++) {
+      const label = join(work, `l${i}.txt`);
+      writeFileSync(label, formatTimecode(times[i]));
+      await runFfmpeg(buildTileArgs(av, times[i], join(work, `tile_${String(i).padStart(3, "0")}.png`), 160, bundledFontPath("bold"), label));
+    }
+    const grid = sheetGrid(times.length);
+    const sheet = p("sheet.png");
+    await runFfmpeg(buildSheetArgs(join(work, "tile_%03d.png"), grid, sheet));
+    const info = await probeMedia(sheet);
+    // 3 columns x 160 px + 2 x 4 px padding + 2 x 4 px margin; 320x240 source -> 120 px tall tiles.
+    expect([grid.columns, grid.rows]).toEqual([3, 2]);
+    expect(info.width).toBe(3 * 160 + 2 * 4 + 2 * 4);
+    expect(info.height).toBe(2 * 120 + 1 * 4 + 2 * 4);
+  });
+
+  it("a poster frame is a single image capped at the requested width (#115)", async () => {
+    const poster = p("poster.png");
+    await runFfmpeg(buildPosterArgs(av, 10, poster, 200));
+    const info = await probeMedia(poster);
+    expect([info.width, info.height]).toEqual([200, 150]);
   });
 
   it("a scene scan finds each cut in a three-scene clip (#114)", async () => {

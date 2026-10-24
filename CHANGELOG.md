@@ -7,6 +7,19 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.16.0]
+
+### Added
+
+- **`contact_sheet` tool** (#115). It tiles N timestamped frames of a video
+  into one image, so an agent can see a whole recording in a single image read
+  instead of N. Frames are spread evenly (`mode: "even"`, default 12) or taken
+  at the scene changes (`mode: "scenes"`, reusing #114's scan). Each tile is an
+  accurate seek, scaled to `tileWidth` (default 320) and labelled with its
+  timecode in the bundled font. The sheet comes back inline. `poster: true`
+  writes a single representative frame instead: ffmpeg's `thumbnail` filter
+  picks it from 30 candidates spread across the video.
+
 ## [0.15.0]
 
 ### Added

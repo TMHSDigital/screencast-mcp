@@ -90,6 +90,27 @@
     }
   },
   {
+    "name": "contact_sheet",
+    "description": "Tile timestamped frames of a video into one image so the agent can see a whole recording in a single look: evenly spaced, or at the scene changes. Returns the image path and the sheet inline. poster: true writes a single representative frame instead.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "count": { "type": "integer", "description": "How many frames to tile (default 12, max 48)" },
+        "mode": { "type": "string", "enum": ["even", "scenes"], "description": "even spreads frames across the video (default); scenes uses the opening frame plus the strongest scene changes" },
+        "sceneThreshold": { "type": "number", "description": "Mode scenes: how much a frame must change to count (default 0.1)" },
+        "columns": { "type": "integer", "description": "Tiles per row (default: one row up to 4 tiles, then roughly square)" },
+        "tileWidth": { "type": "integer", "description": "Width of each tile in px (default 320)" },
+        "poster": { "type": "boolean", "description": "Write one representative poster frame instead of a sheet" },
+        "output": { "type": "string", "description": "Optional output .png path (defaults under SCREENCAST_HOME/frames)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
+        "returnImage": { "type": "boolean", "description": "Also return the sheet inline as a downscaled JPEG image (default true)" },
+        "maxImageWidth": { "type": "integer", "description": "Downscale the inline image to at most this width (default 1280)" }
+      },
+      "required": ["input"]
+    }
+  },
+  {
     "name": "get_media_info",
     "description": "Probe a media file with ffprobe and return duration, resolution, frame rate, codecs, container format, and size.",
     "inputSchema": {
