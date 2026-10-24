@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node-version: [20, 22]
+        node-version: [22, 24]
     steps:
       - uses: actions/checkout@v7
       - name: Use Node.js ${{ matrix.node-version }}
@@ -31,6 +31,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - run: npm ci
+      # Report advisories in shipped (non-dev) dependencies without blocking
+      # the build; a new upstream advisory should not fail an unrelated PR.
+      - name: npm audit (production deps)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       - run: npm run build
       - run: npm run typecheck

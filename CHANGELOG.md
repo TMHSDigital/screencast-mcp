@@ -7,6 +7,28 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.12.0]
+
+### Changed
+
+- **Node.js 22 or newer is now required** (#86). Node 20 reached end of life
+  on 2026-04-30. `engines.node` is now `>=22`, and CI tests Node 22 and 24
+  (previously 20 and 22).
+- **zod 4 and MCP SDK 1.32.2** (#86). zod 3 had a high-severity advisory
+  (GHSA-mrhx-c7xc-m3w5, memory exhaustion validating oversized constrained
+  collections) that is fixed only in zod 4.6.6+, and zod validates every
+  tool's input here. Each tool's published `inputSchema` was diffed before and
+  after the upgrade. Two things changed, and neither changes which arguments
+  are accepted: integer fields now list `maximum: 9007199254740991`, and
+  objects no longer state `additionalProperties: false` (unknown keys were and
+  still are stripped, not rejected). `npm audit` is now clean; the remaining
+  transitive advisories (`body-parser`, `fast-uri`, `ip-address`) were in the
+  SDK's HTTP transports, which this stdio server does not use.
+
+### Added
+
+- A non-blocking `npm audit --omit=dev --audit-level=high` step in CI.
+
 ## [0.11.1]
 
 ### Fixed

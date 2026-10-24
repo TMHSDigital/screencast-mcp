@@ -19,7 +19,7 @@ Capture the desktop, a monitor, a window, or a region; sample a recording into f
 ![Top language](https://img.shields.io/github/languages/top/TMHSDigital/screencast-mcp)
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js_%E2%89%A520-339933?logo=node.js&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js_%E2%89%A522-339933?logo=node.js&logoColor=white)
 ![Model Context Protocol](https://img.shields.io/badge/MCP-stdio-6E56CF)
 ![ffmpeg](https://img.shields.io/badge/ffmpeg-required-007808?logo=ffmpeg&logoColor=white)
 ![Capture](https://img.shields.io/badge/capture-Windows_gdigrab-0078D6?logo=windows&logoColor=white)

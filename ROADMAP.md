@@ -2,7 +2,7 @@
 
 # Roadmap
 
-**Current:** v0.11.1 shipped (Phase 3 complete; a second hardening round is
+**Current:** v0.12.0 shipped (Phase 3 complete; a second hardening round is
 underway, see below and CHANGELOG). Cross-platform capture is the next feature
 phase.
 
@@ -80,7 +80,8 @@ From the September 2026 end-to-end review. Tracked as issues; high priority firs
       notifications (#81)
 - [ ] Capture: exact / reported window matching (#89); non-blocking, cached
       target resolution (#88)
-- [ ] Runtime and deps: drop EOL Node 20, test Node 24, clean `npm audit` (#86)
+- [x] Runtime and deps: drop EOL Node 20, test Node 24, clean `npm audit` (#86)
+      -- v0.12.0
 - [ ] Reach: MCP Registry listing and a README demo (#90)
 
 ## Phase 4 -- Cross-platform capture (next, #15)
@@ -123,6 +124,6 @@ Screencast-native polish that turns a raw capture into something watchable.
 
 Not tied to a single phase; pull in opportunistically.
 
-- [ ] Document the supported Node range in CONTRIBUTING once #86 settles it
+- [x] Document the supported Node range in CONTRIBUTING once #86 settles it
 - [ ] Consistent input-path resolution (absolute) across all tools (#48 fixed
       `concat`; the other tools still pass paths through as given)
