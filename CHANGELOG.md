@@ -7,6 +7,23 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.29.0]
+
+### Added
+
+- `zoom` follows clicks (#119). Without keyframes, `follow: "clicks"` plans zooms
+  from the recording's input event log (#118). It is the default (`auto`) when
+  the log has in-frame clicks. The camera arrives on each click as it happens,
+  pans between clicks less than `holdSec` apart (skipping clicks already well
+  inside the view), and zooms back out `holdSec` after the last one.
+  `follow: "changes"` keeps the screen-change planner; `events` points at a log
+  explicitly.
+- `highlightClicks` draws an expanding, fading ring at each click
+  (`highlightColor`, default `#FF4545`). Rings are drawn before the zoom, so
+  they move with it.
+- Workflows recipe REC 06, "Zoom toward every click", with a before/after GIF
+  from a real run.
+
 ## [0.28.2]
 
 ### Fixed

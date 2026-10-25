@@ -85,6 +85,7 @@ export function buildZoomArgs(
   size: { width: number; height: number; fps: number },
   transition = DEFAULT_TRANSITION_SEC,
   quality: Quality = "standard",
+  rings?: { clicks: ClickPoint[]; color: string },
 ): string[] {
   const { width: W, height: H, fps } = size;
   const up = W <= 1920 ? 2 : 1;
@@ -95,7 +96,19 @@ export function buildZoomArgs(
     `scale=${W * up}:${H * up},` +
     `zoompan=z='${z}':x='clip((${cx})*${up}-iw/zoom/2,0,iw-iw/zoom)':y='clip((${cy})*${up}-ih/zoom/2,0,ih-ih/zoom)'` +
     `:d=1:s=${W}x${H}:fps=${n(fps)}`;
-  return ["-y", "-i", input, "-vf", vf, ...resolveQuality(quality), "-c:a", "copy", output];
+  if (!rings || rings.clicks.length === 0) {
+    return ["-y", "-i", input, "-vf", vf, ...resolveQuality(quality), "-c:a", "copy", output];
+  }
+  // Rings go on before the zoom, in source pixels, so they move with it.
+  const graph = [
+    "[0:v]null[in]",
+    ...ringFilters(rings.clicks, W, H, fps, rings.color),
+    `[out]${vf}[v]`,
+  ].join(";");
+  return [
+    "-y", "-i", input, "-filter_complex", graph,
+    "-map", "[v]", "-map", "0:a?", ...resolveQuality(quality), "-c:a", "copy", output,
+  ];
 }
 
 export interface AutoOptions {
@@ -213,4 +226,96 @@ export function buildAnalysisArgs(input: string, size: { width: number; height: 
     "-vf", `fps=${n(1 / step)},scale=${size.width}:${size.height}:flags=area,format=gray`,
     "-f", "rawvideo", "-",
   ];
+}
+
+/** A click to zoom toward or ring: video time and position in video pixels. */
+export interface ClickPoint {
+  t: number;
+  x: number;
+  y: number;
+}
+
+/**
+ * Plan keyframes from clicks (#119, from the input event log #118). Clicks
+ * less than `holdSec` apart form one zoomed-in run that pans from click to
+ * click; the view is reached as each click happens (the ease starts
+ * `transition` earlier, so the camera arrives with the cursor) and zooms out
+ * `holdSec` after the run's last click. Pure.
+ */
+export function planClickZoom(clicks: ClickPoint[], W: number, H: number, opts: AutoOptions = {}): ZoomKeyframe[] {
+  const hold = opts.holdSec ?? 2;
+  const maxZoom = opts.maxZoom ?? DEFAULT_AUTO_MAX_ZOOM;
+  const T = opts.transition ?? DEFAULT_TRANSITION_SEC;
+  const minW = W / maxZoom;
+  const minH = H / maxZoom;
+  const pad = Math.min(W, H) * 0.05;
+  const sorted = [...clicks].sort((a, b) => a.t - b.t);
+
+  const kfs: ZoomKeyframe[] = [];
+  let lastT = 0;
+  let runEnd = -Infinity;
+  for (let i = 0; i < sorted.length; i++) {
+    const c = sorted[i];
+    const view = fitView({ x: c.x - pad, y: c.y - pad, width: 2 * pad, height: 2 * pad }, W, H, minW, minH);
+    const prev = kfs[kfs.length - 1];
+    // Already well inside the current view: no pan, just extend the run.
+    if (prev && !prev.full && c.t - runEnd <= hold && insideView(prev, c)) {
+      runEnd = c.t;
+      continue;
+    }
+    if (c.t - runEnd > hold && kfs.length > 0) {
+      // Close the previous run before starting a new one.
+      const outAt = Math.max(runEnd + hold, lastT + T);
+      kfs.push({ t: round(outAt), full: true });
+      lastT = outAt;
+    }
+    const at = Math.max(c.t, lastT + T);
+    kfs.push({ t: round(at), ...view });
+    lastT = at;
+    runEnd = c.t;
+  }
+  if (kfs.length > 0) kfs.push({ t: round(Math.max(runEnd + hold, lastT + T)), full: true });
+  return kfs;
+}
+
+/** True when a point lies in the middle 70% of a view, away from its edges. */
+function insideView(v: ZoomKeyframe, p: ClickPoint): boolean {
+  const mx = v.width! * 0.15;
+  const my = v.height! * 0.15;
+  return p.x >= v.x! + mx && p.x <= v.x! + v.width! - mx && p.y >= v.y! + my && p.y <= v.y! + v.height! - my;
+}
+
+export const RING_SEC = 0.6;
+export const DEFAULT_RING_COLOR = "#FF4545";
+
+/** Ring diameter in pixels for a W x H video: about 9% of the short side. */
+export function ringSize(W: number, H: number): number {
+  return Math.max(40, 2 * Math.round(Math.min(W, H) * 0.045));
+}
+
+/**
+ * Filter chains that draw an expanding, fading ring at each click, applied to
+ * `[in]` and ending at `[out]`. Each ring is its own short colour source whose
+ * radius and alpha follow its own clock T, shifted to the click time. Pure.
+ */
+export function ringFilters(clicks: ClickPoint[], W: number, H: number, fps: number, color: string): string[] {
+  const D = ringSize(W, H);
+  const c = D / 2;
+  const th = Math.max(3, Math.round(D / 10));
+  const r0 = c * 0.3;
+  const dr = c - th / 2 - r0;
+  const steps: string[] = [];
+  let cur = "[in]";
+  clicks.forEach((k, i) => {
+    // Solid for the first half, then fading; the ring grows the whole time.
+    const alpha = `if(lt(abs(hypot(X-${c},Y-${c})-(${n(r0)}+${n(dr)}*T/${RING_SEC})),${th / 2}),255*min(1,2-2*T/${RING_SEC}),0)`;
+    steps.push(
+      `color=c=${color}:s=${D}x${D}:r=${n(fps)}:d=${RING_SEC},format=rgba,` +
+        `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alpha}',setpts=PTS+${n(k.t)}/TB[ring${i}]`,
+    );
+    const out = i === clicks.length - 1 ? "[out]" : `[r${i}]`;
+    steps.push(`${cur}[ring${i}]overlay=x=${n(k.x - c)}:y=${n(k.y - c)}:eof_action=pass${out}`);
+    cur = `[r${i}]`;
+  });
+  return steps;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { keyframesToViews, viewExpr, buildZoomArgs, planAutoZoom, fitView } from "../utils/zoom.js";
+import { keyframesToViews, viewExpr, buildZoomArgs, planAutoZoom, planClickZoom, fitView, ringFilters, ringSize, RING_SEC } from "../utils/zoom.js";
 
 /** Evaluate a zoompan expression at input time `it` (if/lt/clip as in ffmpeg). */
 function evalExpr(expr: string, it: number): number {
@@ -83,5 +83,52 @@ describe("zoom (#119)", () => {
     expect(kfs[0].full).toBeUndefined();
     expect(kfs[0].x! + kfs[0].width! / 2).toBeGreaterThan(800); // centred on the box, right of centre
     expect(kfs[1]).toEqual({ t: 3, full: true }); // last change at 2 s + 1 s hold
+  });
+
+  it("zooms toward clicks, pans between clicks close in time, and zooms out after the hold (#119)", () => {
+    const kfs = planClickZoom(
+      [
+        { t: 1, x: 200, y: 150 },
+        { t: 1.8, x: 1000, y: 600 }, // same run: pan
+        { t: 2, x: 1001, y: 601 }, // same spot: no new keyframe
+        { t: 8, x: 640, y: 360 }, // new run after a gap
+      ],
+      W,
+      H,
+      { holdSec: 2, transition: 0.6 },
+    );
+    expect(kfs.map((k) => (k.full ? `out@${k.t}` : `in@${k.t}`))).toEqual(["in@1", "in@1.8", "out@4", "in@8", "out@10"]);
+    const first = kfs[0];
+    expect(first.x).toBe(0); // centred on the click, then clamped inside the frame
+    expect(200).toBeGreaterThan(first.x!);
+    expect(200).toBeLessThan(first.x! + first.width!);
+    expect(first.width).toBeCloseTo(W / 2.5, 0); // the default max zoom
+    expect(planClickZoom([], W, H)).toEqual([]);
+  });
+
+  it("keeps click keyframes at least one transition apart", () => {
+    const kfs = planClickZoom([{ t: 0.1, x: 100, y: 100 }, { t: 0.2, x: 1100, y: 600 }], W, H, { transition: 0.6, holdSec: 2 });
+    const times = kfs.map((k) => k.t);
+    for (let i = 1; i < times.length; i++) expect(times[i] - times[i - 1]).toBeGreaterThanOrEqual(0.6 - 1e-9);
+  });
+
+  it("draws one timed, centred ring per click, before the zoom", () => {
+    const steps = ringFilters([{ t: 1.5, x: 100, y: 80 }, { t: 3, x: 400, y: 300 }], W, H, 30, "#FFB454");
+    const D = ringSize(W, H);
+    expect(D).toBe(64);
+    expect(steps).toHaveLength(4);
+    expect(steps[0]).toContain(`color=c=#FFB454:s=${D}x${D}:r=30:d=${RING_SEC}`);
+    expect(steps[0]).toContain("setpts=PTS+1.5/TB[ring0]");
+    expect(steps[1]).toBe(`[in][ring0]overlay=x=${100 - D / 2}:y=${80 - D / 2}:eof_action=pass[r0]`);
+    expect(steps[3].endsWith("[out]")).toBe(true);
+    const args = buildZoomArgs("in.mp4", "o.mp4", keyframesToViews([{ t: 1, full: true }], W, H), { width: W, height: H, fps: 30 }, 0.6, "draft", {
+      clicks: [{ t: 1, x: 10, y: 10 }],
+      color: "red",
+    });
+    const graph = args[args.indexOf("-filter_complex") + 1];
+    expect(graph.startsWith("[0:v]null[in];color=c=red")).toBe(true);
+    expect(graph).toContain("[out]scale=2560:1440,zoompan=");
+    expect(args).toContain("0:a?");
+    expect(args).not.toContain("-vf");
   });
 });
