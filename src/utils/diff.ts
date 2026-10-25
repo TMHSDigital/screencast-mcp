@@ -10,6 +10,7 @@
 import { ScreencastError } from "./errors.js";
 import type { Monitor } from "./monitors.js";
 import { targetInputArgs, SCREENSHOT_GRAB_FPS, type Target } from "./targets.js";
+import { stillOutput } from "./paths.js";
 
 /** Width frames are analysed at. */
 export const ANALYSIS_WIDTH = 320;
@@ -197,7 +198,7 @@ export function buildSsimArgs(a: string, b: string, size: { width: number; heigh
 /** Draw each changed region as a red outline on `input`, for a quick visual. */
 export function buildHighlightArgs(input: string, regions: Rect[], output: string): string[] {
   const boxes = regions.map((r) => `drawbox=x=${r.x}:y=${r.y}:w=${r.width}:h=${r.height}:color=red@0.9:t=3`);
-  return ["-y", "-v", "error", "-i", input, "-frames:v", "1", ...(boxes.length ? ["-vf", boxes.join(",")] : []), output];
+  return ["-y", "-v", "error", "-i", input, "-frames:v", "1", ...(boxes.length ? ["-vf", boxes.join(",")] : []), ...stillOutput(output)];
 }
 
 /** Parse the `All:` score from ffmpeg's ssim filter output, or null. */

@@ -43,6 +43,22 @@ export function rand(n = 4): string {
   return Math.random().toString(36).slice(2, 2 + n);
 }
 
+/** An ffmpeg image-sequence pattern (`name` holds the `%0Nd`) inside `dir`. A
+ * `%` in the directory itself is escaped as `%%` so ffmpeg reads it literally
+ * (#238). */
+export function sequencePattern(dir: string, name: string): string {
+  return join(dir.replace(/%/g, "%%"), name);
+}
+
+const STILL_IMAGE = /\.(png|jpe?g|bmp|tiff?)$/i;
+
+/** The output args for a single still image. ffmpeg's image2 muxer reads a `%`
+ * in the file name as a sequence pattern (`b%dx.png` becomes `b1x.png`), so
+ * `-update 1` keeps the name literal and the returned path real (#238). */
+export function stillOutput(output: string): string[] {
+  return STILL_IMAGE.test(output) ? ["-update", "1", output] : [output];
+}
+
 /** A unique scratch path in the OS temp dir for short-lived working files (a
  * concat list, a drawtext textfile). Kept out of SCREENCAST_HOME/edits so a hard
  * crash before cleanup leaves it where the OS reaps it, not next to outputs. */

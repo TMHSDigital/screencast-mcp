@@ -110,4 +110,8 @@ describe("captureFrame", () => {
     expect(captureFrame({ kind: "monitor", index: 1 }, monitors)).toEqual({ x: -1280, y: 0, w: 1280, h: 1024 });
     expect(captureFrame({ kind: "full" }, monitors)).toEqual({ x: -1280, y: 0, w: 3200, h: 1080 });
   });
+  it("rounds an odd-sized virtual desktop down to the encoded size (#226)", () => {
+    const odd = [{ index: 0, x: 0, y: 0, width: 1921, height: 1081, primary: true }];
+    expect(captureFrame({ kind: "full" }, odd)).toEqual({ x: 0, y: 0, w: 1920, h: 1080 });
+  });
 });

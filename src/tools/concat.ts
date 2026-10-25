@@ -21,7 +21,9 @@ export function register(server: McpServer): void {
   server.tool(
     "concat",
     "Concatenate two or more videos into a single file using the ffmpeg concat " +
-      "demuxer (stream copy). Inputs should share the same codec and format.",
+      "demuxer (stream copy). Inputs should share the same codec and format. " +
+      "Stream copy carries every packet of each input, including frames an input " +
+      "only hides behind an edit list (a trim with exact: false).",
     inputSchema,
     async (args, extra) => {
       try {

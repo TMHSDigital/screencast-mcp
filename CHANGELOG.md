@@ -7,6 +7,32 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.34.0]
+
+### Changed
+
+- `trim` re-encodes by default, so the cut is frame-exact and nothing from
+  before `start` stays in the file (#203). A stream copy kept the whole GOP
+  before `start`, hidden only behind an MP4 edit list, so players and tools
+  that ignore edit lists still showed the "removed" content. Pass
+  `exact: false` for the old fast stream copy. A re-encoded `.webm` input is
+  written as `.mp4`.
+- Recordings get a keyframe every 2 seconds (`-g`), so a stream-copy cut snaps
+  close to the cut point (#203).
+
+### Fixed
+
+- `wait_for_change` with `target: "full"` failed every time with "No monitors
+  found." The `full` target now resolves with the live monitor list (#180).
+- Recording `full` on a virtual desktop with an odd width or height (offset
+  monitors) failed immediately. It now records an even-sized region of the
+  desktop (#226).
+- `compress` with an odd `maxWidth` failed with a libx264 "not divisible by 2"
+  error. The width cap now rounds down to even (#239).
+- A `%` in an output directory or file name was read as an image-sequence
+  pattern, so ffmpeg failed or the returned path did not exist. Sequence
+  patterns escape it, and single-image outputs pass `-update 1` (#238).
+
 ## [0.33.2]
 
 ### Changed

@@ -41,7 +41,7 @@ describe("contact sheet helpers (#115)", () => {
   it("tiles a numbered sequence into a single frame", () => {
     const a = buildSheetArgs("dir/tile_%03d.png", { columns: 4, rows: 3 }, "sheet.png");
     expect(a[a.indexOf("-vf") + 1]).toBe("tile=4x3:padding=4:margin=4:color=black");
-    expect(a.slice(-3)).toEqual(["-frames:v", "1", "sheet.png"]);
+    expect(a.slice(-5)).toEqual(["-frames:v", "1", "-update", "1", "sheet.png"]);
   });
 
   it("samples 30 poster candidates across the whole video", () => {

@@ -218,7 +218,7 @@
   },
   {
     "name": "trim",
-    "description": "Trim a video to a sub-clip by start + (end or duration). Uses stream copy for speed; cut points snap to the nearest keyframe.",
+    "description": "Trim a video to a sub-clip by start + (end or duration). Re-encodes by default, so the cut is frame-exact and the removed content is really gone; set exact: false for a fast stream copy that keeps hidden frames from before start in the file.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -226,6 +226,7 @@
         "start": { "type": "number", "description": "Start time in seconds" },
         "end": { "type": "number", "description": "End time in seconds (use end OR duration)" },
         "duration": { "type": "number", "description": "Clip length in seconds (use end OR duration)" },
+        "exact": { "type": "boolean", "description": "Re-encode so nothing before start stays in the file (default true); false stream-copies and keeps hidden frames" },
         "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
         "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
@@ -234,7 +235,7 @@
   },
   {
     "name": "concat",
-    "description": "Concatenate two or more videos into a single file using the ffmpeg concat demuxer (stream copy). Inputs should share the same codec and format.",
+    "description": "Concatenate two or more videos into a single file using the ffmpeg concat demuxer (stream copy). Inputs should share the same codec and format. Stream copy carries every packet of each input, including frames an input only hides behind an edit list (a trim with exact: false).",
     "inputSchema": {
       "type": "object",
       "properties": {

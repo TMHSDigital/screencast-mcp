@@ -9,7 +9,7 @@
 import { readFileSync, rmSync } from "node:fs";
 import { ScreencastError, type ImageContent } from "./errors.js";
 import { runFfmpeg } from "./ffmpeg.js";
-import { tempPath } from "./paths.js";
+import { tempPath, stillOutput } from "./paths.js";
 
 /** Default downscale width for inline previews. */
 export const DEFAULT_MAX_IMAGE_WIDTH = 1280;
@@ -30,7 +30,7 @@ export function buildPreviewArgs(input: string, output: string, maxWidth: number
     "-frames:v", "1",
     "-vf", `scale='min(${maxWidth},iw)':-2`,
     "-q:v", "4",
-    output,
+    ...stillOutput(output),
   ];
 }
 

@@ -12,6 +12,7 @@ import {
   DEFAULT_QUALITY,
   DEFAULT_MAX_RECORDING_SEC,
   resolveMaxDuration,
+  captureKeyframeArgs,
   type Quality,
 } from "../utils/targets.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
@@ -32,7 +33,6 @@ import {
   writeEventsFile,
   type KeyMode,
 } from "../utils/events.js";
-import { getMonitors } from "../utils/monitors.js";
 
 const inputSchema = {
   target: z
@@ -176,7 +176,7 @@ export function register(server: McpServer): void {
         const evPaths = args.events ? eventPaths(output) : null;
         // wgc frames the client area; its size is known once the recorder starts.
         let frame = args.events
-          ? captureFrame(target, target.kind === "full" ? await getMonitors() : monitors)
+          ? captureFrame(target, monitors)
           : null;
         const logger = evPaths ? await startEventLogger(evPaths.raw, keyMode) : null;
 
@@ -187,7 +187,7 @@ export function register(server: McpServer): void {
                 process.execPath,
                 [
                   fileURLToPath(new URL("../wgcRecorder.js", import.meta.url)),
-                  JSON.stringify({ ffmpeg, hwnd: window!.hwnd, fps, encode: resolveQuality(quality), output, maxDurationSec }),
+                  JSON.stringify({ ffmpeg, hwnd: window!.hwnd, fps, encode: [...resolveQuality(quality), ...captureKeyframeArgs(fps)], output, maxDurationSec }),
                 ],
                 { stdio: ["pipe", "ignore", "pipe"], windowsHide: true },
               )

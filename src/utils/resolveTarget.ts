@@ -8,7 +8,9 @@
  *   - window:<title> -> the on-screen RECTANGLE the window occupies, captured
  *     via the proven region path (NOT gdigrab title=, which grabs a blank
  *     surface for GPU-composited windows). The rect is resolved once, here.
- *   - full / region -> passed through unchanged.
+ *   - region -> validated against the live desktop, then passed through.
+ *   - full -> passed through, with the live monitor list so callers can size
+ *     the virtual desktop (#180).
  */
 import { parseTarget, validateRegionOnDesktop, type Target } from "./targets.js";
 import { getMonitors, type Monitor } from "./monitors.js";
@@ -50,5 +52,5 @@ export async function resolveCaptureTarget(
     validateRegionOnDesktop(parsed, await getMonitors());
     return { target: parsed, monitors: [] };
   }
-  return { target: parsed, monitors: [] };
+  return { target: parsed, monitors: await getMonitors() };
 }

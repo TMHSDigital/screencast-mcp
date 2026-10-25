@@ -17,7 +17,7 @@ import {
   DEFAULT_MAX_FRAMES,
   MAX_FRAMES_CEILING,
 } from "../utils/media.js";
-import { subdir, stamp, rand } from "../utils/paths.js";
+import { subdir, stamp, rand, sequencePattern } from "../utils/paths.js";
 import {
   encodeInlineImages,
   clampInlineCount,
@@ -166,7 +166,7 @@ export function register(server: McpServer): void {
           // Snapshot any pre-existing PNGs so a reused outputDir does not
           // contaminate the result; return only the frames this run wrote.
           const before = new Set(readdirSync(dir).filter(isPng));
-          const pattern = join(dir, "frame_%05d.png");
+          const pattern = sequencePattern(dir, "frame_%05d.png");
           await runFfmpeg(
             buildSampleByFpsArgs(args.input, plan.fps, pattern, maxFrames, args.dedupe === true),
             5 * 60_000,

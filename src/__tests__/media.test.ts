@@ -109,6 +109,8 @@ describe("probe and sample arg builders", () => {
     const a = buildSampleAtTimestampArgs("in.mp4", 3.5, "f.png");
     expect(a.join(" ")).toContain("-ss 3.5");
     expect(a.join(" ")).toContain("-frames:v 1");
+    // A % in the name stays literal instead of becoming a sequence (#238).
+    expect(a.slice(-3)).toEqual(["-update", "1", "f.png"]);
   });
   it("rejects a negative timestamp", () => {
     expect(() => buildSampleAtTimestampArgs("in.mp4", -1, "f.png")).toThrow();
@@ -122,7 +124,14 @@ describe("buildTrimArgs", () => {
     // -to after an input -ss acts as a duration; the builder emits end - start.
     expect(a.join(" ")).toContain("-t 4");
     expect(a).not.toContain("-to");
+    // Re-encodes by default so nothing before start ships in the file (#203).
+    expect(a.join(" ")).toContain("-c:v libx264");
+    expect(a.join(" ")).not.toContain("-c copy");
+  });
+  it("stream-copies only with exact: false", () => {
+    const a = buildTrimArgs("in.mp4", "out.mp4", { start: 2, end: 6, exact: false });
     expect(a.join(" ")).toContain("-c copy");
+    expect(a.join(" ")).not.toContain("libx264");
   });
   it("trims by start + duration", () => {
     const a = buildTrimArgs("in.mp4", "out.mp4", { start: 2, duration: 4 });
@@ -273,7 +282,10 @@ describe("buildCompressArgs", () => {
     expect(buildCompressArgs("in.mp4", "o.mp4", { level: "heavy" }).join(" ")).toContain("-crf 32");
   });
   it("only downscales with the width cap", () => {
-    expect(buildCompressArgs("in.mp4", "o.mp4", { maxWidth: 1280 }).join(" ")).toContain("scale='min(1280,iw)':-2");
+    expect(buildCompressArgs("in.mp4", "o.mp4", { maxWidth: 1280 }).join(" ")).toContain("scale='trunc(min(1280,iw)/2)*2':-2");
+  });
+  it("rounds an odd width cap down to even (#239)", () => {
+    expect(buildCompressArgs("in.mp4", "o.mp4", { maxWidth: 637 }).join(" ")).toContain("scale='trunc(min(637,iw)/2)*2':-2");
   });
 });
 

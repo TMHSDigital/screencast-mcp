@@ -4,9 +4,11 @@
  * All functions here are pure (string in, args/strings out) so the edit and
  * watch surfaces are unit-tested without ffmpeg present.
  */
+import { extname } from "node:path";
 import { ScreencastError } from "./errors.js";
 import { resolveQuality, type Quality } from "./targets.js";
 import { validateColor, validateEvenDimension } from "./validate.js";
+import { stillOutput } from "./paths.js";
 
 /** Edit re-encodes default to the same preset as a standard capture. */
 const DEFAULT_EDIT_QUALITY: Quality = "standard";
@@ -198,14 +200,24 @@ export function buildSampleAtTimestampArgs(
   if (!Number.isFinite(timestampSec) || timestampSec < 0) {
     throw new ScreencastError("timestamp must be a non-negative number.");
   }
-  return ["-y", "-ss", String(timestampSec), "-i", input, "-frames:v", "1", output];
+  return ["-y", "-ss", String(timestampSec), "-i", input, "-frames:v", "1", ...stillOutput(output)];
 }
 
-/** Trim by start + (end | duration). Stream-copy for speed. */
+/** The default output extension for an edit that encodes libx264/AAC: the
+ * input's own container when it can hold those codecs, else .mp4 (a WebM
+ * cannot, #187). */
+export function editOutputExt(input: string): string {
+  const ext = extname(input).toLowerCase();
+  return ext === ".mp4" || ext === ".mkv" || ext === ".mov" ? ext : ".mp4";
+}
+
+/** Trim by start + (end | duration). Re-encodes by default so the file holds
+ * nothing from before `start`; `exact: false` stream-copies, which is fast but
+ * keeps the GOP before `start` in the file, hidden behind an edit list (#203). */
 export function buildTrimArgs(
   input: string,
   output: string,
-  opts: { start: number; end?: number; duration?: number },
+  opts: { start: number; end?: number; duration?: number; exact?: boolean },
 ): string[] {
   const start = opts.start;
   if (!Number.isFinite(start) || start < 0) {
@@ -228,7 +240,8 @@ export function buildTrimArgs(
   } else {
     args.push("-t", String(validatePositive(opts.duration!, "duration")));
   }
-  args.push("-c", "copy", output);
+  if (opts.exact === false) args.push("-c", "copy", output);
+  else args.push(...resolveQuality(DEFAULT_EDIT_QUALITY), "-c:a", "aac", output);
   return args;
 }
 
@@ -502,7 +515,8 @@ export function buildCompressArgs(
   const args = ["-y", "-i", input];
   if (opts.maxWidth !== undefined) {
     requirePositiveInt(opts.maxWidth, "maxWidth");
-    args.push("-vf", `scale='min(${opts.maxWidth},iw)':-2`);
+    // Always even and never an upscale: libx264 rejects an odd width (#239).
+    args.push("-vf", `scale='trunc(min(${opts.maxWidth},iw)/2)*2':-2`);
   }
   args.push(
     "-c:v", "libx264", "-preset", "slow", "-crf", String(crf), "-pix_fmt", "yuv420p",

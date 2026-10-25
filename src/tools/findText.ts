@@ -10,7 +10,7 @@ import { captureStill } from "../utils/still.js";
 import { buildHighlightArgs } from "../utils/diff.js";
 import { recognize, mergePasses, findMatches, redactionRects, passScales } from "../utils/ocr.js";
 import { windowMatchReport } from "../utils/windows.js";
-import { subdir, stamp, rand } from "../utils/paths.js";
+import { subdir, stamp, rand, stillOutput } from "../utils/paths.js";
 import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js";
 
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tif", ".tiff"]);
@@ -81,7 +81,7 @@ export function register(server: McpServer): void {
             const isImage = IMAGE_EXTENSIONS.has(extname(args.input!).toLowerCase());
             source = join(work, "frame.png");
             await runFfmpeg(
-              ["-y", "-v", "error", ...(isImage ? [] : ["-ss", String(args.timestamp ?? 0)]), "-i", args.input!, "-frames:v", "1", source],
+              ["-y", "-v", "error", ...(isImage ? [] : ["-ss", String(args.timestamp ?? 0)]), "-i", args.input!, "-frames:v", "1", ...stillOutput(source)],
               60_000,
             );
           }
