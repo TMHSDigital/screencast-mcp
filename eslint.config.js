@@ -27,4 +27,15 @@ export default tseslint.config(
     files: ["scripts/**/*.mjs"],
     languageOptions: { globals: { process: "readonly", console: "readonly", URL: "readonly" } },
   },
+  {
+    // The docs site's script runs in the browser.
+    files: ["docs/**/*.js"],
+    languageOptions: {
+      sourceType: "script",
+      globals: {
+        window: "readonly", document: "readonly", navigator: "readonly", location: "readonly",
+        history: "readonly", performance: "readonly", requestAnimationFrame: "readonly", setTimeout: "readonly",
+      },
+    },
+  },
 );

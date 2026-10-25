@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Social clip — Screencast MCP</title>
+  <meta name="description" content="Turn a landscape screen recording into a vertical clip with a title card, music, normalized loudness, and a platform preset.">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/workflows/social-clip.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="Social clip — Screencast MCP">
+  <meta property="og:description" content="Turn a landscape screen recording into a vertical clip with a title card, music, normalized loudness, and a platform preset.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/workflows/social-clip.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../workflows/" class="here">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">WORKFLOWS</a> / REC 04</p>
+      <h1>Social clip</h1>
+      <p class="lede">Screen recordings are landscape; short-form feeds are vertical. The agent re-aspects the recording, puts a title card in front, crossfades the two, lays music under it at a sane level, normalizes loudness, and encodes for the platform.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>THE PROMPT</span></div>
+      <p class="prompt">Make a TikTok from the demo recording: 9:16 with the window letterboxed, a 1.5 s title card that says “Saving, fixed”, a fade into the clip, and this music under it.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>THE CALLS IT MAKES</span></div>
+      <p>reframe &rarr; title_card &rarr; assemble_highlights &rarr; music_bed &rarr; normalize_audio &rarr; export_preset. Paths are shortened; every value is from a real run.</p>
+      <ol class="takes">
+        <li><span class="call"><b>reframe</b> { "input": "rec-….mp4", "aspect": "9:16", "fit": "pad" }</span><span class="why"><code>pad</code> letterboxes and keeps the whole window; <code>crop</code> fills the frame and loses the sides.</span><span class="ret">{ "outputPath": "reframe-….mp4" }</span></li>
+        <li><span class="call"><b>title_card</b> { "text": "Saving, fixed", "duration": 1.5, "width": 1080, "height": 1920 }</span><span class="ret">{ "outputPath": "title-….mp4" }</span></li>
+        <li><span class="call"><b>assemble_highlights</b> { "clips": ["title-….mp4", "reframe-….mp4"], "transition": "fade", "width": 1080, "height": 1920 }</span><span class="why">Normalizes size, fps, and audio first, so mixed clips join cleanly.</span><span class="ret">{ "clips": 2, "transition": "fade" }</span></li>
+        <li><span class="call"><b>music_bed</b> { "video": "highlights-….mp4", "music": "music.wav", "musicVolume": 0.3 }</span><span class="why">Loops or trims the track to the video and fades it in and out.</span><span class="ret">{ "mixedWithOriginal": true }</span></li>
+        <li><span class="call"><b>normalize_audio</b> { "input": "music-….mp4", "target": "youtube" }</span><span class="why">Two-pass loudnorm to −14 LUFS, the level most feeds normalize to anyway.</span><span class="ret">{ "before": { "lufs": -41.59 }, "after": { "lufs": -14.05 } }</span></li>
+        <li><span class="call"><b>export_preset</b> { "input": "loudnorm-….mp4", "platform": "tiktok" }</span><span class="ret">{ "aspect": "9:16", "fps": 30 }</span></li>
+      </ol>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:30</span><span>THE OUTPUT</span></div>
+      <figure class="output">
+        <div class="frame"><img src="../media/social.png" width="736" height="434" alt="Three frames of the vertical clip: the title card fading into the letterboxed settings window, then the window with the Saved banner." loading="lazy"></div>
+        <figcaption><span class="tc">contact_sheet</span> of the final tiktok-….mp4 · 1080 × 1920 · 30 fps</figcaption>
+      </figure>
+      <p>Swap <code>platform</code> for <code>youtube</code>, <code>instagram_reel</code>, <code>x</code>, or <code>square</code>. Have narration? Run <code>transcribe</code> and <code>burn_subtitles</code> with <code>style: "social"</code> before the export: most feeds autoplay muted.</p>
+      <nav class="pager" aria-label="More recipes">
+        <span><a href="verify-ui.html">&larr; REC 03 Agent UI verification loop</a></span>
+        <span><a href="review-recording.html">REC 05 Review a long recording cheaply &rarr;</a></span>
+      </nav>
+    </section>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>CC-BY-NC-ND-4.0</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>

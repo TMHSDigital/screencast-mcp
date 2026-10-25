@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent UI verification loop — Screencast MCP</title>
+  <meta name="description" content="Let a coding agent check its own UI change: screenshot, wait for the screen to settle, diff before and after, and read the result.">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/workflows/verify-ui.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="Agent UI verification loop — Screencast MCP">
+  <meta property="og:description" content="Let a coding agent check its own UI change: screenshot, wait for the screen to settle, diff before and after, and read the result.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/workflows/verify-ui.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../workflows/" class="here">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">WORKFLOWS</a> / REC 03</p>
+      <h1>Agent UI verification loop</h1>
+      <p class="lede">When an agent changes UI code, it should check the result the way a person would: look before, trigger the change, wait for the screen to stop moving, then see exactly what changed and read the text. No guessed <code>sleep</code>, and no burning a full-size image on every poll.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>THE PROMPT</span></div>
+      <p class="prompt">Take a screenshot of Demo Settings, wait until the save finishes, and tell me what changed. Did it say Saved?</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>THE CALLS IT MAKES</span></div>
+      <p>screenshot &rarr; wait_for_change &rarr; screen_diff &rarr; find_text. Paths are shortened; every value is from a real run.</p>
+      <ol class="takes">
+        <li><span class="call"><b>screenshot</b> { "target": "window:Demo Settings" }</span><span class="why">The before image. Returned inline by default so the model sees it.</span><span class="ret">{ "outputPath": "shot-a.png", "region": { "width": 602, "height": 352 } }</span></li>
+        <li><span class="call"><b>wait_for_change</b> { "target": "window:Demo Settings", "mode": "change", "timeoutSec": 10 }</span><span class="why">Returns as soon as anything on screen changes, with where it changed.</span><span class="ret">{ "outcome": "changed", "elapsedSec": 0.87, "regions": [{ "x": 177, "y": 321, "width": 120, "height": 30 }] }</span></li>
+        <li><span class="call"><b>wait_for_change</b> { "target": "window:Demo Settings", "mode": "settle", "settleSec": 0.75, "timeoutSec": 10 }</span><span class="why">Then waits until the screen has been still for 0.75 s: the save has finished animating.</span><span class="ret">{ "outcome": "settled", "elapsedSec": 2.56, "changedWhileWaiting": true }</span></li>
+        <li><span class="call"><b>screenshot</b> { "target": "window:Demo Settings" }</span><span class="why">The after image.</span><span class="ret">{ "outputPath": "shot-b.png" }</span></li>
+        <li><span class="call"><b>screen_diff</b> { "a": "shot-a.png", "b": "shot-b.png" }</span><span class="why">SSIM plus boxes around each changed area, drawn on the after image.</span><span class="ret">{ "identical": false, "ssim": 0.8214, "changedFraction": 0.2833, "regions": [ 3 boxes ] }</span></li>
+        <li><span class="call"><b>find_text</b> { "input": "shot-b.png", "query": "Saved" }</span><span class="why">Confirms the text, not just that pixels moved.</span><span class="ret">{ "matchCount": 1, "matches": [{ "text": "Saved", "x": 21, "y": 301 }] }</span></li>
+      </ol>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:30</span><span>THE OUTPUT</span></div>
+      <figure class="output">
+        <div class="frame"><img src="../media/diff.jpg" width="602" height="352" alt="The settings window after saving, with red boxes around the three areas that changed: the Save button text, the progress bar, and the green Saved banner." loading="lazy"></div>
+        <figcaption><span class="tc">screen_diff</span> · the highlighted after image it returns inline</figcaption>
+      </figure>
+      <p>Each box is a place the agent can look closer, with <code>find_text</code> or a cropped screenshot. <code>screen_diff</code> on two identical images returns <code>identical: true</code>, so the loop can also prove nothing changed.</p>
+      <nav class="pager" aria-label="More recipes">
+        <span><a href="demo-gif.html">&larr; REC 02 README demo GIF</a></span>
+        <span><a href="social-clip.html">REC 04 Social clip &rarr;</a></span>
+      </nav>
+    </section>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>CC-BY-NC-ND-4.0</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>
