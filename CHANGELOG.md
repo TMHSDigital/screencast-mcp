@@ -7,6 +7,19 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.30.1]
+
+### Added
+
+- A demo in the README and on the docs home page (#90): the REC 06 click-zoom
+  GIF, made with the tool. The README image uses an absolute URL so it also
+  renders on npmjs.com.
+
+### Changed
+
+- The README header lists the current tool count (thirty-nine). The note no
+  longer promises cross-platform capture.
+
 ## [0.30.0]
 
 ### Added

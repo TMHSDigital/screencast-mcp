@@ -4,7 +4,7 @@
 
 **An MCP server that lets an agent record the screen, _watch_ the footage, and make minimal ffmpeg edits — over stdio, on Windows.**
 
-Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, scale, overlay, compress, redact, and convert. No cloud, no streaming — ffmpeg and ffprobe wrapped behind nineteen typed tools.
+Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, scale, redact, annotate, zoom, and export. No cloud, no streaming — ffmpeg and ffprobe wrapped behind thirty-nine typed tools.
 
 <br />
 
@@ -24,10 +24,16 @@ Capture the desktop, a monitor, a window, or a region; sample a recording into f
 ![ffmpeg](https://img.shields.io/badge/ffmpeg-required-007808?logo=ffmpeg&logoColor=white)
 ![Capture](https://img.shields.io/badge/capture-Windows_gdigrab-0078D6?logo=windows&logoColor=white)
 
+<br />
+
+<img src="https://raw.githubusercontent.com/TMHSDigital/screencast-mcp/main/docs/media/zoom-after.gif" width="480" alt="A settings window recorded by screencast-mcp: the camera glides in on the Save button as the cursor clicks it, a red ring marks the click, then the view eases back out as a green Saved banner appears." />
+
+<sub>Made with the tool: <code>start_recording</code> with <code>events: true</code>, one click, then <code>zoom { highlightClicks: true }</code> and <code>export_gif</code>. <a href="https://tmhsdigital.github.io/screencast-mcp/workflows/zoom-clicks.html">How it was made</a> · <a href="https://tmhsdigital.github.io/screencast-mcp/workflows/">more workflows</a></sub>
+
 </div>
 
 > [!NOTE]
-> Screen capture uses `gdigrab` and is Windows-only; the watch, edit, and produce tools work anywhere ffmpeg runs. The full pipeline is in place: capture, watch, the edit surface, `redact_region` safety redaction, system-audio capture, and the produce layer (transitions, title cards, music bed, aspect variants, platform export). Cross-platform capture backends are next — see [ROADMAP.md](ROADMAP.md).
+> Screen capture is Windows-only (`gdigrab`, plus Windows Graphics Capture for single windows); the watch, edit, and produce tools work anywhere ffmpeg runs. See [ROADMAP.md](ROADMAP.md) for what's next.
 
 ## Overview
 
