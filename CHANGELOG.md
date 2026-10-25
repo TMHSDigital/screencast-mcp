@@ -7,6 +7,16 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.28.1]
+
+### Fixed
+
+- Publishing: npm releases now go out through npm trusted publishing (GitHub
+  OIDC, with provenance). The MCP Registry step waits until npm serves the new
+  version, and runs whenever the registry lacks the version, so a re-run also
+  repairs a release whose listing failed. 0.28.0 was published to npm but not
+  listed because the registry checked npm too early.
+
 ## [0.28.0]
 
 ### Added
