@@ -183,8 +183,9 @@ export function planPipeline(
         break;
       }
       case "export_preset": {
-        const p = exportPresetParts(s.platform, s.fit ?? "pad");
+        const p = exportPresetParts(s.platform, s.fit ?? "pad", tag);
         chain(p.vf);
+        if (p.af) audio.push(p.af);
         encode = p.encode;
         W = p.width;
         H = p.height;

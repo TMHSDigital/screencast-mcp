@@ -182,6 +182,31 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     expect(e.audioCodec).toBe("aac");
   });
 
+  it("steam_trailer and vertical_reel meet the media-layer spec (#107)", async () => {
+    const stream = (path: string, sel: string, entries: string) => {
+      const r = spawnSync(FFPROBE, ["-v", "error", "-select_streams", sel, "-show_entries", `stream=${entries}`, "-of", "json", path], { encoding: "utf8" });
+      return JSON.parse(r.stdout).streams[0] as Record<string, string | number>;
+    };
+    const steam = p("steam.mp4");
+    await runFfmpeg(buildExportPresetArgs(av, steam, "steam_trailer"));
+    const v = stream(steam, "v:0", "width,height,profile,bit_rate,pix_fmt,r_frame_rate");
+    expect([v.width, v.height, v.profile, v.pix_fmt, v.r_frame_rate]).toEqual([1920, 1080, "High", "yuv420p", "30/1"]);
+    expect(Number(v.bit_rate)).toBeGreaterThan(5_000_000); // padded CBR: above Steam's floor even for easy footage
+    const a = stream(steam, "a:0", "codec_name,sample_rate,channels");
+    expect([a.codec_name, a.sample_rate, a.channels]).toEqual(["aac", "48000", 2]);
+    const loud = parseLoudnorm((await runCapture(FFMPEG, buildLoudnessMeasureArgs(steam, loudnessTarget("youtube")))).stderr);
+    expect(loud.input_i).toBeGreaterThan(-16);
+    expect(loud.input_i).toBeLessThan(-12);
+
+    const reel = p("reel.mp4");
+    await runFfmpeg(buildExportPresetArgs(av, reel, "vertical_reel"));
+    const rv = await probeMedia(reel);
+    expect([rv.width, rv.height]).toEqual([1080, 1920]);
+    // The 4:3 footage fills the centred 1080x1080 square's width: 1080x810.
+    expect(regionLuma(reel, 1, 0, 0, 1080, 400)).toBeGreaterThan(20); // a blurred fill above it, not black bars
+    expect(regionLuma(reel, 1, 0, 0, 1080, 400)).not.toBeCloseTo(regionLuma(reel, 1, 0, 600, 1080, 700), 0);
+  });
+
   it("extract_audio writes an audio-only file", async () => {
     const out = p("audio.mp3");
     await runFfmpeg(buildExtractAudioArgs(av, out, "mp3"));

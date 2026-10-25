@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { selectWindow, windowMatchReport, MAX_CANDIDATES, type WindowQuery } from "../utils/windows.js";
+import { selectWindow, windowMatchReport, parseWindowSelector, MAX_CANDIDATES, type WindowQuery } from "../utils/windows.js";
 
 // A 3840x1080 dual-monitor virtual desktop (two 1920x1080; second at x=1920).
 const VIRTUAL = { x: 0, y: 0, w: 3840, h: 1080 };
@@ -139,5 +139,37 @@ describe("window match reporting (#89)", () => {
     const r = selectWindow({ virtual: { x: 0, y: 0, w: 4000, h: 1080 }, windows: many }, "Editor");
     expect(r.matchCount).toBe(9);
     expect(r.candidates).toHaveLength(MAX_CANDIDATES);
+  });
+});
+
+describe("window:hwnd= and window:exe= (#107: not only by title)", () => {
+  const q: WindowQuery = {
+    virtual: VIRTUAL,
+    windows: [
+      { title: "Untitled - Notepad", left: 0, top: 0, right: 801, bottom: 601, minimized: false, hwnd: 0x1a2b, exe: "notepad.exe" },
+      { title: "README.md - Code", left: 900, top: 0, right: 1700, bottom: 600, minimized: false, hwnd: 4242, exe: "Code.exe" },
+      { title: "settings.json - Code", left: 1800, top: 0, right: 2600, bottom: 600, minimized: false, hwnd: 4343, exe: "Code.exe" },
+    ],
+  };
+  it("parses the selectors and leaves ordinary titles alone", () => {
+    expect(parseWindowSelector("hwnd=0x1A2B")).toEqual({ kind: "hwnd", hwnd: 0x1a2b });
+    expect(parseWindowSelector("hwnd=6699")).toEqual({ kind: "hwnd", hwnd: 6699 });
+    expect(parseWindowSelector("exe=Code.exe")).toEqual({ kind: "exe", exe: "code" });
+    expect(parseWindowSelector("Untitled - Notepad")).toBeNull();
+    expect(parseWindowSelector("hwnd=nope")).toBeNull();
+  });
+  it("picks a window by handle, decimal or hex", () => {
+    expect(selectWindow(q, "hwnd=0x1a2b")).toMatchObject({ matchedTitle: "Untitled - Notepad", matchKind: "hwnd", width: 800, height: 600 });
+    expect(selectWindow(q, "hwnd=4343").matchedTitle).toBe("settings.json - Code");
+  });
+  it("picks the topmost window of an executable, with or without .exe, and flags several", () => {
+    const b = selectWindow(q, "exe=code");
+    expect(b).toMatchObject({ matchedTitle: "README.md - Code", matchKind: "exe", matchCount: 2 });
+    expect(windowMatchReport(b).windowWarning).toMatch(/2 windows matched/);
+    expect(selectWindow(q, "exe=NOTEPAD.EXE").matchCount).toBe(1);
+  });
+  it("explains a missing handle or executable", () => {
+    expect(() => selectWindow(q, "hwnd=0x99")).toThrow(/No visible top-level window with handle 0x99/);
+    expect(() => selectWindow(q, "exe=slack")).toThrow(/slack\.exe/);
   });
 });

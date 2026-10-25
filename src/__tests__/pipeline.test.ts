@@ -65,6 +65,17 @@ describe("planPipeline", () => {
     expect(graphOf(silent.args)).not.toContain("[0:a]");
   });
 
+  it("carries a preset's audio filter and namespaced layout into the graph", () => {
+    const steam = plan([{ op: "trim", start: 0, end: 4 }, { op: "export_preset", platform: "steam_trailer" }]);
+    expect(graphOf(steam.args)).toContain("[0:a]loudnorm=I=-14:TP=-1:LRA=11,aresample=48000[aout]");
+    expect(steam.args).toContain("-x264-params");
+    const reel = plan([{ op: "scale", width: 640 }, { op: "export_preset", platform: "vertical_reel" }]);
+    const g = graphOf(reel.args);
+    expect(g).toContain("[p0]split=2[p1bg][p1fg];");
+    expect(g).toContain("[p1b][p1f]overlay=(W-w)/2:(H-h)/2,setsar=1,fps=30,format=yuv420p[p1]");
+    expect([reel.width, reel.height]).toEqual([1080, 1920]);
+  });
+
   it("an export_gif tail plans a high-quality first stage", () => {
     const p = plan([{ op: "scale", width: 640 }, { op: "export_gif", format: "webp", maxBytes: 3_000_000 }]);
     expect(p.gif).toEqual({ format: "webp", maxBytes: 3_000_000 });

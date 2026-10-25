@@ -7,6 +7,7 @@ import { runEditJob, probeDuration } from "../utils/jobs.js";
 import {
   buildExportPresetArgs,
   PLATFORM_PRESETS,
+  PLATFORMS,
   type Platform,
   type ReframeFit,
 } from "../utils/produce.js";
@@ -15,8 +16,12 @@ import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
   platform: z
-    .enum(["youtube", "instagram_reel", "tiktok", "x", "square"])
-    .describe("Target platform. Sets aspect, resolution, fps, and bitrate."),
+    .enum(PLATFORMS)
+    .describe(
+      "Target platform. Sets aspect, resolution, fps, and bitrate. steam_trailer: 1920x1080, " +
+        "H.264 High, padded 5.5 Mbps CBR, AAC 48 kHz at -14 LUFS. vertical_reel: 1080x1920 with the " +
+        "footage centred over a blurred copy of itself, audio at -14 LUFS (fit is ignored).",
+    ),
   fit: z
     .enum(["pad", "crop"])
     .optional()
@@ -28,9 +33,9 @@ const inputSchema = {
 export function register(server: McpServer): void {
   server.tool(
     "export_preset",
-    "Encode a platform-ready file for youtube, instagram_reel, tiktok, x, or " +
-      "square. Reframes to the platform aspect, caps fps, and encodes H.264 at " +
-      "the platform bitrate with faststart. Returns the output path.",
+    "Encode a platform-ready file for youtube, instagram_reel, tiktok, x, square, " +
+      "steam_trailer, or vertical_reel. Reframes to the platform aspect, caps fps, and " +
+      "encodes H.264 at the platform bitrate with faststart. Returns the output path.",
     inputSchema,
     async (args, extra) => {
       try {

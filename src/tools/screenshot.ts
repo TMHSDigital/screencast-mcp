@@ -12,7 +12,7 @@ const inputSchema = {
   target: z
     .string()
     .describe(
-      "Capture target: 'full' | 'monitor:<index>' | 'window:<title>' | " +
+      "Capture target: 'full' | 'monitor:<index>' | 'window:<title>' (or window:exe=<app.exe> / window:hwnd=<handle>) | " +
         "'region:<x>,<y>,<w>,<h>'. window: captures the on-screen rectangle the " +
         "window occupies as currently displayed - it must be visible, on top, " +
         "and not minimized (case-insensitive exact title, else substring; " +

@@ -189,6 +189,32 @@ describe("buildExportPresetArgs / PLATFORM_PRESETS", () => {
     // @ts-expect-error testing a bad value at runtime
     expect(() => buildExportPresetArgs("i", "o", "myspace")).toThrow();
   });
+  it("steam_trailer: 1080p H.264 High, padded CBR above Steam's 5 Mbps floor, 48 kHz stereo at -14 LUFS (#107)", () => {
+    const a = buildExportPresetArgs("in.mp4", "o.mp4", "steam_trailer");
+    const s = a.join(" ");
+    expect(s).toContain("pad=1920:1080");
+    expect(s).toContain("-profile:v high");
+    expect(s).toContain("-b:v 5.5M -minrate 5.5M -x264-params nal-hrd=cbr -maxrate 5.5M");
+    expect(s).toContain("-ar 48000 -ac 2");
+    expect(a[a.indexOf("-af") + 1]).toBe("loudnorm=I=-14:TP=-1:LRA=11,aresample=48000");
+    expect(Number.parseFloat(PLATFORM_PRESETS.steam_trailer.videoBitrate)).toBeGreaterThan(5);
+  });
+  it("vertical_reel: footage centred over a blurred fill, normalised audio, fit ignored (#107)", () => {
+    const a = buildExportPresetArgs("in.mp4", "o.mp4", "vertical_reel", "crop");
+    const vf = a[a.indexOf("-vf") + 1];
+    expect(vf.startsWith("split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur")).toBe(true);
+    expect(vf).toContain("[fg]scale=1080:1080:force_original_aspect_ratio=decrease:force_divisible_by=2[f]");
+    expect(vf).toContain("[b][f]overlay=(W-w)/2:(H-h)/2,setsar=1,fps=30,format=yuv420p");
+    expect(a[a.indexOf("-af") + 1]).toBe("loudnorm=I=-14:TP=-1:LRA=11");
+    expect(a).not.toContain("-profile:v");
+  });
+  it("the older presets are unchanged: no audio filter, no CBR", () => {
+    for (const p of ["youtube", "instagram_reel", "tiktok", "x", "square"] as const) {
+      const a = buildExportPresetArgs("in.mp4", "o.mp4", p);
+      expect(a).not.toContain("-af");
+      expect(a).not.toContain("-minrate");
+    }
+  });
 });
 
 describe("odd output dimensions are rejected (yuv420p needs even)", () => {

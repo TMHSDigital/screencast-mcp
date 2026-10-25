@@ -14,6 +14,9 @@ describe("escapeFilterPath", () => {
   it("escapes a quote at both unescaping levels (#87)", () => {
     expect(escapeFilterPath("/Users/O'Brien/t.txt")).toBe("/Users/O\\\\\\'Brien/t.txt");
   });
+  it("turns a UNC path into forward slashes with nothing else to escape (#107 fixture table)", () => {
+    expect(escapeFilterPath("\\\\server\\share\\fonts\\x.ttf")).toBe("//server/share/fonts/x.ttf");
+  });
   it("escapes the filtergraph delimiters and leaves spaces alone", () => {
     expect(escapeFilterPath("/a,b;c[d] e/t.txt")).toBe("/a\\,b\\;c\\[d\\] e/t.txt");
   });

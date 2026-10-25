@@ -20,7 +20,7 @@ const inputSchema = {
   target: z
     .string()
     .optional()
-    .describe("Read text live from the screen: 'full' | 'monitor:<index>' | 'window:<title>' | 'region:...'."),
+    .describe("Read text live from the screen: 'full' | 'monitor:<index>' | 'window:<title>' (or window:exe=<app.exe> / window:hwnd=<handle>) | 'region:...'."),
   input: z.string().optional().describe("Or read text from an image or video file (one of target / input)."),
   timestamp: z.number().nonnegative().optional().describe("For a video input: the second to read (default 0)."),
   exactTitle: z.boolean().optional().describe("For window: targets, match the title exactly (default false)."),
