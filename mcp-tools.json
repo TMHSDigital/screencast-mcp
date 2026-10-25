@@ -72,6 +72,30 @@
     }
   },
   {
+    "name": "review_recording",
+    "description": "Open a recording for a person to review. In clients that support MCP Apps it shows an inline player: scrub the timeline, drag trim handles, and draw redaction boxes, then export a trimmed, redacted copy (their choices run as a pipeline call). Elsewhere it returns the video's details; use contact_sheet or sample_frames to look at it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the video" },
+        "sessionId": { "type": "string", "description": "Or the session id of a stopped recording" }
+      }
+    }
+  },
+  {
+    "name": "player_frames",
+    "description": "Preview frames for the review player: JPEGs spread evenly over the video, with their times. Used by the inline player (MCP Apps visibility: app); agents should use sample_frames or contact_sheet instead.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the video" },
+        "maxFrames": { "type": "integer", "minimum": 1, "maximum": 300, "description": "Most frames (default 120)" },
+        "width": { "type": "integer", "minimum": 64, "maximum": 1280, "description": "Frame width (default 640)" }
+      },
+      "required": ["input"]
+    }
+  },
+  {
     "name": "screenshot",
     "description": "Capture a single still frame (PNG) of a target (full screen, a monitor, a window, or a region). Returns the image path, plus the image inline so the model can view it directly. A window: target captures the on-screen rectangle the window occupies as currently displayed (it must be visible, on top, and not minimized).",
     "inputSchema": {

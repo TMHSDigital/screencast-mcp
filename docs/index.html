@@ -82,6 +82,8 @@
             <tr><td><code>screenshot</code></td><td>Capture a single PNG of a target, returned inline for the model to view.</td></tr>
             <tr><td><code>list_sessions</code></td><td>List active and finished recording sessions.</td></tr>
             <tr><td><code>get_session</code></td><td>Inspect a single session by id.</td></tr>
+            <tr><td><code>review_recording</code></td><td>Open a recording in an inline player (in clients with MCP Apps): scrub, trim, draw redaction boxes, export a redacted copy.</td></tr>
+            <tr><td><code>player_frames</code></td><td>Preview frames for the review player (called by the player, not the agent).</td></tr>
             <tr><td><code>read_events</code></td><td>Read a recording&rsquo;s input event log: clicks, scroll, cursor, and key presses on the video&rsquo;s clock. Opt in with <code>start_recording</code> <code>events: true</code>.</td></tr>
             <tr><td><code>list_audio_devices</code></td><td>List DirectShow audio devices and flag a likely system-audio loopback device for start_recording.</td></tr>
           </tbody>

@@ -7,6 +7,28 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.33.0]
+
+### Added
+
+- Review player, an MCP Apps view (#128). In clients that support MCP Apps,
+  `stop_recording` and the new `review_recording` show an inline player:
+  - scrub the recording frame by frame, or play it as a flipbook;
+  - drag trim handles;
+  - draw redaction boxes over anything secret.
+
+  Export runs the person's choices as one `pipeline` call (redact, then trim)
+  and tells the agent what was exported through `ui/update-model-context`.
+  "Review the result" opens the exported file in the player.
+  - The player is the `ui://screencast/player` resource
+    (`text/html;profile=mcp-app`), a self-contained ASCII page in
+    `assets/ui/`. It uses the site's REC look, follows the host's light or dark
+    theme, and loads nothing from outside, as the host's CSP requires.
+  - Frames arrive as JPEGs from `player_frames`, a tool visible only to the
+    app. No local web server is started, so output stays local.
+  - Clients without MCP Apps see the same results as before;
+    `review_recording` returns the video's details there.
+
 ## [0.32.0]
 
 ### Added

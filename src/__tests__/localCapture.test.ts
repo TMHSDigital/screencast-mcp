@@ -151,14 +151,23 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
   }, 30_000);
 
   it("BUG-1: window: captures real window pixels, not a blank surface", async () => {
-    const title = openWindows()[0];
-    if (!title) return; // no titled window available in this environment
-    const shot = await call("screenshot", { target: `window:${title}` });
-    expect(shot.isError).toBe(false);
-    expect(existsSync(shot.json.outputPath)).toBe(true);
-    expect(shot.json.region.width).toBeGreaterThan(0);
-    // The old gdigrab title= path returned a uniform black/white frame.
-    expect(meanLuma(shot.json.outputPath)).toBeGreaterThan(8);
+    // Its own mid-grey window: the user's first open window may be dark (and
+    // should not be captured by a test anyway).
+    const ps = spawn("powershell", ["-NoProfile", "-Command",
+      "Add-Type -AssemblyName System.Windows.Forms;" +
+      "$f=New-Object Windows.Forms.Form;$f.Text='SC-BUG1';$f.StartPosition='Manual';$f.Location='140,140';$f.ClientSize='360,240';$f.BackColor='Gray';$f.TopMost=$true;" +
+      "[Windows.Forms.Application]::Run($f)"], { windowsHide: false });
+    try {
+      for (let i = 0; i < 40 && !openWindows().includes("SC-BUG1"); i++) await sleep(250);
+      const shot = await call("screenshot", { target: "window:SC-BUG1", exactTitle: true });
+      expect(shot.isError).toBe(false);
+      expect(existsSync(shot.json.outputPath)).toBe(true);
+      expect(shot.json.region.width).toBeGreaterThan(0);
+      // The old gdigrab title= path returned a uniform black frame; grey is ~128.
+      expect(meanLuma(shot.json.outputPath)).toBeGreaterThan(60);
+    } finally {
+      ps.kill();
+    }
   }, 30_000);
 
   it("start_recording reports which window it matched, and exactTitle refuses substrings (#89)", async () => {

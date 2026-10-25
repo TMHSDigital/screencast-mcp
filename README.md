@@ -4,7 +4,7 @@
 
 **An MCP server that lets an agent record the screen, _watch_ the footage, and make minimal ffmpeg edits — over stdio, on Windows.**
 
-Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, scale, redact, annotate, zoom, and export. No cloud, no streaming — ffmpeg and ffprobe wrapped behind thirty-nine typed tools.
+Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, scale, redact, annotate, zoom, and export. No cloud, no streaming — ffmpeg and ffprobe wrapped behind forty-one typed tools.
 
 <br />
 
@@ -59,6 +59,8 @@ Thirty-seven tools across four concerns. The manifest in [`mcp-tools.json`](mcp-
 | `stop_recording` | Stop a session by id. Sends ffmpeg a graceful quit so the file is **finalized, not truncated**. Returns the final path and duration. |
 | `list_sessions` | List active and finished sessions. |
 | `get_session` | Inspect a single session by id. |
+| `review_recording` | **Review player** in clients that support MCP Apps: an inline player where a person scrubs the recording, drags trim handles, and draws redaction boxes, then exports a trimmed, redacted copy (one `pipeline` call). `stop_recording` results open it too. Elsewhere it returns the video's details. |
+| `player_frames` | Preview JPEG frames for the review player; called by the player (app-only), not by agents. |
 | `read_events` | Read a recording's input event log (clicks, scroll, cursor, key presses) on the video's clock. Opt in with `start_recording` `events: true`. |
 | `screenshot` | Capture a single PNG of a `target`, and return it inline as an image the model can view. |
 | `list_audio_devices` | List the DirectShow audio devices ffmpeg can see and flag a likely system-audio loopback device for `start_recording`. |
@@ -248,7 +250,7 @@ It also offers **resources**, so a client can list and attach recordings without
 - **Capture is always explicit.** Nothing auto-fires; capture is gated behind an explicit tool call.
 - **Output stays local.** Files are written to the local filesystem only — never uploaded, streamed, or transmitted anywhere.
 - **Public repo, private captures.** The `.gitignore` blocks recordings, frames, screenshots, and common video/image output so test media cannot be committed by accident.
-- **Review before sharing.** Sample frames or inspect a recording before handing a file to another tool or person, so you know what it contains.
+- **Review before sharing.** Sample frames or inspect a recording before handing a file to another tool or person, so you know what it contains. In clients that support MCP Apps, `stop_recording` and `review_recording` open an inline player where a person can scrub the whole recording and draw redaction boxes before anything leaves the machine. The player gets frames through the MCP connection; no local web server is started.
 - **Redaction covers what you declare.** `redact_region` covers only the rectangles you specify. `find_text` can help find them: OCR with a query such as `regex: "sk-|ghp_|api.?key"` and `redact: true` returns ready-made rectangles. But OCR is best-effort; it can miss small or stylised text, so treat it as an aid, not a guarantee. Use the default `box` style for a solid irreversible fill, and still review the output before sharing.
 - **The input event log never records what you type.** `start_recording` `events: true` hooks mouse and keyboard input for that recording only, in a helper that exits with it (or with the server). Keys are `masked` by default: the log says a key went down, not which. `keys: "shortcuts"` also names chords held with Ctrl, Alt, or Win (`Ctrl+S`); plain typing, Shift+letter, and AltGr characters stay masked, and no mode records text. Cursor positions and clicks still reveal what you pointed at, so treat `.events.jsonl` like the recording beside it.
 - **System audio is sensitive too.** When `audio.source` = `system`, the recording captures everything playing on the machine (call audio, notifications, media). Treat audio-bearing recordings with the same care as the video.
