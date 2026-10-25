@@ -7,6 +7,23 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.27.3]
+
+### Added
+
+- Workflows on the docs site (#129): five recipe pages (bug-repro clip for a PR,
+  README demo GIF, agent UI verification loop, social clip, reviewing a long
+  recording), each with an example prompt, the tool calls it makes, and the real
+  output from an end-to-end run. Plus a Connect page with setup for Claude Code,
+  Claude Desktop, Cursor, and VS Code. Linked from the README and the home page.
+- A docs test that every relative link and image on the site resolves, and that
+  recipes name only registered tools.
+
+### Changed
+
+- The site's styles and script moved into shared `docs/site.css` and
+  `docs/site.js`.
+
 ## [0.27.2]
 
 ### Fixed

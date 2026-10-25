@@ -185,6 +185,8 @@ npm run build      # produces dist/index.js, the server entry point
 
 ## Usage
 
+**Workflows:** copy-paste recipes with the tool calls and real outputs are on the docs site: [bug-repro clip for a PR](https://tmhsdigital.github.io/screencast-mcp/workflows/bug-repro.html), [README demo GIF](https://tmhsdigital.github.io/screencast-mcp/workflows/demo-gif.html), [agent UI verification loop](https://tmhsdigital.github.io/screencast-mcp/workflows/verify-ui.html), [social clip](https://tmhsdigital.github.io/screencast-mcp/workflows/social-clip.html), and [reviewing a long recording](https://tmhsdigital.github.io/screencast-mcp/workflows/review-recording.html). Setup for Claude Code, Claude Desktop, Cursor, and VS Code: [Connect your client](https://tmhsdigital.github.io/screencast-mcp/connect.html).
+
 A typical watch loop — record, sample, look:
 
 ```jsonc

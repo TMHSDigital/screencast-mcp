@@ -1,0 +1,300 @@
+:root {
+  color-scheme: dark;
+  --desktop: #0A0D12;
+  --panel: #11161E;
+  --line: #232B36;
+  --ink: #EAF0F6;
+  --dim: #93A0AE;
+  --amber: #FFB454;
+  --rec: #FF4545;
+  --display: "Bricolage Grotesque", system-ui, sans-serif;
+  --body: "Figtree", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
+body {
+  font-family: var(--body);
+  background: var(--desktop);
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.65;
+  font-size: 1.0625rem;
+}
+a { color: var(--amber); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+a:hover { color: var(--ink); }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 2px; }
+code {
+  font-family: var(--mono);
+  font-size: 0.875em;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+}
+pre {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem 1.2rem;
+  overflow-x: auto;
+  font-size: 0.95rem;
+}
+pre code { border: 0; padding: 0; background: none; font-size: 0.875em; }
+.wrap { max-width: 920px; margin: 0 auto; padding: 0 1.5rem; }
+
+/* ---- HUD: the fixed recording chrome ---- */
+.hud {
+  position: fixed; inset: 0 0 auto 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.65rem 1.25rem;
+  font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.04em;
+  color: var(--dim);
+  background: color-mix(in srgb, var(--desktop) 82%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.hud-left { display: flex; align-items: center; gap: 0.6rem; }
+.rec-dot {
+  width: 0.65rem; height: 0.65rem; border-radius: 50%;
+  background: var(--rec);
+  animation: rec-pulse 1.6s ease-in-out infinite;
+}
+.rec-label { color: var(--rec); font-weight: 500; }
+.hud #tc { color: var(--ink); font-variant-numeric: tabular-nums; }
+.hud-right { display: flex; align-items: center; gap: 1.1rem; }
+.hud-right a { color: var(--dim); text-decoration: none; }
+.hud-right a:hover { color: var(--amber); }
+@keyframes rec-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* ---- Hero: headline inside a capture marquee ---- */
+.hero { padding: 9.5rem 0 5rem; }
+.eyebrow {
+  font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.14em;
+  color: var(--dim); margin: 0 0 1.6rem;
+}
+.marquee {
+  position: relative;
+  display: inline-block;
+  padding: clamp(1.4rem, 4vw, 2.6rem) clamp(1.2rem, 4.5vw, 3rem);
+  border: 1px dashed color-mix(in srgb, var(--dim) 55%, transparent);
+  animation: marquee-in 0.7s ease-out 0.15s backwards;
+}
+.marquee .handle {
+  position: absolute; width: 9px; height: 9px;
+  background: var(--desktop); border: 1.5px solid var(--ink);
+}
+.handle.tl { top: -5px; left: -5px; }
+.handle.tr { top: -5px; right: -5px; }
+.handle.bl { bottom: -5px; left: -5px; }
+.handle.br { bottom: -5px; right: -5px; }
+.marquee .dims {
+  position: absolute; right: 0; bottom: -1.7rem;
+  font-family: var(--mono); font-size: 0.72rem; color: var(--dim);
+}
+@keyframes marquee-in {
+  from { opacity: 0; transform: scale(0.985); }
+  to   { opacity: 1; transform: scale(1); }
+}
+h1 {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(2.1rem, 6.2vw, 4.2rem);
+  line-height: 1.04;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+h1 .amber { color: var(--amber); }
+.sub {
+  max-width: 44rem; color: var(--dim); font-size: 1.125rem;
+  margin: 2.6rem 0 2rem;
+}
+.sub strong { color: var(--ink); font-weight: 600; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 0.9rem; align-items: center; }
+.install-cmd {
+  display: flex; align-items: center; gap: 0.9rem;
+  font-family: var(--mono); font-size: 0.95rem;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.7rem 1.1rem;
+}
+.install-cmd .dollar { color: var(--dim); user-select: none; }
+.install-cmd button {
+  font-family: var(--mono); font-size: 0.78rem;
+  color: var(--amber); background: none;
+  border: 1px solid var(--line); border-radius: 5px;
+  padding: 0.25rem 0.6rem; cursor: pointer;
+}
+.install-cmd button:hover { border-color: var(--amber); }
+.gh-link { font-family: var(--mono); font-size: 0.9rem; }
+
+/* ---- Chapters ---- */
+.chapter { padding: 3.6rem 0 0.4rem; }
+.tc-mark {
+  display: flex; align-items: baseline; gap: 0.8rem;
+  font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.1em;
+  color: var(--dim);
+  border-top: 1px solid var(--line); padding-top: 1.1rem;
+}
+.tc-mark .tc { color: var(--amber); }
+h2 {
+  font-family: var(--display); font-weight: 700;
+  font-size: clamp(1.5rem, 3.4vw, 2.1rem);
+  letter-spacing: -0.01em;
+  margin: 0.9rem 0 0.7rem;
+}
+.chapter > p { max-width: 46rem; color: var(--dim); margin-top: 0; }
+.chapter > p strong, .chapter > p code { color: var(--ink); }
+
+/* ---- Tool tables ---- */
+table { width: 100%; border-collapse: collapse; margin: 1.4rem 0 0.6rem; }
+th, td { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th {
+  font-family: var(--mono); font-weight: 500; font-size: 0.75rem;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim);
+}
+td:first-child { white-space: nowrap; }
+td code { background: none; border: 0; padding: 0; color: var(--amber); font-size: 0.85rem; }
+td:last-child { color: var(--dim); font-size: 0.95rem; }
+
+/* ---- Prose sections ---- */
+ul { padding-left: 1.2rem; color: var(--dim); }
+ul li { margin: 0.5rem 0; }
+ul li code { color: var(--ink); }
+.note {
+  background: var(--panel);
+  border-left: 3px solid var(--rec);
+  border-radius: 0 8px 8px 0;
+  padding: 1rem 1.2rem;
+  margin: 1.4rem 0;
+  color: var(--dim);
+  max-width: 46rem;
+}
+.note strong { color: var(--ink); }
+
+footer {
+  margin-top: 5rem; padding: 2rem 0 3rem;
+  border-top: 1px solid var(--line);
+  font-family: var(--mono); font-size: 0.8rem; color: var(--dim);
+  display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between;
+}
+
+@media (max-width: 640px) {
+  .hud { font-size: 0.72rem; padding: 0.55rem 1rem; }
+  .hud-right .pkg { display: none; }
+  .hero { padding-top: 7.5rem; }
+  .install-cmd { font-size: 0.8rem; width: 100%; justify-content: space-between; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .rec-dot { animation: none; }
+  .marquee { animation: none; }
+}
+
+/* ---- Workflow pages ---- */
+.hud-right .here { color: var(--ink); }
+.page-head { padding: 7.5rem 0 1rem; }
+.crumbs {
+  font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.08em;
+  color: var(--dim); margin: 0 0 1.4rem;
+}
+.crumbs a { color: var(--dim); text-decoration: none; }
+.crumbs a:hover { color: var(--amber); }
+.page-head h1 { font-size: clamp(1.9rem, 5vw, 3.1rem); }
+.lede { max-width: 44rem; color: var(--dim); font-size: 1.125rem; margin: 1.2rem 0 0; }
+.lede strong { color: var(--ink); font-weight: 600; }
+
+/* The example prompt: what you type to the agent. */
+.prompt {
+  position: relative; max-width: 46rem;
+  margin: 1.6rem 0; padding: 1rem 1.2rem 1rem 1.2rem;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  font-size: 1.05rem;
+}
+.prompt::before {
+  content: "YOU"; display: block; margin-bottom: 0.35rem;
+  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em; color: var(--amber);
+}
+
+/* Tool calls as a numbered take list. */
+.takes { list-style: none; padding: 0; margin: 1.4rem 0; color: var(--ink); counter-reset: take; }
+.takes > li {
+  counter-increment: take;
+  display: grid; grid-template-columns: 3.2rem 1fr; gap: 0 0.6rem;
+  padding: 0.9rem 0; border-top: 1px solid var(--line); margin: 0;
+}
+.takes > li::before {
+  content: "T" counter(take, decimal-leading-zero);
+  font-family: var(--mono); font-size: 0.8rem; color: var(--amber); padding-top: 0.15rem;
+}
+.takes .call { font-family: var(--mono); font-size: 0.875rem; overflow-wrap: anywhere; }
+.takes .call b { color: var(--amber); font-weight: 500; }
+.takes .why { grid-column: 2; color: var(--dim); font-size: 0.95rem; margin-top: 0.25rem; }
+.takes .ret {
+  grid-column: 2; margin-top: 0.45rem;
+  font-family: var(--mono); font-size: 0.8rem; color: var(--dim); overflow-wrap: anywhere;
+}
+.takes .ret::before { content: "\2192  "; color: var(--rec); }
+
+/* A real output, framed like a capture with its dimensions. */
+figure.output { margin: 2rem 0; }
+figure.output .frame {
+  position: relative; display: inline-block; max-width: 100%;
+  padding: 10px; border: 1px dashed color-mix(in srgb, var(--dim) 55%, transparent);
+}
+figure.output img { display: block; max-width: 100%; height: auto; border-radius: 2px; }
+figure.output figcaption {
+  font-family: var(--mono); font-size: 0.78rem; color: var(--dim); margin-top: 0.6rem;
+}
+figure.output figcaption .tc { color: var(--amber); }
+
+.pager {
+  display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  margin-top: 3.5rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+  font-family: var(--mono); font-size: 0.85rem;
+}
+
+/* Recipe index cards. */
+.recipes { list-style: none; padding: 0; margin: 1.6rem 0; display: grid; gap: 1rem; }
+.recipes li { margin: 0; }
+.recipes a {
+  display: grid; grid-template-columns: 4.2rem 1fr; gap: 0.2rem 1rem; align-items: baseline;
+  padding: 1.1rem 1.2rem; text-decoration: none; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+}
+.recipes a:hover { border-color: var(--amber); }
+.recipes .tc { font-family: var(--mono); font-size: 0.8rem; color: var(--amber); }
+.recipes .name { font-family: var(--display); font-weight: 700; font-size: 1.25rem; }
+.recipes .chain { grid-column: 2; font-family: var(--mono); font-size: 0.8rem; color: var(--dim); }
+
+/* Client tabs; without JS every panel shows, each with its own heading. */
+.tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 1.6rem 0 0; }
+.tabs button {
+  font-family: var(--mono); font-size: 0.82rem; cursor: pointer;
+  color: var(--dim); background: none;
+  border: 1px solid var(--line); border-radius: 6px; padding: 0.45rem 0.9rem;
+}
+.tabs button[aria-selected="true"] { color: var(--desktop); background: var(--amber); border-color: var(--amber); }
+.panel h3 { font-family: var(--display); font-size: 1.3rem; margin: 2rem 0 0.4rem; }
+.js .panel h3 { display: none; }
+.panel > p { color: var(--dim); max-width: 46rem; }
+.panel > p code, .panel > p strong { color: var(--ink); }
+.panel ol { color: var(--dim); padding-left: 1.2rem; }
+.panel ol li { margin: 0.4rem 0; }
+.panel ol li code { color: var(--ink); }
+.copyable { position: relative; padding-right: 4.5rem; }
+.copyable button {
+  position: absolute; top: 0.55rem; right: 0.55rem;
+  font-family: var(--mono); font-size: 0.75rem; color: var(--amber);
+  background: var(--desktop); border: 1px solid var(--line); border-radius: 5px;
+  padding: 0.2rem 0.55rem; cursor: pointer;
+}
+.copyable button:hover { border-color: var(--amber); }
+
+@media (max-width: 640px) {
+  .page-head { padding-top: 6rem; }
+  .hud-right { gap: 0.8rem; }
+  .hud-right .home, .hud-right .gh { display: none; }
+  .takes > li { grid-template-columns: 2.6rem 1fr; }
+  .recipes a { grid-template-columns: 1fr; }
+  .recipes .chain { grid-column: 1; }
+}

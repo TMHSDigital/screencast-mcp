@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>README demo GIF — Screencast MCP</title>
+  <meta name="description" content="Record a feature, check the take at a glance, and export an animated WebP or GIF sized for a README.">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/workflows/demo-gif.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="README demo GIF — Screencast MCP">
+  <meta property="og:description" content="Record a feature, check the take at a glance, and export an animated WebP or GIF sized for a README.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/workflows/demo-gif.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../workflows/" class="here">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">WORKFLOWS</a> / REC 02</p>
+      <h1>README demo GIF</h1>
+      <p class="lede">A README gets one shot at showing what the project does. Record the feature, look over the take as one image before you spend time on it, then export an animation sized for the page. Animated WebP is usually much smaller than GIF for the same frames, and GitHub renders both.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>THE PROMPT</span></div>
+      <p class="prompt">Record the Demo Settings window for about five seconds while the save runs, show me the take, and make a WebP under 3 MB for the README.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>THE CALLS IT MAKES</span></div>
+      <p>start_recording &rarr; contact_sheet &rarr; export_gif (webp). Paths are shortened; every value is from a real run.</p>
+      <ol class="takes">
+        <li><span class="call"><b>start_recording</b> { "target": "window:Demo Settings", "fps": 15 }</span><span class="ret">{ "sessionId": "rec-…", "matchedWindow": "Demo Settings" }</span></li>
+        <li><span class="call"><b>stop_recording</b> { "sessionId": "rec-…" }</span><span class="ret">{ "durationSec": 6.53, "finalizedGracefully": true }</span></li>
+        <li><span class="call"><b>contact_sheet</b> { "input": "rec-….mp4", "mode": "scenes" }</span><span class="why">One image with a timestamped tile at each point the screen changed, returned inline for the agent (and you) to check the take.</span><span class="ret">{ "frameTimes": [0, 3], "columns": 2, "rows": 1 }</span></li>
+        <li><span class="call"><b>export_gif</b> { "input": "rec-….mp4", "format": "webp", "width": 480, "maxBytes": 3000000 }</span><span class="ret">{ "format": "webp", "sizeBytes": 37636, "withinBudget": true }</span></li>
+      </ol>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:30</span><span>THE OUTPUT</span></div>
+      <figure class="output">
+        <div class="frame"><img src="../media/demo.webp" width="480" height="281" alt="Animated WebP of the settings window: a progress bar fills under the Save button, then a green Saved banner slides in." loading="lazy"></div>
+        <figcaption><span class="tc">demo.webp</span> · 480 × 281 · 37 KB. The same clip as a GIF was 99 KB.</figcaption>
+      </figure>
+      <p>Reference it from the README with an ordinary image tag: <code>![Saving settings](docs/demo.webp)</code>. Need GIF for an older viewer? Drop <code>format</code>; the default budget is GitHub's 10 MB.</p>
+      <nav class="pager" aria-label="More recipes">
+        <span><a href="bug-repro.html">&larr; REC 01 Bug-repro clip for a PR</a></span>
+        <span><a href="verify-ui.html">REC 03 Agent UI verification loop &rarr;</a></span>
+      </nav>
+    </section>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>CC-BY-NC-ND-4.0</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>

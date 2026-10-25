@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bug-repro clip for a PR — Screencast MCP</title>
+  <meta name="description" content="Have your agent record a bug, hide the secrets on screen, trim it, mark the problem, and export a GIF small enough for a GitHub PR.">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/workflows/bug-repro.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="Bug-repro clip for a PR — Screencast MCP">
+  <meta property="og:description" content="Have your agent record a bug, hide the secrets on screen, trim it, mark the problem, and export a GIF small enough for a GitHub PR.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/workflows/bug-repro.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../workflows/" class="here">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">WORKFLOWS</a> / REC 01</p>
+      <h1>Bug-repro clip for a PR</h1>
+      <p class="lede">A reviewer understands a bug faster from five seconds of video than from five paragraphs. The agent records the repro, finds and covers anything secret on screen, cuts it to the moment that matters, points at the problem, and hands back a GIF that fits GitHub's 10 MB limit.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>THE PROMPT</span></div>
+      <p class="prompt">Record the Demo Settings window while I click Save. Then hide the API key, trim it to the save, put a box on the Save button saying it hangs, and give me a GIF for the PR.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>THE CALLS IT MAKES</span></div>
+      <p>start_recording &rarr; find_text &rarr; redact_region &rarr; trim &rarr; callout &rarr; export_gif. Paths are shortened; every value is from a real run.</p>
+      <ol class="takes">
+        <li><span class="call"><b>start_recording</b> { "target": "window:Demo Settings", "fps": 15 }</span><span class="why">Matches the window by title and records just its frame.</span><span class="ret">{ "sessionId": "rec-…", "matchKind": "exact", "region": { "width": 602, "height": 352 } }</span></li>
+        <li><span class="call"><b>stop_recording</b> { "sessionId": "rec-…" }</span><span class="why">Quits ffmpeg cleanly so the mp4 is finalized.</span><span class="ret">{ "durationSec": 7.07, "finalizedGracefully": true }</span></li>
+        <li><span class="call"><b>find_text</b> { "input": "rec-….mp4", "timestamp": 0.5, "query": "sk-[\\w-]+", "regex": true, "redact": true }</span><span class="why">Windows OCR reads the frame and returns a padded rectangle for each match. Match on a prefix: OCR read this key's <code>live</code> as <code>1ive</code>.</span><span class="ret">{ "matchCount": 1, "redactRegions": [{ "x": 152, "y": 121, "width": 196, "height": 22 }] }</span></li>
+        <li><span class="call"><b>redact_region</b> { "input": "rec-….mp4", "regions": [{ "x": 152, "y": 121, "width": 196, "height": 22 }] }</span><span class="why">Covers the rectangle for the whole clip (a solid box by default; <code>style</code> can be blur or pixelate).</span><span class="ret">{ "outputPath": "redact-….mp4", "regions": 1 }</span></li>
+        <li><span class="call"><b>find_text</b> { "input": "redact-….mp4", "timestamp": 0.5, "query": "sk-" }</span><span class="why">Check the redaction worked before anything leaves the machine.</span><span class="ret">{ "matchCount": 0 }</span></li>
+        <li><span class="call"><b>trim</b> { "input": "redact-….mp4", "start": 0.5, "end": 5 }</span><span class="ret">{ "outputPath": "trim-….mp4" }</span></li>
+        <li><span class="call"><b>callout</b> { "input": "trim-….mp4", "items": [<br>&nbsp;&nbsp;{ "type": "box", "x": 28, "y": 178, "width": 128, "height": 50, "from": 0.3, "to": 2.6, "color": "red" },<br>&nbsp;&nbsp;{ "type": "text", "x": 170, "y": 188, "text": "Save hangs for 2.5 s", "size": 22, "color": "red", "from": 0.3, "to": 2.6 } ] }</span><span class="why">Timed annotations, drawn only while the bug is on screen.</span><span class="ret">{ "outputPath": "callout-….mp4", "callouts": 2 }</span></li>
+        <li><span class="call"><b>export_gif</b> { "input": "callout-….mp4", "width": 480, "fps": 10, "maxBytes": 2000000 }</span><span class="why">Steps fps, width, and colors down until the file fits the budget.</span><span class="ret">{ "sizeBytes": 71206, "withinBudget": true, "settings": { "fps": 10, "width": 480, "colors": 256 } }</span></li>
+      </ol>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:30</span><span>THE OUTPUT</span></div>
+      <figure class="output">
+        <div class="frame"><img src="../media/bug-repro.gif" width="480" height="281" alt="A settings window with the API key covered by a black box. A red box and the label 'Save hangs for 2.5 s' point at the Save button until a progress bar fills and a green Saved banner appears." loading="lazy"></div>
+        <figcaption><span class="tc">bug-repro.gif</span> · 480 × 281 · 70 KB · the real output of the calls above</figcaption>
+      </figure>
+      <p>Drop the GIF into the PR description. <code>find_text</code> is best-effort: OCR can miss small or stylised text, so look at a frame before you share. If you know where a secret sits, pass the rectangle to <code>redact_region</code> yourself.</p>
+      <nav class="pager" aria-label="More recipes">
+        <span><a href="./">&larr; All workflows</a></span>
+        <span><a href="demo-gif.html">REC 02 README demo GIF &rarr;</a></span>
+      </nav>
+    </section>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>CC-BY-NC-ND-4.0</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>
