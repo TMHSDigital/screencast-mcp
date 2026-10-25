@@ -53,4 +53,11 @@ describe("getMonitors cache (#88)", () => {
     await getMonitors(20);
     expect(execFile.mock.calls[0][0]).toBe("powershell");
   });
+
+  it("makes PowerShell write UTF-8, so non-ASCII text survives the pipe", async () => {
+    await getMonitors(30);
+    const args = execFile.mock.calls[0][1] as string[];
+    const script = Buffer.from(args[args.indexOf("-EncodedCommand") + 1], "base64").toString("utf16le");
+    expect(script.startsWith("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n")).toBe(true);
+  });
 });
