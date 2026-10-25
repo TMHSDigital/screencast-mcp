@@ -55,6 +55,9 @@ export interface SessionRecord {
   error?: string;
   /** For window: targets, the title of the window actually recorded (#89). */
   matchedWindow?: string;
+  /** Capture backend: the screen rectangle (gdigrab) or the window itself
+   * through Windows Graphics Capture (wgc, #113). Absent on older records. */
+  backend?: "gdigrab" | "wgc";
   /** Input event log (#118), when the recording was started with events: true. */
   events?: {
     path: string;
