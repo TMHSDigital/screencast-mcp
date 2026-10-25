@@ -77,11 +77,12 @@
         <table>
           <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td><code>start_recording</code></td><td>Start a background recording. Target = full, a monitor, a window by title, or a region. Optional fps, quality preset, and system audio.</td></tr>
+            <tr><td><code>start_recording</code></td><td>Start a background recording. Target = full, a monitor, a window by title, or a region. Optional fps, quality preset, system audio, and an input event log.</td></tr>
             <tr><td><code>stop_recording</code></td><td>Stop a session by id with a graceful quit so the file is finalized, not truncated.</td></tr>
             <tr><td><code>screenshot</code></td><td>Capture a single PNG of a target, returned inline for the model to view.</td></tr>
             <tr><td><code>list_sessions</code></td><td>List active and finished recording sessions.</td></tr>
             <tr><td><code>get_session</code></td><td>Inspect a single session by id.</td></tr>
+            <tr><td><code>read_events</code></td><td>Read a recording&rsquo;s input event log: clicks, scroll, cursor, and key presses on the video&rsquo;s clock. Opt in with <code>start_recording</code> <code>events: true</code>.</td></tr>
             <tr><td><code>list_audio_devices</code></td><td>List DirectShow audio devices and flag a likely system-audio loopback device for start_recording.</td></tr>
           </tbody>
         </table>
@@ -204,7 +205,8 @@
         the local filesystem, and this public repo ignores captured media so test
         recordings cannot be committed by accident. Review frames before sharing
         a file, and use <code>redact_region</code> before anything leaves the
-        machine.
+        machine. The optional input event log never records typed text: keys are
+        masked by default, and at most Ctrl/Alt/Win shortcuts are named.
       </div>
     </section>
 

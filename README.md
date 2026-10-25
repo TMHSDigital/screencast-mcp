@@ -49,10 +49,11 @@ Thirty-seven tools across four concerns. The manifest in [`mcp-tools.json`](mcp-
 
 | Tool | Purpose |
 | --- | --- |
-| `start_recording` | Start a background recording. `target` = `full` \| `monitor:<index>` \| `window:<title>` \| `region:<x>,<y>,<w>,<h>`; optional `fps`, `quality`, `audio` (set `audio.source` = `system` to also capture loopback audio), and `maxDurationSec` (auto-stop cap, default 3600; `0` = none). Returns a session id and output path. |
+| `start_recording` | Start a background recording. `target` = `full` \| `monitor:<index>` \| `window:<title>` \| `region:<x>,<y>,<w>,<h>`; optional `fps`, `quality`, `audio` (set `audio.source` = `system` to also capture loopback audio), `maxDurationSec` (auto-stop cap, default 3600; `0` = none), and `events` (log clicks, scroll, cursor, and key presses to `<recording>.events.jsonl`; `keys` = `masked` by default or `shortcuts`). Returns a session id and output path. |
 | `stop_recording` | Stop a session by id. Sends ffmpeg a graceful quit so the file is **finalized, not truncated**. Returns the final path and duration. |
 | `list_sessions` | List active and finished sessions. |
 | `get_session` | Inspect a single session by id. |
+| `read_events` | Read a recording's input event log (clicks, scroll, cursor, key presses) on the video's clock. Opt in with `start_recording` `events: true`. |
 | `screenshot` | Capture a single PNG of a `target`, and return it inline as an image the model can view. |
 | `list_audio_devices` | List the DirectShow audio devices ffmpeg can see and flag a likely system-audio loopback device for `start_recording`. |
 
@@ -242,6 +243,7 @@ It also offers **resources**, so a client can list and attach recordings without
 - **Public repo, private captures.** The `.gitignore` blocks recordings, frames, screenshots, and common video/image output so test media cannot be committed by accident.
 - **Review before sharing.** Sample frames or inspect a recording before handing a file to another tool or person, so you know what it contains.
 - **Redaction covers what you declare.** `redact_region` covers only the rectangles you specify. `find_text` can help find them: OCR with a query such as `regex: "sk-|ghp_|api.?key"` and `redact: true` returns ready-made rectangles. But OCR is best-effort; it can miss small or stylised text, so treat it as an aid, not a guarantee. Use the default `box` style for a solid irreversible fill, and still review the output before sharing.
+- **The input event log never records what you type.** `start_recording` `events: true` hooks mouse and keyboard input for that recording only, in a helper that exits with it (or with the server). Keys are `masked` by default: the log says a key went down, not which. `keys: "shortcuts"` also names chords held with Ctrl, Alt, or Win (`Ctrl+S`); plain typing, Shift+letter, and AltGr characters stay masked, and no mode records text. Cursor positions and clicks still reveal what you pointed at, so treat `.events.jsonl` like the recording beside it.
 - **System audio is sensitive too.** When `audio.source` = `system`, the recording captures everything playing on the machine (call audio, notifications, media). Treat audio-bearing recordings with the same care as the video.
 
 ## Project structure

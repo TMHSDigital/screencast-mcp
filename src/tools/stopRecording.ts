@@ -51,6 +51,9 @@ export function register(server: McpServer): void {
           outputPath: record.outputPath,
           durationSec: durationSec ?? null,
           finalizedGracefully: graceful,
+          ...(updated?.events
+            ? { eventsPath: updated.events.path, events: updated.events.summary ?? {}, ...(updated.events.error ? { eventsError: updated.events.error } : {}) }
+            : {}),
           fileExists: existsSync(record.outputPath),
           note: graceful
             ? "ffmpeg quit cleanly; file finalized."

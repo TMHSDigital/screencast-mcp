@@ -9,6 +9,7 @@
 import { existsSync } from "node:fs";
 import type { ChildProcess } from "node:child_process";
 import { runCapture } from "./ffmpeg.js";
+import { whenFinalized } from "./events.js";
 import { buildProbeArgs, parseMediaInfo } from "./media.js";
 import {
   isAlive,
@@ -126,6 +127,8 @@ export async function stopSession(
       }
     }
     store.detachChild(record.id);
+    // The input event log converts once ffmpeg has exited (#118).
+    await whenFinalized(record.id);
 
     const durationSec = await opts.probe(record.outputPath);
     const updated = store.update(record.id, {

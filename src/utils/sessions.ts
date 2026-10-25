@@ -55,6 +55,14 @@ export interface SessionRecord {
   error?: string;
   /** For window: targets, the title of the window actually recorded (#89). */
   matchedWindow?: string;
+  /** Input event log (#118), when the recording was started with events: true. */
+  events?: {
+    path: string;
+    keys: "masked" | "shortcuts";
+    count?: number;
+    summary?: Record<string, number>;
+    error?: string;
+  };
 }
 
 /** Decide what an in-progress session becomes at boot, given liveness.
