@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { extname, join } from "node:path";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
+import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
-import { buildArrowImageArgs, buildCalloutArgs, type Callout } from "../utils/callout.js";
-import { bundledFontPath } from "../utils/fonts.js";
+import { buildCalloutArgs, type Callout } from "../utils/callout.js";
+import { prepareCalloutAssets } from "../utils/calloutAssets.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const timing = {
@@ -16,7 +16,8 @@ const timing = {
   color: z.string().optional().describe("Color name, #RRGGBB, or name@alpha."),
 };
 
-const item = z.discriminatedUnion("type", [
+/** One callout; shared with pipeline. */
+export const calloutItemSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("box"),
     x: z.number(),
@@ -50,7 +51,7 @@ const item = z.discriminatedUnion("type", [
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
   items: z
-    .array(item)
+    .array(calloutItemSchema)
     .min(1)
     .max(50)
     .describe(
@@ -79,28 +80,8 @@ export function register(server: McpServer): void {
         // Text files and rendered arrows live in a private temp dir.
         const work = mkdtempSync(join(tmpdir(), "screencast-callout-"));
         try {
-          const textFiles = items.map((c, i) => {
-            if (c.type !== "text") return null;
-            const f = join(work, `text_${i}.txt`);
-            writeFileSync(f, c.text);
-            return f;
-          });
-          const arrowFiles: Array<string | null> = [];
-          for (let i = 0; i < items.length; i++) {
-            const c = items[i];
-            if (c.type !== "arrow") {
-              arrowFiles.push(null);
-              continue;
-            }
-            const f = join(work, `arrow_${i}.png`);
-            await runFfmpeg(buildArrowImageArgs(c, f), 30_000);
-            arrowFiles.push(f);
-          }
-          const ffArgs = buildCalloutArgs(args.input, output, items, {
-            fontFile: bundledFontPath("bold"),
-            textFiles,
-            arrowFiles,
-          });
+          const assets = await prepareCalloutAssets(items, work);
+          const ffArgs = buildCalloutArgs(args.input, output, items, assets);
           await runEditJob(ffArgs, { output, durationSec: await probeDuration(args.input), extra });
         } finally {
           rmSync(work, { recursive: true, force: true });

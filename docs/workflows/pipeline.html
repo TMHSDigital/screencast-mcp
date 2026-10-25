@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The whole edit in one call — Screencast MCP</title>
+  <meta name="description" content="Redact, trim, annotate, and export a bug-repro GIF in one pipeline call: one ffmpeg pass, no intermediate files, and a recipe you can re-run on the next recording.">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/workflows/pipeline.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="The whole edit in one call — Screencast MCP">
+  <meta property="og:description" content="Redact, trim, annotate, and export a bug-repro GIF in one pipeline call: one ffmpeg pass, no intermediate files, and a recipe you can re-run on the next recording.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/workflows/pipeline.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../workflows/" class="here">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">WORKFLOWS</a> / REC 07</p>
+      <h1>The whole edit in one call</h1>
+      <p class="lede">REC 01 takes six edit calls, six re-encodes, and five intermediate files. <code>pipeline</code> takes the same steps, with the same options as each tool, and runs them as one ffmpeg process. The steps are plain JSON, so save them as your team's standard PR clip and re-run them on the next recording.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>THE PROMPT</span></div>
+      <p class="prompt">Record Demo Settings while I click Save, then in one go: hide the API key, trim to the save, box the Save button saying it hangs, and give me a GIF under 2 MB.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>THE CALLS IT MAKES</span></div>
+      <p>start_recording &rarr; find_text &rarr; pipeline (redact &rarr; trim &rarr; callout &rarr; export_gif). Paths are shortened; every value is from a real run.</p>
+      <ol class="takes">
+        <li><span class="call"><b>start_recording</b> { "target": "window:Demo Settings", "fps": 15 }</span><span class="why">Then <code>stop_recording</code> when the repro is done.</span><span class="ret">{ "sessionId": "rec-…", "region": { "width": 602, "height": 352 } }</span></li>
+        <li><span class="call"><b>find_text</b> { "input": "rec-….mp4", "timestamp": 0.5, "query": "sk-[\\w-]+", "regex": true, "redact": true }</span><span class="why">Finding the secret is the one step that stays separate: its rectangles feed the pipeline.</span><span class="ret">{ "matchCount": 1, "redactRegions": [{ "x": 152, "y": 121, "width": 196, "height": 22 }] }</span></li>
+        <li><span class="call"><b>pipeline</b> { "input": "rec-….mp4", "dryRun": true, "steps": [<br>&nbsp;&nbsp;{ "op": "redact", "regions": [{ "x": 152, "y": 121, "width": 196, "height": 22 }] },<br>&nbsp;&nbsp;{ "op": "trim", "start": 0.5, "end": 5 },<br>&nbsp;&nbsp;{ "op": "callout", "items": [ { "type": "box", … }, { "type": "text", "text": "Save hangs for 2.5 s", … } ] },<br>&nbsp;&nbsp;{ "op": "export_gif", "width": 480, "fps": 10, "maxBytes": 2000000 } ] }</span><span class="why">The plan: what each step became, and the fused ffmpeg command. Redact runs first, so it covers the whole clip; callout times are on the trimmed timeline.</span><span class="ret">{ "steps": ["redact 1 region(s), box", "trim 0.5-5s: trim filter", "callout 2 item(s)", "export_gif (gif): second stage, size-budget ladder"], "processes": 2, "width": 602, "height": 352, "durationSec": 4.5 }</span></li>
+        <li><span class="call"><b>pipeline</b> { …the same steps, without dryRun }</span><span class="why">One fused encode, then the GIF size ladder. 368 ms here, against six tool calls for REC 01.</span><span class="ret">{ "outputPath": "pipeline-….gif", "animation": { "sizeBytes": 47020, "withinBudget": true } }</span></li>
+      </ol>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:30</span><span>THE OUTPUT</span></div>
+      <figure class="output">
+        <div class="frame"><img src="../media/pipeline.gif" width="480" height="281" alt="The same bug-repro GIF as REC 01: the API key covered by a black box, a red box and label on the Save button, then the Saved banner." loading="lazy"></div>
+        <figcaption><span class="tc">pipeline.gif</span> · 480 × 281 · 46 KB · one pipeline call</figcaption>
+      </figure>
+      <p>Steps run in order, and each sees the frame and timeline left by the steps before it: crop then redact means redact coordinates are in the cropped frame. <code>export_preset</code> or <code>export_gif</code> can only come last. Without one, the result is an mp4 at <code>quality</code> (default standard).</p>
+      <nav class="pager" aria-label="More recipes">
+        <span><a href="zoom-clicks.html">&larr; REC 06 Zoom toward every click</a></span>
+        <span><a href="../connect.html">Connect your client &rarr;</a></span>
+      </nav>
+    </section>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>CC-BY-NC-ND-4.0</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>

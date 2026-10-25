@@ -34,7 +34,8 @@ function readClicks(path: string): ClickPoint[] | null {
 }
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
-const keyframe = z.object({
+/** One zoom keyframe; shared with pipeline. */
+export const zoomKeyframeSchema = z.object({
   t: z.number().nonnegative().describe("Seconds: the view is fully reached at this time."),
   x: z.number().optional(),
   y: z.number().optional(),
@@ -46,7 +47,7 @@ const keyframe = z.object({
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
   keyframes: z
-    .array(keyframe)
+    .array(zoomKeyframeSchema)
     .max(100)
     .optional()
     .describe(

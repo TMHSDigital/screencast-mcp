@@ -2,7 +2,7 @@
 
 # Roadmap
 
-**Current:** v0.29.0 shipped (Phase 3 complete; a second hardening round is
+**Current:** v0.30.0 shipped (Phase 3 complete; a second hardening round is
 underway, see below and CHANGELOG). Cross-platform capture is the next feature
 phase.
 
@@ -123,7 +123,7 @@ Screencast-native polish that turns a raw capture into something watchable.
 - [x] Optimized GIF/WebP export (palette tuning, size budget) beyond `convert`
       (#124, `export_gif`) -- v0.17.0
 - [ ] Chapter markers / cue points written into the container
-- [ ] `pipeline` -- chain several edits in one call to avoid intermediate files
+- [x] `pipeline` -- chain several edits as one ffmpeg process (one re-encode, no intermediate files), ending in `export_preset` or `export_gif` (#125) -- v0.30.0
 
 ## Cross-cutting backlog
 

@@ -8,19 +8,20 @@ import { runEditJob } from "../utils/jobs.js";
 import { buildRedactArgs, type RedactStyle } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
+/** One rectangle to redact; shared with pipeline. */
+export const redactRegionSchema = z.object({
+  x: z.number().int().nonnegative().describe("Left edge in pixels."),
+  y: z.number().int().nonnegative().describe("Top edge in pixels."),
+  width: z.number().int().positive().describe("Region width in pixels."),
+  height: z.number().int().positive().describe("Region height in pixels."),
+  start: z.number().nonnegative().optional().describe("Optional second to start redacting from."),
+  end: z.number().positive().optional().describe("Optional second to stop redacting after."),
+});
+
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
   regions: z
-    .array(
-      z.object({
-        x: z.number().int().nonnegative().describe("Left edge in pixels."),
-        y: z.number().int().nonnegative().describe("Top edge in pixels."),
-        width: z.number().int().positive().describe("Region width in pixels."),
-        height: z.number().int().positive().describe("Region height in pixels."),
-        start: z.number().nonnegative().optional().describe("Optional second to start redacting from."),
-        end: z.number().positive().optional().describe("Optional second to stop redacting after."),
-      }),
-    )
+    .array(redactRegionSchema)
     .min(1)
     .describe("One or more rectangles to redact. Each may be limited to a time window."),
   style: z

@@ -614,6 +614,22 @@
     }
   },
   {
+    "name": "pipeline",
+    "description": "Run several edits as one ffmpeg process: one re-encode and no intermediate files, instead of a tool call and a re-encode per edit. Steps use the same options as the standalone tools (trim, crop, scale, speed, redact, callout, reframe, zoom) and may end with export_preset or export_gif. The same steps can be saved and re-run on another recording. dryRun returns the plan.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "steps": { "type": "array", "description": "Edits in order, each { op, ...the same options as its tool }: trim, crop, scale, speed, redact, callout, reframe, zoom (keyframes), and as the last step only export_preset or export_gif. Times and pixels in a step are on the timeline and frame as they are at that step", "items": { "type": "object" } },
+        "quality": { "type": "string", "enum": ["draft", "standard", "high"], "description": "Encoder preset for an mp4 result (default standard)" },
+        "dryRun": { "type": "boolean", "description": "Return the planned ffmpeg command and output size without running it" },
+        "output": { "type": "string", "description": "Optional output path. Defaults under SCREENCAST_HOME/edits" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+      },
+      "required": ["input", "steps"]
+    }
+  },
+  {
     "name": "export_preset",
     "description": "Encode a platform-ready file for youtube, instagram_reel, tiktok, x, or square. Reframes to the platform aspect, caps fps, and encodes H.264 at the platform bitrate with faststart.",
     "inputSchema": {
