@@ -111,7 +111,7 @@ What it can do beyond record-and-look:
 
 | Tool | Purpose |
 | --- | --- |
-| `trim` | Cut a sub-clip by `start` + (`end` or `duration`). Stream-copy for speed. |
+| `trim` | Cut a sub-clip by `start` + (`end` or `duration`). Re-encodes by default so nothing before `start` stays in the file; `exact: false` stream-copies for speed. |
 | `concat` | Join two or more videos into one. |
 | `convert` | Convert between `mp4`, `gif`, and `webm`. |
 | `export_gif` | Animated **GIF or WebP that fits a size budget** (default: GitHub's 10 MB image limit) for PRs, issues, and READMEs. Two-stage palette for GIF; steps fps, width, and palette/quality down until it fits, and reports the settings used. |

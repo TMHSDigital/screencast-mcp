@@ -293,10 +293,39 @@ describe("buildWgcScreenshotArgs (#113)", () => {
   it("captures one frame of a window by handle through gfxcapture", () => {
     const a = buildWgcScreenshotArgs(132456, "w.png");
     expect(a[a.indexOf("-filter_complex") + 1]).toBe("gfxcapture=hwnd=132456:max_framerate=30,hwdownload,format=bgra");
-    expect(a.slice(-3)).toEqual(["-frames:v", "1", "w.png"]);
+    expect(a.slice(-5)).toEqual(["-frames:v", "1", "-update", "1", "w.png"]);
   });
   it("rejects an invalid handle", () => {
     expect(() => buildWgcScreenshotArgs(0, "w.png")).toThrow(/handle/);
     expect(() => buildWgcScreenshotArgs(1.5, "w.png")).toThrow(/handle/);
+  });
+});
+
+describe("full on an odd-sized virtual desktop (#226)", () => {
+  // Two 1920x1080 monitors, the second offset to y=301: a 3840x1381 desktop.
+  const ODD: Monitor[] = [
+    { index: 0, x: 0, y: 0, width: 1920, height: 1080, primary: true },
+    { index: 1, x: 1920, y: 301, width: 1920, height: 1080, primary: false },
+  ];
+
+  it("records an even-sized region of the desktop", () => {
+    const a = buildCaptureArgs({ kind: "full" }, { output: "o.mp4", monitors: ODD }).join(" ");
+    expect(a).toContain("-offset_x 0 -offset_y 0 -video_size 3840x1380 -i desktop");
+    expect(a).not.toContain("crop=");
+  });
+
+  it("keeps the plain desktop input when the desktop is already even", () => {
+    const a = buildCaptureArgs({ kind: "full" }, { output: "o.mp4", monitors: MONITORS }).join(" ");
+    expect(a).not.toContain("-video_size");
+    expect(a).not.toContain("crop=");
+  });
+
+  it("crops to even dimensions when no monitor geometry is known", () => {
+    const a = buildCaptureArgs({ kind: "full" }, { output: "o.mp4" }).join(" ");
+    expect(a).toContain("-vf crop=trunc(iw/2)*2:trunc(ih/2)*2");
+  });
+
+  it("leaves screenshots at the exact desktop size", () => {
+    expect(buildScreenshotArgs({ kind: "full" }, "s.png", ODD).join(" ")).not.toContain("-video_size");
   });
 });

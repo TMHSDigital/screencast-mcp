@@ -10,6 +10,7 @@ import { escapeFilterPath } from "./fonts.js";
 import { enableExpr } from "./media.js";
 import { resolveQuality, type Quality } from "./targets.js";
 import { validateColor } from "./validate.js";
+import { stillOutput } from "./paths.js";
 
 interface Timed {
   /** Show from this second (default: start of video). */
@@ -87,7 +88,7 @@ export function buildArrowImageArgs(a: ArrowCallout, output: string): string[] {
     "-f", "lavfi", "-i", `color=c=${color}:s=${length}x${head}`,
     "-vf", `format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alpha}',rotate=a=${ang}:ow=rotw(${ang}):oh=roth(${ang}):c=none`,
     "-frames:v", "1",
-    output,
+    ...stillOutput(output),
   ];
 }
 

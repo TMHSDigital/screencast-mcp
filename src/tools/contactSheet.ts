@@ -24,7 +24,7 @@ import {
   DEFAULT_TILE_WIDTH,
 } from "../utils/sheet.js";
 import { bundledFontPath } from "../utils/fonts.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { resolveOutput, subdir, stamp, rand, sequencePattern } from "../utils/paths.js";
 import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js";
 
 const inputSchema = {
@@ -135,7 +135,7 @@ export function register(server: McpServer): void {
               const tile = join(work, `tile_${String(i).padStart(3, "0")}.png`);
               await runFfmpeg(buildTileArgs(args.input, times[i], tile, tileWidth, font, labelFile), 60_000);
             }
-            await runFfmpeg(buildSheetArgs(join(work, "tile_%03d.png"), grid, output), 60_000);
+            await runFfmpeg(buildSheetArgs(sequencePattern(work, "tile_%03d.png"), grid, output), 60_000);
           } finally {
             rmSync(work, { recursive: true, force: true });
           }

@@ -17,9 +17,12 @@ import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { binaryWorks, runCapture, runFfmpeg, runFfmpegBuffer, probeMedia } from "../../utils/ffmpeg.js";
+import { sequencePattern } from "../../utils/paths.js";
 import {
   buildTrimArgs,
   buildClipArgs,
+  buildCompressArgs,
+  buildSampleAtTimestampArgs,
   buildSpeedArgs,
   buildCropArgs,
   buildScaleArgs,
@@ -141,6 +144,39 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     const out = p("trim-dur.mp4");
     await runFfmpeg(buildTrimArgs(av, out, { start: 2, duration: 4 }));
     expect((await probeMedia(out)).durationSec!).toBeCloseTo(4, 0);
+  });
+
+  it("trim leaves no hidden frames from before start; exact: false keeps them (#203)", async () => {
+    // av has a keyframe every 30 frames, so a 7.5 s start sits mid-GOP.
+    const count = (f: string) =>
+      Number(
+        spawnSync("ffprobe", [
+          "-v", "error", "-ignore_editlist", "1", "-select_streams", "v:0", "-count_packets",
+          "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", f,
+        ], { encoding: "utf8" }).stdout.trim(),
+      );
+    const exact = p("trim-exact.mp4");
+    const copy = p("trim-copy.mp4");
+    await runFfmpeg(buildTrimArgs(av, exact, { start: 7.5, duration: 2 }));
+    await runFfmpeg(buildTrimArgs(av, copy, { start: 7.5, duration: 2, exact: false }));
+    expect(count(exact)).toBeLessThanOrEqual(61);
+    expect(count(copy)).toBeGreaterThan(count(exact));
+  });
+
+  it("compress with an odd maxWidth writes an even-width file (#239)", async () => {
+    const out = p("compress-odd.mp4");
+    await runFfmpeg(buildCompressArgs(av, out, { level: "heavy", maxWidth: 237 }));
+    expect((await probeMedia(out)).width).toBe(236);
+  });
+
+  it("a % in output dirs and names stays literal (#238)", async () => {
+    const pct = p("50%1 pct");
+    mkdirSync(pct);
+    const still = join(pct, "b%dx.png");
+    await runFfmpeg(buildSampleAtTimestampArgs(av, 1, still));
+    expect(existsSync(still)).toBe(true);
+    await runFfmpeg(buildSampleByFpsArgs(av, 1, sequencePattern(pct, "frame_%05d.png"), 2));
+    expect(readdirSync(pct).filter((f) => f.startsWith("frame_"))).toEqual(["frame_00001.png", "frame_00002.png"]);
   });
 
   it("clip is frame-accurate", async () => {

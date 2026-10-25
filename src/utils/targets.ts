@@ -12,6 +12,7 @@
  */
 import { ScreencastError } from "./errors.js";
 import type { Monitor } from "./monitors.js";
+import { stillOutput } from "./paths.js";
 
 export type Quality = "draft" | "standard" | "high";
 
@@ -186,8 +187,20 @@ export function targetInputArgs(
   opts: InputArgsOptions = {},
 ): string[] {
   switch (target.kind) {
-    case "full":
+    case "full": {
+      // An odd-sized virtual desktop (offset monitors) fails libx264 + yuv420p,
+      // so the recording path grabs it as an even-sized region instead (#226).
+      const v = virtualDesktopBounds(monitors);
+      if (opts.evenSize && monitors.length > 0 && (v.w % 2 !== 0 || v.h % 2 !== 0)) {
+        return [
+          "-offset_x", String(v.x),
+          "-offset_y", String(v.y),
+          "-video_size", `${evenDown(v.w)}x${evenDown(v.h)}`,
+          "-i", "desktop",
+        ];
+      }
       return ["-i", "desktop"];
+    }
     case "window":
       // A window target must be resolved to its on-screen rectangle first (see
       // resolveCaptureTarget). gdigrab `title=` grabs a blank surface for
@@ -280,6 +293,13 @@ function validateFps(fps: number): number {
   return fps;
 }
 
+/** A keyframe every 2 s of capture. x264's default (250 frames) is 25 s at 10
+ * fps, so a stream-copy cut snaps far from the cut point and hides that much
+ * content behind an edit list (#203). */
+export function captureKeyframeArgs(fps: number): string[] {
+  return ["-g", String(Math.max(1, Math.round(fps * 2)))];
+}
+
 /** Build the full ffmpeg argument vector for a recording (gdigrab -> mp4). */
 export function buildCaptureArgs(target: Target, opts: CaptureOptions): string[] {
   const fps = validateFps(opts.fps ?? DEFAULT_FPS);
@@ -292,7 +312,13 @@ export function buildCaptureArgs(target: Target, opts: CaptureOptions): string[]
     "-framerate", String(fps),
     ...targetInputArgs(target, monitors, { evenSize: true }),
     ...buildAudioInputArgs(opts.audio),
+    // Without monitor geometry `full` cannot be sized up front, so crop it to
+    // even dimensions in the filter graph instead (#226).
+    ...(target.kind === "full" && monitors.length === 0
+      ? ["-vf", "crop=trunc(iw/2)*2:trunc(ih/2)*2"]
+      : []),
     ...resolveQuality(quality),
+    ...captureKeyframeArgs(fps),
     ...(opts.audio ? ["-c:a", "aac", "-b:a", "160k"] : []),
     // Fragmented mp4: keeps the file playable even if the process is killed
     // before the trailing moov atom would normally be written.
@@ -317,7 +343,7 @@ export function buildWgcScreenshotArgs(hwnd: number, output: string): string[] {
     "-y", "-v", "error",
     "-filter_complex", `gfxcapture=hwnd=${hwnd}:max_framerate=30,hwdownload,format=bgra`,
     "-frames:v", "1",
-    output,
+    ...stillOutput(output),
   ];
 }
 
@@ -333,7 +359,7 @@ export function buildScreenshotArgs(
     "-framerate", String(SCREENSHOT_GRAB_FPS),
     ...targetInputArgs(target, monitors),
     "-frames:v", "1",
-    output,
+    ...stillOutput(output),
   ];
 }
 
@@ -351,8 +377,10 @@ export function captureFrame(
       const m = resolveMonitor(target.index, monitors);
       return { x: m.x, y: m.y, w: evenDown(m.width), h: evenDown(m.height) };
     }
-    case "full":
-      return virtualDesktopBounds(monitors);
+    case "full": {
+      const v = virtualDesktopBounds(monitors);
+      return { x: v.x, y: v.y, w: evenDown(v.w), h: evenDown(v.h) };
+    }
     case "window":
       throw new ScreencastError("Internal: resolve a window target to a region first.");
   }

@@ -8,6 +8,7 @@
  */
 import { ScreencastError } from "./errors.js";
 import { escapeFilterPath } from "./fonts.js";
+import { stillOutput } from "./paths.js";
 
 export const DEFAULT_SHEET_COUNT = 12;
 export const MAX_SHEET_COUNT = 48;
@@ -59,7 +60,7 @@ export function buildTileArgs(
     "-y", "-v", "error", "-ss", String(timeSec), "-i", input,
     "-frames:v", "1",
     "-vf", `scale=${tileWidth}:-2,${label}`,
-    output,
+    ...stillOutput(output),
   ];
 }
 
@@ -73,7 +74,7 @@ export function buildSheetArgs(
     "-y", "-v", "error", "-framerate", "1", "-i", tilePattern,
     "-vf", `tile=${grid.columns}x${grid.rows}:padding=4:margin=4:color=black`,
     "-frames:v", "1",
-    output,
+    ...stillOutput(output),
   ];
 }
 
@@ -87,6 +88,6 @@ export function buildPosterArgs(input: string, durationSec: number, output: stri
     "-y", "-v", "error", "-i", input,
     "-vf", `fps=${rate.toFixed(4)},thumbnail=${candidates},scale='min(${width},iw)':-2`,
     "-frames:v", "1",
-    output,
+    ...stillOutput(output),
   ];
 }
