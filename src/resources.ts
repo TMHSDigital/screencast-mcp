@@ -10,7 +10,7 @@
  */
 import { existsSync, rmSync } from "node:fs";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { getStore } from "./context.js";
+import { getStore, isShuttingDown } from "./context.js";
 import { ScreencastError } from "./utils/errors.js";
 import { runFfmpeg, probeMedia } from "./utils/ffmpeg.js";
 import { encodeInlineImages } from "./utils/images.js";
@@ -81,7 +81,14 @@ export function registerResources(server: McpServer): void {
     },
   );
 
+  // Skipped once shutdown starts (the client's pipe may be gone), and never
+  // allowed to throw into a registry write (#229).
   getStore().onChange(() => {
-    if (server.isConnected()) server.sendResourceListChanged();
+    if (isShuttingDown() || !server.isConnected()) return;
+    try {
+      server.sendResourceListChanged();
+    } catch {
+      /* the client went away */
+    }
   });
 }

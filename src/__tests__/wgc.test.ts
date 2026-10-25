@@ -1,6 +1,6 @@
 /** #113: recording one window through Windows Graphics Capture. */
 import { describe, it, expect } from "vitest";
-import { buildWgcEncodeArgs, buildWgcGrabArgs, framesDue, nudgeScript, parseRawSize, startBanner, yuv420FrameBytes } from "../utils/wgc.js";
+import { buildWgcEncodeArgs, buildWgcGrabArgs, framesDue, nudgeScript, parseRawSize, startBanner, yuv420FrameBytes, wgcStopFile } from "../utils/wgc.js";
 import { parseCaptureStart } from "../utils/events.js";
 
 const CFG = { ffmpeg: "ffmpeg", hwnd: 4242, fps: 15, encode: ["-c:v", "libx264", "-crf", "23", "-pix_fmt", "yuv420p"], output: "o.mp4", maxDurationSec: 0 };
@@ -51,5 +51,17 @@ describe("wgc recorder helpers", () => {
     expect(s).toContain("0x0105"); // INVALIDATE | ERASE | UPDATENOW: covered windows need the erase
     expect(s).toContain("while([ScNudge]::IsWindow([IntPtr]4242))");
     expect(s).toContain("Start-Sleep -Milliseconds 200");
+  });
+});
+
+describe("wgc recorder cleanup and stop file (#208, #182)", () => {
+  it("stops repainting once the recorder process is gone", () => {
+    const s = nudgeScript(4242, 200, 777);
+    expect(s).toContain("Get-Process -Id 777");
+    expect(s).toContain("-and $p -and !$p.HasExited");
+    expect(nudgeScript(4242, 200)).not.toContain("Get-Process");
+  });
+  it("puts the stop file next to the output", () => {
+    expect(wgcStopFile("C:/r/rec.mp4")).toBe("C:/r/rec.mp4.stop");
   });
 });

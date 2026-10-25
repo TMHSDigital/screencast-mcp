@@ -12,3 +12,15 @@ export function getStore(): SessionStore {
   }
   return store;
 }
+
+let shuttingDown = false;
+
+/** Set once shutdown begins: from then on nothing writes to the client, whose
+ * pipe may already be closed (#229). */
+export function markShuttingDown(): void {
+  shuttingDown = true;
+}
+
+export function isShuttingDown(): boolean {
+  return shuttingDown;
+}

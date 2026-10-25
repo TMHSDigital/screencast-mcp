@@ -5,11 +5,15 @@
  *   node wgcRecorder.js '<WgcRecorderConfig as JSON>'
  *
  * and stopped like ffmpeg: "q" on stdin, stdin closing (the server went away),
- * or the duration cap finalizes the file and exits 0. If the window closes,
- * the recording ends there, also cleanly. Diagnostics go to stderr; the first
- * frame prints an ffmpeg-style "start:" banner the session code reads.
+ * the stop file appearing (a stop from another server instance, #182), or the
+ * duration cap finalizes the file and exits 0. If the window closes, the
+ * recording ends there too, with WGC_WINDOW_CLOSED_EXIT (#240). Every exit
+ * path kills the grab, encoder and nudge children first (#208). Diagnostics go
+ * to stderr; the first frame prints an ffmpeg-style "start:" banner the
+ * session code reads.
  */
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync, rmSync } from "node:fs";
 import {
   buildWgcEncodeArgs,
   buildWgcGrabArgs,
@@ -18,6 +22,8 @@ import {
   nudgeScript,
   startBanner,
   yuv420FrameBytes,
+  wgcStopFile,
+  WGC_WINDOW_CLOSED_EXIT,
   type WgcRecorderConfig,
 } from "./utils/wgc.js";
 
@@ -31,7 +37,7 @@ const log = (s: string) => process.stderr.write(s.endsWith("\n") ? s : `${s}\n`)
 
 const grab = spawn(cfg.ffmpeg, buildWgcGrabArgs(cfg.hwnd, cfg.fps), { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
 // Tiny repaints for the whole recording; see nudgeScript.
-const nudge = spawn("powershell", ["-NoProfile", "-NonInteractive", "-Command", nudgeScript(cfg.hwnd, 200)], {
+const nudge = spawn("powershell", ["-NoProfile", "-NonInteractive", "-Command", nudgeScript(cfg.hwnd, 200, process.pid)], {
   stdio: "ignore",
   windowsHide: true,
 });
@@ -46,6 +52,28 @@ let startedAt = 0;
 let written = 0;
 let pacer: NodeJS.Timeout | null = null;
 let finishing = false;
+let windowClosed = false;
+const stopFile = wgcStopFile(cfg.output);
+
+function killChild(c: ChildProcess | null): void {
+  if (c && c.exitCode === null && c.signalCode === null) {
+    try {
+      c.kill();
+    } catch {
+      /* already gone */
+    }
+  }
+}
+
+/** Kill every child, then exit: no grab, encoder or repaint loop outlives the
+ * recorder on any path (#208). */
+function exitWith(code: number): never {
+  killChild(nudge);
+  killChild(grab);
+  killChild(encoder);
+  rmSync(stopFile, { force: true });
+  process.exit(code);
+}
 
 /** Cut whole frames off the buffered bytes; the newest becomes `latest`. Runs
  * from both handlers: the size line (stderr) and the frames (stdout) can
@@ -82,7 +110,7 @@ function begin(): void {
     windowsHide: true,
   });
   encoder.stderr?.on("data", (d: Buffer) => log(d.toString()));
-  encoder.on("exit", (code) => process.exit(code ?? 1));
+  encoder.on("exit", (code) => exitWith(code === 0 && windowClosed ? WGC_WINDOW_CLOSED_EXIT : (code ?? 1)));
   encoder.stdin?.on("error", () => {
     // The encoder went away; its exit handler reports it.
   });
@@ -102,18 +130,25 @@ function begin(): void {
   };
   tick();
   pacer = setInterval(tick, Math.max(5, Math.floor(1000 / cfg.fps / 2)));
-  if (cfg.maxDurationSec > 0) setTimeout(finish, cfg.maxDurationSec * 1000);
+  if (cfg.maxDurationSec > 0) finishAfter(cfg.maxDurationSec * 1000);
+}
+
+/** setTimeout clamps delays past 2^31-1 ms to 1 ms, so a long cap is chained
+ * in steps instead of firing at once (#184). */
+function finishAfter(ms: number): void {
+  const step = Math.min(ms, 2 ** 31 - 1);
+  setTimeout(() => (ms > step ? finishAfter(ms - step) : finish()), step);
 }
 
 function finish(): void {
   if (finishing) return;
   finishing = true;
   if (pacer) clearInterval(pacer);
-  nudge.kill();
-  grab.kill();
+  killChild(nudge);
+  killChild(grab);
   if (!encoder) {
     log("wgc: no frame was captured from the window");
-    process.exit(1);
+    exitWith(1);
   }
   encoder.stdin?.end();
   // encoder's exit handler ends this process with its exit code.
@@ -123,9 +158,10 @@ grab.on("exit", () => {
   if (finishing) return;
   if (!encoder) {
     log(`wgc: capture failed: ${grabErr.split("\n").filter((l) => /error|fail|invalid/i.test(l)).slice(-3).join(" ") || "gfxcapture exited"}`);
-    process.exit(1);
+    exitWith(1);
   }
   log("wgc: the window closed; recording ended");
+  windowClosed = true;
   finish();
 });
 
@@ -133,11 +169,17 @@ setTimeout(() => {
   if (!encoder && !finishing) {
     log(`wgc: the window produced no frame in ${FIRST_FRAME_TIMEOUT_MS / 1000}s`);
     finishing = true;
-    nudge.kill();
-    grab.kill();
-    process.exit(1);
+    exitWith(1);
   }
 }, FIRST_FRAME_TIMEOUT_MS);
+
+// A stop from another server instance, which has no stdin handle (#182).
+rmSync(stopFile, { force: true });
+setInterval(() => {
+  if (existsSync(stopFile)) finish();
+}, 250).unref();
+
+for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, () => exitWith(1));
 
 process.stdin.on("data", (d: Buffer) => {
   if (d.toString().includes("q")) finish();

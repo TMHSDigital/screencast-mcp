@@ -20,7 +20,7 @@
         },
         "output": { "type": "string", "description": "Optional output .mp4 path (defaults under SCREENCAST_HOME/recordings)" },
         "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
-        "maxDurationSec": { "type": "integer", "minimum": 0, "description": "Stop automatically after this many seconds, finalizing the file (default 3600, or SCREENCAST_MAX_RECORDING_SEC). 0 = no cap" },
+        "maxDurationSec": { "type": "integer", "minimum": 0, "maximum": 604800, "description": "Stop automatically after this many seconds, finalizing the file (default 3600, or SCREENCAST_MAX_RECORDING_SEC; at most 604800, 7 days). 0 = no cap" },
         "backend": { "type": "string", "enum": ["gdigrab", "wgc"], "description": "gdigrab (default) records the screen rectangle. wgc (window: targets, FFmpeg 8+) records the window's own surface through Windows Graphics Capture: covered, moved, or background windows keep recording; frames only its client area. No audio with wgc" },
         "events": { "type": "boolean", "description": "Also log mouse clicks, scroll, cursor positions, and key presses to <recording>.events.jsonl, timed to the video and in video pixels (default false). Read it with read_events" },
         "keys": { "type": "string", "enum": ["masked", "shortcuts"], "description": "With events: masked (default) logs that a key was pressed, never which; shortcuts also names Ctrl/Alt/Win chords (e.g. Ctrl+S). Typed text is never logged" }

@@ -10,6 +10,7 @@ import {
   validateRegionOnDesktop,
   QUALITY_PRESETS,
   resolveMaxDuration,
+  MAX_RECORDING_CAP_SEC,
   DEFAULT_MAX_RECORDING_SEC,
   buildWgcScreenshotArgs,
 } from "../utils/targets.js";
@@ -286,6 +287,11 @@ describe("resolveMaxDuration", () => {
   });
   it("rejects a malformed env value with a clear error", () => {
     expect(() => resolveMaxDuration(undefined, { SCREENCAST_MAX_RECORDING_SEC: "1h" })).toThrow(/SCREENCAST_MAX_RECORDING_SEC/);
+  });
+  it("caps the duration at 7 days (#184)", () => {
+    expect(resolveMaxDuration(MAX_RECORDING_CAP_SEC, {})).toBe(604_800);
+    expect(() => resolveMaxDuration(MAX_RECORDING_CAP_SEC + 1, {})).toThrow(/7 days/);
+    expect(() => resolveMaxDuration(undefined, { SCREENCAST_MAX_RECORDING_SEC: "3000000" })).toThrow(/7 days/);
   });
 });
 

@@ -12,7 +12,7 @@ import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
-import { getStore } from "./context.js";
+import { getStore, isShuttingDown, markShuttingDown } from "./context.js";
 import { requireFfmpeg } from "./utils/ffmpeg.js";
 import { probeDuration, stopAll } from "./utils/lifecycle.js";
 import { register as registerStartRecording } from "./tools/startRecording.js";
@@ -142,12 +142,28 @@ async function main(): Promise<void> {
   }
 }
 
-let shuttingDown = false;
+// A write to a client that has gone away fails with EPIPE; without a handler
+// that error is uncaught and kills the server mid-cleanup (#229).
+process.stdout.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code !== "EPIPE") process.stderr.write(`stdout error: ${err.message}\n`);
+  void shutdown("client pipe closed");
+});
+
+// A crash must never leave captures running: stop them, then exit (#207).
+process.on("uncaughtException", (err) => {
+  process.stderr.write(`Uncaught exception: ${err.stack ?? err.message}\n`);
+  void shutdown("uncaught exception", 1);
+});
+process.on("unhandledRejection", (reason) => {
+  process.stderr.write(
+    `Unhandled rejection: ${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}\n`,
+  );
+});
 
 /** Finalize every active recording, then exit. Idempotent and never throws. */
-async function shutdown(reason: string): Promise<void> {
-  if (shuttingDown) return;
-  shuttingDown = true;
+async function shutdown(reason: string, exitCode = 0): Promise<void> {
+  if (isShuttingDown()) return;
+  markShuttingDown();
   try {
     const store = getStore();
     if (store.activeIds().length > 0) {
@@ -167,7 +183,7 @@ async function shutdown(reason: string): Promise<void> {
       `Shutdown cleanup failed: ${err instanceof Error ? err.message : String(err)}\n`,
     );
   }
-  process.exit(0);
+  process.exit(exitCode);
 }
 
 main().catch((error: unknown) => {

@@ -81,6 +81,15 @@ export function framesDue(elapsedMs: number, fps: number): number {
 /** What the recorder prints when its first frame is written: the same shape as
  * ffmpeg's input banner, so parseCaptureStart aligns the input event log
  * (#118) exactly as it does for gdigrab. */
+/** The wgc recorder's exit code when the recorded window closed (#240). */
+export const WGC_WINDOW_CLOSED_EXIT = 3;
+
+/** A file whose appearance asks a running wgc recorder to finalize: the
+ * graceful stop for an instance that holds no stdin handle to it (#182). */
+export function wgcStopFile(output: string): string {
+  return `${output}.stop`;
+}
+
 export function startBanner(epochMs: number): string {
   return `Input #0, wgc, from 'window':\n  Duration: N/A, start: ${(epochMs / 1000).toFixed(6)}, bitrate: N/A\n`;
 }
@@ -92,7 +101,12 @@ export function startBanner(epochMs: number): string {
  * newest frame back until another arrives; without these tiny repaints the
  * first frame never comes from a static window, and its last change never
  * leaves ffmpeg. Runs in PowerShell until killed. */
-export function nudgeScript(hwnd: number, intervalMs: number): string {
+export function nudgeScript(hwnd: number, intervalMs: number, parentPid?: number): string {
+  // With a parent pid it also stops once the recorder is gone, so a recorder
+  // that dies without cleanup cannot leave it repainting forever (#208).
+  const watch = parentPid ? `$p=Get-Process -Id ${parentPid} -ErrorAction SilentlyContinue
+` : "";
+  const alive = parentPid ? ` -and $p -and !$p.HasExited` : "";
   return `Add-Type @"
 using System;using System.Runtime.InteropServices;
 public class ScNudge{
@@ -102,5 +116,5 @@ public class ScNudge{
 }
 "@
 $r=New-Object ScNudge+RECT;$r.R=1;$r.B=1
-while([ScNudge]::IsWindow([IntPtr]${hwnd})){[void][ScNudge]::RedrawWindow([IntPtr]${hwnd},[ref]$r,[IntPtr]::Zero,0x0105);Start-Sleep -Milliseconds ${intervalMs}}`;
+${watch}while([ScNudge]::IsWindow([IntPtr]${hwnd})${alive}){[void][ScNudge]::RedrawWindow([IntPtr]${hwnd},[ref]$r,[IntPtr]::Zero,0x0105);Start-Sleep -Milliseconds ${intervalMs}}`;
 }

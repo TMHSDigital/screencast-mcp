@@ -7,6 +7,45 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.36.0]
+
+### Added
+
+- `endReason: "window_closed"`: a `backend: "wgc"` recording that ends because
+  the window closed is now reported as such, instead of as hitting its
+  `maxDurationSec` cap. A clean exit counts as `max_duration` only once the
+  cap could have been reached (#240).
+
+### Changed
+
+- `maxDurationSec` and `SCREENCAST_MAX_RECORDING_SEC` are capped at 604800
+  (7 days); use 0 for no cap. A larger value overflowed Node's timer, so a
+  WGC recording stopped almost at once (#184).
+
+### Fixed
+
+- A second `stop_recording` for the same session (an agent retry, or
+  shutdown racing a stop) force-killed ffmpeg while it was finalizing,
+  leaving a truncated file. It now waits for the first stop and returns the
+  same result (#181).
+- Stopping a WGC recording from another server instance (or reaping it at
+  boot) marked it stopped while it kept recording, because only `ffmpeg.exe`
+  was accepted as the recorder process. Sessions record their process image,
+  WGC recordings finalize gracefully through a stop file, and a stop that
+  leaves the process running reports an error (#182).
+- The WGC recorder left its ffmpeg and the repaint PowerShell running when
+  it failed. Every exit path now kills all of its children, and the repaint
+  loop also exits when the recorder is gone (#208).
+- A failed session-registry write (a full disk, a locked `sessions.json`)
+  inside a recording's exit handler or event-log finalizer could crash the
+  server. Those writes are now logged instead. If the session record cannot
+  be created at all, the capture is stopped rather than left unreachable.
+  An uncaught exception now stops every recording before the server exits
+  (#207).
+- Shutdown after a client disconnect could crash on a stdout `EPIPE` from a
+  resource-list notification, leaving ffmpeg running. Notifications stop once
+  shutdown starts, and stdout errors are handled (#229).
+
 ## [0.35.0]
 
 ### Changed

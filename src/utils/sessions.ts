@@ -24,6 +24,7 @@ import {
 } from "node:fs";
 import type { ChildProcess } from "node:child_process";
 import type { Quality } from "./targets.js";
+import { WGC_WINDOW_CLOSED_EXIT } from "./wgc.js";
 
 /** Cap on retained finished records, so the registry does not grow without
  * bound. Active ("recording") records are always kept. */
@@ -32,8 +33,9 @@ export const MAX_FINISHED_RECORDS = 100;
 export type SessionStatus = "recording" | "stopped" | "failed" | "orphaned";
 
 /** Why a recording ended: an explicit stop_recording, the maxDurationSec cap,
- * an ffmpeg crash, or the server shutting down (client disconnect / signal). */
-export type EndReason = "stopped" | "max_duration" | "crashed" | "shutdown";
+ * an ffmpeg crash, the server shutting down (client disconnect / signal), or
+ * the recorded window closing (wgc, #240). */
+export type EndReason = "stopped" | "max_duration" | "crashed" | "shutdown" | "window_closed";
 
 export interface SessionRecord {
   id: string;
@@ -58,6 +60,10 @@ export interface SessionRecord {
   /** Capture backend: the screen rectangle (gdigrab) or the window itself
    * through Windows Graphics Capture (wgc, #113). Absent on older records. */
   backend?: "gdigrab" | "wgc";
+  /** Image name of the process behind `pid` (ffmpeg.exe, or node.exe for the
+   * wgc recorder), checked before a kill by pid (#182). Absent on older
+   * records; see expectedImage. */
+  processImage?: string;
   /** Input event log (#118), when the recording was started with events: true. */
   events?: {
     path: string;
@@ -115,9 +121,22 @@ export function isAlive(pid: number | null): boolean {
   }
 }
 
-/** On Windows, confirm a pid is actually an ffmpeg.exe before killing it, so a
- * recycled pid belonging to an unrelated process is never terminated. */
-export function isFfmpegProcess(pid: number | null): boolean {
+/** The process image a record's pid should belong to: what it stored, else
+ * what its backend spawns (the wgc recorder runs under node, #182). Pure. */
+export function expectedImage(record: Pick<SessionRecord, "processImage" | "backend">): string {
+  return record.processImage ?? (record.backend === "wgc" ? "node.exe" : "ffmpeg.exe");
+}
+
+/** True when a `tasklist /FO CSV` line names the given image. Pure. */
+export function tasklistHasImage(stdout: string, image: string): boolean {
+  const first = stdout.split(/\r?\n/)[0] ?? "";
+  return first.toLowerCase().startsWith(`"${image.toLowerCase()}"`);
+}
+
+/** On Windows, confirm a pid is still the expected recorder image before
+ * killing it, so a recycled pid belonging to an unrelated process is never
+ * terminated. */
+export function isRecorderProcess(pid: number | null, image: string): boolean {
   if (pid === null || process.platform !== "win32") return false;
   const res = spawnSync(
     "tasklist",
@@ -125,7 +144,28 @@ export function isFfmpegProcess(pid: number | null): boolean {
     { encoding: "utf8", windowsHide: true },
   );
   if (res.status !== 0 || !res.stdout) return false;
-  return /"ffmpeg\.exe"/i.test(res.stdout);
+  return tasklistHasImage(res.stdout, image);
+}
+
+/** isRecorderProcess for an ffmpeg.exe. */
+export function isFfmpegProcess(pid: number | null): boolean {
+  return isRecorderProcess(pid, "ffmpeg.exe");
+}
+
+/** Classify a recorder exit nobody asked for. Non-zero is a crash; the wgc
+ * window-closed code is its own reason; a clean exit is the maxDurationSec cap
+ * only once the cap could actually have been reached (#240). Pure. */
+export function classifyUnrequestedExit(opts: {
+  code: number | null;
+  backend: "gdigrab" | "wgc";
+  maxDurationSec: number;
+  elapsedMs: number;
+}): { status: "stopped" | "failed"; endReason: EndReason } {
+  const { code, backend, maxDurationSec, elapsedMs } = opts;
+  if (backend === "wgc" && code === WGC_WINDOW_CLOSED_EXIT) return { status: "stopped", endReason: "window_closed" };
+  if (code !== 0 && code !== null) return { status: "failed", endReason: "crashed" };
+  const capReached = maxDurationSec > 0 && elapsedMs >= maxDurationSec * 1000 - 2000;
+  return { status: "stopped", endReason: capReached ? "max_duration" : "stopped" };
 }
 
 /** Forcefully terminate a pid tree (used only for orphan reaping). */
@@ -364,6 +404,20 @@ export class SessionStore {
     return this.records.get(id) ?? next;
   }
 
+  /** update() for event handlers: a failed registry write (a full disk, a
+   * locked sessions.json) is logged instead of thrown, because a throw from a
+   * child-process or finalizer callback would crash the server (#207). */
+  tryUpdate(id: string, patch: Partial<SessionRecord>): SessionRecord | undefined {
+    try {
+      return this.update(id, patch);
+    } catch (err) {
+      process.stderr.write(
+        `Could not save session ${id}: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+      return undefined;
+    }
+  }
+
   attachChild(id: string, child: ChildProcess): void {
     this.children.set(id, child);
   }
@@ -410,7 +464,7 @@ export class SessionStore {
       const alive = isAlive(record.pid);
       const verdict = classifyOrphan(record, alive);
       if (verdict.reaped && record.pid !== null) {
-        if (isFfmpegProcess(record.pid)) killPid(record.pid);
+        if (isRecorderProcess(record.pid, expectedImage(record))) killPid(record.pid);
         reaped.push(record.id);
       }
       this.dirty.add(record.id);

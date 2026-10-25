@@ -13,8 +13,12 @@ import {
   pruneRecords,
   MAX_FINISHED_RECORDS,
   SessionStore,
+  classifyUnrequestedExit,
+  expectedImage,
+  tasklistHasImage,
   type SessionRecord,
 } from "../utils/sessions.js";
+import { WGC_WINDOW_CLOSED_EXIT } from "../utils/wgc.js";
 
 function record(over: Partial<SessionRecord> = {}): SessionRecord {
   return {
@@ -282,4 +286,51 @@ describe("SessionStore across processes (#55)", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   }, 60_000);
+});
+
+describe("recorder process image (#182)", () => {
+  it("expects node for wgc recordings and ffmpeg otherwise", () => {
+    expect(expectedImage({ backend: "wgc" })).toBe("node.exe");
+    expect(expectedImage({ backend: "gdigrab" })).toBe("ffmpeg.exe");
+    expect(expectedImage({})).toBe("ffmpeg.exe");
+    expect(expectedImage({ backend: "wgc", processImage: "electron.exe" })).toBe("electron.exe");
+  });
+  it("matches the image column of a tasklist CSV line", () => {
+    const line = '"node.exe","4242","Console","1","52,120 K"\r\n';
+    expect(tasklistHasImage(line, "node.exe")).toBe(true);
+    expect(tasklistHasImage(line, "NODE.EXE")).toBe(true);
+    expect(tasklistHasImage(line, "ffmpeg.exe")).toBe(false);
+    expect(tasklistHasImage("INFO: No tasks are running which match the specified criteria.", "node.exe")).toBe(false);
+  });
+});
+
+describe("classifyUnrequestedExit (#240)", () => {
+  const base = { backend: "gdigrab" as const, maxDurationSec: 60, elapsedMs: 60_500 };
+  it("reports a closed window, not the cap", () => {
+    expect(classifyUnrequestedExit({ ...base, backend: "wgc", code: WGC_WINDOW_CLOSED_EXIT, elapsedMs: 5_000 })).toEqual({ status: "stopped", endReason: "window_closed" });
+  });
+  it("calls a clean exit the cap only once the cap could have fired", () => {
+    expect(classifyUnrequestedExit({ ...base, code: 0 })).toEqual({ status: "stopped", endReason: "max_duration" });
+    expect(classifyUnrequestedExit({ ...base, code: 0, elapsedMs: 5_000 })).toEqual({ status: "stopped", endReason: "stopped" });
+    expect(classifyUnrequestedExit({ ...base, code: 0, maxDurationSec: 0 })).toEqual({ status: "stopped", endReason: "stopped" });
+  });
+  it("treats any other non-zero exit as a crash", () => {
+    expect(classifyUnrequestedExit({ ...base, code: 1 })).toEqual({ status: "failed", endReason: "crashed" });
+    expect(classifyUnrequestedExit({ ...base, code: WGC_WINDOW_CLOSED_EXIT })).toEqual({ status: "failed", endReason: "crashed" });
+  });
+});
+
+describe("tryUpdate (#207)", () => {
+  it("logs a failed registry write instead of throwing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "sc-try-"));
+    const store = new SessionStore(join(dir, "sessions.json"));
+    store.load();
+    store.create({ id: "r", target: "full", outputPath: "o.mp4", fps: 30, quality: "standard", pid: null, status: "recording", startedAt: new Date().toISOString() });
+    store.persist = () => {
+      throw Object.assign(new Error("ENOSPC: no space left on device"), { code: "ENOSPC" });
+    };
+    expect(() => store.update("r", { status: "stopped" })).toThrow(/ENOSPC/);
+    expect(() => store.tryUpdate("r", { status: "stopped" })).not.toThrow();
+    rmSync(dir, { recursive: true, force: true });
+  });
 });

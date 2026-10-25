@@ -3,7 +3,7 @@
  * in-memory transport (no ffmpeg or Windows needed, except the poster read).
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -85,5 +85,27 @@ describe("MCP prompts and resources (#126)", () => {
     expect(templates).toContain("screencast://sessions/{id}/poster");
     await expect(client.readResource({ uri: "screencast://sessions/rec-1/poster" })).rejects.toThrow(/not found/);
     await expect(client.readResource({ uri: "screencast://sessions/missing" })).rejects.toThrow(/No session/);
+  });
+});
+
+describe("no client notifications after shutdown starts (#229)", () => {
+  it("skips the resource-list notification once shutting down", async () => {
+    const { markShuttingDown } = await import("../context.js");
+    const server = new McpServer({ name: "t2", version: "0" });
+    registerResources(server);
+    let sent = 0;
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    const c = new Client({ name: "c2", version: "0" });
+    c.setNotificationHandler(ResourceListChangedNotificationSchema, () => {
+      sent++;
+    });
+    await Promise.all([server.connect(a), c.connect(b)]);
+    markShuttingDown();
+    mkdirSync(home, { recursive: true }); // the suite above already cleaned it up
+    getStore().create({ id: "rec-late", target: "full", outputPath: join(home, "late.mp4"), fps: 30, quality: "standard", pid: null, status: "stopped", startedAt: new Date().toISOString() });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(sent).toBe(0);
+    await c.close();
+    rmSync(home, { recursive: true, force: true });
   });
 });

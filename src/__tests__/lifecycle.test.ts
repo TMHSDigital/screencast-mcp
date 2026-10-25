@@ -138,3 +138,29 @@ describe("stopAll (#76)", () => {
     expect(await stopAll(newStore(), async () => null)).toEqual([]);
   });
 });
+
+describe("concurrent stops (#181)", () => {
+  it("joins a second stop of the same session instead of escalating", async () => {
+    const store = newStore();
+    const rec = record({ id: "rec-dup" });
+    store.create(rec);
+    // Exits only on the graceful path, a beat after 'q', like ffmpeg writing its moov.
+    const child = fakeChild(false);
+    child.stdin.write = (d: string) => {
+      child.written.push(d);
+      setTimeout(() => {
+        child.exitCode = 0;
+        child.emit("exit", 0);
+      }, 30);
+    };
+    store.attachChild(rec.id, child as unknown as ChildProcess);
+    const [a, b] = await Promise.all([
+      stopSession(store, rec, { reason: "stopped", probe: async () => 1 }),
+      stopSession(store, rec, { reason: "shutdown", probe: async () => 1 }),
+    ]);
+    expect(child.written).toEqual(["q\n"]);
+    expect(a).toBe(b);
+    expect(a.graceful).toBe(true);
+    expect(store.get(rec.id)).toMatchObject({ status: "stopped", endReason: "stopped" });
+  });
+});

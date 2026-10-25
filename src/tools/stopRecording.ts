@@ -42,7 +42,9 @@ export function register(server: McpServer): void {
             note:
               record.endReason === "max_duration"
                 ? `Recording already ended at its maxDurationSec cap (${record.maxDurationSec}s).`
-                : "Session was not active; returning its recorded final state.",
+                : record.endReason === "window_closed"
+                  ? "Recording already ended: the recorded window was closed."
+                  : "Session was not active; returning its recorded final state.",
           });
         }
 

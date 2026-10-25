@@ -269,9 +269,9 @@ export function resolveMaxDuration(
   const raw = env.SCREENCAST_MAX_RECORDING_SEC;
   if (raw !== undefined && raw.trim() !== "") {
     const n = Number(raw);
-    if (!Number.isInteger(n) || n < 0) {
+    if (!Number.isInteger(n) || n < 0 || n > MAX_RECORDING_CAP_SEC) {
       throw new ScreencastError(
-        `SCREENCAST_MAX_RECORDING_SEC must be a non-negative integer (0 = no cap), got "${raw}".`,
+        `SCREENCAST_MAX_RECORDING_SEC must be an integer from 0 (no cap) to ${MAX_RECORDING_CAP_SEC} (7 days), got "${raw}".`,
       );
     }
     return n;
@@ -279,9 +279,14 @@ export function resolveMaxDuration(
   return DEFAULT_MAX_RECORDING_SEC;
 }
 
+/** The largest accepted cap: 7 days. Use 0 for no cap at all (#184). */
+export const MAX_RECORDING_CAP_SEC = 7 * 24 * 3600;
+
 function validateMaxDuration(n: number): number {
-  if (!Number.isInteger(n) || n < 0) {
-    throw new ScreencastError("maxDurationSec must be a non-negative integer (0 = no cap).");
+  if (!Number.isInteger(n) || n < 0 || n > MAX_RECORDING_CAP_SEC) {
+    throw new ScreencastError(
+      `maxDurationSec must be an integer from 0 (no cap) to ${MAX_RECORDING_CAP_SEC} (7 days).`,
+    );
   }
   return n;
 }

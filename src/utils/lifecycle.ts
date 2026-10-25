@@ -6,14 +6,17 @@
  * cross-restart stop), the process is terminated by pid; the fragmented-mp4
  * muxing keeps a killed recording playable either way.
  */
-import { existsSync } from "node:fs";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
 import type { ChildProcess } from "node:child_process";
 import { runCapture } from "./ffmpeg.js";
 import { whenFinalized } from "./events.js";
 import { buildProbeArgs, parseMediaInfo } from "./media.js";
+import { ScreencastError } from "./errors.js";
+import { wgcStopFile } from "./wgc.js";
 import {
+  expectedImage,
   isAlive,
-  isFfmpegProcess,
+  isRecorderProcess,
   killPid,
   type EndReason,
   type SessionRecord,
@@ -98,14 +101,34 @@ export async function stopAll(
   return ids;
 }
 
+/** Stops in flight, per store and session id. A second stop of the same
+ * session (an agent retry, or shutdown racing stop_recording) joins the first
+ * instead of force-killing a recording that is still finalizing (#181). */
+const inFlight = new WeakMap<SessionStore, Map<string, Promise<StopResult>>>();
+
 /** Stop an active recording and record its final state. The caller has already
  * checked the record exists and is "recording". */
-export async function stopSession(
+export function stopSession(
+  store: SessionStore,
+  record: SessionRecord,
+  opts: StopOptions,
+): Promise<StopResult> {
+  let stops = inFlight.get(store);
+  if (!stops) inFlight.set(store, (stops = new Map()));
+  const running = stops.get(record.id);
+  if (running) return running;
+  const stop = runStop(store, record, opts).finally(() => stops.delete(record.id));
+  stops.set(record.id, stop);
+  return stop;
+}
+
+async function runStop(
   store: SessionStore,
   record: SessionRecord,
   opts: StopOptions,
 ): Promise<StopResult> {
   store.markStopping(record.id);
+  const stopFile = record.backend === "wgc" ? wgcStopFile(record.outputPath) : null;
   try {
     let graceful = false;
     const child = store.getChild(record.id);
@@ -119,11 +142,25 @@ export async function stopSession(
         await waitForPidExit(record.pid, 2000);
       }
     } else if (record.pid !== null && isAlive(record.pid)) {
-      // Cross-restart stop: no stdin handle. Terminate by pid, but only if the
-      // pid is still an ffmpeg (never a recycled, unrelated process).
-      if (isFfmpegProcess(record.pid)) {
-        killPid(record.pid);
-        await waitForPidExit(record.pid, 2000);
+      // Cross-restart stop: no stdin handle. Act on the pid only while it is
+      // still the recorder this record started (never a recycled, unrelated
+      // process); the wgc recorder runs under node, not ffmpeg (#182).
+      if (isRecorderProcess(record.pid, expectedImage(record))) {
+        if (stopFile) {
+          // The wgc recorder finalizes when its stop file appears.
+          writeFileSync(stopFile, "");
+          await waitForPidExit(record.pid, opts.gracefulMs ?? 8000);
+          graceful = !isAlive(record.pid);
+        }
+        if (isAlive(record.pid)) {
+          killPid(record.pid);
+          await waitForPidExit(record.pid, 2000);
+        }
+        if (isAlive(record.pid)) {
+          throw new ScreencastError(
+            `Could not stop recording ${record.id}: its process (pid ${record.pid}) is still running.`,
+          );
+        }
       }
     }
     store.detachChild(record.id);
@@ -142,6 +179,7 @@ export async function stopSession(
     });
     return { record: updated, graceful, durationSec };
   } finally {
+    if (stopFile) rmSync(stopFile, { force: true });
     store.clearStopping(record.id);
   }
 }

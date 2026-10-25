@@ -11,6 +11,7 @@ import {
   DEFAULT_FPS,
   DEFAULT_QUALITY,
   DEFAULT_MAX_RECORDING_SEC,
+  MAX_RECORDING_CAP_SEC,
   resolveMaxDuration,
   captureKeyframeArgs,
   type Quality,
@@ -20,8 +21,9 @@ import { windowMatchReport } from "../utils/windows.js";
 import { resolveLoopbackDevice } from "../utils/audioDevices.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { getStore } from "../context.js";
-import type { SessionRecord } from "../utils/sessions.js";
+import { classifyUnrequestedExit, killPid, type SessionRecord } from "../utils/sessions.js";
 import { rmSync } from "node:fs";
+import { basename } from "node:path";
 import {
   DEFAULT_KEY_MODE,
   eventPaths,
@@ -91,10 +93,11 @@ const inputSchema = {
     .number()
     .int()
     .min(0)
+    .max(MAX_RECORDING_CAP_SEC)
     .optional()
     .describe(
       `Stop automatically after this many seconds, finalizing the file (default ` +
-        `${DEFAULT_MAX_RECORDING_SEC}, or SCREENCAST_MAX_RECORDING_SEC). 0 = no cap. ` +
+        `${DEFAULT_MAX_RECORDING_SEC}, or SCREENCAST_MAX_RECORDING_SEC; at most ${MAX_RECORDING_CAP_SEC}, 7 days). 0 = no cap. ` +
         "A safety net against a recording that is never stopped.",
     ),
   events: z
@@ -256,10 +259,23 @@ export function register(server: McpServer): void {
           ...(window ? { matchedWindow: window.matchedTitle } : {}),
           ...(evPaths ? { events: { path: evPaths.jsonl, keys: keyMode } } : {}),
           backend,
+          processImage: backend === "wgc" ? basename(process.execPath).toLowerCase() : "ffmpeg.exe",
         };
         const store = getStore();
-        store.create(record);
+        // Register the child for shutdown first; if the registry write fails,
+        // stop the capture rather than leave one nothing can reach (#207).
         store.attachChild(id, child);
+        try {
+          store.create(record);
+        } catch (err) {
+          store.detachChild(id);
+          if (child.pid !== undefined) killPid(child.pid);
+          if (logger) await stopEventLogger(logger);
+          if (evPaths) rmSync(evPaths.raw, { force: true });
+          throw new ScreencastError(
+            `Recording stopped: the session registry could not be written (${(err as Error).message}).`,
+          );
+        }
         if (logger && evPaths && frame) {
           const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
           trackFinalizer(
@@ -269,14 +285,16 @@ export function register(server: McpServer): void {
               const startMs = parseCaptureStart(stderrHead) ?? spawnedAt;
               try {
                 const events = writeEventsFile(evPaths, { startMs, frame, endSec: (Date.now() - startMs) / 1000 });
-                store.update(id, {
+                store.tryUpdate(id, {
                   events: { path: evPaths.jsonl, keys: keyMode, count: events.length, summary: summarizeEvents(events) },
                 });
               } catch (err) {
-                store.update(id, {
+                store.tryUpdate(id, {
                   events: { path: evPaths.jsonl, keys: keyMode, error: (err as Error).message },
                 });
               }
+            }).catch((err: unknown) => {
+              process.stderr.write(`Event log for ${id} failed: ${err instanceof Error ? err.message : String(err)}\n`);
             }),
           );
         }
@@ -284,33 +302,21 @@ export function register(server: McpServer): void {
         // non-zero exit is a crash (disk full, encoder failure), not a clean
         // stop - record it as "failed" with the stderr tail so the caller can
         // tell the two apart. A clean exit nobody requested is the
-        // maxDurationSec cap.
+        // maxDurationSec cap, or the recorded window closing (#240).
         child.on("exit", (code) => {
+          store.detachChild(id);
           const cur = store.get(id);
           // A deliberate stop (stop_recording / shutdown) records its own final
           // state; only an exit nobody asked for is classified here.
-          if (cur && cur.status === "recording" && !store.isStopping(id)) {
-            if (code !== 0 && code !== null) {
-              store.update(id, {
-                status: "failed",
-                endReason: "crashed",
-                stoppedAt: new Date().toISOString(),
-                error: `ffmpeg exited with code ${code}:\n${stderrTail
-                  .trim()
-                  .split("\n")
-                  .slice(-6)
-                  .join("\n")}`,
-              });
-            } else {
-              // A clean exit with no stop in flight is the -t cap firing (#82).
-              store.update(id, {
-                status: "stopped",
-                endReason: maxDurationSec > 0 ? "max_duration" : "stopped",
-                stoppedAt: new Date().toISOString(),
-              });
-            }
-          }
-          store.detachChild(id);
+          if (!cur || cur.status !== "recording" || store.isStopping(id)) return;
+          const verdict = classifyUnrequestedExit({ code, backend, maxDurationSec, elapsedMs: Date.now() - spawnedAt });
+          store.tryUpdate(id, {
+            ...verdict,
+            stoppedAt: new Date().toISOString(),
+            ...(verdict.status === "failed"
+              ? { error: `${backend === "wgc" ? "The window recorder" : "ffmpeg"} exited with code ${code}:\n${stderrTail.trim().split("\n").slice(-6).join("\n")}` }
+              : {}),
+          });
         });
 
         return okResponse({
