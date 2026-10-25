@@ -35,6 +35,7 @@ export default tseslint.config(
       globals: {
         window: "readonly", document: "readonly", navigator: "readonly", location: "readonly",
         history: "readonly", performance: "readonly", requestAnimationFrame: "readonly", setTimeout: "readonly",
+        IntersectionObserver: "readonly", scrollY: "readonly", innerHeight: "readonly", addEventListener: "readonly",
       },
     },
   },

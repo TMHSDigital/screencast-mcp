@@ -41,7 +41,6 @@
 
   <main class="wrap">
     <section class="hero">
-      <p class="eyebrow">MCP SERVER &middot; WINDOWS CAPTURE &middot; FFMPEG</p>
       <div class="marquee">
         <span class="handle tl" aria-hidden="true"></span>
         <span class="handle tr" aria-hidden="true"></span>
@@ -58,13 +57,35 @@
         <span class="install-cmd"><span class="dollar">$</span><span id="cmd">claude mcp add screencast -- cmd /c npx -y @tmhs/screencast-mcp</span><button id="copy" type="button" aria-label="Copy the Claude Code install command">copy</button></span>
       </div>
       <p class="cta-links">
-        <a href="connect.html">Claude Desktop, Cursor, VS Code &rarr;</a>
-        <a href="workflows/">See the workflows &rarr;</a>
-        <a href="https://github.com/TMHSDigital/screencast-mcp">View source &nearr;</a>
+        <a href="connect.html">Set up Claude Desktop, Cursor, or VS Code</a>
+        <a href="workflows/">See the workflows</a>
+        <a href="https://github.com/TMHSDigital/screencast-mcp">View the source</a>
       </p>
-      <figure class="output hero-demo">
-        <div class="frame"><img src="media/zoom-after.gif" width="480" height="281" alt="A settings window recorded by screencast-mcp: the camera glides in on the Save button as the cursor clicks it, a red ring marks the click, then the view eases back out as a green Saved banner appears." fetchpriority="high"></div>
-        <figcaption><span class="tc">REC 06</span> &middot; made with the tool: <code>start_recording { events: true }</code>, one click, <code>zoom { highlightClicks: true }</code></figcaption>
+      <figure class="viewfinder" id="vf" data-frames="28" data-fps="4" data-duration="6.94">
+        <figcaption class="vf-head">
+          <span>This is what the agent sees. Drag along the strip.</span>
+          <span class="vf-toggle" role="group" aria-label="Which version">
+            <button type="button" data-version="before" aria-pressed="true">Raw recording</button>
+            <button type="button" data-version="after" aria-pressed="false">After zoom</button>
+          </span>
+        </figcaption>
+        <div class="vf-screen">
+          <span class="handle tl" aria-hidden="true"></span>
+          <span class="handle tr" aria-hidden="true"></span>
+          <span class="handle bl" aria-hidden="true"></span>
+          <span class="handle br" aria-hidden="true"></span>
+          <div class="vf-frame" role="img" aria-label="A frame from a recording of a settings window"></div>
+          <span class="vf-readout" aria-hidden="true"><span class="vf-rec">&#9679;</span> <span id="vf-tc">00:00:00;00</span></span>
+        </div>
+        <div class="vf-strip">
+          <div class="vf-thumbs" aria-hidden="true"></div>
+          <span class="vf-mark scene" style="--at: 0.4571" title="Scene change at 3.2 s"></span>
+          <span class="vf-mark click" style="--at: 0.4543" title="Click at 3.18 s"></span>
+          <span class="vf-head-line" aria-hidden="true"></span>
+          <input class="vf-range" type="range" min="0" max="27" step="1" value="0" aria-label="Scrub the recording" aria-valuetext="0.00 seconds">
+        </div>
+        <p class="vf-call"><code id="vf-call">sample_frames { "input": "rec.mp4", "timestamps": [0.00] }</code></p>
+        <p class="vf-note" id="vf-note" aria-live="polite">Every frame here came from <code>sample_frames</code> on a real recording. The amber mark is where <code>mode: "scenes"</code> picks a frame; the red one is the click <code>read_events</code> logged.</p>
       </figure>
       <p id="prerequisites" class="sub small">
       Needs Windows 10 or 11 and <code>ffmpeg</code> / <code>ffprobe</code> on <code>PATH</code>
@@ -80,6 +101,12 @@
 }</code></pre>
     </section>
 
+    <div class="finder" role="search">
+      <label for="tool-q">Find a tool</label>
+      <input id="tool-q" type="search" placeholder="Try trim, OCR, GIF, redact" autocomplete="off" spellcheck="false">
+      <span id="tool-count" aria-live="polite"></span>
+    </div>
+    <p class="finder-empty" id="tool-empty" hidden></p>
     <div id="tools">
       <section class="chapter" id="capture">
         <div class="tc-mark"><span class="tc">00:02</span><span>CHAPTER 1 / CAPTURE</span></div>
