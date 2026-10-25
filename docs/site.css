@@ -87,7 +87,7 @@ pre code { border: 0; padding: 0; background: none; font-size: 0.875em; }
   border: 1px dashed color-mix(in srgb, var(--dim) 55%, transparent);
   animation: marquee-in 0.7s ease-out 0.15s backwards;
 }
-.marquee .handle {
+.marquee .handle, .vf-screen .handle {
   position: absolute; width: 9px; height: 9px;
   background: var(--desktop); border: 1.5px solid var(--ink);
 }
@@ -312,4 +312,82 @@ figure.output figcaption .tc { color: var(--amber); }
   .takes > li { grid-template-columns: 2.6rem 1fr; }
   .recipes a { grid-template-columns: 1fr; }
   .recipes .chain { grid-column: 1; }
+}
+
+/* ---- Hero viewfinder: real frames from sample_frames, scrubbable ---- */
+.viewfinder { margin: 2.8rem 0 1rem; max-width: 600px; }
+.vf-head {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+  gap: 0.6rem 1rem; margin-bottom: 1rem; color: var(--dim); font-size: 0.95rem;
+}
+.vf-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.vf-toggle button {
+  font-family: var(--mono); font-size: 0.8rem; color: var(--dim);
+  background: none; border: 0; padding: 0.45rem 0.85rem; cursor: pointer;
+}
+.vf-toggle button + button { border-left: 1px solid var(--line); }
+.vf-toggle button[aria-pressed="true"] { color: var(--ink); background: var(--panel); box-shadow: inset 0 -2px 0 var(--amber); }
+.vf-screen { position: relative; padding: 12px; border: 1px dashed color-mix(in srgb, var(--dim) 55%, transparent); }
+.vf-frame {
+  aspect-ratio: 480 / 282; border-radius: 2px;
+  background: #000 url("media/viewfinder-before.webp") 0 0 / 2800% 100% no-repeat;
+}
+.viewfinder[data-version="after"] .vf-frame,
+.viewfinder[data-version="after"] .vf-thumbs span { background-image: url("media/viewfinder-after.webp"); }
+.vf-readout {
+  position: absolute; top: 22px; left: 22px;
+  font-family: var(--mono); font-size: 0.75rem; font-variant-numeric: tabular-nums;
+  color: #fff; background: rgba(10, 13, 18, 0.78); padding: 0.15rem 0.5rem; border-radius: 3px;
+}
+.vf-rec { color: var(--rec); }
+.vf-strip { position: relative; height: 54px; margin-top: 1rem; }
+.vf-strip:has(.vf-range:focus-visible) { outline: 2px solid var(--amber); outline-offset: 4px; border-radius: 4px; }
+.vf-thumbs { position: absolute; inset: 0; display: flex; overflow: hidden; border: 1px solid var(--line); border-radius: 4px; }
+.vf-thumbs span {
+  flex: 1 1 0; min-width: 0; opacity: 0.45;
+  background: url("media/viewfinder-before.webp") 0 0 / 2800% 100% no-repeat;
+}
+.vf-thumbs span.past { opacity: 0.8; }
+.vf-mark { position: absolute; left: calc(var(--at) * 100%); pointer-events: none; }
+.vf-mark.scene { top: -7px; bottom: 0; width: 2px; margin-left: -1px; background: var(--amber); }
+.vf-mark.scene::before {
+  content: ""; position: absolute; top: 0; left: -4px;
+  border: 5px solid transparent; border-top-color: var(--amber); border-bottom: 0;
+}
+.vf-mark.click { bottom: -6px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--rec); box-shadow: 0 0 0 2px var(--desktop); }
+.vf-head-line {
+  position: absolute; top: -5px; bottom: -5px; width: 2px; margin-left: -1px;
+  left: calc(var(--p, 0.018) * 100%); background: var(--ink); pointer-events: none;
+}
+.vf-range { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
+.vf-call { margin: 1rem 0 0.35rem; font-family: var(--mono); font-size: 0.85rem; white-space: nowrap; overflow-x: auto; }
+.vf-call code { background: none; border: 0; padding: 0; color: var(--ink); font-size: inherit; }
+/* Fixed height: the note changes as you scrub, and the page must not jump. */
+.vf-note { margin: 0; max-width: 46rem; min-height: 4.95em; color: var(--dim); font-size: 0.95rem; }
+.vf-note code { color: var(--ink); }
+
+/* ---- The page as a recording: HUD track follows scroll ---- */
+.hud-track { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; pointer-events: none; }
+.hud-fill { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--progress, 0) * 100%); background: var(--rec); }
+.hud-tick { position: absolute; top: -3px; width: 1px; height: 5px; background: var(--dim); }
+
+/* ---- Tool finder ---- */
+.finder {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1rem;
+  margin-top: 3.6rem; padding-top: 1.1rem; border-top: 1px solid var(--line);
+}
+.finder label { font-family: var(--display); font-weight: 700; font-size: 1.3rem; }
+.finder input {
+  flex: 1 1 16rem; min-width: 0;
+  font-family: var(--mono); font-size: 0.95rem; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 0.55rem 0.8rem;
+}
+.finder input::placeholder { color: var(--dim); }
+#tool-count { font-family: var(--mono); font-size: 0.8rem; color: var(--dim); }
+.finder-empty { color: var(--dim); margin: 1.4rem 0 0; }
+#tools .chapter:first-child { padding-top: 2rem; }
+
+@media (max-width: 640px) {
+  .vf-strip { height: 44px; }
+  .vf-note { min-height: 7.2em; }
 }

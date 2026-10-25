@@ -7,6 +7,27 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.33.2]
+
+### Changed
+
+- Docs home page:
+  - **Viewfinder in the hero.** Real frames from the REC 06 recording, made with
+    `sample_frames` and packed into one sprite per version.
+    - Drag along the strip (or use the arrow keys) to scrub. The
+      `sample_frames` call for that frame updates underneath.
+    - Markers show where `mode: "scenes"` picks a frame (3.2 s) and where
+      `read_events` logged the click (3.18 s). A toggle switches to the
+      `zoom` output.
+    - The first time it comes into view, the playhead runs up to the click
+      once; not with reduced motion.
+  - **Tool finder.** A search box over the 41 tools that filters the tables as
+    you type.
+  - The all-caps eyebrow and the arrows on the hero links are gone.
+- Every page: the HUD timecode follows the scroll position, landing on each
+  chapter's own timecode mark, and a track under the HUD fills as you scroll,
+  with a tick at each chapter.
+
 ## [0.33.1]
 
 ### Changed
