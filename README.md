@@ -4,7 +4,7 @@
 
 **An MCP server that lets an agent record the screen, _watch_ the footage, and make minimal ffmpeg edits — over stdio, on Windows.**
 
-Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, scale, redact, annotate, zoom, and export. No cloud, no streaming — ffmpeg and ffprobe wrapped behind forty-one typed tools.
+Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, redact, annotate, zoom toward clicks, and export for GitHub or social. No cloud, no streaming: ffmpeg and ffprobe behind 41 typed tools.
 
 <br />
 
@@ -12,17 +12,17 @@ Capture the desktop, a monitor, a window, or a region; sample a recording into f
 
 <br />
 
+[![npm](https://img.shields.io/npm/v/@tmhs/screencast-mcp?color=CB3837&logo=npm)](https://www.npmjs.com/package/@tmhs/screencast-mcp)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-listed-6E56CF)](https://registry.modelcontextprotocol.io/v0/servers?search=screencast-mcp)
 [![CI](https://github.com/TMHSDigital/screencast-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/TMHSDigital/screencast-mcp/actions/workflows/ci.yml)
 [![License: CC BY-NC-ND 4.0](https://img.shields.io/badge/license-CC--BY--NC--ND--4.0-green)](LICENSE)
 ![Last commit](https://img.shields.io/github/last-commit/TMHSDigital/screencast-mcp)
-![Repo size](https://img.shields.io/github/repo-size/TMHSDigital/screencast-mcp)
-![Top language](https://img.shields.io/github/languages/top/TMHSDigital/screencast-mcp)
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js_%E2%89%A522-339933?logo=node.js&logoColor=white)
 ![Model Context Protocol](https://img.shields.io/badge/MCP-stdio-6E56CF)
 ![ffmpeg](https://img.shields.io/badge/ffmpeg-required-007808?logo=ffmpeg&logoColor=white)
-![Capture](https://img.shields.io/badge/capture-Windows_gdigrab-0078D6?logo=windows&logoColor=white)
+![Capture](https://img.shields.io/badge/capture-Windows_10%2F11-0078D6?logo=windows&logoColor=white)
 
 <br />
 
@@ -32,8 +32,31 @@ Capture the desktop, a monitor, a window, or a region; sample a recording into f
 
 </div>
 
-> [!NOTE]
-> Screen capture is Windows-only (`gdigrab`, plus Windows Graphics Capture for single windows); the watch, edit, and produce tools work anywhere ffmpeg runs. See [ROADMAP.md](ROADMAP.md) for what's next.
+## Quick start
+
+**You need** Windows 10 or 11, [Node.js](https://nodejs.org) 22+, and ffmpeg on `PATH` (`winget install Gyan.FFmpeg`). Capture is Windows-only; the watch, edit, and produce tools work anywhere ffmpeg runs.
+
+**Add it to your client:**
+
+| Client | How |
+| --- | --- |
+| Claude Code | `claude mcp add screencast -- cmd /c npx -y @tmhs/screencast-mcp` |
+| Claude Desktop | Download the `.mcpb` from the [latest release](https://github.com/TMHSDigital/screencast-mcp/releases/latest) and open it (one click) |
+| Cursor, VS Code, others | The JSON config below, or step-by-step on [Connect your client](https://tmhsdigital.github.io/screencast-mcp/connect.html) |
+
+```json
+{
+  "mcpServers": {
+    "screencast": { "command": "npx", "args": ["-y", "@tmhs/screencast-mcp"] }
+  }
+}
+```
+
+**Then ask your agent:**
+
+> Record my VS Code window for five seconds while I reproduce the bug, then show me the frames where something changed.
+
+More in the [workflows](https://tmhsdigital.github.io/screencast-mcp/workflows/): a bug-repro GIF for a PR, a README demo, a UI verification loop, a social clip, a cheap review of a long recording, zoom toward clicks, and the whole edit in one call.
 
 ## Overview
 
@@ -47,9 +70,17 @@ The design choices are deliberate rather than incidental:
 - **Safe by default.** Output lands under `SCREENCAST_HOME`, never inside a project checkout, and the public repo's `.gitignore` blocks captured media from being committed.
 - **Recordings end.** When the client disconnects (or the server gets SIGINT/SIGTERM), every active recording is finalized and the server exits. Every recording also has a `maxDurationSec` cap (default one hour). A recording interrupted by a hard crash is reconciled on the next start (orphan reaping).
 
+What it can do beyond record-and-look:
+
+- **Zoom toward clicks.** Record with `events: true` and `zoom` glides in on each click and rings it, Screen Studio style.
+- **Review before sharing.** In clients with MCP Apps, `stop_recording` opens an inline player where a person trims and draws redaction boxes.
+- **Find and cover secrets.** `find_text` reads the screen with Windows OCR and returns rectangles for `redact_region`.
+- **One call, one encode.** `pipeline` runs trim, crop, redact, callouts, and an export as a single ffmpeg pass.
+- **Record a covered window.** `backend: "wgc"` records a window's own surface through Windows Graphics Capture.
+
 ## Tools
 
-Thirty-seven tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
+41 tools in six groups. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface; tests keep it, this README, and the docs site in sync with `src/tools/`.
 
 ### Capture
 
@@ -138,64 +169,31 @@ Every capture tool takes a single `target` string, so an agent never has to jugg
 | `full` | The whole virtual desktop |
 | `monitor:<index>` | One display; `0` is always primary |
 | `window:<title>` | The on-screen rectangle a window occupies (case-insensitive exact title, else substring; topmost wins) |
+| `window:exe=<app.exe>` | That app's topmost window, without relying on its title |
+| `window:hwnd=<handle>` | One exact window by handle (hex `0x1A2B` or decimal) |
 | `region:<x>,<y>,<w>,<h>` | An absolute pixel rectangle |
 
-For `window:` targets, `screenshot` and `start_recording` both report `matchedWindow`, `matchCount`, `matchKind` (`exact` or `substring`), and the captured `region`. When the title matched only as a substring, or several windows matched, the result carries a `windowWarning` listing the candidate titles, so a generic title like `window:Code` cannot quietly record a different window. Pass `exactTitle: true` to refuse the substring fallback entirely.
-
-Set `SCREENCAST_MAX_RECORDING_SEC` to change the default recording cap (`0` disables it).
+For `window:` targets, `screenshot` and `start_recording` both report `matchedWindow`, `matchCount`, `matchKind` (`exact`, `substring`, `exe`, or `hwnd`), and the captured `region`. When the title matched only as a substring, or several windows matched, the result carries a `windowWarning` listing the candidate titles, so a generic title like `window:Code` cannot quietly record a different window. Pass `exactTitle: true` to refuse the substring fallback entirely.
 
 Output is written under `SCREENCAST_HOME` (default `<homedir>/.screencast-mcp`) into `recordings/`, `frames/`, `screenshots/`, and `edits/`. Any tool also accepts an explicit output path.
 
 Edit and produce tools write to a `<name>.partial.<ext>` file next to the output and rename it into place only when ffmpeg succeeds, so a failed, timed-out, or cancelled job never leaves a truncated file at `output`. The job timeout scales with the media's length (at least 10 minutes, or 4x the duration); set `SCREENCAST_JOB_TIMEOUT_MS` to override it. Clients that send a progress token get `notifications/progress` updates while a job runs, and cancelling the request stops ffmpeg.
 
-## Prerequisites
+## Configuration
 
-`ffmpeg` and `ffprobe` are external dependencies and must be on `PATH` (or pointed at via the `FFMPEG_PATH` / `FFPROBE_PATH` environment variables). The server detects them per call and returns a clear error with an install hint if either is missing.
+`ffmpeg` and `ffprobe` must be on `PATH`, or pointed at with `FFMPEG_PATH` / `FFPROBE_PATH`; the server checks per call and returns an install hint if either is missing (macOS: `brew install ffmpeg`; Linux: `apt install ffmpeg`, for the non-capture tools).
 
-| Platform | Install |
-| --- | --- |
-| Windows | `winget install Gyan.FFmpeg` or `choco install ffmpeg` |
-| macOS | `brew install ffmpeg` |
-| Linux | `apt install ffmpeg` |
-
-## Installation
-
-**Claude Desktop (one click):** download `screencast-mcp-<version>.mcpb` from the [latest release](https://github.com/TMHSDigital/screencast-mcp/releases/latest) and open it, or drag it into Settings > Extensions. Claude Desktop installs it with its own Node runtime. You can optionally pick an output folder, and point at `ffmpeg.exe` / `ffprobe.exe` if they are not on `PATH`.
-
-**Any MCP client (npm):**
-
-```bash
-npm install -g @tmhs/screencast-mcp
-```
-
-Or run it from a clone:
-
-```bash
-git clone https://github.com/TMHSDigital/screencast-mcp.git
-cd screencast-mcp
-npm install
-npm run build      # produces dist/index.js, the server entry point
-```
-
-### MCP client configuration
-
-```json
-{
-  "mcpServers": {
-    "screencast": {
-      "command": "npx",
-      "args": ["-y", "@tmhs/screencast-mcp"]
-    }
-  }
-}
-```
-
-> [!TIP]
-> Running from a clone instead of the published package? Point the client straight at the build: `"command": "node"`, `"args": ["C:/path/to/screencast-mcp/dist/index.js"]`.
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `SCREENCAST_HOME` | `<homedir>/.screencast-mcp` | Where recordings, frames, screenshots, and edits are written |
+| `SCREENCAST_MAX_RECORDING_SEC` | `3600` | Default recording cap (`0` disables it) |
+| `SCREENCAST_JOB_TIMEOUT_MS` | scales with length | Override the edit job timeout |
+| `SCREENCAST_WHISPER_MODEL` | none | whisper.cpp model for `transcribe` |
+| `FFMPEG_PATH` / `FFPROBE_PATH` | `PATH` lookup | Explicit ffmpeg / ffprobe binaries |
 
 ## Usage
 
-**Workflows:** copy-paste recipes with the tool calls and real outputs are on the docs site: [bug-repro clip for a PR](https://tmhsdigital.github.io/screencast-mcp/workflows/bug-repro.html), [README demo GIF](https://tmhsdigital.github.io/screencast-mcp/workflows/demo-gif.html), [agent UI verification loop](https://tmhsdigital.github.io/screencast-mcp/workflows/verify-ui.html), [social clip](https://tmhsdigital.github.io/screencast-mcp/workflows/social-clip.html), and [reviewing a long recording](https://tmhsdigital.github.io/screencast-mcp/workflows/review-recording.html). Setup for Claude Code, Claude Desktop, Cursor, and VS Code: [Connect your client](https://tmhsdigital.github.io/screencast-mcp/connect.html).
+**Workflows:** copy-paste recipes with the tool calls and real outputs are on the docs site: [bug-repro clip for a PR](https://tmhsdigital.github.io/screencast-mcp/workflows/bug-repro.html), [README demo GIF](https://tmhsdigital.github.io/screencast-mcp/workflows/demo-gif.html), [agent UI verification loop](https://tmhsdigital.github.io/screencast-mcp/workflows/verify-ui.html), [social clip](https://tmhsdigital.github.io/screencast-mcp/workflows/social-clip.html), [reviewing a long recording](https://tmhsdigital.github.io/screencast-mcp/workflows/review-recording.html), [zoom toward every click](https://tmhsdigital.github.io/screencast-mcp/workflows/zoom-clicks.html), and [the whole edit in one call](https://tmhsdigital.github.io/screencast-mcp/workflows/pipeline.html).
 
 A typical watch loop — record, sample, look:
 
@@ -238,7 +236,8 @@ It also offers **resources**, so a client can list and attach recordings without
 ## Windows notes
 
 - **Multi-monitor offsets.** `gdigrab` has no "capture monitor N" selector, so a monitor target captures the whole virtual desktop and crops to that display's pixel bounds (from `System.Windows.Forms.Screen.AllScreens`). `monitor:1` grabs the second display at its real offset; `monitor:0` is always primary.
-- **Window capture** resolves the window to the on-screen **rectangle** it occupies and captures that, rather than the window's own surface — `gdigrab`'s native `title=` grab returns a blank frame for GPU- or DirectComposition-composited windows (Chrome, Electron, UWP). Target it by title, or without relying on the title by `window:exe=Code.exe` (that app's topmost window) or `window:hwnd=0x1A2B` (one exact window); results report the matched title. The window must be **visible, on top, and not minimized** (a minimized window is rejected with a clear error), the capture includes anything drawn over that rectangle, and for `start_recording` the rectangle is fixed **once at start**. For stills, `backend: "wgc"` on `screenshot` and `find_text` captures the window's **own surface** through Windows Graphics Capture (FFmpeg 8+ `gfxcapture`, by window handle), even when other windows cover it. It takes 1-2 s instead of ~0.2 s, so it is opt-in. `start_recording` takes `backend: "wgc"` too: it records the window's own surface (its client area) while it is covered, moved, or in the background. `gfxcapture` only emits a frame when the window presents, so a small recorder process repaints one pixel of the window every 200 ms and repeats the latest frame at the requested fps; it stops on `q` like ffmpeg, so `stop_recording` and `maxDurationSec` work the same. The first frame takes a second or two, and `start_recording` returns once it is captured. No audio with `wgc` yet.
+- **Window capture** resolves the window to the on-screen **rectangle** it occupies and captures that, rather than the window's own surface — `gdigrab`'s native `title=` grab returns a blank frame for GPU- or DirectComposition-composited windows (Chrome, Electron, UWP). Target it by title, or without relying on the title by `window:exe=Code.exe` (that app's topmost window) or `window:hwnd=0x1A2B` (one exact window); results report the matched title. The window must be **visible, on top, and not minimized** (a minimized window is rejected with a clear error), the capture includes anything drawn over that rectangle, and for `start_recording` the rectangle is fixed **once at start**. Use `backend: "wgc"` (below) to capture the window itself instead.
+- **Windows Graphics Capture (`backend: "wgc"`, FFmpeg 8+).** Captures a window's **own surface** by handle, even when other windows cover it. On `screenshot` and `find_text` it takes 1-2 s instead of ~0.2 s, so it is opt-in. On `start_recording` it records the window's client area while it is covered, moved, or in the background. `gfxcapture` only emits a frame when the window presents, so a small recorder process repaints one pixel of the window every 200 ms and repeats the latest frame at the requested fps; it stops on `q` like ffmpeg, so `stop_recording` and `maxDurationSec` work the same. The first frame takes a second or two, and `start_recording` returns once it is captured. No audio with `wgc` yet.
 - **Fullscreen-exclusive apps** often produce black frames under `gdigrab`; run the source in borderless-windowed mode for reliable capture.
 - **System audio needs a loopback device.** `gdigrab` is video-only, so `start_recording` with `audio.source` = `system` captures from a separate dshow input. Windows has no native loopback, so this needs a virtual-audio device (enable Stereo Mix, or install a driver such as screen-capture-recorder's `virtual-audio-capturer` or VB-CABLE). Run `list_audio_devices` to find it. Microphone capture is intentionally not supported.
 
@@ -261,11 +260,15 @@ It also offers **resources**, so a client can list and attach recordings without
 .
 ├── src/
 │   ├── index.ts          # MCP server entry (stdio); registers every tool, reaps orphans
-│   ├── context.ts        # shared session-store singleton
-│   ├── tools/            # one file per tool (capture, watch, edit)
-│   ├── utils/            # ffmpeg, monitors, windows, sessions, paths, targets
-│   └── __tests__/        # vitest unit tests + guarded local-capture harness
-├── docs/                 # GitHub Pages documentation site
+│   ├── prompts.ts        # MCP prompts (workflows as slash commands)
+│   ├── resources.ts      # MCP resources (sessions, posters)
+│   ├── wgcRecorder.ts    # recorder process for backend: "wgc"
+│   ├── tools/            # one file per tool
+│   ├── utils/            # pure builders and helpers (ffmpeg args, targets, sessions, ...)
+│   └── __tests__/        # vitest: unit, ffmpeg integration, guarded local-capture harness
+├── assets/               # bundled fonts and the review player (assets/ui)
+├── docs/                 # GitHub Pages site (scripts/build-docs-pages.mjs writes the recipe pages)
+├── scripts/              # Claude Desktop bundle (.mcpb) and docs page builders
 ├── mcp-tools.json        # canonical tool manifest (kept in sync with src/tools)
 ├── server.json           # MCP Registry listing (name matches package.json mcpName)
 ├── .github/workflows/    # CI, release, npm publish, Pages, ecosystem drift check
@@ -276,11 +279,15 @@ It also offers **resources**, so a client can list and attach recordings without
 ## Development
 
 ```bash
+git clone https://github.com/TMHSDigital/screencast-mcp.git
+cd screencast-mcp
 npm install
 npm run build      # tsc -> dist/
 npm test           # vitest: unit tests, plus the ffmpeg integration suite when ffmpeg is on PATH
 npm run dev        # tsx watch
 ```
+
+To run your build from a client, point it at `dist/index.js`: `"command": "node"`, `"args": ["C:/path/to/screencast-mcp/dist/index.js"]`.
 
 The integration suite (`src/__tests__/integration`) runs the real edit and produce builders through ffmpeg against lavfi-generated fixtures and checks the probed result (durations, dimensions, streams, loudness). It skips when ffmpeg is missing; set `REQUIRE_FFMPEG=1` to make a missing ffmpeg fail instead, as CI's Linux job does.
 
@@ -296,7 +303,7 @@ Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) 
 
 ## License
 
-Released under the [CC-BY-NC-ND-4.0](LICENSE) license.
+Released under the [CC-BY-NC-ND-4.0](LICENSE) license: free to use and share for non-commercial purposes, with attribution and without modification. For other uses, [open an issue](https://github.com/TMHSDigital/screencast-mcp/issues).
 
 <div align="center">
 <br />

@@ -65,3 +65,25 @@ describe("docs pages", () => {
     expect(unknown).toEqual([]);
   });
 });
+
+describe("docs/sitemap.xml", () => {
+  it("lists every page", () => {
+    const sitemap = readFileSync(join(root, "docs", "sitemap.xml"), "utf8");
+    const listed = [...sitemap.matchAll(/<loc>https:\/\/tmhsdigital\.github\.io\/screencast-mcp\/([^<]*)<\/loc>/g)].map((m) => m[1]);
+    const expected = pages.map((p) => p.replace(/(^|\/)index\.html$/, "$1"));
+    expect(listed.sort()).toEqual(expected.sort());
+  });
+});
+
+describe("README", () => {
+  const readme = readFileSync(join(root, "README.md"), "utf8");
+  it("states the real tool count", () => {
+    const counts = [...readme.matchAll(/\b(\d+) (?:typed )?tools\b/g)].map((m) => Number(m[1]));
+    expect(counts.length).toBeGreaterThan(0);
+    expect(counts.every((n) => n === registered.length), `README says ${counts.join(", ")}; manifest has ${registered.length}`).toBe(true);
+  });
+  it("documents every registered tool in a table", () => {
+    const rows = [...readme.matchAll(/^\| `([a-z_]+)` \|/gm)].map((m) => m[1]);
+    expect(registered.filter((t) => !rows.includes(t))).toEqual([]);
+  });
+});
