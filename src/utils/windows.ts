@@ -157,6 +157,9 @@ export function windowMatchReport(w: WindowBounds): Record<string, unknown> {
 // Per-monitor-DPI-aware enumeration of top-level windows + virtual screen
 // bounds. Runs as a single PowerShell process; passed base64 (EncodedCommand)
 // so no quoting of the C# shim is needed. Kept verbatim-small for startup cost.
+// Bounds come from DWMWA_EXTENDED_FRAME_BOUNDS (9), the visible frame:
+// GetWindowRect includes the invisible resize border (about 8 px on Windows
+// 10/11), so a window: capture also grabbed a strip of whatever was behind it.
 const PS_ENUM = `
 $ErrorActionPreference='Stop'
 Add-Type @"
@@ -176,7 +179,8 @@ public class WinShim{
  static bool Col(IntPtr h,IntPtr l){_h.Add(h);return true;}
  public static IntPtr[] Z(){_h=new List<IntPtr>();EnumWindows(Col,IntPtr.Zero);return _h.ToArray();}
  public static string T(IntPtr h){int n=GetWindowTextLength(h);if(n==0)return "";var s=new StringBuilder(n+1);GetWindowText(h,s,s.Capacity);return s.ToString();}
- public static int[] R(IntPtr h){RECT r;GetWindowRect(h,out r);return new int[]{r.Left,r.Top,r.Right,r.Bottom};}
+ [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr h,int a,out RECT r,int n);
+ public static int[] R(IntPtr h){RECT r;if(DwmGetWindowAttribute(h,9,out r,Marshal.SizeOf(typeof(RECT)))!=0){GetWindowRect(h,out r);}return new int[]{r.Left,r.Top,r.Right,r.Bottom};}
  public static bool Ic(IntPtr h){return IsIconic(h);}
  public static bool Vis(IntPtr h){return IsWindowVisible(h);}
  public static int SM(int i){return GetSystemMetrics(i);}
