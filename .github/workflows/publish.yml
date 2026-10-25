@@ -17,6 +17,10 @@ jobs:
       # that if the secret is ever rotated out or removed, the publish step skips
       # cleanly rather than leaving a perpetually-red post-merge workflow.
       HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
+      # Set the repository variable NPM_TRUSTED_PUBLISHING=true once npm trusted
+      # publishing is configured for this repo + publish.yml on npmjs.com. npm
+      # then authenticates with GitHub OIDC (id-token: write): no token, no OTP.
+      TRUSTED: ${{ vars.NPM_TRUSTED_PUBLISHING == 'true' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
@@ -42,8 +46,8 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Skip publish (no NPM_TOKEN configured)
-        if: env.HAS_NPM_TOKEN != 'true'
+      - name: Skip publish (no NPM_TOKEN or trusted publishing configured)
+        if: env.HAS_NPM_TOKEN != 'true' && env.TRUSTED != 'true'
         run: |
           echo "NPM_TOKEN is not configured for this repository."
           echo "Build and tests passed, but nothing was published to npm."
@@ -51,10 +55,17 @@ jobs:
           echo "trusted publishing for this repo) and re-run this workflow."
 
       - name: Publish to npm
-        if: steps.pub.outputs.skip == 'false' && env.HAS_NPM_TOKEN == 'true'
-        run: npm publish --provenance --access public
+        if: steps.pub.outputs.skip == 'false' && (env.HAS_NPM_TOKEN == 'true' || env.TRUSTED == 'true')
+        run: |
+          set -o pipefail
+          if npm publish --provenance --access public 2>&1 | tee publish.log; then exit 0; fi
+          if grep -q EOTP publish.log; then
+            echo "::error::npm asked for a one-time password: NPM_TOKEN is a 2FA-protected token, which CI cannot use. Configure npm trusted publishing (npmjs.com > package > Settings > Trusted publishing: GitHub Actions, this repo, publish.yml) and set the repository variable NPM_TRUSTED_PUBLISHING=true."
+          fi
+          exit 1
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # With trusted publishing, no token: npm uses the OIDC identity instead.
+          NODE_AUTH_TOKEN: ${{ env.TRUSTED != 'true' && secrets.NPM_TOKEN || '' }}
 
       # List the release in the official MCP Registry (#90). The registry checks
       # that the npm package's mcpName matches server.json, so this runs only
@@ -62,7 +73,7 @@ jobs:
       # which grants the io.github.TMHSDigital/* namespace; no secret needed.
       # mcp-publisher is pinned and checksum-verified.
       - name: Publish to the MCP Registry
-        if: steps.pub.outputs.skip == 'false' && env.HAS_NPM_TOKEN == 'true'
+        if: steps.pub.outputs.skip == 'false' && (env.HAS_NPM_TOKEN == 'true' || env.TRUSTED == 'true')
         env:
           MCP_PUBLISHER_VERSION: "1.8.1"
           MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc

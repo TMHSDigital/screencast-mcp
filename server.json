@@ -8,12 +8,12 @@
     "source": "github"
   },
   "websiteUrl": "https://tmhsdigital.github.io/screencast-mcp/",
-  "version": "0.26.0",
+  "version": "0.26.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@tmhs/screencast-mcp",
-      "version": "0.26.0",
+      "version": "0.26.1",
       "transport": {
         "type": "stdio"
       },

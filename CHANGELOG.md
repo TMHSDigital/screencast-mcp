@@ -7,6 +7,19 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.26.1]
+
+### Changed
+
+- **The publish workflow supports npm trusted publishing.** With the
+  repository variable `NPM_TRUSTED_PUBLISHING=true` (after configuring trusted
+  publishing for this repo and `publish.yml` on npmjs.com), npm authenticates
+  with GitHub OIDC: no token to expire, no one-time password. Publishing has
+  failed since 0.11.0, first with an expired token (`E404`) and then with a
+  2FA-protected token (`EOTP`, which CI cannot answer). An `EOTP` failure now
+  prints exactly what to configure. The token path still works when the
+  variable is unset.
+
 ## [0.26.0]
 
 ### Added
