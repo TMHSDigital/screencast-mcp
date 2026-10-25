@@ -7,6 +7,14 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.28.2]
+
+### Fixed
+
+- Publishing: the "already in the MCP Registry" check uses the per-name
+  versions endpoint. Registry search misses names containing a slash, so a
+  re-run would have tried to publish a duplicate version.
+
 ## [0.28.1]
 
 ### Fixed

@@ -83,7 +83,11 @@ jobs:
           set -euo pipefail
           v=$(node -p "require('./package.json').version")
           name=$(jq -r .name server.json)
-          if curl -fsSL "https://registry.modelcontextprotocol.io/v0/servers?search=${name}"             | jq -e --arg n "$name" --arg v "$v" '[.servers[] | (.server // .) | select(.name == $n and .version == $v)] | length > 0' >/dev/null; then
+          # Search misses names containing a slash; the per-name versions list
+          # works. A 404 (never listed) falls through to publishing.
+          enc=$(jq -rn --arg n "$name" '$n | @uri')
+          if curl -fsSL "https://registry.modelcontextprotocol.io/v0/servers/${enc}/versions" 2>/dev/null \
+            | jq -e --arg v "$v" '[.servers[] | (.server // .) | select(.version == $v)] | length > 0' >/dev/null; then
             echo "$name $v is already in the MCP Registry."
             exit 0
           fi
