@@ -271,6 +271,66 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     }
   }, 40_000);
 
+  it("events: true logs a click on the video's clock, in video pixels (#118)", async () => {
+    // The window turns black on mouse down, so the click is visible in the video.
+    const win = spawn("powershell", ["-NoProfile", "-Command",
+      "Add-Type -AssemblyName System.Windows.Forms;" +
+      "$f=New-Object Windows.Forms.Form;$f.Text='SC-EVENTS';$f.StartPosition='Manual';$f.Location='160,160';$f.ClientSize='400,260';$f.BackColor='White';$f.TopMost=$true;" +
+      "$f.Add_MouseDown({$f.BackColor='Black'});[Windows.Forms.Application]::Run($f)"], { windowsHide: false });
+    // One atomic absolute move+click (it cannot land elsewhere if the real mouse
+    // moves), then Ctrl+S only if the test window really has focus.
+    const inject = (x: number, y: number) => spawnSync("powershell", ["-NoProfile", "-Command", [
+      "Add-Type @\"",
+      "using System;using System.Text;using System.Runtime.InteropServices;",
+      "public class Inj{",
+      " [DllImport(\"user32.dll\")] public static extern IntPtr SetProcessDpiAwarenessContext(IntPtr v);",
+      " [DllImport(\"user32.dll\")] public static extern int GetSystemMetrics(int i);",
+      " [DllImport(\"user32.dll\")] public static extern void mouse_event(uint f,int x,int y,int d,IntPtr e);",
+      " [DllImport(\"user32.dll\")] public static extern void keybd_event(byte k,byte s,uint f,IntPtr e);",
+      " [DllImport(\"user32.dll\")] public static extern IntPtr GetForegroundWindow();",
+      " [DllImport(\"user32.dll\",CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h,StringBuilder s,int n);",
+      "}",
+      "\"@",
+      "[void][Inj]::SetProcessDpiAwarenessContext([IntPtr](-4))",
+      "$w=[Inj]::GetSystemMetrics(0);$h=[Inj]::GetSystemMetrics(1)",
+      "[Inj]::mouse_event(0x8007,[int](__X__*65535/($w-1)),[int](__Y__*65535/($h-1)),0,[IntPtr]::Zero)",
+      "Start-Sleep -Milliseconds 400",
+      "$s=New-Object Text.StringBuilder 64;[void][Inj]::GetWindowText([Inj]::GetForegroundWindow(),$s,64)",
+      "if($s.ToString() -eq 'SC-EVENTS'){[Inj]::keybd_event(0x11,0,0,[IntPtr]::Zero);[Inj]::keybd_event(0x53,0,0,[IntPtr]::Zero);[Inj]::keybd_event(0x53,0,2,[IntPtr]::Zero);[Inj]::keybd_event(0x11,0,2,[IntPtr]::Zero);'keys'}",
+    ].join("\n").replace("__X__", String(x)).replace("__Y__", String(y))], { encoding: "utf8" });
+    try {
+      await sleep(2000);
+      const rec = await call("start_recording", { target: "window:SC-EVENTS", exactTitle: true, fps: 30, events: true, keys: "shortcuts" });
+      expect(rec.isError, rec.text).toBe(false);
+      const { x: wx, y: wy, width, height } = rec.json.region;
+      await sleep(1500);
+      const sentKeys = inject(wx + Math.round(width / 2), wy + Math.round(height / 2)).stdout.includes("keys");
+      await sleep(1000);
+      const stop = await call("stop_recording", { sessionId: rec.json.sessionId });
+      expect(stop.json.eventsPath).toMatch(/\.events\.jsonl$/);
+
+      const read = await call("read_events", { sessionId: rec.json.sessionId, types: ["down", "key"], inFrameOnly: true });
+      const click = read.json.events.find((e: { type: string; x: number; y: number }) =>
+        e.type === "down" && Math.abs(e.x - width / 2) <= 3 && Math.abs(e.y - height / 2) <= 3);
+      expect(click, JSON.stringify(read.json.events)).toBeTruthy();
+      if (sentKeys) {
+        expect(read.json.events.some((e: { keys?: string }) => e.keys === "Ctrl+S")).toBe(true);
+      }
+
+      // The first frame where the window is black: the click repaint.
+      const stats = spawnSync("ffmpeg", ["-v", "error", "-i", rec.json.outputPath, "-vf",
+        "crop=100:60:(iw-100)/2:(ih-60)/2,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-", "-f", "null", "-"], { encoding: "utf8" });
+      const frames = [...stats.stdout.matchAll(/pts_time:([\d.]+)[\s\S]*?YAVG=([\d.]+)/g)].map((m) => ({ t: Number(m[1]), y: Number(m[2]) }));
+      const black = frames.find((f) => f.y < 60);
+      expect(black, "no black frame").toBeTruthy();
+      // The repaint lands a frame or two after the click at 30 fps.
+      expect(black!.t - click.t).toBeGreaterThanOrEqual(-0.04);
+      expect(black!.t - click.t).toBeLessThanOrEqual(0.12);
+    } finally {
+      win.kill();
+    }
+  }, 60_000);
+
   it("window: captures the visible frame, not the invisible border around it", async () => {
     // GetWindowRect includes ~8 px of invisible resize border on each side, so
     // a 500 px client area captured ~516 px wide, edged with whatever was behind.

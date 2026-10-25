@@ -20,7 +20,9 @@
         },
         "output": { "type": "string", "description": "Optional output .mp4 path (defaults under SCREENCAST_HOME/recordings)" },
         "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
-        "maxDurationSec": { "type": "integer", "minimum": 0, "description": "Stop automatically after this many seconds, finalizing the file (default 3600, or SCREENCAST_MAX_RECORDING_SEC). 0 = no cap" }
+        "maxDurationSec": { "type": "integer", "minimum": 0, "description": "Stop automatically after this many seconds, finalizing the file (default 3600, or SCREENCAST_MAX_RECORDING_SEC). 0 = no cap" },
+        "events": { "type": "boolean", "description": "Also log mouse clicks, scroll, cursor positions, and key presses to <recording>.events.jsonl, timed to the video and in video pixels (default false). Read it with read_events" },
+        "keys": { "type": "string", "enum": ["masked", "shortcuts"], "description": "With events: masked (default) logs that a key was pressed, never which; shortcuts also names Ctrl/Alt/Win chords (e.g. Ctrl+S). Typed text is never logged" }
       },
       "required": ["target"]
     }
@@ -50,6 +52,22 @@
         "sessionId": { "type": "string", "description": "Session id returned by start_recording" }
       },
       "required": ["sessionId"]
+    }
+  },
+  {
+    "name": "read_events",
+    "description": "Read the input event log of a recording made with start_recording events: true: mouse clicks, scroll, cursor positions, and key presses, each with its video time and position in video pixels. Filter by time range and type.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string", "description": "Session id of a recording started with events: true" },
+        "input": { "type": "string", "description": "Or a recording path (its sibling .events.jsonl is read) or the .events.jsonl itself" },
+        "from": { "type": "number", "minimum": 0, "description": "Only events at or after this video time, in seconds" },
+        "to": { "type": "number", "minimum": 0, "description": "Only events at or before this video time, in seconds" },
+        "types": { "type": "array", "items": { "type": "string", "enum": ["down", "up", "move", "wheel", "key"] }, "description": "Only these event types; clicks are down" },
+        "inFrameOnly": { "type": "boolean", "description": "Drop events whose cursor was outside the recorded area" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 5000, "description": "Most events to return (default 200)" }
+      }
     }
   },
   {

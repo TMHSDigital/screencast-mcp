@@ -336,3 +336,24 @@ export function buildScreenshotArgs(
     output,
   ];
 }
+
+/** Where the recorded video sits on the desktop, and its size: the offset that
+ * maps desktop coordinates (input events, #118) to video pixels. `full` needs
+ * the monitor list for the virtual desktop's origin, which can be negative. */
+export function captureFrame(
+  target: Target,
+  monitors: Monitor[],
+): { x: number; y: number; w: number; h: number } {
+  switch (target.kind) {
+    case "region":
+      return { x: target.x, y: target.y, w: evenDown(target.w), h: evenDown(target.h) };
+    case "monitor": {
+      const m = resolveMonitor(target.index, monitors);
+      return { x: m.x, y: m.y, w: evenDown(m.width), h: evenDown(m.height) };
+    }
+    case "full":
+      return virtualDesktopBounds(monitors);
+    case "window":
+      throw new ScreencastError("Internal: resolve a window target to a region first.");
+  }
+}

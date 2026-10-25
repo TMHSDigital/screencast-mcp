@@ -7,6 +7,25 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.28.0]
+
+### Added
+
+- Input event log (#118). `start_recording { events: true }` writes
+  `<recording>.events.jsonl` beside the video: mouse clicks (down/up per button),
+  scroll, cursor positions sampled every 33 ms, and key presses. Each event
+  carries its time on the video's clock (aligned to gdigrab's first-frame
+  timestamp; a click shows up within about a frame) and its position in video
+  pixels, flagged `inFrame` when the cursor was inside the recorded area.
+- `read_events`: read a slice of the log by session or path, filtered by time
+  range, type, and `inFrameOnly`. For example, `types: ["down"]` lists the clicks
+  to sample frames at or zoom toward.
+- Keys are never logged as text. `keys: "masked"` (default) records only that a
+  key went down; `keys: "shortcuts"` also names Ctrl/Alt/Win chords such as
+  `Ctrl+S`. Plain typing, Shift+letter, and AltGr characters stay masked. The
+  hook helper runs only for that recording and exits with it or with the server.
+  The threat model covers the log.
+
 ## [0.27.3]
 
 ### Added

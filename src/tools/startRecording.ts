@@ -5,6 +5,7 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import {
   buildCaptureArgs,
+  captureFrame,
   DEFAULT_FPS,
   DEFAULT_QUALITY,
   DEFAULT_MAX_RECORDING_SEC,
@@ -17,6 +18,19 @@ import { resolveLoopbackDevice } from "../utils/audioDevices.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { getStore } from "../context.js";
 import type { SessionRecord } from "../utils/sessions.js";
+import { rmSync } from "node:fs";
+import {
+  DEFAULT_KEY_MODE,
+  eventPaths,
+  parseCaptureStart,
+  startEventLogger,
+  stopEventLogger,
+  summarizeEvents,
+  trackFinalizer,
+  writeEventsFile,
+  type KeyMode,
+} from "../utils/events.js";
+import { getMonitors } from "../utils/monitors.js";
 
 const inputSchema = {
   target: z
@@ -81,6 +95,22 @@ const inputSchema = {
         `${DEFAULT_MAX_RECORDING_SEC}, or SCREENCAST_MAX_RECORDING_SEC). 0 = no cap. ` +
         "A safety net against a recording that is never stopped.",
     ),
+  events: z
+    .boolean()
+    .optional()
+    .describe(
+      "Also log mouse clicks, scroll, cursor positions, and key presses to " +
+        "<recording>.events.jsonl, timed to the video and in video pixels (default " +
+        "false). Read it with read_events. Adds about a second to start.",
+    ),
+  keys: z
+    .enum(["masked", "shortcuts"])
+    .optional()
+    .describe(
+      "With events: masked (default) logs that a key was pressed, never which. " +
+        "shortcuts also names chords made with Ctrl, Alt, or Win (e.g. Ctrl+S); " +
+        "typed text is never logged.",
+    ),
 };
 
 export function register(server: McpServer): void {
@@ -123,15 +153,28 @@ export function register(server: McpServer): void {
           audio,
           maxDurationSec,
         });
+        // The event logger starts first so the first frames have events (#118).
+        const keyMode: KeyMode = args.keys ?? DEFAULT_KEY_MODE;
+        const evPaths = args.events ? eventPaths(output) : null;
+        const frame = args.events
+          ? captureFrame(target, target.kind === "full" ? await getMonitors() : monitors)
+          : null;
+        const logger = evPaths ? await startEventLogger(evPaths.raw, keyMode) : null;
+
+        const spawnedAt = Date.now();
         const child = spawn(ffmpeg, ffArgs, {
           stdio: ["pipe", "ignore", "pipe"],
           windowsHide: true,
         });
 
         // Detect an immediate failure (bad window title, busy device, etc.).
+        // The head keeps the input banner, whose start: time aligns events.
         let stderrTail = "";
+        let stderrHead = "";
         child.stderr?.on("data", (d) => {
-          stderrTail = (stderrTail + d.toString()).slice(-2000);
+          const text = d.toString();
+          stderrTail = (stderrTail + text).slice(-2000);
+          if (stderrHead.length < 8000) stderrHead += text;
         });
         const settled = await new Promise<"running" | "exited">((resolve) => {
           const timer = setTimeout(() => resolve("running"), 1200);
@@ -148,6 +191,8 @@ export function register(server: McpServer): void {
 
         const id = `rec-${stamp()}-${rand(6)}`;
         if (settled === "exited") {
+          if (logger) await stopEventLogger(logger);
+          if (evPaths) rmSync(evPaths.raw, { force: true });
           const tail = stderrTail.trim().split("\n").slice(-6).join("\n");
           throw new ScreencastError(
             `Recording failed to start (ffmpeg exited immediately):\n${tail}`,
@@ -166,10 +211,31 @@ export function register(server: McpServer): void {
           startedAt: new Date().toISOString(),
           ...(maxDurationSec > 0 ? { maxDurationSec } : {}),
           ...(window ? { matchedWindow: window.matchedTitle } : {}),
+          ...(evPaths ? { events: { path: evPaths.jsonl, keys: keyMode } } : {}),
         };
         const store = getStore();
         store.create(record);
         store.attachChild(id, child);
+        if (logger && evPaths && frame) {
+          const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+          trackFinalizer(
+            id,
+            exited.then(async () => {
+              await stopEventLogger(logger);
+              const startMs = parseCaptureStart(stderrHead) ?? spawnedAt;
+              try {
+                const events = writeEventsFile(evPaths, { startMs, frame, endSec: (Date.now() - startMs) / 1000 });
+                store.update(id, {
+                  events: { path: evPaths.jsonl, keys: keyMode, count: events.length, summary: summarizeEvents(events) },
+                });
+              } catch (err) {
+                store.update(id, {
+                  events: { path: evPaths.jsonl, keys: keyMode, error: (err as Error).message },
+                });
+              }
+            }),
+          );
+        }
         // Keep the on-disk record consistent if the child dies on its own. A
         // non-zero exit is a crash (disk full, encoder failure), not a clean
         // stop - record it as "failed" with the stderr tail so the caller can
@@ -213,6 +279,7 @@ export function register(server: McpServer): void {
           audioDevice: audio?.device ?? null,
           maxDurationSec: maxDurationSec > 0 ? maxDurationSec : null,
           ...(window ? windowMatchReport(window) : {}),
+          ...(evPaths ? { eventsPath: evPaths.jsonl, keys: keyMode } : {}),
           note:
             "Call stop_recording with this sessionId to finalize the file." +
             (maxDurationSec > 0

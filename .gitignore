@@ -34,6 +34,10 @@ output/
 /*.webp
 /*.bmp
 
+# Input event logs written next to a recording (#118).
+*.events.jsonl
+*.events.raw
+
 # Audio (Phase 2 capture seam - ignore pre-emptively).
 *.wav
 *.mp3
