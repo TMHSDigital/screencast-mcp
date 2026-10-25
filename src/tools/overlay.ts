@@ -1,11 +1,10 @@
 import { z } from "zod";
-import { extname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
-import { buildOverlayArgs } from "../utils/media.js";
+import { buildOverlayArgs, editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
@@ -25,7 +24,9 @@ export function register(server: McpServer): void {
   server.tool(
     "overlay",
     "Composite an image or video (logo, watermark, picture-in-picture) onto a " +
-      "base video at a pixel position, optionally scaled and time-limited.",
+      "base video at a pixel position, optionally scaled and time-limited. A " +
+      "video overlay starts playing at start and holds its last frame if it ends " +
+      "early; the output keeps the base video's audio and length.",
     inputSchema,
     async (args, extra) => {
       try {
@@ -36,7 +37,8 @@ export function register(server: McpServer): void {
         if (!existsSync(args.overlay)) {
           throw new ScreencastError(`Overlay file not found: ${args.overlay}`);
         }
-        const ext = extname(args.input) || ".mp4";
+        assertEditContainer(args.output);
+        const ext = editOutputExt(args.input);
         const output = resolveOutput(
           args.output,
           subdir("edits"),
@@ -47,14 +49,16 @@ export function register(server: McpServer): void {
           args.width !== undefined || args.height !== undefined
             ? { width: args.width, height: args.height }
             : undefined;
+        const durationSec = await probeDuration(args.input);
         const ffArgs = buildOverlayArgs(args.input, args.overlay, output, {
           x: args.x,
           y: args.y,
           start: args.start,
           end: args.end,
           scale,
+          durationSec,
         });
-        await runEditJob(ffArgs, { output, durationSec: await probeDuration(args.input), extra });
+        await runEditJob(ffArgs, { output, durationSec, extra });
         return okResponse({ outputPath: output });
       } catch (error) {
         return errorResponse(error);

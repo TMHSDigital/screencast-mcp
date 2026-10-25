@@ -7,6 +7,45 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.35.0]
+
+### Changed
+
+- `concat` probes its inputs. Inputs that differ in codec, size, pixel format,
+  frame rate or audio layout used to give a broken file that still exited 0.
+  They are now re-encoded with hard cuts, at the first input's size and frame
+  rate (#206). So are inputs that hold frames hidden behind an edit list,
+  which a stream copy would carry into the joined file (#203). Matching inputs
+  are still stream-copied. The result reports `mode` (`copy` or `reencode`)
+  and the `reason`.
+- `get_media_info` also reports `videoDurationSec`, `pixFmt`, `videoFrames`,
+  `sampleRate` and `channels`.
+
+### Fixed
+
+- `xfade_transition` and `assemble_highlights` took each clip's length from
+  the container, which is its longest stream. When a clip's audio ran longer
+  than its video, the next clip's video was dropped or later audio drifted.
+  Offsets now use the video stream's length, and each audio track is padded or
+  trimmed to match (#205).
+- Edit tools failed on `.webm` input with "Nothing was written into output
+  file", because they wrote H.264/AAC into WebM. The default output is now
+  `.mp4` for any container that cannot hold those codecs, and an explicit
+  `.webm` or `.gif` output path is refused with a clear message (#187).
+- `normalize_audio` and `denoise` to an audio-only output (`.wav`, `.mp3`,
+  `.m4a`) from a video input failed. They now drop the video (#187).
+- `overlay` took the overlay's audio and length when it had more channels or
+  ran longer. It now keeps the base video's audio and length (#188).
+- `overlay` with a video and a `start` time showed a frozen last frame. The
+  overlay's clock now starts at `start`, so it plays from its first frame
+  (#230).
+- `xfade_transition` dropped all audio when only one clip had a track. The
+  silent clip now gets matching silence (#188).
+- The `vertical_reel` export wrote 96 kHz audio. Exports now always resample
+  to 48 kHz after loudness normalization (#188).
+- A `blur` redaction of a region smaller than 8 px failed in libx264. The
+  chroma plane now gets its own, smaller blur radius (#188).
+
 ## [0.34.0]
 
 ### Changed

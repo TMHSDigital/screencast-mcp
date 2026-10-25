@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { extname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
@@ -15,6 +14,7 @@ import {
   DEFAULT_MIN_IDLE_SEC,
   DEFAULT_KEEP_SEC,
 } from "../utils/idle.js";
+import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
@@ -76,7 +76,8 @@ export function register(server: McpServer): void {
         if (args.dryRun || cuts.length === 0) {
           return okResponse({ ...summary, ...(cuts.length === 0 ? { note: "No idle stretches found; nothing to cut." } : { dryRun: true }) });
         }
-        const ext = extname(args.input) || ".mp4";
+        assertEditContainer(args.output);
+        const ext = editOutputExt(args.input);
         const output = resolveOutput(args.output, subdir("edits"), `trimmed-idle-${stamp()}-${rand()}${ext}`, args.overwrite);
         await runEditJob(buildCutIdleArgs(args.input, output, cuts, hasAudio), {
           output,

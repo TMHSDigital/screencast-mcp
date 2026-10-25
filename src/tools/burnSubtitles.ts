@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { dirname, extname } from "node:path";
+import { dirname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
@@ -7,6 +7,7 @@ import { requireFfmpeg, probeMedia, hasFilter } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildBurnSubtitlesArgs, type CaptionStyle } from "../utils/captions.js";
 import { bundledFontPath } from "../utils/fonts.js";
+import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
@@ -35,7 +36,8 @@ export function register(server: McpServer): void {
         if (!hasFilter("subtitles")) {
           throw new ScreencastError("This ffmpeg has no subtitles filter (it needs libass).", "Install a full ffmpeg build, e.g. `winget install Gyan.FFmpeg`.");
         }
-        const ext = extname(args.input) || ".mp4";
+        assertEditContainer(args.output);
+        const ext = editOutputExt(args.input);
         const output = resolveOutput(args.output, subdir("edits"), `subtitled-${stamp()}-${rand()}${ext}`, args.overwrite);
         const fontsDir = dirname(bundledFontPath("regular"));
         const style = (args.style as CaptionStyle | undefined) ?? "clean";

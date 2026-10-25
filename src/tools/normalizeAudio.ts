@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { extname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
@@ -12,6 +11,7 @@ import {
   parseLoudnorm,
   type LoudnessPreset,
 } from "../utils/audio.js";
+import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
@@ -43,7 +43,8 @@ export function register(server: McpServer): void {
         const info = await probeMedia(args.input);
         if (!info.audioCodec) throw new ScreencastError(`Input has no audio stream: ${args.input}`);
         const t = loudnessTarget(args.target as LoudnessPreset | number | undefined);
-        const ext = extname(args.input) || ".mp4";
+        assertEditContainer(args.output);
+        const ext = editOutputExt(args.input, { audio: true });
         const output = resolveOutput(args.output, subdir("edits"), `loudnorm-${stamp()}-${rand()}${ext}`, args.overwrite);
 
         const timeout = jobTimeoutMs(info.durationSec);

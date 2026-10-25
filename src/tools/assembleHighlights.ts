@@ -4,7 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
-import { buildAssembleArgs, DEFAULT_TRANSITION_DUR } from "../utils/produce.js";
+import { buildAssembleArgs, clipLength, DEFAULT_TRANSITION_DUR } from "../utils/produce.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
@@ -42,7 +42,7 @@ export function register(server: McpServer): void {
           if (!existsSync(f)) throw new ScreencastError(`Input file not found: ${f}`);
         }
         const infos = await Promise.all(args.clips.map((c) => probeMedia(c)));
-        const durations = infos.map((i) => i.durationSec ?? 0);
+        const durations = infos.map((i) => clipLength(i) ?? 0);
         const clipHasAudio = infos.map((i) => i.audioCodec !== null);
         const output = resolveOutput(
           args.output,

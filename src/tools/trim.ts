@@ -5,7 +5,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
-import { buildTrimArgs, editOutputExt } from "../utils/media.js";
+import { buildTrimArgs, editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
@@ -40,6 +40,7 @@ export function register(server: McpServer): void {
         }
         // A stream copy keeps the input's container; a re-encode needs one that
         // holds libx264/AAC.
+        if (args.exact !== false) assertEditContainer(args.output);
         const ext = args.exact === false ? extname(args.input) || ".mp4" : editOutputExt(args.input);
         const output = resolveOutput(
           args.output,

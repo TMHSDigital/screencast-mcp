@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { extname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
@@ -32,6 +31,7 @@ function readClicks(path: string): ClickPoint[] | null {
     .filter((e) => e.type === "down" && e.inFrame)
     .map((e) => ({ t: e.t, x: e.x, y: e.y }));
 }
+import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 /** One zoom keyframe; shared with pipeline. */
@@ -156,7 +156,8 @@ export function register(server: McpServer): void {
         }
 
         const views = keyframesToViews(keyframes, W, H);
-        const ext = extname(args.input) || ".mp4";
+        assertEditContainer(args.output);
+        const ext = editOutputExt(args.input);
         const output = resolveOutput(args.output, subdir("edits"), `zoom-${stamp()}-${rand()}${ext}`, args.overwrite);
         const rings = args.highlightClicks ? { clicks: clicks ?? [], color: ringColor } : undefined;
         await runEditJob(buildZoomArgs(args.input, output, views, { width: W, height: H, fps }, transition, "standard", rings), {

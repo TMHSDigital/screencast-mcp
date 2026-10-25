@@ -14,7 +14,11 @@ import { stillOutput } from "./paths.js";
 const DEFAULT_EDIT_QUALITY: Quality = "standard";
 
 export interface MediaInfo {
+  /** Container duration: the longest stream. */
   durationSec: number | null;
+  /** The video stream's own duration (falls back to the container's), the
+   * length to cut and crossfade on when audio and video differ (#205). */
+  videoDurationSec: number | null;
   width: number | null;
   height: number | null;
   fps: number | null;
@@ -22,6 +26,11 @@ export interface MediaInfo {
   audioCodec: string | null;
   format: string | null;
   sizeBytes: number | null;
+  pixFmt: string | null;
+  /** Video packets in the file, including any an edit list hides (#203). */
+  videoFrames: number | null;
+  sampleRate: number | null;
+  channels: number | null;
 }
 
 interface FfprobeStream {
@@ -31,6 +40,17 @@ interface FfprobeStream {
   height?: number;
   avg_frame_rate?: string;
   r_frame_rate?: string;
+  duration?: string;
+  pix_fmt?: string;
+  nb_frames?: string;
+  sample_rate?: string;
+  channels?: number;
+}
+
+function numberOrNull(v: string | number | undefined): number | null {
+  if (v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 interface FfprobeJson {
@@ -56,8 +76,10 @@ export function parseMediaInfo(probe: FfprobeJson): MediaInfo {
   const audio = streams.find((s) => s.codec_type === "audio");
   const duration = probe.format?.duration;
   const size = probe.format?.size;
+  const durationSec = duration !== undefined ? Number(duration) : null;
   return {
-    durationSec: duration !== undefined ? Number(duration) : null,
+    durationSec,
+    videoDurationSec: video ? (numberOrNull(video.duration) ?? durationSec) : null,
     width: video?.width ?? null,
     height: video?.height ?? null,
     fps: parseFrameRate(video?.avg_frame_rate) ?? parseFrameRate(video?.r_frame_rate),
@@ -65,6 +87,10 @@ export function parseMediaInfo(probe: FfprobeJson): MediaInfo {
     audioCodec: audio?.codec_name ?? null,
     format: probe.format?.format_name ?? null,
     sizeBytes: size !== undefined ? Number(size) : null,
+    pixFmt: video?.pix_fmt ?? null,
+    videoFrames: numberOrNull(video?.nb_frames),
+    sampleRate: numberOrNull(audio?.sample_rate),
+    channels: audio?.channels ?? null,
   };
 }
 
@@ -206,9 +232,32 @@ export function buildSampleAtTimestampArgs(
 /** The default output extension for an edit that encodes libx264/AAC: the
  * input's own container when it can hold those codecs, else .mp4 (a WebM
  * cannot, #187). */
-export function editOutputExt(input: string): string {
+export function editOutputExt(input: string, opts: { audio?: boolean } = {}): string {
   const ext = extname(input).toLowerCase();
-  return ext === ".mp4" || ext === ".mkv" || ext === ".mov" ? ext : ".mp4";
+  if (ext === ".mp4" || ext === ".mkv" || ext === ".mov") return ext;
+  // Audio tools also keep an audio-only container they can encode to.
+  if (opts.audio && AUDIO_ONLY_EXTS.has(ext)) return ext;
+  return ".mp4";
+}
+
+const AUDIO_ONLY_EXTS = new Set([".wav", ".mp3", ".m4a"]);
+
+/** True when the output path is an audio-only container (.wav/.mp3/.m4a). */
+export function isAudioOnlyPath(path: string): boolean {
+  return AUDIO_ONLY_EXTS.has(extname(path).toLowerCase());
+}
+
+/** Refuse an explicit output path whose container cannot hold the H.264/AAC
+ * an edit writes, instead of ffmpeg's cryptic "Nothing was written" (#187). */
+export function assertEditContainer(output: string | undefined): void {
+  if (output === undefined) return;
+  const ext = extname(output).toLowerCase();
+  if (ext === ".webm" || ext === ".gif") {
+    throw new ScreencastError(
+      `This tool writes H.264/AAC, which a ${ext} file cannot hold. Use an .mp4, .mkv or .mov ` +
+        `output, then convert (format: "webm") or export_gif the result.`,
+    );
+  }
 }
 
 /** Trim by start + (end | duration). Re-encodes by default so the file holds
@@ -259,6 +308,42 @@ export function buildConcatListContent(inputs: string[]): string {
 
 export function buildConcatArgs(listFile: string, output: string): string[] {
   return ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", output];
+}
+
+/** True when a file holds noticeably more video packets than its duration
+ * plays: frames hidden behind an edit list, as a stream-copy trim leaves
+ * them (#203). A stream-copy concat would carry them into the join. */
+export function hasHiddenFrames(info: MediaInfo): boolean {
+  const { videoFrames: n, videoDurationSec: d, fps } = info;
+  if (n === null || d === null || fps === null) return false;
+  return n > d * fps * 1.05 + 2;
+}
+
+/** Why a set of inputs cannot be joined by stream copy, or null when they
+ * can: the concat demuxer needs identical codecs, size, pixel format, frame
+ * rate and audio layout, and silently writes a broken file otherwise (#206). */
+export function concatCopyBlocker(paths: string[], infos: MediaInfo[]): string | null {
+  const fields: [keyof MediaInfo, string][] = [
+    ["videoCodec", "video codec"],
+    ["width", "width"],
+    ["height", "height"],
+    ["pixFmt", "pixel format"],
+    ["fps", "frame rate"],
+    ["audioCodec", "audio codec"],
+    ["sampleRate", "audio sample rate"],
+    ["channels", "audio channels"],
+  ];
+  const first = infos[0];
+  for (let i = 0; i < infos.length; i++) {
+    if (hasHiddenFrames(infos[i])) return `${paths[i]} holds hidden frames behind an edit list`;
+    if (i === 0) continue;
+    for (const [key, label] of fields) {
+      if (infos[i][key] !== first[key]) {
+        return `${label} differs: ${paths[0]} has ${first[key] ?? "none"}, ${paths[i]} has ${infos[i][key] ?? "none"}`;
+      }
+    }
+  }
+  return null;
 }
 
 export type ConvertFormat = "mp4" | "gif" | "webm";
@@ -460,10 +545,15 @@ export interface OverlayOptions {
   start?: number;
   end?: number;
   scale?: { width?: number; height?: number };
+  /** The main input's length: the output never runs longer (#188). */
+  durationSec?: number | null;
 }
 
 /** Composite an overlay image or video onto the input at (x, y), optionally
- * scaled and optionally limited to a time window. */
+ * scaled and optionally limited to a time window. The overlay's clock is
+ * shifted to `start`, so a video plays from its first frame inside the window
+ * and holds its last frame if it ends early (#230). The output keeps the main
+ * input's audio and length (#188). */
 export function buildOverlayArgs(
   input: string,
   overlay: string,
@@ -475,21 +565,25 @@ export function buildOverlayArgs(
   const y = requireNonNegativeInt(opts.y, "overlay y");
   const expr = enableExpr(opts.start, opts.end);
   const enable = expr ? `:enable='${expr}'` : "";
-  let filter: string;
+  const shift = `setpts=PTS-STARTPTS+${opts.start ?? 0}/TB`;
+  let ovl = `[1:v]${shift}`;
   if (opts.scale && (opts.scale.width !== undefined || opts.scale.height !== undefined)) {
     if (opts.scale.width !== undefined) requirePositiveInt(opts.scale.width, "overlay scale width");
     if (opts.scale.height !== undefined) requirePositiveInt(opts.scale.height, "overlay scale height");
     const sw = opts.scale.width ?? -1;
     const sh = opts.scale.height ?? -1;
-    filter = `[1:v]scale=${sw}:${sh}[ovl];[0:v][ovl]overlay=${x}:${y}${enable}`;
-  } else {
-    filter = `[0:v][1:v]overlay=${x}:${y}${enable}`;
+    ovl += `,scale=${sw}:${sh}`;
   }
+  const filter = `${ovl}[ovl];[0:v][ovl]overlay=${x}:${y}${enable}[v]`;
+  const dur = opts.durationSec;
   return [
     "-y", "-i", input, "-i", overlay,
     "-filter_complex", filter,
+    "-map", "[v]", "-map", "0:a?",
     ...resolveQuality(quality),
     "-c:a", "copy",
+    // A longer overlay video would otherwise run the output past the main clip.
+    ...(dur != null && dur > 0 ? ["-t", String(dur)] : []),
     output,
   ];
 }
@@ -658,10 +752,14 @@ function normalizeRegions(
   });
 }
 
-/** boxblur radius scaled to the region so small boxes do not exceed the limit
- * (the radius must stay under half the smaller side). */
-function blurRadius(r: NormalizedRegion): number {
-  return Math.max(2, Math.min(20, Math.floor(Math.min(r.w, r.h) / 4)));
+/** boxblur radii scaled to the region so small boxes do not exceed the limit:
+ * a radius must stay within half the plane's smaller side, and the yuv420p
+ * chroma plane is half the size, so it gets its own radius (#188). */
+export function blurRadius(r: { w: number; h: number }): string {
+  const m = Math.min(r.w, r.h);
+  const lr = Math.min(Math.floor(m / 2), Math.max(2, Math.min(20, Math.floor(m / 4))));
+  const cr = Math.min(lr, Math.floor(Math.ceil(m / 2) / 2));
+  return `lr=${lr}:cr=${cr}`;
 }
 
 export interface RedactOptions {

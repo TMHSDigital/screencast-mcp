@@ -87,51 +87,34 @@ export interface XfadeOptions extends NormalizeOpts {
   duration?: number;
 }
 
-/** Crossfade two clips. durA is the (probed) duration of the first clip, used
- * for the xfade offset. hasAudio means both inputs carry audio. */
+/** The length to cut and crossfade a clip on: its video stream, not the
+ * container, which is the longest stream (#205). */
+export function clipLength(info: { videoDurationSec: number | null; durationSec: number | null }): number | null {
+  return info.videoDurationSec ?? info.durationSec;
+}
+
+/** Crossfade two clips: assemble_highlights with one xfade join. durations
+ * are the clips' video lengths; a clip without audio gets matching silence,
+ * so one silent clip no longer drops the other's audio (#188). */
 export function buildXfadeArgs(
   inputA: string,
   inputB: string,
-  durA: number,
+  durations: [number, number],
   output: string,
   opts: XfadeOptions = {},
-  hasAudio = false,
+  clipHasAudio: [boolean, boolean] = [false, false],
 ): string[] {
-  const { w, h } = producedDims(opts);
-  const fps = opts.fps ?? DEFAULT_PRODUCE_FPS;
-  const rate = opts.audioRate ?? DEFAULT_AUDIO_RATE;
   const transition = validateTransition(opts.transition ?? "fade");
   const d = opts.duration ?? DEFAULT_TRANSITION_DUR;
   if (!Number.isFinite(d) || d <= 0) {
     throw new ScreencastError("transition duration must be a positive number.");
   }
-  if (!Number.isFinite(durA) || durA <= d) {
+  if (!Number.isFinite(durations[0]) || durations[0] <= d) {
     throw new ScreencastError(
-      `first clip (${durA}s) must be longer than the transition (${d}s).`,
+      `first clip (${durations[0]}s) must be longer than the transition (${d}s).`,
     );
   }
-  const offset = round3(durA - d);
-  const vf = videoNormalizeChain(w, h, fps);
-  const af = audioNormalizeChain(rate);
-  const parts = [
-    `[0:v]${vf}[v0]`,
-    `[1:v]${vf}[v1]`,
-    `[v0][v1]xfade=transition=${transition}:duration=${d}:offset=${offset}[vout]`,
-  ];
-  const maps = ["-map", "[vout]"];
-  if (hasAudio) {
-    parts.push(`[0:a]${af}[a0]`, `[1:a]${af}[a1]`, `[a0][a1]acrossfade=d=${d}[aout]`);
-    maps.push("-map", "[aout]");
-  }
-  return [
-    "-y", "-i", inputA, "-i", inputB,
-    "-filter_complex", parts.join(";"),
-    ...maps,
-    ...encodeArgs(opts.quality ?? DEFAULT_QUALITY),
-    ...(hasAudio ? ["-c:a", "aac", "-b:a", "160k"] : ["-an"]),
-    "-movflags", "+faststart",
-    output,
-  ];
+  return buildAssembleArgs([inputA, inputB], durations, output, { ...opts, transition }, clipHasAudio);
 }
 
 export interface AssembleOptions extends NormalizeOpts {
@@ -175,7 +158,11 @@ export function buildAssembleArgs(
     parts.push(`[${i}:v]${vf}[v${i}]`);
     if (!anyAudio) continue;
     if (clipHasAudio[i]) {
-      parts.push(`[${i}:a]${af}[a${i}]`);
+      // Pad or trim each track to its clip's video length, so audio joins
+      // where the video does (#205).
+      const dur = durations[i];
+      const fit = Number.isFinite(dur) && dur > 0 ? `,apad,atrim=duration=${round3(dur)}` : "";
+      parts.push(`[${i}:a]${af}${fit}[a${i}]`);
     } else {
       const dur = durations[i];
       if (!Number.isFinite(dur) || dur <= 0) {
@@ -476,7 +463,8 @@ export function exportPresetParts(
   const dim = ASPECT_DIMS[p.aspect];
   const frame = p.blurFill ? blurFillFilter(dim.w, dim.h, tag) : reframeFilter(dim.w, dim.h, fit);
   const af = p.loudness
-    ? `loudnorm=I=-14:TP=-1:LRA=11${p.loudness.sampleRate ? `,aresample=${p.loudness.sampleRate}` : ""}`
+    ? // One-pass loudnorm resamples to 192 kHz; always bring it back (#188).
+      `loudnorm=I=-14:TP=-1:LRA=11,aresample=${p.loudness.sampleRate ?? DEFAULT_AUDIO_RATE}`
     : undefined;
   return {
     vf: `${frame},fps=${p.fps},format=yuv420p`,

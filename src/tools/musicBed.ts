@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { extname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildMusicBedArgs } from "../utils/produce.js";
+import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
@@ -37,7 +37,8 @@ export function register(server: McpServer): void {
         if (info.durationSec === null) {
           throw new ScreencastError(`Could not read duration of ${args.video}.`);
         }
-        const ext = extname(args.video) || ".mp4";
+        assertEditContainer(args.output);
+        const ext = editOutputExt(args.video);
         const output = resolveOutput(args.output, subdir("edits"), `music-${stamp()}-${rand()}${ext}`, args.overwrite);
         const ffArgs = buildMusicBedArgs(
           args.video,

@@ -4,7 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
-import { buildXfadeArgs, DEFAULT_TRANSITION_DUR } from "../utils/produce.js";
+import { buildXfadeArgs, clipLength, DEFAULT_TRANSITION_DUR } from "../utils/produce.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
@@ -28,7 +28,8 @@ export function register(server: McpServer): void {
     "xfade_transition",
     "Crossfade two videos into one with an xfade transition. Both clips are " +
       "auto-normalized to a common resolution, fps, and audio rate first, so " +
-      "they need not match. Audio is crossfaded when both clips have a track.",
+      "they need not match. Offsets follow each clip's video length; audio is " +
+      "crossfaded, with silence standing in for a clip that has no track.",
     inputSchema,
     async (args, extra) => {
       try {
@@ -37,10 +38,13 @@ export function register(server: McpServer): void {
           if (!existsSync(f)) throw new ScreencastError(`Input file not found: ${f}`);
         }
         const [a, b] = await Promise.all([probeMedia(args.inputA), probeMedia(args.inputB)]);
-        if (a.durationSec === null) {
-          throw new ScreencastError(`Could not read duration of ${args.inputA}.`);
+        const durA = clipLength(a);
+        const durB = clipLength(b);
+        if (durA === null || durB === null) {
+          throw new ScreencastError(`Could not read duration of ${durA === null ? args.inputA : args.inputB}.`);
         }
-        const hasAudio = a.audioCodec !== null && b.audioCodec !== null;
+        const clipHasAudio: [boolean, boolean] = [a.audioCodec !== null, b.audioCodec !== null];
+        const hasAudio = clipHasAudio[0] || clipHasAudio[1];
         const output = resolveOutput(
           args.output,
           subdir("edits"),
@@ -50,12 +54,12 @@ export function register(server: McpServer): void {
         const ffArgs = buildXfadeArgs(
           args.inputA,
           args.inputB,
-          a.durationSec,
+          [durA, durB],
           output,
           { transition: args.transition, duration: args.duration },
-          hasAudio,
+          clipHasAudio,
         );
-        await runEditJob(ffArgs, { output, durationSec: a.durationSec + (b.durationSec ?? 0), extra });
+        await runEditJob(ffArgs, { output, durationSec: durA + durB, extra });
         return okResponse({ outputPath: output, audio: hasAudio });
       } catch (error) {
         return errorResponse(error);

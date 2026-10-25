@@ -38,21 +38,32 @@ describe("videoNormalizeChain", () => {
 
 describe("buildXfadeArgs", () => {
   it("sets the offset from the first clip duration and maps video only without audio", () => {
-    const s = buildXfadeArgs("a.mp4", "b.mp4", 5, "o.mp4", { duration: 1 }, false).join(" ");
+    const s = buildXfadeArgs("a.mp4", "b.mp4", [5, 4], "o.mp4", { duration: 1 }, [false, false]).join(" ");
     expect(s).toContain("xfade=transition=fade:duration=1:offset=4");
     expect(s).toContain("-map [vout]");
     expect(s).toContain("-an");
     expect(s).not.toContain("acrossfade");
   });
   it("adds an audio crossfade when both clips have audio", () => {
-    const s = buildXfadeArgs("a.mp4", "b.mp4", 5, "o.mp4", { transition: "wipeleft" }, true).join(" ");
+    const s = buildXfadeArgs("a.mp4", "b.mp4", [5, 4], "o.mp4", { transition: "wipeleft" }, [true, true]).join(" ");
     expect(s).toContain("transition=wipeleft");
     expect(s).toContain("acrossfade=d=1");
     expect(s).toContain("-map [aout]");
     expect(s).toContain("-c:a aac");
   });
+  it("keeps one clip's audio, with silence for the clip that has none (#188)", () => {
+    const s = buildXfadeArgs("a.mp4", "b.mp4", [5, 4], "o.mp4", {}, [true, false]).join(" ");
+    expect(s).toContain("anullsrc=channel_layout=stereo:sample_rate=48000:d=4[a1]");
+    expect(s).toContain("acrossfade=d=1");
+    expect(s).not.toContain("-an");
+  });
+  it("fits each audio track to its clip's video length (#205)", () => {
+    const s = buildXfadeArgs("a.mp4", "b.mp4", [3, 3], "o.mp4", {}, [true, true]).join(" ");
+    expect(s).toContain("apad,atrim=duration=3[a0]");
+    expect(s).toContain("offset=2");
+  });
   it("rejects a first clip shorter than the transition", () => {
-    expect(() => buildXfadeArgs("a", "b", 0.5, "o", { duration: 1 })).toThrow();
+    expect(() => buildXfadeArgs("a", "b", [0.5, 3], "o", { duration: 1 })).toThrow();
   });
 });
 
@@ -205,7 +216,8 @@ describe("buildExportPresetArgs / PLATFORM_PRESETS", () => {
     expect(vf.startsWith("split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur")).toBe(true);
     expect(vf).toContain("[fg]scale=1080:1080:force_original_aspect_ratio=decrease:force_divisible_by=2[f]");
     expect(vf).toContain("[b][f]overlay=(W-w)/2:(H-h)/2,setsar=1,fps=30,format=yuv420p");
-    expect(a[a.indexOf("-af") + 1]).toBe("loudnorm=I=-14:TP=-1:LRA=11");
+    // Back to 48 kHz after one-pass loudnorm's 192 kHz (#188).
+    expect(a[a.indexOf("-af") + 1]).toBe("loudnorm=I=-14:TP=-1:LRA=11,aresample=48000");
     expect(a).not.toContain("-profile:v");
   });
   it("the older presets are unchanged: no audio filter, no CBR", () => {
@@ -219,8 +231,8 @@ describe("buildExportPresetArgs / PLATFORM_PRESETS", () => {
 
 describe("odd output dimensions are rejected (yuv420p needs even)", () => {
   it("buildXfadeArgs", () => {
-    expect(() => buildXfadeArgs("a.mp4", "b.mp4", 5, "o.mp4", { width: 101 })).toThrow(/even/);
-    expect(() => buildXfadeArgs("a.mp4", "b.mp4", 5, "o.mp4", { height: 719 })).toThrow(/even/);
+    expect(() => buildXfadeArgs("a.mp4", "b.mp4", [5, 5], "o.mp4", { width: 101 })).toThrow(/even/);
+    expect(() => buildXfadeArgs("a.mp4", "b.mp4", [5, 5], "o.mp4", { height: 719 })).toThrow(/even/);
   });
   it("buildAssembleArgs", () => {
     expect(() =>

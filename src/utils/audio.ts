@@ -8,6 +8,7 @@
  */
 import { extname } from "node:path";
 import { ScreencastError } from "./errors.js";
+import { isAudioOnlyPath } from "./media.js";
 
 export type LoudnessPreset = "youtube" | "podcast" | "broadcast";
 
@@ -78,6 +79,14 @@ export function parseLoudnorm(stderr: string): LoudnessMeasurement {
   return m;
 }
 
+/** Copy the video through, unless the output is audio-only (.wav/.mp3/.m4a),
+ * where a video map makes the muxer fail (#187). */
+function keepVideoArgs(output: string): string[] {
+  return isAudioOnlyPath(output)
+    ? ["-map", "0:a:0", "-vn"]
+    : ["-map", "0:v?", "-map", "0:a:0", "-c:v", "copy"];
+}
+
 /** Audio encoder for an output path: PCM for .wav, MP3 for .mp3, else AAC. */
 export function audioCodecFor(output: string): string[] {
   switch (extname(output).toLowerCase()) {
@@ -98,8 +107,7 @@ export function buildLoudnessApplyArgs(input: string, output: string, t: Loudnes
     `measured_thresh=${m.input_thresh}:offset=${m.target_offset}`;
   return [
     "-y", "-hide_banner", "-i", input,
-    "-map", "0:v?", "-map", "0:a:0",
-    "-c:v", "copy",
+    ...keepVideoArgs(output),
     "-af", `loudnorm=${filterTarget(t)}:${measured}:linear=true:print_format=json`,
     "-ar", "48000",
     ...audioCodecFor(output),
@@ -152,8 +160,7 @@ export function buildDenoiseArgs(
   if (nr === undefined) throw new ScreencastError(`Unknown denoise strength "${strength}".`);
   return [
     "-y", "-i", input,
-    "-map", "0:v?", "-map", "0:a:0",
-    "-c:v", "copy",
+    ...keepVideoArgs(output),
     "-af", `afftdn=nr=${nr}:nf=${noiseFloorSetting(noiseFloorDb)}`,
     ...audioCodecFor(output),
     output,

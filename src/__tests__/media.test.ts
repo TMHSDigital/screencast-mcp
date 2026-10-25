@@ -20,6 +20,13 @@ import {
   atempoChain,
   buildSpeedArgs,
   buildOverlayArgs,
+  blurRadius,
+  editOutputExt,
+  assertEditContainer,
+  isAudioOnlyPath,
+  hasHiddenFrames,
+  concatCopyBlocker,
+  type MediaInfo,
   buildCompressArgs,
   buildExtractAudioArgs,
   buildClipArgs,
@@ -63,6 +70,11 @@ describe("parseMediaInfo", () => {
       audioCodec: "aac",
       format: "mov,mp4,m4a",
       sizeBytes: 1048576,
+      videoDurationSec: 12.5,
+      pixFmt: null,
+      videoFrames: null,
+      sampleRate: null,
+      channels: null,
     });
   });
 
@@ -264,13 +276,20 @@ describe("buildOverlayArgs", () => {
     const s = buildOverlayArgs("base.mp4", "logo.png", "o.mp4", { x: 12, y: 8 }).join(" ");
     expect(s).toContain("-i base.mp4");
     expect(s).toContain("-i logo.png");
-    expect(s).toContain("[0:v][1:v]overlay=12:8");
+    expect(s).toContain("[0:v][ovl]overlay=12:8[v]");
+    // The main input's audio, not the overlay's (#188).
+    expect(s).toContain("-map [v] -map 0:a?");
+  });
+  it("starts the overlay's clock at start and caps the output at the main length (#230, #188)", () => {
+    const s = buildOverlayArgs("base.mp4", "pip.mp4", "o.mp4", { x: 0, y: 0, start: 3, end: 5, durationSec: 6 }).join(" ");
+    expect(s).toContain("[1:v]setpts=PTS-STARTPTS+3/TB[ovl]");
+    expect(s).toContain("-t 6");
   });
   it("scales the overlay and time-gates it", () => {
     const s = buildOverlayArgs("base.mp4", "logo.png", "o.mp4", {
       x: 0, y: 0, start: 1, end: 4, scale: { width: 200 },
     }).join(" ");
-    expect(s).toContain("[1:v]scale=200:-1[ovl]");
+    expect(s).toContain("[1:v]setpts=PTS-STARTPTS+1/TB,scale=200:-1[ovl]");
     expect(s).toContain("enable='between(t,1,4)'");
   });
 });
@@ -336,5 +355,57 @@ describe("scene sampling (#114)", () => {
     const a = buildSampleByFpsArgs("in.mp4", 2, "p_%05d.png", 50, true).join(" ");
     expect(a).toContain("-vf fps=2,mpdecimate");
     expect(a).toContain("-fps_mode vfr");
+  });
+});
+
+describe("blurRadius (#188)", () => {
+  it("keeps both planes' radii legal on tiny regions", () => {
+    expect(blurRadius({ w: 4, h: 4 })).toBe("lr=2:cr=1");
+    expect(blurRadius({ w: 2, h: 6 })).toBe("lr=1:cr=0");
+  });
+  it("matches the old strength on normal regions", () => {
+    expect(blurRadius({ w: 40, h: 40 })).toBe("lr=10:cr=10");
+    expect(blurRadius({ w: 400, h: 300 })).toBe("lr=20:cr=20");
+  });
+});
+
+describe("edit output containers (#187)", () => {
+  it("maps inputs whose container cannot hold H.264/AAC to .mp4", () => {
+    expect(editOutputExt("in.webm")).toBe(".mp4");
+    expect(editOutputExt("in.MKV")).toBe(".mkv");
+    expect(editOutputExt("in")).toBe(".mp4");
+  });
+  it("keeps audio-only containers for audio tools", () => {
+    expect(editOutputExt("voice.wav", { audio: true })).toBe(".wav");
+    expect(editOutputExt("voice.wav")).toBe(".mp4");
+    expect(isAudioOnlyPath("out.MP3")).toBe(true);
+    expect(isAudioOnlyPath("out.mp4")).toBe(false);
+  });
+  it("rejects an explicit .webm output with a clear message", () => {
+    expect(() => assertEditContainer("out.webm")).toThrow(/cannot hold/);
+    expect(() => assertEditContainer("out.mp4")).not.toThrow();
+    expect(() => assertEditContainer(undefined)).not.toThrow();
+  });
+});
+
+describe("concat stream-copy checks (#206, #203)", () => {
+  const base: MediaInfo = {
+    durationSec: 3, videoDurationSec: 3, width: 320, height: 240, fps: 30,
+    videoCodec: "h264", audioCodec: "aac", format: "mov,mp4,m4a", sizeBytes: 1,
+    pixFmt: "yuv420p", videoFrames: 90, sampleRate: 48000, channels: 2,
+  };
+  it("allows a copy for matching inputs", () => {
+    expect(concatCopyBlocker(["a", "b"], [base, { ...base }])).toBeNull();
+  });
+  it("names the first differing field", () => {
+    expect(concatCopyBlocker(["a", "b"], [base, { ...base, width: 640 }])).toMatch(/width differs/);
+    expect(concatCopyBlocker(["a", "b"], [base, { ...base, audioCodec: null, sampleRate: null, channels: null }])).toMatch(/audio codec/);
+  });
+  it("flags frames hidden behind an edit list", () => {
+    // A stream-copy trim: 3 s at 30 fps playing, 300 packets in the file.
+    const trimmed = { ...base, videoFrames: 300 };
+    expect(hasHiddenFrames(trimmed)).toBe(true);
+    expect(hasHiddenFrames(base)).toBe(false);
+    expect(concatCopyBlocker(["a", "b"], [base, trimmed])).toMatch(/hidden frames/);
   });
 });

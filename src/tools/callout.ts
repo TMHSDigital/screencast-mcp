@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { extname, join } from "node:path";
+import { join } from "node:path";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -8,6 +8,7 @@ import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildCalloutArgs, type Callout } from "../utils/callout.js";
 import { prepareCalloutAssets } from "../utils/calloutAssets.js";
+import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const timing = {
@@ -75,7 +76,8 @@ export function register(server: McpServer): void {
           throw new ScreencastError(`Input file not found: ${args.input}`);
         }
         const items = args.items as Callout[];
-        const ext = extname(args.input) || ".mp4";
+        assertEditContainer(args.output);
+        const ext = editOutputExt(args.input);
         const output = resolveOutput(args.output, subdir("edits"), `callout-${stamp()}-${rand()}${ext}`, args.overwrite);
         // Text files and rendered arrows live in a private temp dir.
         const work = mkdtempSync(join(tmpdir(), "screencast-callout-"));

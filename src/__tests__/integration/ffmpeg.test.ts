@@ -23,6 +23,10 @@ import {
   buildClipArgs,
   buildCompressArgs,
   buildSampleAtTimestampArgs,
+  buildOverlayArgs,
+  concatCopyBlocker,
+  hasHiddenFrames,
+  editOutputExt,
   buildSpeedArgs,
   buildCropArgs,
   buildScaleArgs,
@@ -179,6 +183,130 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     expect(readdirSync(pct).filter((f) => f.startsWith("frame_"))).toEqual(["frame_00001.png", "frame_00002.png"]);
   });
 
+  /** Per-stream durations, sample rates and channel counts from ffprobe. */
+  const streams = (f: string) => {
+    const out = spawnSync(FFPROBE, [
+      "-v", "error", "-show_entries", "stream=codec_type,duration,sample_rate,channels", "-of", "json", f,
+    ], { encoding: "utf8" }).stdout;
+    const list = (JSON.parse(out).streams ?? []) as { codec_type: string; duration?: string; sample_rate?: string; channels?: number }[];
+    const v = list.find((x) => x.codec_type === "video");
+    const a = list.find((x) => x.codec_type === "audio");
+    return {
+      v: v?.duration !== undefined ? Number(v.duration) : null,
+      a: a?.duration !== undefined ? Number(a.duration) : null,
+      rate: a?.sample_rate !== undefined ? Number(a.sample_rate) : null,
+      channels: a?.channels ?? null,
+    };
+  };
+
+  it("crossfades on video length when a clip's audio runs longer (#205)", async () => {
+    // 3 s of video carrying 4 s of audio: the container says 4 s.
+    const long = p("long-audio.mp4");
+    await runFfmpeg([
+      "-y", "-f", "lavfi", "-i", "testsrc=duration=3:size=320x240:rate=30",
+      "-f", "lavfi", "-i", "sine=frequency=440:duration=4",
+      "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", long,
+    ]);
+    const info = await probeMedia(long);
+    expect(info.videoDurationSec!).toBeCloseTo(3, 1);
+    const out = p("xfade-205.mp4");
+    await runFfmpeg(buildXfadeArgs(long, short, [info.videoDurationSec!, 4], out, { width: 320, height: 240, duration: 1, quality: "draft" }, [true, true]));
+    const st = streams(out);
+    // 3 + 4 - 1 = 6 s of each, in step.
+    expect(st.v!).toBeCloseTo(6, 0);
+    expect(Math.abs(st.a! - st.v!)).toBeLessThan(0.1);
+  });
+
+  it("xfade keeps narration when the other clip is silent (#188)", async () => {
+    const out = p("xfade-silent.mp4");
+    await runFfmpeg(buildXfadeArgs(short, vOnly, [4, 4], out, { width: 320, height: 240, quality: "draft" }, [true, false]));
+    const st = streams(out);
+    expect(st.a).not.toBeNull();
+    expect(st.a!).toBeCloseTo(7, 0);
+  });
+
+  it("overlay keeps the main audio and length, and a PiP video plays from start (#188, #230)", async () => {
+    const main = p("main-mono.mp4");
+    const pip = p("pip-stereo.mp4");
+    await runFfmpeg([
+      "-y", "-f", "lavfi", "-i", "testsrc=duration=6:size=320x240:rate=30",
+      "-f", "lavfi", "-i", "sine=frequency=440:duration=6",
+      "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ac", "1", "-shortest", main,
+    ]);
+    await runFfmpeg([
+      "-y", "-f", "lavfi", "-i", "testsrc2=duration=9:size=80x60:rate=30",
+      "-f", "lavfi", "-i", "sine=frequency=660:duration=9",
+      "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ac", "2", "-shortest", pip,
+    ]);
+    const out = p("overlay-pip.mp4");
+    await runFfmpeg(buildOverlayArgs(main, pip, out, { x: 10, y: 10, start: 3, end: 5, durationSec: 6 }));
+    const st = streams(out);
+    expect(st.v!).toBeCloseTo(6, 0);
+    expect(st.channels).toBe(1);
+    const frameMd5 = (t: number) =>
+      spawnSync(FFMPEG, ["-v", "error", "-ss", String(t), "-i", out, "-frames:v", "1", "-vf", "crop=80:60:10:10", "-f", "md5", "-"], { encoding: "utf8" }).stdout.trim();
+    expect(new Set([frameMd5(3.2), frameMd5(3.6), frameMd5(4.4)]).size).toBe(3);
+  });
+
+  it("the vertical_reel export is 48 kHz (#188)", async () => {
+    const reel = p("reel-48k.mp4");
+    await runFfmpeg(buildExportPresetArgs(short, reel, "vertical_reel"));
+    expect(streams(reel).rate).toBe(48000);
+  });
+
+  it("blur redacts a 4x4 region (#188)", async () => {
+    const out = p("blur-tiny.mp4");
+    await runFfmpeg(buildRedactArgs(av, out, [{ x: 10, y: 10, width: 4, height: 4 }], { style: "blur", pad: 0 }, { width: 320, height: 240 }));
+    expect((await probeMedia(out)).videoCodec).toBe("h264");
+  });
+
+  it("concat re-encodes mismatched inputs into one valid file with both clips (#206)", async () => {
+    const big = p("big-av.mp4");
+    await runFfmpeg([
+      "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=640x480:rate=30",
+      "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+      "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", big,
+    ]);
+    const inputs = [vOnly, big];
+    const infos = await Promise.all(inputs.map((f) => probeMedia(f)));
+    expect(concatCopyBlocker(inputs, infos)).toMatch(/differs/);
+    const out = p("concat-mixed.mp4");
+    await runFfmpeg(buildAssembleArgs(inputs, infos.map((i) => i.videoDurationSec!), out, { width: 320, height: 240, quality: "draft" }, infos.map((i) => i.audioCodec !== null)));
+    const info = await probeMedia(out);
+    expect([info.width, info.height]).toEqual([320, 240]);
+    const st = streams(out);
+    expect(st.v!).toBeCloseTo(6, 0);
+    expect(st.a!).toBeCloseTo(6, 0);
+  });
+
+  it("a stream-copy trim is detected as holding hidden frames (#203)", async () => {
+    const copy = p("trim-hidden.mp4");
+    await runFfmpeg(buildTrimArgs(av, copy, { start: 7.5, duration: 2, exact: false }));
+    expect(hasHiddenFrames(await probeMedia(copy))).toBe(true);
+    const exact = p("trim-clean.mp4");
+    await runFfmpeg(buildTrimArgs(av, exact, { start: 7.5, duration: 2 }));
+    expect(hasHiddenFrames(await probeMedia(exact))).toBe(false);
+  });
+
+  it("edits a .webm input into an .mp4, and normalizes audio to a .wav (#187)", async () => {
+    const webm = p("in.webm");
+    await runFfmpeg([
+      "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=320x240:rate=30",
+      "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+      "-c:v", "libvpx-vp9", "-deadline", "realtime", "-cpu-used", "8", "-c:a", "libopus", "-shortest", webm,
+    ]);
+    const cropped = p(`crop-webm${editOutputExt(webm)}`);
+    await runFfmpeg(buildCropArgs(webm, cropped, { x: 0, y: 0, width: 160, height: 120 }));
+    expect((await probeMedia(cropped)).width).toBe(160);
+    const t = loudnessTarget("podcast");
+    const measured = parseLoudnorm((await runCapture(FFMPEG, buildLoudnessMeasureArgs(av, t))).stderr);
+    const wav = p("normalized.wav");
+    await runFfmpeg(buildLoudnessApplyArgs(av, wav, t, measured));
+    const w = await probeMedia(wav);
+    expect(w.audioCodec).toBe("pcm_s16le");
+    expect(w.videoCodec).toBeNull();
+  });
+
   it("clip is frame-accurate", async () => {
     const out = p("clip.mp4");
     await runFfmpeg(buildClipArgs(av, out, { start: 2.5, end: 5 }));
@@ -253,7 +381,7 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
 
   it("xfade overlaps the clips by the transition duration", async () => {
     const out = p("xfade.mp4");
-    await runFfmpeg(buildXfadeArgs(short, short, 4, out, { width: 320, height: 240, duration: 1, quality: "draft" }, true));
+    await runFfmpeg(buildXfadeArgs(short, short, [4, 4], out, { width: 320, height: 240, duration: 1, quality: "draft" }, [true, true]));
     const info = await probeMedia(out);
     expect(Math.abs(info.durationSec! - 7)).toBeLessThan(0.2);
     expect(info.audioCodec).toBe("aac");

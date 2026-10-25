@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { extname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob, jobTimeoutMs } from "../utils/jobs.js";
 import { buildDenoiseArgs, buildNoiseFloorArgs, parseNoiseFloor, type DenoiseStrength } from "../utils/audio.js";
+import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
@@ -33,7 +33,8 @@ export function register(server: McpServer): void {
         const info = await probeMedia(args.input);
         if (!info.audioCodec) throw new ScreencastError(`Input has no audio stream: ${args.input}`);
         const strength = (args.strength as DenoiseStrength | undefined) ?? "medium";
-        const ext = extname(args.input) || ".mp4";
+        assertEditContainer(args.output);
+        const ext = editOutputExt(args.input, { audio: true });
         const output = resolveOutput(args.output, subdir("edits"), `denoise-${stamp()}-${rand()}${ext}`, args.overwrite);
         // Measure the noise floor first: afftdn only works when told roughly how
         // loud the noise is.
