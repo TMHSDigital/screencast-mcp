@@ -7,6 +7,15 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.27.2]
+
+### Fixed
+
+- `window:<title>` captures the window's visible frame. Bounds came from
+  `GetWindowRect`, which on Windows 10/11 includes an invisible resize border of
+  about 8 px a side, so every window capture was edged with a strip of whatever
+  was behind the window. Bounds now come from `DWMWA_EXTENDED_FRAME_BOUNDS`.
+
 ## [0.27.1]
 
 ### Fixed

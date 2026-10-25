@@ -271,6 +271,25 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     }
   }, 40_000);
 
+  it("window: captures the visible frame, not the invisible border around it", async () => {
+    // GetWindowRect includes ~8 px of invisible resize border on each side, so
+    // a 500 px client area captured ~516 px wide, edged with whatever was behind.
+    const ps = spawn("powershell", ["-NoProfile", "-Command",
+      "Add-Type -AssemblyName System.Windows.Forms;" +
+      "$f=New-Object Windows.Forms.Form;$f.Text='SC-EDGE';$f.StartPosition='Manual';$f.Location='120,120';$f.ClientSize='500,300';$f.BackColor='White';$f.TopMost=$true;" +
+      "[Windows.Forms.Application]::Run($f)"], { windowsHide: false });
+    try {
+      await sleep(2000);
+      const shot = await call("screenshot", { target: "window:SC-EDGE", exactTitle: true, returnImage: false });
+      expect(shot.isError).toBe(false);
+      const { width } = ffprobe(shot.json.outputPath);
+      expect(width).toBeGreaterThanOrEqual(500);
+      expect(width).toBeLessThanOrEqual(504); // the visible frame is 1 px a side
+    } finally {
+      ps.kill();
+    }
+  }, 30_000);
+
   it("matches a non-ASCII window title exactly, and OCR survives non-ASCII text", async () => {
     // PowerShell used to write its OEM code page: "é" came back as U+FFFD and
     // "•"/"→" as control bytes, breaking title matches and OCR JSON parsing.
