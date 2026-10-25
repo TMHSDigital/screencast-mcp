@@ -7,6 +7,23 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.31.0]
+
+### Added
+
+- Game-Systems media-layer spec (#107):
+  - `export_preset` `steam_trailer`: 1920x1080, H.264 High, padded 5.5 Mbps CBR
+    (stays above Steam's 5 Mbps floor), AAC 48 kHz stereo normalised to -14 LUFS,
+    faststart.
+  - `export_preset` `vertical_reel`: 1080x1920 with the footage centred over a
+    blurred, filled copy of itself, audio normalised to -14 LUFS.
+  - Both work as `pipeline` export steps too.
+- Window targets that don't rely on the title (#107, #113):
+  `window:exe=Code.exe` picks that app's topmost window, and
+  `window:hwnd=0x1A2B` one exact window, for every tool that takes a target.
+  Window enumeration now reports each window's executable.
+- An escaping fixture for UNC paths, completing the spec's escape table.
+
 ## [0.30.1]
 
 ### Added

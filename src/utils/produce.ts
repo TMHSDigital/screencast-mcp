@@ -415,7 +415,8 @@ export function buildReframeArgs(
   ];
 }
 
-export type Platform = "youtube" | "instagram_reel" | "tiktok" | "x" | "square";
+export const PLATFORMS = ["youtube", "instagram_reel", "tiktok", "x", "square", "steam_trailer", "vertical_reel"] as const;
+export type Platform = (typeof PLATFORMS)[number];
 
 interface PresetSpec {
   aspect: Aspect;
@@ -423,15 +424,44 @@ interface PresetSpec {
   videoBitrate: string;
   bufsize: string;
   audioBitrate: string;
+  /** Constant bitrate, padded with filler so it never dips below the rate
+   * (Steam rejects trailers under 5 Mbps), at H.264 High profile. */
+  cbr?: boolean;
+  /** Footage fitted in a centred square over a blurred, filled copy of itself
+   * (a vertical reel), instead of a pad or crop reframe. */
+  blurFill?: boolean;
+  /** Normalise loudness to -14 LUFS (one pass) and, when set, resample. */
+  loudness?: { sampleRate?: number };
 }
 
+/** Export presets. steam_trailer and vertical_reel come from the Game-Systems
+ * media-layer spec (#107). */
 export const PLATFORM_PRESETS: Record<Platform, PresetSpec> = {
   youtube: { aspect: "16:9", fps: 30, videoBitrate: "8M", bufsize: "16M", audioBitrate: "192k" },
   instagram_reel: { aspect: "9:16", fps: 30, videoBitrate: "6M", bufsize: "12M", audioBitrate: "160k" },
   tiktok: { aspect: "9:16", fps: 30, videoBitrate: "6M", bufsize: "12M", audioBitrate: "160k" },
   x: { aspect: "16:9", fps: 30, videoBitrate: "5M", bufsize: "10M", audioBitrate: "128k" },
   square: { aspect: "1:1", fps: 30, videoBitrate: "6M", bufsize: "12M", audioBitrate: "160k" },
+  steam_trailer: {
+    aspect: "16:9", fps: 30, videoBitrate: "5.5M", bufsize: "11M", audioBitrate: "192k",
+    cbr: true, loudness: { sampleRate: 48000 },
+  },
+  vertical_reel: {
+    aspect: "9:16", fps: 30, videoBitrate: "6M", bufsize: "12M", audioBitrate: "160k",
+    blurFill: true, loudness: {},
+  },
 };
+
+/** A vertical-reel canvas: the footage fitted into a centred W x W square over
+ * a blurred, darkened copy that fills W x H. Labels carry `tag`. Pure. */
+export function blurFillFilter(w: number, h: number, tag = ""): string {
+  return (
+    `split=2[${tag}bg][${tag}fg];` +
+    `[${tag}bg]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},boxblur=20:2,eq=brightness=-0.08[${tag}b];` +
+    `[${tag}fg]scale=${w}:${w}:force_original_aspect_ratio=decrease:force_divisible_by=2[${tag}f];` +
+    `[${tag}b][${tag}f]overlay=(W-w)/2:(H-h)/2,setsar=1`
+  );
+}
 
 /** The filter chain and encoder settings for a platform-ready file: reframe to
  * the platform aspect, cap fps, and encode H.264 at the platform's bitrate with
@@ -439,17 +469,27 @@ export const PLATFORM_PRESETS: Record<Platform, PresetSpec> = {
 export function exportPresetParts(
   platform: Platform,
   fit: ReframeFit = "pad",
-): { vf: string; encode: string[]; width: number; height: number } {
+  tag = "",
+): { vf: string; af?: string; encode: string[]; width: number; height: number } {
   const p = PLATFORM_PRESETS[platform];
   if (!p) throw new ScreencastError(`Unknown platform "${platform}".`);
   const dim = ASPECT_DIMS[p.aspect];
+  const frame = p.blurFill ? blurFillFilter(dim.w, dim.h, tag) : reframeFilter(dim.w, dim.h, fit);
+  const af = p.loudness
+    ? `loudnorm=I=-14:TP=-1:LRA=11${p.loudness.sampleRate ? `,aresample=${p.loudness.sampleRate}` : ""}`
+    : undefined;
   return {
-    vf: `${reframeFilter(dim.w, dim.h, fit)},fps=${p.fps},format=yuv420p`,
+    vf: `${frame},fps=${p.fps},format=yuv420p`,
+    ...(af ? { af } : {}),
     encode: [
       "-c:v", "libx264", "-preset", "medium",
-      "-b:v", p.videoBitrate, "-maxrate", p.videoBitrate, "-bufsize", p.bufsize,
+      ...(p.cbr ? ["-profile:v", "high"] : []),
+      "-b:v", p.videoBitrate,
+      ...(p.cbr ? ["-minrate", p.videoBitrate, "-x264-params", "nal-hrd=cbr"] : []),
+      "-maxrate", p.videoBitrate, "-bufsize", p.bufsize,
       "-pix_fmt", "yuv420p",
       "-c:a", "aac", "-b:a", p.audioBitrate,
+      ...(p.loudness?.sampleRate ? ["-ar", String(p.loudness.sampleRate), "-ac", "2"] : []),
       "-r", String(p.fps),
       "-movflags", "+faststart",
     ],
@@ -464,6 +504,6 @@ export function buildExportPresetArgs(
   platform: Platform,
   fit: ReframeFit = "pad",
 ): string[] {
-  const { vf, encode } = exportPresetParts(platform, fit);
-  return ["-y", "-i", input, "-vf", vf, ...encode, output];
+  const { vf, af, encode } = exportPresetParts(platform, fit);
+  return ["-y", "-i", input, "-vf", vf, ...(af ? ["-af", af] : []), ...encode, output];
 }

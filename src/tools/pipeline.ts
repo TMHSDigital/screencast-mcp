@@ -14,6 +14,7 @@ import { calloutItemSchema } from "./callout.js";
 import { zoomKeyframeSchema } from "./zoom.js";
 import { redactRegionSchema } from "./redactRegion.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { PLATFORMS } from "../utils/produce.js";
 
 const aspect = z.enum(["16:9", "9:16", "1:1", "4:5"]);
 const fit = z.enum(["pad", "crop"]).optional();
@@ -44,7 +45,7 @@ const step = z.discriminatedUnion("op", [
   z.object({ op: z.literal("callout"), items: z.array(calloutItemSchema).min(1).max(50) }),
   z.object({ op: z.literal("reframe"), aspect, fit }),
   z.object({ op: z.literal("zoom"), keyframes: z.array(zoomKeyframeSchema).min(1).max(100), transitionSec: z.number().positive().max(5).optional() }),
-  z.object({ op: z.literal("export_preset"), platform: z.enum(["youtube", "instagram_reel", "tiktok", "x", "square"]), fit }),
+  z.object({ op: z.literal("export_preset"), platform: z.enum(PLATFORMS), fit }),
   z.object({
     op: z.literal("export_gif"),
     format: z.enum(["gif", "webp"]).optional(),

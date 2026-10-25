@@ -20,7 +20,7 @@ import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js"
 const inputSchema = {
   target: z
     .string()
-    .describe("What to watch: 'full' | 'monitor:<index>' | 'window:<title>' | 'region:<x>,<y>,<w>,<h>'."),
+    .describe("What to watch: 'full' | 'monitor:<index>' | 'window:<title>' (or window:exe=<app.exe> / window:hwnd=<handle>) | 'region:<x>,<y>,<w>,<h>'."),
   exactTitle: z.boolean().optional().describe("For window: targets, match the title exactly (default false)."),
   mode: z
     .enum(["change", "settle"])

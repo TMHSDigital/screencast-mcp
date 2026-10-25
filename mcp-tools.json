@@ -5,7 +5,7 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "target": { "type": "string", "description": "full | monitor:<index> (0 = primary) | window:<title> | region:<x>,<y>,<w>,<h>. window: captures the rectangle the window occupies as displayed (case-insensitive exact title, else substring; topmost match)" },
+        "target": { "type": "string", "description": "full | monitor:<index> (0 = primary) | window:<title> (or window:exe=<app.exe> / window:hwnd=<handle>) | region:<x>,<y>,<w>,<h>. window: captures the rectangle the window occupies as displayed (case-insensitive exact title, else substring; topmost match)" },
         "exactTitle": { "type": "boolean", "description": "For window: targets, match only a window whose title equals the given title (case-insensitive); never fall back to a substring (default false)" },
         "fps": { "type": "integer", "minimum": 1, "maximum": 120, "description": "Frames per second (default 30)" },
         "quality": { "type": "string", "enum": ["draft", "standard", "high"], "description": "Encoder preset (default standard)" },
@@ -76,7 +76,7 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "target": { "type": "string", "description": "full | monitor:<index> | window:<title> | region:<x>,<y>,<w>,<h>. window: captures the rectangle the window occupies as displayed (case-insensitive exact title, else substring; topmost match)" },
+        "target": { "type": "string", "description": "full | monitor:<index> | window:<title> (or window:exe=<app.exe> / window:hwnd=<handle>) | region:<x>,<y>,<w>,<h>. window: captures the rectangle the window occupies as displayed (case-insensitive exact title, else substring; topmost match)" },
         "exactTitle": { "type": "boolean", "description": "For window: targets, match only a window whose title equals the given title (case-insensitive); never fall back to a substring (default false)" },
         "backend": { "type": "string", "enum": ["gdigrab", "wgc"], "description": "gdigrab (default) captures what is visible; wgc (window: targets, FFmpeg 8+) captures the window itself even when covered, via Windows Graphics Capture" },
         "output": { "type": "string", "description": "Optional output .png path (defaults under SCREENCAST_HOME/screenshots)" },
@@ -149,7 +149,7 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "target": { "type": "string", "description": "full | monitor:<index> | window:<title> | region:<x>,<y>,<w>,<h>" },
+        "target": { "type": "string", "description": "full | monitor:<index> | window:<title> (or window:exe=<app.exe> / window:hwnd=<handle>) | region:<x>,<y>,<w>,<h>" },
         "exactTitle": { "type": "boolean", "description": "For window: targets, match the title exactly (default false)" },
         "mode": { "type": "string", "enum": ["change", "settle"], "description": "change (default): return when the target differs from the start; settle: return once it has stopped changing for settleSec" },
         "timeoutSec": { "type": "number", "description": "Give up after this many seconds (default 30, max 600); a timeout is a normal result" },
@@ -167,7 +167,7 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "target": { "type": "string", "description": "Read live from the screen: full | monitor:<index> | window:<title> | region:<x>,<y>,<w>,<h> (one of target / input)" },
+        "target": { "type": "string", "description": "Read live from the screen: full | monitor:<index> | window:<title> (or window:exe=<app.exe> / window:hwnd=<handle>) | region:<x>,<y>,<w>,<h> (one of target / input)" },
         "input": { "type": "string", "description": "Or read from an image or video file" },
         "timestamp": { "type": "number", "description": "For a video input: the second to read (default 0)" },
         "exactTitle": { "type": "boolean", "description": "For window: targets, match the title exactly (default false)" },
@@ -631,12 +631,12 @@
   },
   {
     "name": "export_preset",
-    "description": "Encode a platform-ready file for youtube, instagram_reel, tiktok, x, or square. Reframes to the platform aspect, caps fps, and encodes H.264 at the platform bitrate with faststart.",
+    "description": "Encode a platform-ready file for youtube, instagram_reel, tiktok, x, square, steam_trailer, or vertical_reel. Reframes to the platform aspect, caps fps, and encodes H.264 at the platform bitrate with faststart.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "input": { "type": "string", "description": "Path to the source video" },
-        "platform": { "type": "string", "enum": ["youtube", "instagram_reel", "tiktok", "x", "square"], "description": "Target platform (sets aspect, resolution, fps, bitrate)" },
+        "platform": { "type": "string", "enum": ["youtube", "instagram_reel", "tiktok", "x", "square", "steam_trailer", "vertical_reel"], "description": "Target platform (sets aspect, resolution, fps, bitrate). steam_trailer: 1080p H.264 High, padded 5.5 Mbps CBR, 48 kHz audio at -14 LUFS. vertical_reel: 1080x1920, footage centred over a blurred copy, audio at -14 LUFS" },
         "fit": { "type": "string", "enum": ["pad", "crop"], "description": "How to fit the source into the platform aspect: pad (default) or crop" },
         "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
         "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }

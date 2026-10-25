@@ -25,6 +25,8 @@ export interface RawWindow {
   minimized: boolean;
   /** The window handle, for capturing the window itself (WGC backend, #113). */
   hwnd?: number;
+  /** The owning process's executable, e.g. "Code.exe" (#107, #113). */
+  exe?: string;
 }
 
 export interface WindowQuery {
@@ -43,8 +45,9 @@ export interface WindowBounds {
   matchedTitle: string;
   /** How many windows matched the requested title (>1 => topmost was chosen). */
   matchCount: number;
-  /** Whether the title matched exactly or only as a substring (#89). */
-  matchKind: "exact" | "substring";
+  /** How the window was matched: by exact title, title substring (#89), or by
+   * handle / executable (window:hwnd=..., window:exe=..., #107). */
+  matchKind: "exact" | "substring" | "hwnd" | "exe";
   /** Titles of every matching window, topmost first (at most MAX_CANDIDATES). */
   candidates: string[];
   /** The matched window handle, when enumeration provided one. */
@@ -59,11 +62,23 @@ export interface SelectWindowOptions {
 /** How many candidate titles a match reports. */
 export const MAX_CANDIDATES = 5;
 
+/** `hwnd=0x1A2B` / `hwnd=6699` or `exe=Code.exe` / `exe=code`: a window
+ * picked by handle or by its process's executable instead of its title. */
+export function parseWindowSelector(wanted: string): { kind: "hwnd"; hwnd: number } | { kind: "exe"; exe: string } | null {
+  const h = /^hwnd=(0x[0-9a-f]+|\d+)$/i.exec(wanted.trim());
+  if (h) return { kind: "hwnd", hwnd: Number(h[1]) };
+  const e = /^exe=(.+)$/i.exec(wanted.trim());
+  if (e) return { kind: "exe", exe: e[1].trim().toLowerCase().replace(/\.exe$/, "") };
+  return null;
+}
+
 /**
- * Choose a window by title and reduce it to a clamped, even-sized rectangle.
+ * Choose a window and reduce it to a clamped, even-sized rectangle.
  *
- * Matching: a case-insensitive EXACT title match wins; if none, a
- * case-insensitive SUBSTRING match is used (unless exactOnly). With several
+ * Matching by title: a case-insensitive EXACT title match wins; if none, a
+ * case-insensitive SUBSTRING match is used (unless exactOnly). `hwnd=...`
+ * picks one window by handle and `exe=...` the windows of an executable, so a
+ * window can be targeted without relying on its title (#107). With several
  * matches the topmost (first in Z-order) is chosen. Pure: takes the enumerated
  * query, returns the rectangle or throws a ScreencastError the caller can
  * surface verbatim.
@@ -74,6 +89,21 @@ export function selectWindow(
   opts: SelectWindowOptions = {},
 ): WindowBounds {
   const all = Array.isArray(query.windows) ? query.windows : [];
+  const selector = parseWindowSelector(wanted);
+  if (selector) {
+    const hits =
+      selector.kind === "hwnd"
+        ? all.filter((w) => w.hwnd === selector.hwnd)
+        : all.filter((w) => (w.exe ?? "").toLowerCase().replace(/\.exe$/, "") === selector.exe);
+    if (hits.length === 0) {
+      throw new ScreencastError(
+        selector.kind === "hwnd"
+          ? `No visible top-level window with handle ${wanted.trim().slice(5)}. It may have closed; handles change when an app restarts.`
+          : `No visible window belonging to ${selector.exe}.exe. Is the app running with a window open (and not minimized)?`,
+      );
+    }
+    return toBounds(query, hits, selector.kind);
+  }
   const needle = wanted.trim().toLowerCase();
   const exact = all.filter((w) => w.title.toLowerCase() === needle);
   const substring = all.filter((w) => w.title.toLowerCase().includes(needle));
@@ -91,9 +121,15 @@ export function selectWindow(
   if (matches.length === 0) {
     throw new ScreencastError(
       `No visible window matching title "${wanted}". Open the window (it must ` +
-        `be on screen and not minimized), or use an exact/substring of its title.`,
+        `be on screen and not minimized), or use an exact/substring of its title, ` +
+        `or target it by window:exe=<app.exe> or window:hwnd=<handle>.`,
     );
   }
+  return toBounds(query, matches, matchKind);
+}
+
+/** The topmost of `matches`, clamped to the desktop and rounded down to even. */
+function toBounds(query: WindowQuery, matches: RawWindow[], matchKind: WindowBounds["matchKind"]): WindowBounds {
   const chosen = matches[0]; // EnumWindows Z-order: index 0 is the topmost.
   if (chosen.minimized) {
     throw new ScreencastError(
@@ -173,6 +209,7 @@ public class WinShim{
  [DllImport("user32.dll")] public static extern int GetWindowTextLength(IntPtr h);
  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out RECT r);
  [DllImport("user32.dll")] public static extern int GetSystemMetrics(int i);
+ [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);
  [DllImport("user32.dll")] public static extern IntPtr SetProcessDpiAwarenessContext(IntPtr v);
  public struct RECT{public int Left,Top,Right,Bottom;}
  static List<IntPtr> _h;
@@ -184,16 +221,20 @@ public class WinShim{
  public static bool Ic(IntPtr h){return IsIconic(h);}
  public static bool Vis(IntPtr h){return IsWindowVisible(h);}
  public static int SM(int i){return GetSystemMetrics(i);}
+ public static uint P(IntPtr h){uint p;GetWindowThreadProcessId(h,out p);return p;}
 }
 "@
 try{[void][WinShim]::SetProcessDpiAwarenessContext([IntPtr](-4))}catch{}
 $ws=New-Object System.Collections.ArrayList
+$exes=@{}
 foreach($h in [WinShim]::Z()){
  if(-not [WinShim]::Vis($h)){continue}
  $t=[WinShim]::T($h)
  if([string]::IsNullOrEmpty($t)){continue}
  $r=[WinShim]::R($h)
- [void]$ws.Add([pscustomobject]@{title=$t;left=$r[0];top=$r[1];right=$r[2];bottom=$r[3];minimized=[bool][WinShim]::Ic($h);hwnd=[int64]$h})
+ $procId=[WinShim]::P($h)
+ if(-not $exes.ContainsKey($procId)){$exes[$procId]=try{(Get-Process -Id $procId -ErrorAction Stop).ProcessName+'.exe'}catch{''}}
+ [void]$ws.Add([pscustomobject]@{title=$t;left=$r[0];top=$r[1];right=$r[2];bottom=$r[3];minimized=[bool][WinShim]::Ic($h);hwnd=[int64]$h;exe=$exes[$procId]})
 }
 $v=[pscustomobject]@{x=[WinShim]::SM(76);y=[WinShim]::SM(77);w=[WinShim]::SM(78);h=[WinShim]::SM(79)}
 [pscustomobject]@{virtual=$v;windows=@($ws)}|ConvertTo-Json -Compress -Depth 4

@@ -37,7 +37,7 @@ const inputSchema = {
     .string()
     .describe(
       "Capture target: 'full' | 'monitor:<index>' (0 = primary) | " +
-        "'window:<title>' | 'region:<x>,<y>,<w>,<h>' (absolute pixels). " +
+        "'window:<title>' (or window:exe=<app.exe> / window:hwnd=<handle>, without relying on the title) | 'region:<x>,<y>,<w>,<h>' (absolute pixels). " +
         "window: records the on-screen rectangle the window occupies, resolved " +
         "ONCE at start (it must be visible, on top, not minimized); it does not " +
         "follow a window moved or resized mid-recording.",

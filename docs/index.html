@@ -157,7 +157,7 @@
             <tr><td><code>reframe</code></td><td>Re-aspect to 16:9, 9:16, 1:1, or 4:5 with pad (letterbox) or crop (fill).</td></tr>
             <tr><td><code>zoom</code></td><td>Smooth zoom-and-pan into the action: from keyframes, toward each click in the input event log (with optional click rings), or toward where the screen changed.</td></tr>
             <tr><td><code>pipeline</code></td><td>Run several edits (trim, crop, scale, speed, redact, callout, reframe, zoom, then an export) as one ffmpeg process: one re-encode, no intermediate files.</td></tr>
-            <tr><td><code>export_preset</code></td><td>Encode a platform-ready file (youtube, instagram_reel, tiktok, x, square) at the right aspect, fps, and bitrate.</td></tr>
+            <tr><td><code>export_preset</code></td><td>Encode a platform-ready file (youtube, instagram_reel, tiktok, x, square, steam_trailer, vertical_reel) at the right aspect, fps, and bitrate.</td></tr>
           </tbody>
         </table>
       </section>
@@ -192,7 +192,8 @@
         offset; <code>monitor:0</code> is primary.</li>
         <li>Window capture matches a case-insensitive exact title first, then
         falls back to a substring match; with several matches the topmost window
-        wins.</li>
+        wins. To avoid relying on the title, target <code>window:exe=Code.exe</code>
+        (the app's topmost window) or <code>window:hwnd=0x1A2B</code>.</li>
         <li>Fullscreen-exclusive apps can produce black frames under gdigrab; use
         borderless-windowed mode.</li>
         <li>System audio capture (<code>start_recording</code> with
