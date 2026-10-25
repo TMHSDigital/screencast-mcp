@@ -574,6 +574,24 @@
     }
   },
   {
+    "name": "zoom",
+    "description": "Smooth animated zoom-and-pan, Screen Studio style: zoom into where the action is and back out. Give keyframes (rectangles by time), or let it plan them from where the screen changes. dryRun returns the plan so it can be adjusted. Returns the output path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "keyframes": { "type": "array", "description": "Views to animate between: {t, x, y, width, height} fills the frame with that rectangle by time t; {t, full: true} zooms out. Omit to plan automatically from where the screen changes", "items": {"type": "object"} },
+        "transitionSec": { "type": "number", "description": "How long each zoom/pan eases (default 0.6)" },
+        "maxZoom": { "type": "number", "description": "Auto mode: the furthest it zooms in (default 2.5)" },
+        "holdSec": { "type": "number", "description": "Auto mode: stay zoomed this long after activity stops (default 2)" },
+        "dryRun": { "type": "boolean", "description": "Only return the planned keyframes; write nothing" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+      },
+      "required": ["input"]
+    }
+  },
+  {
     "name": "export_preset",
     "description": "Encode a platform-ready file for youtube, instagram_reel, tiktok, x, or square. Reframes to the platform aspect, caps fps, and encodes H.264 at the platform bitrate with faststart.",
     "inputSchema": {
