@@ -76,10 +76,16 @@ export const MONITOR_CACHE_MS = 5_000;
 
 let cache: { at: number; monitors: Promise<Monitor[]> } | null = null;
 
+/** Make PowerShell write UTF-8. By default it writes the console's OEM code
+ * page (e.g. 437), which turns "é" into a replacement character and maps
+ * symbols such as "•" and "→" to raw control bytes (0x07, 0x1A): window
+ * titles stopped matching and OCR output stopped parsing as JSON. */
+export const PS_UTF8_PREAMBLE = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n";
+
 /** Run a base64-encoded PowerShell script without blocking the event loop and
- * return its stdout. Shared with the window enumeration in windows.ts. */
+ * return its stdout (UTF-8). Shared by window enumeration and OCR. */
 export function runPowerShell(script: string, what: string): Promise<string> {
-  const encoded = Buffer.from(script, "utf16le").toString("base64");
+  const encoded = Buffer.from(PS_UTF8_PREAMBLE + script, "utf16le").toString("base64");
   return new Promise((resolve, reject) => {
     execFile(
       "powershell",

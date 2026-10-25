@@ -271,6 +271,30 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     }
   }, 40_000);
 
+  it("matches a non-ASCII window title exactly, and OCR survives non-ASCII text", async () => {
+    // PowerShell used to write its OEM code page: "é" came back as U+FFFD and
+    // "•"/"→" as control bytes, breaking title matches and OCR JSON parsing.
+    const title = "SC-TÉST — ünï 日本";
+    const ps = spawn("powershell", ["-NoProfile", "-Command",
+      "Add-Type -AssemblyName System.Windows.Forms;" +
+      `$f=New-Object Windows.Forms.Form;$f.Text=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${Buffer.from(title).toString("base64")}'));` +
+      "$f.StartPosition='Manual';$f.Location='120,120';$f.Size='520,200';$f.TopMost=$true;$f.BackColor='White';" +
+      "$l=New-Object Windows.Forms.Label;$l.AutoSize=$true;$l.Font=New-Object Drawing.Font('Segoe UI',20);$l.Location='20,40';" +
+      `$l.Text=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${Buffer.from("Café • next → done").toString("base64")}'));` +
+      "$f.Controls.Add($l);[Windows.Forms.Application]::Run($f)"], { windowsHide: false });
+    try {
+      await sleep(2500);
+      const shot = await call("screenshot", { target: `window:${title}`, exactTitle: true, returnImage: false });
+      expect(shot.isError).toBe(false);
+      expect(shot.json.matchedWindow).toBe(title);
+      const ocr = await call("find_text", { input: shot.json.outputPath, returnImage: false });
+      expect(ocr.isError).toBe(false);
+      expect(ocr.json.text).toMatch(/Caf/);
+    } finally {
+      ps.kill();
+    }
+  }, 40_000);
+
   it("screen_diff reports identical screenshots as unchanged (#116)", async () => {
     const a = await call("screenshot", { target: "region:0,0,64,64", returnImage: false });
     const d = await call("screen_diff", { a: a.json.outputPath, b: a.json.outputPath, returnImage: false });

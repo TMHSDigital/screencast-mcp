@@ -7,6 +7,15 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.27.1]
+
+### Fixed
+
+- PowerShell output is now read as UTF-8. It used to come back in the console's
+  OEM code page, so a window title with "é" or "—" no longer matched
+  `window:<title>`, and `find_text` failed with "Bad control character" when the
+  screen showed symbols such as "•" or "→".
+
 ## [0.27.0]
 
 ### Added
