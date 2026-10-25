@@ -23,6 +23,7 @@ import {
   buildSpeedArgs,
   buildCropArgs,
   buildScaleArgs,
+  buildCompressArgs,
   buildExtractAudioArgs,
   buildRedactArgs,
   buildSampleByFpsArgs,
@@ -167,6 +168,14 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     await runFfmpeg(buildScaleArgs(av, scaled, { width: 160 }));
     const s = await probeMedia(scaled);
     expect([s.width, s.height]).toEqual([160, 120]);
+  });
+
+  it("compress with an odd maxWidth rounds down to an even width and produces a file (#239)", async () => {
+    const out = p("compress-odd.mp4");
+    await runFfmpeg(buildCompressArgs(short, out, { maxWidth: 201 }));
+    const info = await probeMedia(out);
+    expect([info.width, info.height]).toEqual([200, 150]);
+    expect(info.videoCodec).toBe("h264");
   });
 
   it("reframe and export_preset hit the platform canvas", async () => {

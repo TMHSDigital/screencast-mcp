@@ -273,7 +273,11 @@ describe("buildCompressArgs", () => {
     expect(buildCompressArgs("in.mp4", "o.mp4", { level: "heavy" }).join(" ")).toContain("-crf 32");
   });
   it("only downscales with the width cap", () => {
-    expect(buildCompressArgs("in.mp4", "o.mp4", { maxWidth: 1280 }).join(" ")).toContain("scale='min(1280,iw)':-2");
+    expect(buildCompressArgs("in.mp4", "o.mp4", { maxWidth: 1280 }).join(" ")).toContain("scale='trunc(min(1280,iw)/2)*2':-2");
+  });
+  it("rounds an odd maxWidth down to an even width in the scale filter (#239)", () => {
+    const args = buildCompressArgs("in.mp4", "o.mp4", { maxWidth: 637 });
+    expect(args[args.indexOf("-vf") + 1]).toBe("scale='trunc(min(637,iw)/2)*2':-2");
   });
 });
 

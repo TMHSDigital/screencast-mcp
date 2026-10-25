@@ -490,7 +490,8 @@ const COMPRESS_CRF: Record<CompressLevel, number> = {
 };
 
 /** Re-encode to a smaller file with a CRF ladder and an optional width cap.
- * The width cap only ever downscales (min of the source width and maxWidth). */
+ * The width cap only ever downscales (min of the source width and maxWidth)
+ * and rounds down to an even width so libx264 + yuv420p never see an odd width. */
 export function buildCompressArgs(
   input: string,
   output: string,
@@ -502,7 +503,7 @@ export function buildCompressArgs(
   const args = ["-y", "-i", input];
   if (opts.maxWidth !== undefined) {
     requirePositiveInt(opts.maxWidth, "maxWidth");
-    args.push("-vf", `scale='min(${opts.maxWidth},iw)':-2`);
+    args.push("-vf", `scale='trunc(min(${opts.maxWidth},iw)/2)*2':-2`);
   }
   args.push(
     "-c:v", "libx264", "-preset", "slow", "-crf", String(crf), "-pix_fmt", "yuv420p",
