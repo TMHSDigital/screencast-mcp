@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review player</title>
+<!--
+  screencast-mcp review player (#128): an MCP Apps view. The host renders it in
+  a sandboxed iframe for stop_recording / review_recording results. It talks to
+  the host with JSON-RPC over postMessage (ui/initialize, tool notifications,
+  tools/call), shows the recording as JPEG frames from player_frames, and sends
+  the person's trim and redaction back as one pipeline call. Self-contained: the
+  host's CSP allows no outside origins.
+-->
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0A0D12; --panel: #11161E; --line: #232B36; --ink: #EAF0F6; --dim: #93A0AE;
+    --amber: #FFB454; --rec: #FF4545; --ok: #3FB950;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #FFFFFF; --panel: #F4F6F9; --line: #D5DBE3; --ink: #0F141A; --dim: #5B6673;
+    --amber: #B4690E; --rec: #D92D2D; --ok: #1A7F37;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 var(--sans); }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .hud {
+    display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+    padding: .55rem .9rem; border-bottom: 1px solid var(--line);
+    font: 12px/1.4 var(--mono); letter-spacing: .04em; color: var(--dim);
+  }
+  .dot { width: .6rem; height: .6rem; border-radius: 50%; background: var(--rec); }
+  .rec { color: var(--rec); font-weight: 600; }
+  #file { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 6rem; }
+  #tc { color: var(--ink); font-variant-numeric: tabular-nums; }
+  main { padding: .8rem .9rem 1rem; display: grid; gap: .7rem; }
+  .stage {
+    position: relative; background: #000; border: 1px solid var(--line); border-radius: 6px;
+    min-height: 120px; display: grid; place-items: center; overflow: hidden; touch-action: none;
+  }
+  .stage img { display: block; max-width: 100%; max-height: 60vh; user-select: none; -webkit-user-drag: none; }
+  .stage.drawing { cursor: crosshair; }
+  #empty { color: var(--dim); font: 12px var(--mono); padding: 2rem; text-align: center; }
+  .box { position: absolute; border: 2px solid var(--rec); background: color-mix(in srgb, var(--rec) 28%, transparent); pointer-events: none; }
+  .box.draft { border-style: dashed; }
+  .box span { position: absolute; top: -1.3rem; left: -2px; font: 11px var(--mono); background: var(--rec); color: #fff; padding: 0 .3rem; border-radius: 3px 3px 0 0; }
+  .controls, .row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+  .btn {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    padding: .35rem .75rem; cursor: pointer; font: 12px var(--mono);
+  }
+  .btn:hover:not(:disabled) { border-color: var(--amber); }
+  .btn[aria-pressed="true"] { border-color: var(--rec); color: var(--rec); }
+  .btn.primary { background: var(--amber); color: #111; border-color: var(--amber); font-weight: 600; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #hint { color: var(--dim); font-size: 12px; }
+  .timeline { position: relative; height: 56px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); cursor: pointer; touch-action: none; }
+  #strip { position: absolute; inset: 0; display: flex; overflow: hidden; border-radius: 5px; opacity: .55; }
+  #strip img { height: 100%; flex: 1 1 0; min-width: 0; object-fit: cover; pointer-events: none; }
+  .shade { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--bg) 70%, transparent); pointer-events: none; }
+  #head { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); pointer-events: none; }
+  .handle {
+    position: absolute; top: -6px; bottom: -6px; width: 14px; margin-left: -7px; padding: 0;
+    background: var(--amber); border: 0; border-radius: 4px; cursor: ew-resize;
+  }
+  .handle::after { content: ""; position: absolute; inset: 40% 5px; border-left: 2px solid #111; border-right: 2px solid #111; }
+  .times { font: 12px var(--mono); color: var(--dim); gap: 1.2rem; }
+  .times b { color: var(--amber); font-weight: 500; }
+  #boxList { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem; }
+  #boxList li { font: 12px var(--mono); border: 1px solid var(--line); border-radius: 6px; padding: .15rem .2rem .15rem .55rem; display: flex; gap: .4rem; align-items: center; }
+  #boxList button { border: 0; background: none; color: var(--dim); cursor: pointer; padding: 0 .3rem; }
+  #boxList button:hover { color: var(--rec); }
+  #status { font: 12px var(--mono); color: var(--dim); overflow-wrap: anywhere; }
+  #status.ok { color: var(--ok); }
+  #status.err { color: var(--rec); }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+</style>
+</head>
+<body>
+<header class="hud" aria-label="Recording">
+  <span class="dot" aria-hidden="true"></span><span class="rec">REVIEW</span>
+  <span id="file">waiting for a recording</span>
+  <span id="tc">00:00.0 / 00:00.0</span>
+</header>
+<main>
+  <div class="stage" id="stage">
+    <div id="empty">Loading the recording...</div>
+    <img id="frame" alt="" hidden>
+  </div>
+  <div class="controls">
+    <button class="btn" id="play" type="button" disabled>Play</button>
+    <button class="btn" id="draw" type="button" aria-pressed="false" disabled>Draw redaction box</button>
+    <span id="hint">Drag the amber handles to trim. Draw boxes over anything secret.</span>
+  </div>
+  <div class="timeline" id="timeline" role="group" aria-label="Timeline: click to seek">
+    <div id="strip"></div>
+    <div class="shade" id="shadeIn"></div><div class="shade" id="shadeOut"></div>
+    <div id="head"></div>
+    <button class="handle" id="hIn" type="button" aria-label="Trim start (arrow keys move one frame)"></button>
+    <button class="handle" id="hOut" type="button" aria-label="Trim end (arrow keys move one frame)"></button>
+  </div>
+  <div class="row times"><span>IN <b id="inT">0.0s</b></span><span>OUT <b id="outT">0.0s</b></span><span id="lenT"></span></div>
+  <ul id="boxList" aria-label="Redaction boxes"></ul>
+  <div class="row">
+    <button class="btn primary" id="apply" type="button" disabled>Export trimmed + redacted copy</button>
+    <button class="btn" id="openResult" type="button" hidden>Review the result</button>
+    <span id="status" role="status"></span>
+  </div>
+</main>
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const PROTOCOL = "2026-01-26";
+
+  // --- JSON-RPC over postMessage with the host ---------------------------
+  let nextId = 1;
+  const pending = new Map();
+  const send = (msg) => window.parent.postMessage({ jsonrpc: "2.0", ...msg }, "*");
+  const request = (method, params) =>
+    new Promise((resolve, reject) => {
+      const id = nextId++;
+      pending.set(id, { resolve, reject });
+      send({ id, method, params });
+    });
+  const notify = (method, params) => send({ method, params });
+
+  window.addEventListener("message", (e) => {
+    if (e.source !== window.parent) return;
+    const m = e.data;
+    if (!m || m.jsonrpc !== "2.0") return;
+    if (m.id !== undefined && !m.method) {
+      const p = pending.get(m.id);
+      if (!p) return;
+      pending.delete(m.id);
+      m.error ? p.reject(new Error(m.error.message || "request failed")) : p.resolve(m.result);
+      return;
+    }
+    if (m.id !== undefined) {
+      // A request from the host.
+      if (m.method === "ui/resource-teardown" || m.method === "ping") send({ id: m.id, result: {} });
+      else send({ id: m.id, error: { code: -32601, message: `Unsupported: ${m.method}` } });
+      return;
+    }
+    if (m.method === "ui/notifications/tool-input") onToolInput(m.params?.arguments || {});
+    else if (m.method === "ui/notifications/tool-result") onToolResult(m.params || {});
+    else if (m.method === "ui/notifications/host-context-changed") applyHostContext(m.params || {});
+    else if (m.method === "ui/notifications/tool-cancelled") setEmpty("The tool call was cancelled.");
+  });
+
+  const applyHostContext = (ctx) => {
+    if (ctx && (ctx.theme === "light" || ctx.theme === "dark")) document.documentElement.dataset.theme = ctx.theme;
+  };
+  const callTool = async (name, args) => {
+    const r = await request("tools/call", { name, arguments: args });
+    if (r && r.isError) throw new Error((r.content || []).map((c) => c.text).filter(Boolean).join(" ") || `${name} failed`);
+    return r;
+  };
+  const resultJson = (r) => {
+    const t = (r?.content || []).find((c) => c.type === "text");
+    try { return t ? JSON.parse(t.text) : null; } catch { return null; }
+  };
+
+  // --- state ---------------------------------------------------------------
+  const S = { input: null, duration: 0, W: 0, H: 0, frames: [], times: [], i: 0, inI: 0, outI: 0, boxes: [], drawing: false, playing: null };
+  const fmt = (t) => { const m = Math.floor(t / 60), s = t - m * 60; return `${String(m).padStart(2, "0")}:${s.toFixed(1).padStart(4, "0")}`; };
+  const sliceStart = (i) => (i * S.duration) / S.frames.length;
+  const sliceEnd = (i) => ((i + 1) * S.duration) / S.frames.length;
+  const setEmpty = (text) => { $("empty").textContent = text; $("empty").hidden = false; };
+  const status = (text, kind) => { const s = $("status"); s.textContent = text; s.className = kind || ""; };
+
+  function onToolInput(args) {
+    if (args.input) $("file").textContent = args.input;
+  }
+  function onToolResult(result) {
+    if (result.isError) return setEmpty((result.content || []).map((c) => c.text).join(" ") || "The tool failed.");
+    const j = resultJson(result);
+    const input = j && (j.outputPath || j.input);
+    if (!input) return setEmpty("No video in this result.");
+    load(input);
+  }
+
+  async function load(input) {
+    S.input = input;
+    S.boxes = [];
+    $("file").textContent = input.split(/[\\/]/).pop();
+    $("file").title = input;
+    setEmpty("Loading frames...");
+    status("");
+    try {
+      const r = await callTool("player_frames", { input });
+      const meta = resultJson(r);
+      S.frames = (r.content || []).filter((c) => c.type === "image").map((c) => `data:${c.mimeType};base64,${c.data}`);
+      if (!meta || S.frames.length === 0) throw new Error("No frames came back.");
+      Object.assign(S, { duration: meta.durationSec, W: meta.width, H: meta.height, times: meta.frameTimes, i: 0, inI: 0, outI: S.frames.length - 1 });
+    } catch (err) {
+      return setEmpty(`Could not load the recording: ${err.message}`);
+    }
+    $("empty").hidden = true;
+    $("frame").hidden = false;
+    // A strip of up to 40 evenly chosen thumbnails.
+    const strip = $("strip");
+    strip.replaceChildren();
+    const n = Math.min(40, S.frames.length);
+    for (let k = 0; k < n; k++) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = S.frames[Math.floor((k * S.frames.length) / n)];
+      strip.appendChild(img);
+    }
+    ["play", "draw"].forEach((id) => ($(id).disabled = false));
+    show(0);
+    render();
+  }
+
+  function show(i) {
+    S.i = Math.max(0, Math.min(S.frames.length - 1, i));
+    $("frame").src = S.frames[S.i];
+    $("tc").textContent = `${fmt(S.times[S.i] || 0)} / ${fmt(S.duration)}`;
+    $("head").style.left = `${((S.i + 0.5) / S.frames.length) * 100}%`;
+  }
+
+  function render() {
+    const n = S.frames.length || 1;
+    const a = (S.inI / n) * 100, b = ((S.outI + 1) / n) * 100;
+    $("hIn").style.left = `${a}%`;
+    $("hOut").style.left = `${b}%`;
+    $("shadeIn").style.cssText = `left:0;width:${a}%`;
+    $("shadeOut").style.cssText = `left:${b}%;right:0`;
+    const tin = sliceStart(S.inI), tout = sliceEnd(S.outI);
+    $("inT").textContent = `${tin.toFixed(1)}s`;
+    $("outT").textContent = `${tout.toFixed(1)}s`;
+    $("lenT").textContent = `${(tout - tin).toFixed(1)}s kept`;
+    renderBoxes();
+    const trimmed = S.inI > 0 || S.outI < S.frames.length - 1;
+    $("apply").disabled = !S.input || (!trimmed && S.boxes.length === 0);
+  }
+
+  // --- timeline: seek and trim handles ----------------------------------
+  const tl = $("timeline");
+  const indexAt = (clientX) => {
+    const r = tl.getBoundingClientRect();
+    return Math.floor(((clientX - r.left) / r.width) * S.frames.length);
+  };
+  let dragging = null;
+  tl.addEventListener("pointerdown", (e) => {
+    if (!S.frames.length) return;
+    dragging = e.target === $("hIn") ? "in" : e.target === $("hOut") ? "out" : "seek";
+    tl.setPointerCapture(e.pointerId);
+    move(e);
+  });
+  tl.addEventListener("pointermove", (e) => dragging && move(e));
+  tl.addEventListener("pointerup", () => (dragging = null));
+  function move(e) {
+    const i = Math.max(0, Math.min(S.frames.length - 1, indexAt(e.clientX)));
+    if (dragging === "in") S.inI = Math.min(i, S.outI);
+    else if (dragging === "out") S.outI = Math.max(i, S.inI);
+    show(i);
+    render();
+  }
+  for (const [id, key] of [["hIn", "inI"], ["hOut", "outI"]]) {
+    $(id).addEventListener("keydown", (e) => {
+      const d = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0;
+      if (!d) return;
+      e.preventDefault();
+      const v = S[key] + d;
+      if (key === "inI") S.inI = Math.max(0, Math.min(v, S.outI));
+      else S.outI = Math.min(S.frames.length - 1, Math.max(v, S.inI));
+      show(S[key]);
+      render();
+    });
+  }
+
+  // --- playback: a flipbook over the kept range ---------------------------
+  $("play").addEventListener("click", () => {
+    if (S.playing) return stop();
+    $("play").textContent = "Pause";
+    let i = S.i < S.inI || S.i >= S.outI ? S.inI : S.i;
+    const ms = (S.duration / S.frames.length) * 1000;
+    S.playing = setInterval(() => {
+      show(i);
+      i = i >= S.outI ? S.inI : i + 1;
+    }, ms);
+  });
+  function stop() {
+    clearInterval(S.playing);
+    S.playing = null;
+    $("play").textContent = "Play";
+  }
+
+  // --- redaction boxes, in video pixels -----------------------------------
+  const stage = $("stage"), img = $("frame");
+  $("draw").addEventListener("click", () => {
+    S.drawing = !S.drawing;
+    $("draw").setAttribute("aria-pressed", String(S.drawing));
+    stage.classList.toggle("drawing", S.drawing);
+  });
+  const toVideo = (clientX, clientY) => {
+    const r = img.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(S.W, ((clientX - r.left) / r.width) * S.W)),
+      y: Math.max(0, Math.min(S.H, ((clientY - r.top) / r.height) * S.H)),
+    };
+  };
+  let start = null, draft = null;
+  stage.addEventListener("pointerdown", (e) => {
+    if (!S.drawing || !S.frames.length) return;
+    start = toVideo(e.clientX, e.clientY);
+    stage.setPointerCapture(e.pointerId);
+    draft = document.createElement("div");
+    draft.className = "box draft";
+    stage.appendChild(draft);
+  });
+  stage.addEventListener("pointermove", (e) => {
+    if (!start) return;
+    placeBox(draft, rectOf(start, toVideo(e.clientX, e.clientY)));
+  });
+  stage.addEventListener("pointerup", (e) => {
+    if (!start) return;
+    const r = rectOf(start, toVideo(e.clientX, e.clientY));
+    start = null;
+    draft.remove();
+    if (r.width >= 4 && r.height >= 4) S.boxes.push(r);
+    render();
+  });
+  const rectOf = (a, b) => {
+    const x = Math.floor(Math.min(a.x, b.x)), y = Math.floor(Math.min(a.y, b.y));
+    return { x, y, width: Math.ceil(Math.max(a.x, b.x)) - x, height: Math.ceil(Math.max(a.y, b.y)) - y };
+  };
+  function placeBox(el, r) {
+    const ir = img.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+    const k = ir.width / S.W;
+    el.style.left = `${ir.left - sr.left + r.x * k}px`;
+    el.style.top = `${ir.top - sr.top + r.y * k}px`;
+    el.style.width = `${r.width * k}px`;
+    el.style.height = `${r.height * k}px`;
+  }
+  function renderBoxes() {
+    stage.querySelectorAll(".box:not(.draft)").forEach((b) => b.remove());
+    const list = $("boxList");
+    list.replaceChildren();
+    S.boxes.forEach((r, n) => {
+      const el = document.createElement("div");
+      el.className = "box";
+      el.innerHTML = `<span>${n + 1}</span>`;
+      stage.appendChild(el);
+      placeBox(el, r);
+      const li = document.createElement("li");
+      li.textContent = `#${n + 1} ${r.width}\u00d7${r.height} at ${r.x},${r.y}`;
+      const rm = document.createElement("button");
+      rm.type = "button";
+      rm.textContent = "\u2715";
+      rm.setAttribute("aria-label", `Remove box ${n + 1}`);
+      rm.addEventListener("click", () => { S.boxes.splice(n, 1); render(); });
+      li.appendChild(rm);
+      list.appendChild(li);
+    });
+  }
+  img.addEventListener("load", renderBoxes);
+  new ResizeObserver(renderBoxes).observe(stage);
+
+  // --- export: one pipeline call -----------------------------------------
+  $("apply").addEventListener("click", async () => {
+    stop();
+    const steps = [];
+    // Redact first, so a box covers every frame of the kept range.
+    if (S.boxes.length) steps.push({ op: "redact", regions: S.boxes.map((b) => ({ ...b })) });
+    const tin = Math.round(sliceStart(S.inI) * 1000) / 1000, tout = Math.round(sliceEnd(S.outI) * 1000) / 1000;
+    if (S.inI > 0 || S.outI < S.frames.length - 1) steps.push({ op: "trim", start: tin, end: Math.min(tout, S.duration) });
+    $("apply").disabled = true;
+    status("Exporting...");
+    try {
+      const out = resultJson(await callTool("pipeline", { input: S.input, steps }));
+      S.result = out.outputPath;
+      status(`Saved ${S.result}`, "ok");
+      $("openResult").hidden = false;
+      const what = [steps.some((s) => s.op === "trim") ? `trimmed to ${tin}-${tout}s` : "", S.boxes.length ? `${S.boxes.length} region(s) redacted` : ""].filter(Boolean).join(", ");
+      // Tell the agent what the person did; the host includes it on the next turn.
+      request("ui/update-model-context", {
+        content: [{ type: "text", text: `In the review player the user exported ${S.input}, ${what}, to ${S.result}.` }],
+        structuredContent: { input: S.input, output: S.result, steps },
+      }).catch(() => {});
+    } catch (err) {
+      status(`Export failed: ${err.message}`, "err");
+    } finally {
+      render();
+    }
+  });
+  $("openResult").addEventListener("click", () => {
+    $("openResult").hidden = true;
+    load(S.result);
+  });
+
+  // --- start ---------------------------------------------------------------
+  new ResizeObserver(() => notify("ui/notifications/size-changed", { height: Math.ceil(document.documentElement.scrollHeight) })).observe(document.body);
+  request("ui/initialize", { appInfo: { name: "screencast-review-player", version: "1.0.0" }, appCapabilities: {}, protocolVersion: PROTOCOL })
+    .then((r) => {
+      applyHostContext(r && r.hostContext);
+      notify("ui/notifications/initialized", {});
+    })
+    .catch((err) => setEmpty(`The host did not start the player: ${err.message}`));
+})();
+</script>
+</body>
+</html>

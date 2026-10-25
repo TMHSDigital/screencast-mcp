@@ -5,19 +5,26 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { probeDuration, stopSession } from "../utils/lifecycle.js";
 import { getStore } from "../context.js";
+import { PLAYER_TOOL_META } from "../utils/player.js";
 
 const inputSchema = {
   sessionId: z.string().min(1).describe("Session id returned by start_recording."),
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "stop_recording",
-    "Stop a recording by session id. Sends ffmpeg a graceful quit so the file " +
-      "is finalized rather than truncated, then returns the final path and " +
-      "duration. Falls back to terminating the process by pid if the live " +
-      "handle was lost (for example after a server restart).",
-    inputSchema,
+    {
+      description:
+        "Stop a recording by session id. Sends ffmpeg a graceful quit so the file " +
+        "is finalized rather than truncated, then returns the final path and " +
+        "duration. Falls back to terminating the process by pid if the live " +
+        "handle was lost (for example after a server restart). Clients with MCP " +
+        "Apps show the review player for the result.",
+      inputSchema,
+      // The review player (#128) renders for this result in Apps-capable hosts.
+      _meta: PLAYER_TOOL_META,
+    },
     async (args) => {
       try {
         const store = getStore();
