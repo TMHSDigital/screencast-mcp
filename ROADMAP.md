@@ -2,7 +2,7 @@
 
 # Roadmap
 
-**Current:** v0.31.0 shipped (Phase 3 complete; a second hardening round is
+**Current:** v0.32.0 shipped (Phase 3 complete; a second hardening round is
 underway, see below and CHANGELOG). Cross-platform capture is the next feature
 phase.
 

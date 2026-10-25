@@ -331,6 +331,42 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     }
   }, 60_000);
 
+  it("backend 'wgc' records a covered window, and keeps recording it after it moves (#113)", async () => {
+    const probe = spawnSync("ffmpeg", ["-hide_banner", "-h", "filter=gfxcapture"], { encoding: "utf8" });
+    if (!/gfxcapture AVOptions/.test(probe.stdout)) return; // older ffmpeg: covered by the error test below
+    // A static lime target under a topmost magenta cover. Once recording, a flag
+    // file makes it move and turn blue (and then sit still), still covered.
+    const flag = join(home, "wgc-go.flag");
+    const ps = spawn("powershell", ["-NoProfile", "-Command",
+      "Add-Type -AssemblyName System.Windows.Forms;" +
+      "$f=New-Object Windows.Forms.Form;$f.Text='SC-WGC-REC';$f.StartPosition='Manual';$f.Location='300,300';$f.ClientSize='400,300';$f.BackColor='Lime';" +
+      "$c=New-Object Windows.Forms.Form;$c.Text='SC-WGC-RCOVER';$c.StartPosition='Manual';$c.Location='200,200';$c.Size='700,560';$c.BackColor='Magenta';$c.TopMost=$true;" +
+      `$t=New-Object Windows.Forms.Timer;$t.Interval=100;$t.Add_Tick({if(Test-Path '${flag}'){$f.Location='340,330';$f.BackColor='Blue';$t.Stop()}});$t.Start();` +
+      "$f.Show();$c.Show();[Windows.Forms.Application]::Run($c)"], { windowsHide: false });
+    const centre = (path: string, t: number) =>
+      [...spawnSync("ffmpeg", ["-v", "error", "-ss", String(t), "-i", path, "-vf", "crop=iw/2:ih/2:iw/4:ih/4,scale=1:1,format=rgb24", "-frames:v", "1", "-f", "rawvideo", "-"]).stdout];
+    try {
+      await sleep(3000);
+      const rec = await call("start_recording", { target: "window:SC-WGC-REC", exactTitle: true, backend: "wgc", fps: 15 });
+      expect(rec.isError, rec.text).toBe(false);
+      expect(rec.json.backend).toBe("wgc");
+      await sleep(1500);
+      writeFileSync(flag, "go");
+      await sleep(2500);
+      const stop = await call("stop_recording", { sessionId: rec.json.sessionId });
+      expect(stop.json.finalizedGracefully).toBe(true);
+      const { width, height, durationSec } = ffprobe(stop.json.outputPath);
+      expect([width, height]).toEqual([400, 300]); // the client area
+      expect(durationSec).toBeGreaterThan(3);
+      const [r0, g0, b0] = centre(stop.json.outputPath, 0.2);
+      const [r1, g1, b1] = centre(stop.json.outputPath, durationSec - 0.3);
+      expect(r0 + b0 < 120 || b0 > 200, `start ${[r0, g0, b0]}`).toBe(true); // lime or blue, never the magenta cover
+      expect(b1 > 200 && r1 < 80 && g1 < 80, `end ${[r1, g1, b1]}`).toBe(true); // blue: still the target after it moved
+    } finally {
+      ps.kill();
+    }
+  }, 60_000);
+
   it("window: captures the visible frame, not the invisible border around it", async () => {
     // GetWindowRect includes ~8 px of invisible resize border on each side, so
     // a 500 px client area captured ~516 px wide, edged with whatever was behind.

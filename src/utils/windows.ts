@@ -27,6 +27,10 @@ export interface RawWindow {
   hwnd?: number;
   /** The owning process's executable, e.g. "Code.exe" (#107, #113). */
   exe?: string;
+  /** Screen position of the client area's top-left corner: where a WGC
+   * recording's frame starts (#113). */
+  clientX?: number;
+  clientY?: number;
 }
 
 export interface WindowQuery {
@@ -52,6 +56,8 @@ export interface WindowBounds {
   candidates: string[];
   /** The matched window handle, when enumeration provided one. */
   hwnd?: number;
+  /** Screen position of the matched window's client area (#113). */
+  client?: { x: number; y: number };
 }
 
 export interface SelectWindowOptions {
@@ -161,6 +167,7 @@ function toBounds(query: WindowQuery, matches: RawWindow[], matchKind: WindowBou
     x, y, width, height,
     matchedTitle: chosen.title,
     ...(chosen.hwnd !== undefined ? { hwnd: chosen.hwnd } : {}),
+    ...(chosen.clientX !== undefined && chosen.clientY !== undefined ? { client: { x: chosen.clientX, y: chosen.clientY } } : {}),
     matchCount: matches.length,
     matchKind,
     candidates: matches.slice(0, MAX_CANDIDATES).map((w) => w.title),
@@ -210,6 +217,8 @@ public class WinShim{
  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out RECT r);
  [DllImport("user32.dll")] public static extern int GetSystemMetrics(int i);
  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);
+ [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr h,ref PT p);
+ public struct PT{public int X,Y;}
  [DllImport("user32.dll")] public static extern IntPtr SetProcessDpiAwarenessContext(IntPtr v);
  public struct RECT{public int Left,Top,Right,Bottom;}
  static List<IntPtr> _h;
@@ -222,6 +231,7 @@ public class WinShim{
  public static bool Vis(IntPtr h){return IsWindowVisible(h);}
  public static int SM(int i){return GetSystemMetrics(i);}
  public static uint P(IntPtr h){uint p;GetWindowThreadProcessId(h,out p);return p;}
+ public static int[] C(IntPtr h){PT p=new PT();ClientToScreen(h,ref p);return new int[]{p.X,p.Y};}
 }
 "@
 try{[void][WinShim]::SetProcessDpiAwarenessContext([IntPtr](-4))}catch{}
@@ -233,8 +243,9 @@ foreach($h in [WinShim]::Z()){
  if([string]::IsNullOrEmpty($t)){continue}
  $r=[WinShim]::R($h)
  $procId=[WinShim]::P($h)
+ $c=[WinShim]::C($h)
  if(-not $exes.ContainsKey($procId)){$exes[$procId]=try{(Get-Process -Id $procId -ErrorAction Stop).ProcessName+'.exe'}catch{''}}
- [void]$ws.Add([pscustomobject]@{title=$t;left=$r[0];top=$r[1];right=$r[2];bottom=$r[3];minimized=[bool][WinShim]::Ic($h);hwnd=[int64]$h;exe=$exes[$procId]})
+ [void]$ws.Add([pscustomobject]@{title=$t;left=$r[0];top=$r[1];right=$r[2];bottom=$r[3];minimized=[bool][WinShim]::Ic($h);hwnd=[int64]$h;exe=$exes[$procId];clientX=$c[0];clientY=$c[1]})
 }
 $v=[pscustomobject]@{x=[WinShim]::SM(76);y=[WinShim]::SM(77);w=[WinShim]::SM(78);h=[WinShim]::SM(79)}
 [pscustomobject]@{virtual=$v;windows=@($ws)}|ConvertTo-Json -Compress -Depth 4

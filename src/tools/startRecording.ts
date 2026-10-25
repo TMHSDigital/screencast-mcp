@@ -2,10 +2,12 @@ import { spawn } from "node:child_process";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg } from "../utils/ffmpeg.js";
+import { requireFfmpeg, wgcAvailable } from "../utils/ffmpeg.js";
+import { fileURLToPath } from "node:url";
 import {
   buildCaptureArgs,
   captureFrame,
+  resolveQuality,
   DEFAULT_FPS,
   DEFAULT_QUALITY,
   DEFAULT_MAX_RECORDING_SEC,
@@ -111,6 +113,14 @@ const inputSchema = {
         "shortcuts also names chords made with Ctrl, Alt, or Win (e.g. Ctrl+S); " +
         "typed text is never logged.",
     ),
+  backend: z
+    .enum(["gdigrab", "wgc"])
+    .optional()
+    .describe(
+      "gdigrab (default) records the screen rectangle. wgc (window: targets, FFmpeg 8+) records the " +
+        "window's own surface through Windows Graphics Capture: it keeps recording the window when " +
+        "it is covered, moved, or in the background, and frames only its client area. No audio with wgc.",
+    ),
 };
 
 export function register(server: McpServer): void {
@@ -128,6 +138,14 @@ export function register(server: McpServer): void {
         const { target, monitors, window } = await resolveCaptureTarget(args.target, {
           exactTitle: args.exactTitle,
         });
+        const backend = args.backend ?? "gdigrab";
+        if (backend === "wgc") {
+          if (!window?.hwnd) throw new ScreencastError('backend "wgc" records one window: use a window: target.');
+          if (args.audio?.source === "system") throw new ScreencastError('Audio is not supported with backend "wgc" yet; use gdigrab.');
+          if (!wgcAvailable()) {
+            throw new ScreencastError('backend "wgc" needs FFmpeg 8 or newer (the gfxcapture filter). Use gdigrab, or update ffmpeg.');
+          }
+        }
         const fps = args.fps ?? DEFAULT_FPS;
         const quality: Quality = (args.quality as Quality) ?? DEFAULT_QUALITY;
         const maxDurationSec = resolveMaxDuration(args.maxDurationSec);
@@ -156,16 +174,27 @@ export function register(server: McpServer): void {
         // The event logger starts first so the first frames have events (#118).
         const keyMode: KeyMode = args.keys ?? DEFAULT_KEY_MODE;
         const evPaths = args.events ? eventPaths(output) : null;
-        const frame = args.events
+        // wgc frames the client area; its size is known once the recorder starts.
+        let frame = args.events
           ? captureFrame(target, target.kind === "full" ? await getMonitors() : monitors)
           : null;
         const logger = evPaths ? await startEventLogger(evPaths.raw, keyMode) : null;
 
         const spawnedAt = Date.now();
-        const child = spawn(ffmpeg, ffArgs, {
-          stdio: ["pipe", "ignore", "pipe"],
-          windowsHide: true,
-        });
+        const child =
+          backend === "wgc"
+            ? spawn(
+                process.execPath,
+                [
+                  fileURLToPath(new URL("../wgcRecorder.js", import.meta.url)),
+                  JSON.stringify({ ffmpeg, hwnd: window!.hwnd, fps, encode: resolveQuality(quality), output, maxDurationSec }),
+                ],
+                { stdio: ["pipe", "ignore", "pipe"], windowsHide: true },
+              )
+            : spawn(ffmpeg, ffArgs, {
+                stdio: ["pipe", "ignore", "pipe"],
+                windowsHide: true,
+              });
 
         // Detect an immediate failure (bad window title, busy device, etc.).
         // The head keeps the input banner, whose start: time aligns events.
@@ -176,8 +205,18 @@ export function register(server: McpServer): void {
           stderrTail = (stderrTail + text).slice(-2000);
           if (stderrHead.length < 8000) stderrHead += text;
         });
+        // gdigrab is running once it survives a moment; the wgc recorder says
+        // so when its first frame is written (a repaint can take a second).
         const settled = await new Promise<"running" | "exited">((resolve) => {
-          const timer = setTimeout(() => resolve("running"), 1200);
+          const timer = setTimeout(() => resolve("running"), backend === "wgc" ? 15_000 : 1200);
+          if (backend === "wgc") {
+            child.stderr?.on("data", () => {
+              if (parseCaptureStart(stderrHead) !== null) {
+                clearTimeout(timer);
+                resolve("running");
+              }
+            });
+          }
           child.on("error", (err) => {
             clearTimeout(timer);
             stderrTail += `\n${err.message}`;
@@ -195,8 +234,12 @@ export function register(server: McpServer): void {
           if (evPaths) rmSync(evPaths.raw, { force: true });
           const tail = stderrTail.trim().split("\n").slice(-6).join("\n");
           throw new ScreencastError(
-            `Recording failed to start (ffmpeg exited immediately):\n${tail}`,
+            `Recording failed to start (${backend === "wgc" ? "window capture" : "ffmpeg"} exited immediately):\n${tail}`,
           );
+        }
+        if (backend === "wgc" && frame && window?.client) {
+          const m = /wgc: (\d+)x(\d+)/.exec(stderrHead);
+          frame = { x: window.client.x, y: window.client.y, w: m ? Number(m[1]) : frame.w, h: m ? Number(m[2]) : frame.h };
         }
 
         const record: SessionRecord = {
@@ -212,6 +255,7 @@ export function register(server: McpServer): void {
           ...(maxDurationSec > 0 ? { maxDurationSec } : {}),
           ...(window ? { matchedWindow: window.matchedTitle } : {}),
           ...(evPaths ? { events: { path: evPaths.jsonl, keys: keyMode } } : {}),
+          backend,
         };
         const store = getStore();
         store.create(record);
@@ -272,6 +316,7 @@ export function register(server: McpServer): void {
         return okResponse({
           sessionId: id,
           status: "recording",
+          backend,
           outputPath: output,
           pid: record.pid,
           fps,

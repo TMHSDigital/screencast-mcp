@@ -196,6 +196,10 @@
         (the app's topmost window) or <code>window:hwnd=0x1A2B</code>.</li>
         <li>Fullscreen-exclusive apps can produce black frames under gdigrab; use
         borderless-windowed mode.</li>
+        <li><code>backend: "wgc"</code> on <code>start_recording</code> or
+        <code>screenshot</code> captures one window&rsquo;s own surface through
+        Windows Graphics Capture (FFmpeg 8+): it keeps recording the window while it
+        is covered, moved, or in the background.</li>
         <li>System audio capture (<code>start_recording</code> with
         <code>audio.source</code> = system) needs a virtual-audio loopback device,
         since gdigrab is video-only and Windows has no native loopback. Use

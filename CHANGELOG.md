@@ -7,6 +7,28 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.32.0]
+
+### Added
+
+- `start_recording` `backend: "wgc"` (#113) records one window's own surface
+  through Windows Graphics Capture (FFmpeg 8+ `gfxcapture`, by window handle).
+  The window keeps being recorded while it is covered by other windows, moved,
+  or in the background. The frame is its client area.
+  - `gfxcapture` only emits a frame when the window presents, and ffmpeg holds
+    the newest frame back until another arrives. A static window therefore gave
+    no frames at all and ignored the graceful stop. A small recorder process
+    (`dist/wgcRecorder.js`) now:
+    - repaints a 1x1 pixel area of the window every 200 ms (with erase, which
+      covered windows need);
+    - keeps the latest frame and writes it to the encoder at the requested fps;
+    - stops on `q` like ffmpeg, so `stop_recording`, `maxDurationSec`, crash
+      detection, and the input event log work unchanged.
+  - Results and sessions report `backend`. Audio is not supported with `wgc`
+    yet; gdigrab stays the default.
+- Window enumeration reports each window's client-area origin, which maps the
+  input event log onto a `wgc` recording.
+
 ## [0.31.0]
 
 ### Added
