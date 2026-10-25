@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zoom toward every click — Screencast MCP</title>
+  <meta name="description" content="Record with an input event log, then zoom smoothly toward each click and ring it, Screen Studio style, all from one tool call.">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/workflows/zoom-clicks.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="Zoom toward every click — Screencast MCP">
+  <meta property="og:description" content="Record with an input event log, then zoom smoothly toward each click and ring it, Screen Studio style, all from one tool call.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/workflows/zoom-clicks.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../workflows/" class="here">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">WORKFLOWS</a> / REC 06</p>
+      <h1>Zoom toward every click</h1>
+      <p class="lede">A full-window recording makes viewers hunt for the cursor. Record with the input event log on, and <code>zoom</code> glides the camera in as each click happens, pans between clicks close together, rings the click, and zooms back out when things go quiet. The log never records what you type.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>THE PROMPT</span></div>
+      <p class="prompt">Record the Demo Settings window while I click Save, then make a version that zooms in on my clicks and highlights them.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>THE CALLS IT MAKES</span></div>
+      <p>start_recording (events) &rarr; stop_recording &rarr; read_events &rarr; zoom (follow clicks, highlightClicks) &rarr; export_gif. Paths are shortened; every value is from a real run.</p>
+      <ol class="takes">
+        <li><span class="call"><b>start_recording</b> { "target": "window:Demo Settings", "fps": 30, "events": true }</span><span class="why">Starts a small input hook alongside ffmpeg. Keys are <code>masked</code> by default: the log says a key went down, never which.</span><span class="ret">{ "sessionId": "rec-…", "eventsPath": "rec-….events.jsonl", "keys": "masked" }</span></li>
+        <li><span class="call"><b>stop_recording</b> { "sessionId": "rec-…" }</span><span class="why">The log is converted to the video's clock and pixels as the recording stops.</span><span class="ret">{ "durationSec": 6.9, "eventsPath": "rec-….events.jsonl", "events": { "moves": 1, "clicks": 1 } }</span></li>
+        <li><span class="call"><b>read_events</b> { "sessionId": "rec-…", "types": ["down"] }</span><span class="why">Each click with its video time and position. Handy on its own: sample_frames at those times shows what each click did.</span><span class="ret">{ "matched": 1, "events": [{ "t": 3.183, "type": "down", "x": 91, "y": 204, "inFrame": true, "button": "left" }] }</span></li>
+        <li><span class="call"><b>zoom</b> { "input": "rec-….mp4", "dryRun": true }</span><span class="why">With an event log next to the recording, <code>follow</code> defaults to clicks. The plan is editable: pass it back as <code>keyframes</code>.</span><span class="ret">{ "follow": "clicks", "keyframes": [{ "t": 3.18, "x": 0, "y": 134, "width": 241, "height": 141 }, { "t": 5.18, "full": true }] }</span></li>
+        <li><span class="call"><b>zoom</b> { "input": "rec-….mp4", "highlightClicks": true }</span><span class="why">The camera arrives on the click as it happens (the ease starts 0.6 s earlier), holds 2 s, and zooms out. Rings are drawn before the zoom, so they move with it.</span><span class="ret">{ "outputPath": "zoom-….mp4", "follow": "clicks", "ringedClicks": 1 }</span></li>
+        <li><span class="call"><b>export_gif</b> { "input": "zoom-….mp4", "width": 480, "fps": 15 }</span><span class="ret">{ "sizeBytes": 317734, "withinBudget": true }</span></li>
+      </ol>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:30</span><span>THE OUTPUT</span></div>
+      <figure class="output">
+        <div class="frame"><img src="../media/zoom-before.gif" width="480" height="281" alt="The raw recording: the whole settings window, the cursor moves to Save and clicks, and a green Saved banner appears." loading="lazy"></div>
+        <figcaption><span class="tc">before</span> · the raw recording, 480 × 281</figcaption>
+      </figure>
+      <figure class="output">
+        <div class="frame"><img src="../media/zoom-after.gif" width="480" height="281" alt="The zoomed version: the camera glides in on the Save button as the cursor clicks it, a red ring expands from the click, then the view eases back out to the whole window with the Saved banner." loading="lazy"></div>
+        <figcaption><span class="tc">after</span> · zoom with highlightClicks, the real output of the calls above</figcaption>
+      </figure>
+      <p>No event log? <code>zoom</code> falls back to <code>follow: "changes"</code> and zooms toward where the screen changed. Keep the event log next to the original recording: its times and pixels match that file, not a trimmed or rescaled copy.</p>
+      <nav class="pager" aria-label="More recipes">
+        <span><a href="review-recording.html">&larr; REC 05 Review a long recording cheaply</a></span>
+        <span><a href="../connect.html">Connect your client &rarr;</a></span>
+      </nav>
+    </section>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>CC-BY-NC-ND-4.0</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>

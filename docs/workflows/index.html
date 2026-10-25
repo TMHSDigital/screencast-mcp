@@ -36,7 +36,7 @@
     <section class="page-head">
       <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / WORKFLOWS</p>
       <h1>Workflows</h1>
-      <p class="lede">Five things people actually do with a screen recorder in an agent loop. Each recipe starts from a prompt you would type, shows the tool calls the agent makes, and ends with the real output. Every recipe was run end to end against the current release.</p>
+      <p class="lede">Six things people actually do with a screen recorder in an agent loop. Each recipe starts from a prompt you would type, shows the tool calls the agent makes, and ends with the real output. Every recipe was run end to end against the current release.</p>
     </section>
 
     <section class="chapter">
@@ -47,6 +47,7 @@
         <li><a href="verify-ui.html"><span class="tc">REC 03</span><span class="name">Agent UI verification loop</span><span class="chain">screenshot &rarr; wait_for_change &rarr; screen_diff &rarr; find_text</span></a></li>
         <li><a href="social-clip.html"><span class="tc">REC 04</span><span class="name">Social clip</span><span class="chain">reframe &rarr; title_card &rarr; assemble_highlights &rarr; music_bed &rarr; normalize_audio &rarr; export_preset</span></a></li>
         <li><a href="review-recording.html"><span class="tc">REC 05</span><span class="name">Review a long recording cheaply</span><span class="chain">get_media_info &rarr; contact_sheet &rarr; sample_frames (scenes) &rarr; cut_idle</span></a></li>
+        <li><a href="zoom-clicks.html"><span class="tc">REC 06</span><span class="name">Zoom toward every click</span><span class="chain">start_recording (events) &rarr; stop_recording &rarr; read_events &rarr; zoom (follow clicks, highlightClicks) &rarr; export_gif</span></a></li>
       </ul>
       <p>Not set up yet? <a href="../connect.html">Connect your client</a> first. The server also ships these as MCP prompts (<code>bug-repro-clip</code>, <code>demo-gif</code>, <code>verify-ui-change</code>, <code>review-recording</code>), which Claude Code and VS Code show as slash commands.</p>
     </section>

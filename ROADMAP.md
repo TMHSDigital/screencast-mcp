@@ -2,7 +2,7 @@
 
 # Roadmap
 
-**Current:** v0.28.2 shipped (Phase 3 complete; a second hardening round is
+**Current:** v0.29.0 shipped (Phase 3 complete; a second hardening round is
 underway, see below and CHANGELOG). Cross-platform capture is the next feature
 phase.
 
@@ -108,7 +108,8 @@ Screencast-native polish that turns a raw capture into something watchable.
       opt-in, no bundled model), feeding `burn_subtitles` (#120) -- v0.25.0
 - [x] `zoom` -- animated zoom-and-pan from keyframes or planned from screen changes (#119) -- v0.27.0
 - [x] Input event log -- `start_recording` `events: true` + `read_events`: clicks, scroll, cursor, and masked keys / Ctrl-Alt-Win shortcuts on the video clock (#118) -- v0.28.0
-- [ ] Cursor highlight / spotlight (needs cursor positions; see #118)
+- [x] Zoom toward clicks + click rings -- `zoom` `follow: "clicks"` (default when the event log has clicks) and `highlightClicks` (#119) -- v0.29.0
+- [ ] Cursor spotlight (dim everything but the cursor; positions are in the event log, #118)
 - [x] `callout` -- timed text/arrow/box annotations over the video (#121) -- v0.21.0
 - [ ] `keystroke_overlay` -- render captured keystrokes/clicks as on-screen badges
       (requires a capture-time input hook; scope TBD)

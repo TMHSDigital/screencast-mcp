@@ -45,7 +45,7 @@ import { animLadder, buildAnimArgs } from "../../utils/anim.js";
 import { buildArrowImageArgs, buildCalloutArgs } from "../../utils/callout.js";
 import { buildBurnSubtitlesArgs, buildTranscribeArgs, parseSrt, normalizeCues } from "../../utils/captions.js";
 import { buildIdleScanArgs, parseFreezes, parseSilences, intersect, cutsFor, buildCutIdleArgs } from "../../utils/idle.js";
-import { keyframesToViews, buildZoomArgs } from "../../utils/zoom.js";
+import { keyframesToViews, buildZoomArgs, planClickZoom } from "../../utils/zoom.js";
 import { loudnessTarget, buildLoudnessMeasureArgs, buildLoudnessApplyArgs, parseLoudnorm, buildDenoiseArgs, buildNoiseFloorArgs, parseNoiseFloor } from "../../utils/audio.js";
 import { analysisSize, diffFrames, buildRawFrameArgs, buildSsimArgs, parseSsim } from "../../utils/diff.js";
 import { evenTimes, formatTimecode, sheetGrid, buildTileArgs, buildSheetArgs, buildPosterArgs } from "../../utils/sheet.js";
@@ -254,6 +254,28 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     expect(regionLuma(out, 1.5, 20, 20, 280, 200)).toBeGreaterThan(235); // the white box fills the frame
     const info = await probeMedia(out);
     expect([info.width, info.height]).toEqual([320, 240]);
+  });
+
+  it("zoom follows clicks and rings each one, only while it is fresh (#119)", async () => {
+    const src = p("click-src.mp4");
+    await runFfmpeg(["-y", "-f", "lavfi", "-i", "color=c=gray:s=320x240:d=3:r=30", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", src]);
+    // Rings only (the view never leaves the full frame), so pixels map 1:1.
+    const ringed = p("ringed.mp4");
+    const full = keyframesToViews([{ t: 0, full: true }], 320, 240);
+    await runFfmpeg(buildZoomArgs(src, ringed, full, { width: 320, height: 240, fps: 30 }, 0.5, "draft", {
+      clicks: [{ t: 1, x: 100, y: 100 }],
+      color: "white",
+    }));
+    expect(regionMaxLuma(ringed, 0.5, 80, 80, 40, 40)).toBeLessThan(140); // before the click: plain gray
+    expect(regionMaxLuma(ringed, 1.2, 80, 80, 40, 40)).toBeGreaterThan(180); // the ring
+    expect(regionMaxLuma(ringed, 2.2, 80, 80, 40, 40)).toBeLessThan(140); // gone after RING_SEC
+    // Click-planned zoom keeps the size and duration.
+    const zoomed = p("click-zoomed.mp4");
+    const kfs = planClickZoom([{ t: 0.8, x: 240, y: 180 }], 320, 240, { holdSec: 1, transition: 0.5 });
+    await runFfmpeg(buildZoomArgs(src, zoomed, keyframesToViews(kfs, 320, 240), { width: 320, height: 240, fps: 30 }, 0.5, "draft"));
+    const info = await probeMedia(zoomed);
+    expect([info.width, info.height]).toEqual([320, 240]);
+    expect(info.durationSec).toBeCloseTo(3, 0);
   });
 
   it("cut_idle removes a frozen, silent stretch and keeps audio in sync (#122)", async () => {
