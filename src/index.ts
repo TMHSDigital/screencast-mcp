@@ -50,6 +50,7 @@ import { register as registerAssembleHighlights } from "./tools/assembleHighligh
 import { register as registerTitleCard } from "./tools/titleCard.js";
 import { register as registerMusicBed } from "./tools/musicBed.js";
 import { register as registerReframe } from "./tools/reframe.js";
+import { register as registerZoom } from "./tools/zoom.js";
 import { register as registerExportPreset } from "./tools/exportPreset.js";
 import { registerResources } from "./resources.js";
 import { registerPrompts } from "./prompts.js";
@@ -101,6 +102,7 @@ registerAssembleHighlights(server);
 registerTitleCard(server);
 registerMusicBed(server);
 registerReframe(server);
+registerZoom(server);
 registerExportPreset(server);
 registerResources(server);
 registerPrompts(server);

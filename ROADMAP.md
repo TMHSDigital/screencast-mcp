@@ -2,7 +2,7 @@
 
 # Roadmap
 
-**Current:** v0.26.1 shipped (Phase 3 complete; a second hardening round is
+**Current:** v0.27.0 shipped (Phase 3 complete; a second hardening round is
 underway, see below and CHANGELOG). Cross-platform capture is the next feature
 phase.
 
@@ -106,8 +106,8 @@ Screencast-native polish that turns a raw capture into something watchable.
 - [x] `burn_subtitles` -- burn an SRT/ASS track into the video (styleable) (#120) -- v0.25.0
 - [x] `transcribe` -- optional speech-to-text to an SRT sidecar (FFmpeg 8 whisper,
       opt-in, no bundled model), feeding `burn_subtitles` (#120) -- v0.25.0
-- [ ] `zoom_to` / cursor emphasis -- animated zoom-and-pan to a region, and a
-      cursor highlight/spotlight, the highest-value screencast affordance
+- [x] `zoom` -- animated zoom-and-pan from keyframes or planned from screen changes (#119) -- v0.27.0
+- [ ] Cursor highlight / spotlight (needs cursor positions; see #118)
 - [x] `callout` -- timed text/arrow/box annotations over the video (#121) -- v0.21.0
 - [ ] `keystroke_overlay` -- render captured keystrokes/clicks as on-screen badges
       (requires a capture-time input hook; scope TBD)

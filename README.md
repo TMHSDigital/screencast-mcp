@@ -43,7 +43,7 @@ The design choices are deliberate rather than incidental:
 
 ## Tools
 
-Thirty-six tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
+Thirty-seven tools across four concerns. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface and is kept in sync with `src/tools/`.
 
 ### Capture
 
@@ -116,6 +116,7 @@ The production layer turns raw clips into a finished piece. Tools that combine c
 | `title_card` | Generate a standalone title card (centered text on a solid background, with a silent track so it composes). Text uses a bundled font, so no system font is needed. |
 | `music_bed` | Lay a music track under a video: looped/trimmed to length, faded in and out, leveled, and mixed with any existing audio (optionally ducked). |
 | `reframe` | Re-aspect to `16:9`, `9:16`, `1:1`, or `4:5` with `pad` (letterbox, no content lost) or `crop` (fill, trims overflow). |
+| `zoom` | **Smooth zoom-and-pan** (Screen Studio style) into where the action is and back out. Give keyframes (rectangles by time), or let it plan them from where the screen changes; `dryRun` returns the plan to adjust. |
 | `export_preset` | Encode a platform-ready file (`youtube`, `instagram_reel`, `tiktok`, `x`, `square`): reframes, caps fps, and encodes H.264 at the platform bitrate with faststart. |
 
 ### Targets

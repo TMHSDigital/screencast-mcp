@@ -7,6 +7,23 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.27.0]
+
+### Added
+
+- **`zoom` tool** (#119). It adds smooth Screen Studio-style zoom-and-pan.
+  Keyframes are source rectangles reached by a time (or `full: true` to
+  zoom out). Between keyframes the view holds, then eases into the next over
+  `transitionSec` (smoothstep). Without keyframes, it plans them from where
+  the screen changed, using the same cell-grid differ as `screen_diff`: it
+  zooms into localised changes (up to `maxZoom`, default 2.5×), stays for
+  `holdSec` after activity stops, and treats a whole-screen change as a cue
+  to zoom out rather than in. `dryRun` returns the plan to adjust and pass
+  back. Rendering uses `zoompan` on a 2× upscale (sources up to 1920 wide),
+  so positions don't judder. A `scale` + `crop` chain cannot animate this:
+  `crop` reads its input size once, so a per-frame `scale` leaves it
+  cropping the top-left corner.
+
 ## [0.26.1]
 
 ### Changed

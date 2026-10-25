@@ -45,6 +45,7 @@ import { animLadder, buildAnimArgs } from "../../utils/anim.js";
 import { buildArrowImageArgs, buildCalloutArgs } from "../../utils/callout.js";
 import { buildBurnSubtitlesArgs, buildTranscribeArgs, parseSrt, normalizeCues } from "../../utils/captions.js";
 import { buildIdleScanArgs, parseFreezes, parseSilences, intersect, cutsFor, buildCutIdleArgs } from "../../utils/idle.js";
+import { keyframesToViews, buildZoomArgs } from "../../utils/zoom.js";
 import { loudnessTarget, buildLoudnessMeasureArgs, buildLoudnessApplyArgs, parseLoudnorm, buildDenoiseArgs, buildNoiseFloorArgs, parseNoiseFloor } from "../../utils/audio.js";
 import { analysisSize, diffFrames, buildRawFrameArgs, buildSsimArgs, parseSsim } from "../../utils/diff.js";
 import { evenTimes, formatTimecode, sheetGrid, buildTileArgs, buildSheetArgs, buildPosterArgs } from "../../utils/sheet.js";
@@ -241,6 +242,18 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     await runFfmpeg(buildDenoiseArgs(noise, quiet, "strong", floor));
     // Steady noise near the floor is cut hard (measured ~20 dB at strong).
     expect(await meanVolume(quiet)).toBeLessThan((await meanVolume(noise)) - 10);
+  });
+
+  it("zoom fills the frame with a keyframe's rectangle once reached (#119)", async () => {
+    const src = p("zoom-src.mp4");
+    await runFfmpeg(["-y", "-f", "lavfi", "-i", "color=c=gray:s=320x240:d=3:r=30", "-vf", "drawbox=x=160:y=120:w=80:h=60:color=white:t=fill", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", src]);
+    const out = p("zoomed.mp4");
+    const views = keyframesToViews([{ t: 1, x: 160, y: 120, width: 80, height: 60 }, { t: 2.5, full: true }], 320, 240);
+    await runFfmpeg(buildZoomArgs(src, out, views, { width: 320, height: 240, fps: 30 }, 0.5, "draft"));
+    expect(regionLuma(out, 0.2, 0, 0, 320, 240)).toBeLessThan(150); // not zoomed yet: mostly gray
+    expect(regionLuma(out, 1.5, 20, 20, 280, 200)).toBeGreaterThan(235); // the white box fills the frame
+    const info = await probeMedia(out);
+    expect([info.width, info.height]).toEqual([320, 240]);
   });
 
   it("cut_idle removes a frozen, silent stretch and keeps audio in sync (#122)", async () => {
