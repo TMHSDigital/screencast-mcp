@@ -10,10 +10,18 @@
   <meta property="og:description" content="A Windows-first MCP server for screen recording, frame sampling, and minimal ffmpeg edits.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/">
-  <meta name="twitter:card" content="summary">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <meta property="og:site_name" content="Screencast MCP">
+  <meta property="og:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Screencast MCP: give your agent eyes on the screen. A recorded window zooms in on a clicked Save button.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Screencast MCP","applicationCategory":"DeveloperApplication","operatingSystem":"Windows","description":"An MCP server that lets an AI agent record the Windows screen, watch the footage as frames, and edit it with ffmpeg.","url":"https://tmhsdigital.github.io/screencast-mcp/","downloadUrl":"https://www.npmjs.com/package/@tmhs/screencast-mcp","codeRepository":"https://github.com/TMHSDigital/screencast-mcp","license":"https://creativecommons.org/licenses/by-nc-nd/4.0/","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Organization","name":"TMHSDigital","url":"https://github.com/TMHSDigital"}}</script>
+  <link rel="preload" href="fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script>document.documentElement.classList.add("js")</script>
   <link rel="stylesheet" href="site.css">
 </head>
 <body>
@@ -47,16 +55,22 @@
       ffmpeg &mdash; from a quick trim to a platform-ready export. It speaks MCP
       over stdio, so it plugs into any MCP client.</p>
       <div class="cta-row" id="install">
-        <span class="install-cmd"><span class="dollar">$</span><span id="cmd">npm install -g @tmhs/screencast-mcp</span><button id="copy" type="button" aria-label="Copy install command">copy</button></span>
-        <a class="gh-link" href="https://github.com/TMHSDigital/screencast-mcp">View source &nearr;</a>
+        <span class="install-cmd"><span class="dollar">$</span><span id="cmd">claude mcp add screencast -- cmd /c npx -y @tmhs/screencast-mcp</span><button id="copy" type="button" aria-label="Copy the Claude Code install command">copy</button></span>
       </div>
-      <p id="prerequisites" class="sub" style="font-size: 0.95rem; margin-top: 1.6rem;">
-      Needs <code>ffmpeg</code> and <code>ffprobe</code> on <code>PATH</code>
-      (or <code>FFMPEG_PATH</code> / <code>FFPROBE_PATH</code>). Capture uses
-      <code>gdigrab</code>, which is Windows-only; the watch and edit tools run
-      anywhere ffmpeg runs. Add it to an MCP client with the snippet below, or see
-      <a href="connect.html">setup for Claude Code, Claude Desktop, Cursor, and VS Code</a>.</p>
-      <pre><code>{
+      <p class="cta-links">
+        <a href="connect.html">Claude Desktop, Cursor, VS Code &rarr;</a>
+        <a href="workflows/">See the workflows &rarr;</a>
+        <a href="https://github.com/TMHSDigital/screencast-mcp">View source &nearr;</a>
+      </p>
+      <figure class="output hero-demo">
+        <div class="frame"><img src="media/zoom-after.gif" width="480" height="281" alt="A settings window recorded by screencast-mcp: the camera glides in on the Save button as the cursor clicks it, a red ring marks the click, then the view eases back out as a green Saved banner appears." fetchpriority="high"></div>
+        <figcaption><span class="tc">REC 06</span> &middot; made with the tool: <code>start_recording { events: true }</code>, one click, <code>zoom { highlightClicks: true }</code></figcaption>
+      </figure>
+      <p id="prerequisites" class="sub small">
+      Needs Windows 10 or 11 and <code>ffmpeg</code> / <code>ffprobe</code> on <code>PATH</code>
+      (<code>winget install Gyan.FFmpeg</code>, or set <code>FFMPEG_PATH</code> / <code>FFPROBE_PATH</code>).
+      Capture is Windows-only; the watch and edit tools run anywhere ffmpeg runs. Any other MCP client:</p>
+      <pre class="copyable"><code>{
   "mcpServers": {
     "screencast": {
       "command": "npx",
@@ -170,10 +184,6 @@
       <h2>Recipes you can paste.</h2>
       <p>Each one starts from a prompt you would actually type, shows the tool calls
       it produces, and ends with the real output.</p>
-      <figure class="output">
-        <div class="frame"><img src="media/zoom-after.gif" width="480" height="281" alt="A settings window recorded by screencast-mcp: the camera glides in on the Save button as the cursor clicks it, a red ring marks the click, then the view eases back out as a green Saved banner appears." loading="lazy"></div>
-        <figcaption><span class="tc">REC 06</span> · recorded with <code>events: true</code>, then <code>zoom { highlightClicks: true }</code></figcaption>
-      </figure>
       <ul class="recipes">
         <li><a href="workflows/bug-repro.html"><span class="tc">REC 01</span><span class="name">Bug-repro clip for a PR</span></a></li>
         <li><a href="workflows/demo-gif.html"><span class="tc">REC 02</span><span class="name">README demo GIF</span></a></li>

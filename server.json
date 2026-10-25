@@ -2,18 +2,18 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.TMHSDigital/screencast-mcp",
   "title": "Screencast MCP",
-  "description": "MCP server for Windows screen recording, frame sampling, and minimal ffmpeg edits",
+  "description": "Let AI agents record the Windows screen, watch it as frames, and edit it with ffmpeg",
   "repository": {
     "url": "https://github.com/TMHSDigital/screencast-mcp",
     "source": "github"
   },
   "websiteUrl": "https://tmhsdigital.github.io/screencast-mcp/",
-  "version": "0.33.0",
+  "version": "0.33.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@tmhs/screencast-mcp",
-      "version": "0.33.0",
+      "version": "0.33.1",
       "transport": {
         "type": "stdio"
       },

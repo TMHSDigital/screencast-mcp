@@ -7,6 +7,35 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.33.1]
+
+### Changed
+
+- README, ready for first-time visitors:
+  - a Quick start right under the demo (requirements, one line per client, a
+    first prompt to try);
+  - a highlights list, and a configuration table of the environment variables;
+  - the `window:exe=` / `window:hwnd=` targets, links to all seven workflows,
+    an updated project structure, and a plain-language license note;
+  - npm and MCP Registry badges.
+- Docs site:
+  - the home page hero leads with the Claude Code command, links to the other
+    clients and the workflows, and shows the click-zoom demo;
+  - fonts are self-hosted (SIL OFL) and preloaded, removing the layout shift on
+    load and the request to Google Fonts;
+  - a 1200x630 social card (`og:image`, `summary_large_image`) on every page,
+    structured data on the home page, a sitemap, and a 404 page;
+  - client tabs no longer flash every panel before the script runs.
+- npm: `package.json` description, homepage (the docs site), and keywords; the
+  MCP Registry description matches.
+- `scripts/build-docs-pages.mjs` (the recipe and Connect page generator) is now
+  in the repo.
+
+### Added
+
+- Tests that the README states the real tool count and documents every tool,
+  and that the sitemap lists every page.
+
 ## [0.33.0]
 
 ### Added

@@ -1,3 +1,10 @@
+/* Fonts are self-hosted (SIL OFL 1.1, see fonts/OFL.txt): same-origin and
+   preloaded, so they arrive before first paint and swap without shifting. */
+@font-face { font-family: "Bricolage Grotesque"; font-style: normal; font-weight: 700 800; font-stretch: 100%; font-display: swap; src: url("fonts/bricolage-grotesque-latin.woff2") format("woff2"); }
+@font-face { font-family: "Figtree"; font-style: normal; font-weight: 400 600; font-display: swap; src: url("fonts/figtree-latin.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/ibm-plex-mono-400-latin.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/ibm-plex-mono-500-latin.woff2") format("woff2"); }
+
 :root {
   color-scheme: dark;
   --desktop: #0A0D12;
@@ -126,6 +133,11 @@ h1 .amber { color: var(--amber); }
 }
 .install-cmd button:hover { border-color: var(--amber); }
 .gh-link { font-family: var(--mono); font-size: 0.9rem; }
+.install-cmd { max-width: 100%; }
+.install-cmd #cmd { white-space: nowrap; overflow-x: auto; min-width: 0; scrollbar-width: thin; }
+.cta-links { display: flex; flex-wrap: wrap; gap: 0.6rem 1.4rem; margin: 1rem 0 0; font-family: var(--mono); font-size: 0.9rem; }
+.hero-demo { margin: 2.4rem 0 1rem; }
+.sub.small { font-size: 0.95rem; margin-top: 1.6rem; }
 
 /* ---- Chapters ---- */
 .chapter { padding: 3.6rem 0 0.4rem; }
@@ -276,6 +288,9 @@ figure.output figcaption .tc { color: var(--amber); }
 .tabs button[aria-selected="true"] { color: var(--desktop); background: var(--amber); border-color: var(--amber); }
 .panel h3 { font-family: var(--display); font-size: 1.3rem; margin: 2rem 0 0.4rem; }
 .js .panel h3 { display: none; }
+/* Before site.js runs, show only the first panel so nothing jumps; site.js marks the chosen one .active. */
+.js .tabs ~ .panel ~ .panel:not(.active) { display: none; }
+.js .panel[hidden] { display: none; }
 .panel > p { color: var(--dim); max-width: 46rem; }
 .panel > p code, .panel > p strong { color: var(--ink); }
 .panel ol { color: var(--dim); padding-left: 1.2rem; }

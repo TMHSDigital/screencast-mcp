@@ -1,7 +1,7 @@
 {
   "name": "@tmhs/screencast-mcp",
-  "version": "0.33.0",
-  "description": "MCP server for Windows screen recording, frame sampling, and minimal ffmpeg edits",
+  "version": "0.33.1",
+  "description": "Let AI agents record the Windows screen, watch it as frames, and edit it with ffmpeg",
   "mcpName": "io.github.TMHSDigital/screencast-mcp",
   "type": "module",
   "main": "dist/index.js",
@@ -33,17 +33,25 @@
     "type": "git",
     "url": "git+https://github.com/TMHSDigital/screencast-mcp.git"
   },
-  "homepage": "https://github.com/TMHSDigital/screencast-mcp#readme",
+  "homepage": "https://tmhsdigital.github.io/screencast-mcp/",
   "bugs": {
     "url": "https://github.com/TMHSDigital/screencast-mcp/issues"
   },
   "keywords": [
     "mcp",
+    "mcp-server",
     "model-context-protocol",
+    "ai-agents",
+    "claude",
     "screen-recording",
+    "screen-capture",
+    "screencast",
     "screenshot",
     "ffmpeg",
-    "gdigrab",
+    "gif",
+    "video-editing",
+    "ocr",
+    "redaction",
     "windows",
     "developer-tools"
   ],

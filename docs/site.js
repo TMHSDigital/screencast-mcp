@@ -53,7 +53,9 @@
         var on = t === tab;
         t.setAttribute("aria-selected", on ? "true" : "false");
         t.tabIndex = on ? 0 : -1;
-        document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+        var panel = document.getElementById(t.getAttribute("aria-controls"));
+        panel.hidden = !on;
+        panel.classList.toggle("active", on);
       });
       if (focus) tab.focus();
     };
