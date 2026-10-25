@@ -76,6 +76,22 @@ export function viewExpr(views: View[], key: "z" | "cx" | "cy", transition: numb
   return expr;
 }
 
+/** The zoom as one filter chain on a W x H stream. The source is upscaled
+ * (2x up to 1920 wide, else 1x) so zoompan's whole-pixel steps do not judder.
+ * Shared by zoom and pipeline. Pure. */
+export function zoomFilter(views: View[], size: { width: number; height: number; fps: number }, transition = DEFAULT_TRANSITION_SEC): string {
+  const { width: W, height: H, fps } = size;
+  const up = W <= 1920 ? 2 : 1;
+  const z = viewExpr(views, "z", transition);
+  const cx = viewExpr(views, "cx", transition);
+  const cy = viewExpr(views, "cy", transition);
+  return (
+    `scale=${W * up}:${H * up},` +
+    `zoompan=z='${z}':x='clip((${cx})*${up}-iw/zoom/2,0,iw-iw/zoom)':y='clip((${cy})*${up}-ih/zoom/2,0,ih-ih/zoom)'` +
+    `:d=1:s=${W}x${H}:fps=${n(fps)}`
+  );
+}
+
 /** Render the zoom. `up` is the pre-zoompan upscale factor (2 for sources up
  * to 1920 wide, else 1, to keep frames a sane size). Pure. */
 export function buildZoomArgs(
@@ -88,14 +104,7 @@ export function buildZoomArgs(
   rings?: { clicks: ClickPoint[]; color: string },
 ): string[] {
   const { width: W, height: H, fps } = size;
-  const up = W <= 1920 ? 2 : 1;
-  const z = viewExpr(views, "z", transition);
-  const cx = viewExpr(views, "cx", transition);
-  const cy = viewExpr(views, "cy", transition);
-  const vf =
-    `scale=${W * up}:${H * up},` +
-    `zoompan=z='${z}':x='clip((${cx})*${up}-iw/zoom/2,0,iw-iw/zoom)':y='clip((${cy})*${up}-ih/zoom/2,0,ih-ih/zoom)'` +
-    `:d=1:s=${W}x${H}:fps=${n(fps)}`;
+  const vf = zoomFilter(views, size, transition);
   if (!rings || rings.clicks.length === 0) {
     return ["-y", "-i", input, "-vf", vf, ...resolveQuality(quality), "-c:a", "copy", output];
   }

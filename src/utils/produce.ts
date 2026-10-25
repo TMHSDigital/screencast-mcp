@@ -433,27 +433,37 @@ export const PLATFORM_PRESETS: Record<Platform, PresetSpec> = {
   square: { aspect: "1:1", fps: 30, videoBitrate: "6M", bufsize: "12M", audioBitrate: "160k" },
 };
 
-/** Encode a platform-ready file: reframe to the platform aspect, cap fps, and
- * encode H.264 at the platform's bitrate with faststart. */
+/** The filter chain and encoder settings for a platform-ready file: reframe to
+ * the platform aspect, cap fps, and encode H.264 at the platform's bitrate with
+ * faststart. Shared by export_preset and pipeline. */
+export function exportPresetParts(
+  platform: Platform,
+  fit: ReframeFit = "pad",
+): { vf: string; encode: string[]; width: number; height: number } {
+  const p = PLATFORM_PRESETS[platform];
+  if (!p) throw new ScreencastError(`Unknown platform "${platform}".`);
+  const dim = ASPECT_DIMS[p.aspect];
+  return {
+    vf: `${reframeFilter(dim.w, dim.h, fit)},fps=${p.fps},format=yuv420p`,
+    encode: [
+      "-c:v", "libx264", "-preset", "medium",
+      "-b:v", p.videoBitrate, "-maxrate", p.videoBitrate, "-bufsize", p.bufsize,
+      "-pix_fmt", "yuv420p",
+      "-c:a", "aac", "-b:a", p.audioBitrate,
+      "-r", String(p.fps),
+      "-movflags", "+faststart",
+    ],
+    width: dim.w,
+    height: dim.h,
+  };
+}
+
 export function buildExportPresetArgs(
   input: string,
   output: string,
   platform: Platform,
   fit: ReframeFit = "pad",
 ): string[] {
-  const p = PLATFORM_PRESETS[platform];
-  if (!p) throw new ScreencastError(`Unknown platform "${platform}".`);
-  const dim = ASPECT_DIMS[p.aspect];
-  const vf = `${reframeFilter(dim.w, dim.h, fit)},fps=${p.fps},format=yuv420p`;
-  return [
-    "-y", "-i", input,
-    "-vf", vf,
-    "-c:v", "libx264", "-preset", "medium",
-    "-b:v", p.videoBitrate, "-maxrate", p.videoBitrate, "-bufsize", p.bufsize,
-    "-pix_fmt", "yuv420p",
-    "-c:a", "aac", "-b:a", p.audioBitrate,
-    "-r", String(p.fps),
-    "-movflags", "+faststart",
-    output,
-  ];
+  const { vf, encode } = exportPresetParts(platform, fit);
+  return ["-y", "-i", input, "-vf", vf, ...encode, output];
 }

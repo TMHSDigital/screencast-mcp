@@ -327,13 +327,9 @@ export interface CropRect {
 
 /** Crop to a pixel rectangle. If frame dims are supplied, a rectangle that
  * runs off the frame is rejected rather than silently clamped by ffmpeg. */
-export function buildCropArgs(
-  input: string,
-  output: string,
-  rect: CropRect,
-  dims?: { width: number | null; height: number | null },
-  quality: Quality = DEFAULT_EDIT_QUALITY,
-): string[] {
+/** The crop filter for a rectangle, validated against the frame when known.
+ * Shared by crop and pipeline. */
+export function cropFilter(rect: CropRect, dims?: { width: number | null; height: number | null }): string {
   const x = requireNonNegativeInt(rect.x, "crop x");
   const y = requireNonNegativeInt(rect.y, "crop y");
   const w = validateEvenDimension(requirePositiveInt(rect.width, "crop width"), "crop width");
@@ -346,9 +342,19 @@ export function buildCropArgs(
       );
     }
   }
+  return `crop=${w}:${h}:${x}:${y}`;
+}
+
+export function buildCropArgs(
+  input: string,
+  output: string,
+  rect: CropRect,
+  dims?: { width: number | null; height: number | null },
+  quality: Quality = DEFAULT_EDIT_QUALITY,
+): string[] {
   return [
     "-y", "-i", input,
-    "-vf", `crop=${w}:${h}:${x}:${y}`,
+    "-vf", cropFilter(rect, dims),
     ...resolveQuality(quality),
     "-c:a", "copy",
     output,
@@ -357,12 +363,7 @@ export function buildCropArgs(
 
 /** Scale to a width and/or height. A missing side uses -2 (keep aspect, even
  * dimension as required by yuv420p). */
-export function buildScaleArgs(
-  input: string,
-  output: string,
-  opts: { width?: number; height?: number },
-  quality: Quality = DEFAULT_EDIT_QUALITY,
-): string[] {
+export function scaleFilter(opts: { width?: number; height?: number }): string {
   if (opts.width === undefined && opts.height === undefined) {
     throw new ScreencastError("scale requires width or height (or both).");
   }
@@ -372,11 +373,27 @@ export function buildScaleArgs(
   if (opts.height !== undefined) {
     validateEvenDimension(requirePositiveInt(opts.height, "scale height"), "scale height");
   }
-  const w = opts.width ?? -2;
-  const h = opts.height ?? -2;
+  return `scale=${opts.width ?? -2}:${opts.height ?? -2}`;
+}
+
+/** The frame size scaleFilter produces from a W x H source (-2 keeps aspect
+ * and rounds to an even size, as ffmpeg does). */
+export function scaledSize(W: number, H: number, opts: { width?: number; height?: number }): { width: number; height: number } {
+  const even = (v: number) => Math.max(2, Math.round(v / 2) * 2);
+  if (opts.width !== undefined && opts.height !== undefined) return { width: opts.width, height: opts.height };
+  if (opts.width !== undefined) return { width: opts.width, height: even((H * opts.width) / W) };
+  return { width: even((W * opts.height!) / H), height: opts.height! };
+}
+
+export function buildScaleArgs(
+  input: string,
+  output: string,
+  opts: { width?: number; height?: number },
+  quality: Quality = DEFAULT_EDIT_QUALITY,
+): string[] {
   return [
     "-y", "-i", input,
-    "-vf", `scale=${w}:${h}`,
+    "-vf", scaleFilter(opts),
     ...resolveQuality(quality),
     "-c:a", "copy",
     output,
@@ -639,15 +656,16 @@ export interface RedactOptions {
   color?: string;
 }
 
-/** Redact declared rectangles. `box` (default) draws an irreversible solid fill;
- * `blur` and `pixelate` composite a softened crop back over each region. */
-export function buildRedactArgs(
-  input: string,
-  output: string,
+/** Filter steps that redact regions of the stream labelled `input` (e.g.
+ * "[0:v]"); labels are prefixed with `tag` so several can share one graph.
+ * Returns the steps and the output label. Shared by redact_region and pipeline. */
+export function redactSteps(
   regions: RedactRegion[],
-  opts: RedactOptions = {},
-  dims?: { width: number | null; height: number | null },
-): string[] {
+  opts: RedactOptions,
+  dims: { width: number | null; height: number | null } | undefined,
+  input: string,
+  tag: string,
+): { steps: string[]; out: string } {
   if (regions.length === 0) {
     throw new ScreencastError("redact_region requires at least one region.");
   }
@@ -659,9 +677,6 @@ export function buildRedactArgs(
   const color = validateColor(opts.color ?? "black", "color");
   const rs = normalizeRegions(regions, pad, dims);
 
-  // A crisp re-encode keeps the redaction edges sharp.
-  const encode = resolveQuality("high");
-
   if (style === "box") {
     const boxes = rs
       .map((r) => {
@@ -669,35 +684,54 @@ export function buildRedactArgs(
         return `drawbox=x=${r.x}:y=${r.y}:w=${r.w}:h=${r.h}:color=${color}:t=fill${en}`;
       })
       .join(",");
-    return ["-y", "-i", input, "-vf", boxes, ...encode, "-c:a", "copy", output];
+    return { steps: [`${input}${boxes}[${tag}out]`], out: `[${tag}out]` };
   }
 
   // blur / pixelate: split the source, soften each cropped region, then overlay
   // the softened patches back over the base in order.
   const n = rs.length;
-  const parts: string[] = [];
-  const splitOuts = ["base", ...rs.map((_, i) => `s${i}`)];
-  parts.push(`[0:v]split=${n + 1}[${splitOuts.join("][")}]`);
+  const steps: string[] = [];
+  const splitOuts = [`${tag}base`, ...rs.map((_, i) => `${tag}s${i}`)];
+  steps.push(`${input}split=${n + 1}[${splitOuts.join("][")}]`);
   rs.forEach((r, i) => {
     const crop = `crop=${r.w}:${r.h}:${r.x}:${r.y}`;
     const soften =
       style === "blur"
         ? `boxblur=${blurRadius(r)}`
         : `scale='max(1,iw/16)':'max(1,ih/16)':flags=neighbor,scale=${r.w}:${r.h}:flags=neighbor`;
-    parts.push(`[s${i}]${crop},${soften}[b${i}]`);
+    steps.push(`[${tag}s${i}]${crop},${soften}[${tag}b${i}]`);
   });
-  let prev = "base";
+  let prev = `${tag}base`;
   rs.forEach((r, i) => {
     const en = r.enable ? `:enable='${r.enable}'` : "";
-    const out = i === n - 1 ? "out" : `c${i}`;
-    parts.push(`[${prev}][b${i}]overlay=${r.x}:${r.y}${en}[${out}]`);
-    prev = `c${i}`;
+    const out = i === n - 1 ? `${tag}out` : `${tag}c${i}`;
+    steps.push(`[${prev}][${tag}b${i}]overlay=${r.x}:${r.y}${en}[${out}]`);
+    prev = `${tag}c${i}`;
   });
+  return { steps, out: `[${tag}out]` };
+}
+
+/** Redact declared rectangles. `box` (default) draws an irreversible solid fill;
+ * `blur` and `pixelate` composite a softened crop back over each region. */
+export function buildRedactArgs(
+  input: string,
+  output: string,
+  regions: RedactRegion[],
+  opts: RedactOptions = {},
+  dims?: { width: number | null; height: number | null },
+): string[] {
+  const { steps, out } = redactSteps(regions, opts, dims, "[0:v]", "");
+  // A crisp re-encode keeps the redaction edges sharp.
+  if ((opts.style ?? "box") === "box") {
+    // One linear chain: a plain -vf, without the graph labels.
+    const vf = steps[0].slice("[0:v]".length, -out.length);
+    return ["-y", "-i", input, "-vf", vf, ...resolveQuality("high"), "-c:a", "copy", output];
+  }
   return [
     "-y", "-i", input,
-    "-filter_complex", parts.join(";"),
-    "-map", "[out]", "-map", "0:a?",
-    ...encode,
+    "-filter_complex", steps.join(";"),
+    "-map", out, "-map", "0:a?",
+    ...resolveQuality("high"),
     "-c:a", "copy",
     output,
   ];

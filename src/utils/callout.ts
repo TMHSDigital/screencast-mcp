@@ -99,20 +99,23 @@ export interface CalloutAssets {
   arrowFiles: Array<string | null>;
 }
 
-/** Draw every callout in order (later items on top). Pure. */
-export function buildCalloutArgs(
-  input: string,
-  output: string,
+/** Filter steps that draw every callout over the stream labelled `input`
+ * (later items on top). Arrow images become extra inputs numbered from
+ * `firstInput`; labels are prefixed with `tag`. Shared by callout and
+ * pipeline. Pure. */
+export function calloutSteps(
   items: Callout[],
   assets: CalloutAssets,
-  quality: Quality = "standard",
-): string[] {
+  input: string,
+  firstInput: number,
+  tag: string,
+): { steps: string[]; out: string; extraInputs: string[] } {
   if (items.length === 0) throw new ScreencastError("Give at least one callout.");
   const extraInputs: string[] = [];
   const steps: string[] = [];
-  let cur = "[0:v]";
+  let cur = input;
   items.forEach((c, i) => {
-    const out = `[c${i}]`;
+    const out = `[${tag}c${i}]`;
     if (c.type === "box") {
       const color = validateColor(c.color ?? "red");
       const t = c.fill ? "fill" : String(Math.max(1, Math.round(c.thickness ?? 4)));
@@ -134,16 +137,28 @@ export function buildCalloutArgs(
       const file = assets.arrowFiles[i];
       if (!file) throw new ScreencastError("Internal: missing image for an arrow callout.");
       const { cx, cy } = arrowGeometry(c);
-      const n = 1 + extraInputs.length / 4;
+      const n = firstInput + extraInputs.length / 4;
       extraInputs.push("-loop", "1", "-i", file);
       steps.push(`${cur}[${n}:v]overlay=x=${cx.toFixed(1)}-w/2:y=${cy.toFixed(1)}-h/2:shortest=1${enable(c)}${out}`);
     }
     cur = out;
   });
+  return { steps, out: cur, extraInputs };
+}
+
+/** Draw every callout in order (later items on top). Pure. */
+export function buildCalloutArgs(
+  input: string,
+  output: string,
+  items: Callout[],
+  assets: CalloutAssets,
+  quality: Quality = "standard",
+): string[] {
+  const { steps, out, extraInputs } = calloutSteps(items, assets, "[0:v]", 1, "");
   return [
     "-y", "-i", input, ...extraInputs,
     "-filter_complex", steps.join(";"),
-    "-map", cur, "-map", "0:a?",
+    "-map", out, "-map", "0:a?",
     ...resolveQuality(quality),
     "-c:a", "copy",
     output,

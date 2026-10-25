@@ -7,6 +7,33 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.30.0]
+
+### Added
+
+- `pipeline` (#125): run several edits as one ffmpeg process. `steps` take the
+  same options as their tools (`trim`, `crop`, `scale`, `speed`, `redact`,
+  `callout`, `reframe`, `zoom` with keyframes), optionally ending in
+  `export_preset` or `export_gif`. That means one re-encode instead of one per
+  edit, no intermediate files, and a JSON recipe that can be saved and re-run.
+  - Frame size, fps, and duration are tracked through the chain, so each step
+    is validated against the frame it actually receives; times in a step are
+    on the timeline as it is at that step.
+  - A leading `trim` becomes an input seek; a later one uses trim/atrim. Audio
+    follows trims and speed changes.
+  - An `export_gif` tail renders a high-quality mp4 stage, then runs the
+    size-budget ladder.
+  - `dryRun` returns what each step became and the fused ffmpeg command.
+- Workflows recipe REC 07, "The whole edit in one call": the REC 01 bug-repro
+  chain as one pipeline call.
+
+### Changed
+
+- The crop, scale, redact, callout, zoom, and export_preset builders now expose
+  their filter fragments, and `export_gif`'s size ladder is a shared utility,
+  so `pipeline` and the standalone tools share one implementation. The
+  standalone tools' output is unchanged.
+
 ## [0.29.0]
 
 ### Added

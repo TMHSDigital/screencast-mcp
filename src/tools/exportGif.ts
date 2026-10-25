@@ -1,21 +1,10 @@
 import { z } from "zod";
-import { basename, dirname, extname, join } from "node:path";
-import { existsSync, renameSync, rmSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
-import { runEditJob, probeDuration } from "../utils/jobs.js";
-import {
-  animLadder,
-  nextLadderIndex,
-  buildAnimArgs,
-  DEFAULT_ANIM_FPS,
-  DEFAULT_ANIM_WIDTH,
-  DEFAULT_MAX_BYTES,
-  MAX_ATTEMPTS,
-  type AnimFormat,
-  type AnimSettings,
-} from "../utils/anim.js";
+import { DEFAULT_ANIM_FPS, DEFAULT_ANIM_WIDTH, DEFAULT_MAX_BYTES, type AnimFormat } from "../utils/anim.js";
+import { exportAnimation } from "../utils/animExport.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
@@ -63,52 +52,14 @@ export function register(server: McpServer): void {
         const format: AnimFormat = args.format ?? "gif";
         const maxBytes = args.maxBytes ?? DEFAULT_MAX_BYTES;
         const output = resolveOutput(args.output, subdir("edits"), `anim-${stamp()}-${rand()}.${format}`, args.overwrite);
-        const full = await probeDuration(args.input);
-        const clipSec = args.duration ?? (full !== null ? full - (args.start ?? 0) : null);
-        const ladder = animLadder(format, args.fps ?? DEFAULT_ANIM_FPS, args.width ?? DEFAULT_ANIM_WIDTH);
-
-        // Each attempt is its own sibling file so a later, smaller attempt never
-        // has to overwrite an earlier one; the winner is renamed onto output.
-        const ext = extname(output);
-        const attemptPath = (i: number) => join(dirname(output), `${basename(output, ext)}.try${i}${ext}`);
-        const attempts: Array<{ path: string; size: number; settings: AnimSettings }> = [];
-        try {
-          let index: number | null = 0;
-          while (index !== null && attempts.length < MAX_ATTEMPTS) {
-            const path = attemptPath(attempts.length);
-            const clip = { start: args.start, duration: args.duration };
-            await runEditJob(buildAnimArgs(args.input, path, format, ladder[index], clip), {
-              output: path,
-              durationSec: clipSec,
-              extra,
-            });
-            const size = statSync(path).size;
-            attempts.push({ path, size, settings: ladder[index] });
-            if (size <= maxBytes) break;
-            index = nextLadderIndex(index, size, maxBytes, ladder.length);
-          }
-          const fits = attempts.find((a) => a.size <= maxBytes);
-          const chosen = fits ?? attempts.reduce((a, b) => (b.size < a.size ? b : a));
-          renameSync(chosen.path, output);
-          return okResponse({
-            outputPath: output,
-            format,
-            sizeBytes: chosen.size,
-            maxBytes,
-            withinBudget: chosen.size <= maxBytes,
-            settings: chosen.settings,
-            attempts: attempts.map((a) => ({ ...a.settings, sizeBytes: a.size })),
-            ...(fits
-              ? {}
-              : {
-                  note:
-                    `Could not get under ${maxBytes} bytes; kept the smallest attempt. ` +
-                    "Export a shorter clip (start/duration), or try format: 'webp'.",
-                }),
-          });
-        } finally {
-          for (const a of attempts) rmSync(a.path, { force: true });
-        }
+        return okResponse(
+          await exportAnimation(
+            args.input,
+            output,
+            { format, maxBytes, fps: args.fps, width: args.width, start: args.start, duration: args.duration },
+            extra,
+          ),
+        );
       } catch (error) {
         return errorResponse(error);
       }

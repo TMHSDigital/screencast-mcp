@@ -119,6 +119,7 @@ The production layer turns raw clips into a finished piece. Tools that combine c
 | `reframe` | Re-aspect to `16:9`, `9:16`, `1:1`, or `4:5` with `pad` (letterbox, no content lost) or `crop` (fill, trims overflow). |
 | `zoom` | **Smooth zoom-and-pan** (Screen Studio style) into where the action is and back out. Give keyframes (rectangles by time), or let it plan them from the clicks in the input event log (`start_recording` `events: true`; `highlightClicks` rings each click) or from where the screen changes; `dryRun` returns the plan to adjust. |
 | `export_preset` | Encode a platform-ready file (`youtube`, `instagram_reel`, `tiktok`, `x`, `square`): reframes, caps fps, and encodes H.264 at the platform bitrate with faststart. |
+| `pipeline` | **Several edits in one ffmpeg process**: `steps` of `trim`, `crop`, `scale`, `speed`, `redact`, `callout`, `reframe`, `zoom` (keyframes), ending optionally in `export_preset` or `export_gif`, each with its tool's options. One re-encode, no intermediate files, and a recipe you can save and re-run on the next recording; `dryRun` returns the planned command. |
 
 ### Targets
 

@@ -50,6 +50,8 @@ import { loudnessTarget, buildLoudnessMeasureArgs, buildLoudnessApplyArgs, parse
 import { analysisSize, diffFrames, buildRawFrameArgs, buildSsimArgs, parseSsim } from "../../utils/diff.js";
 import { evenTimes, formatTimecode, sheetGrid, buildTileArgs, buildSheetArgs, buildPosterArgs } from "../../utils/sheet.js";
 import { runEditJob, partialPath, type ToolExtra } from "../../utils/jobs.js";
+import { planPipeline, type PipelineStep } from "../../utils/pipeline.js";
+import { exportAnimation } from "../../utils/animExport.js";
 
 const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
 const FFPROBE = process.env.FFPROBE_PATH || "ffprobe";
@@ -276,6 +278,63 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     const info = await probeMedia(zoomed);
     expect([info.width, info.height]).toEqual([320, 240]);
     expect(info.durationSec).toBeCloseTo(3, 0);
+  });
+
+  it("pipeline runs trim -> crop -> scale -> export_preset as one process, matching the tools one by one (#125)", async () => {
+    // Sequential: four tool calls, four files. trim starts on a keyframe (every
+    // second in av), so its stream copy is frame-accurate too.
+    const [t1, t2, t3, seq] = [p("seq1.mp4"), p("seq2.mp4"), p("seq3.mp4"), p("seq4.mp4")];
+    await runFfmpeg(buildTrimArgs(av, t1, { start: 2, end: 6 }));
+    await runFfmpeg(buildCropArgs(t1, t2, { x: 40, y: 20, width: 240, height: 180 }));
+    await runFfmpeg(buildScaleArgs(t2, t3, { width: 160 }));
+    await runFfmpeg(buildExportPresetArgs(t3, seq, "square"));
+    // Fused: one ffmpeg invocation.
+    const fused = p("fused.mp4");
+    const steps: PipelineStep[] = [
+      { op: "trim", start: 2, end: 6 },
+      { op: "crop", x: 40, y: 20, width: 240, height: 180 },
+      { op: "scale", width: 160 },
+      { op: "export_preset", platform: "square" },
+    ];
+    const plan = planPipeline(av, fused, steps, { width: 320, height: 240, fps: 30, durationSec: 10, hasAudio: true });
+    expect(plan.args.filter((a) => a === "-i")).toHaveLength(1);
+    await runFfmpeg(plan.args);
+
+    const [a, b] = [await probeMedia(seq), await probeMedia(fused)];
+    expect([b.width, b.height]).toEqual([1080, 1080]);
+    expect([plan.width, plan.height]).toEqual([1080, 1080]);
+    expect(b.durationSec!).toBeCloseTo(a.durationSec!, 1);
+    expect(b.audioCodec).toBe("aac");
+    const ssim = await runCapture(FFMPEG, ["-v", "info", "-i", seq, "-i", fused, "-lavfi", "[0][1]ssim", "-f", "null", "-"]);
+    expect(parseSsim(ssim.stderr)).toBeGreaterThan(0.95);
+  });
+
+  it("pipeline fuses speed, redact, and callout, keeps audio in step, and can end in a GIF (#125)", async () => {
+    const out = p("pipe-mixed.mp4");
+    const steps: PipelineStep[] = [
+      { op: "speed", factor: 2 },
+      { op: "redact", regions: [{ x: 200, y: 100, width: 80, height: 60 }] },
+      { op: "callout", items: [{ type: "box", x: 10, y: 10, width: 60, height: 40, color: "red" }] },
+    ];
+    const assets = { 2: { fontFile: bundledFontPath("bold"), textFiles: [null], arrowFiles: [null] } };
+    const plan = planPipeline(av, out, steps, { width: 320, height: 240, fps: 30, durationSec: 10, hasAudio: true }, assets, "draft");
+    await runFfmpeg(plan.args);
+    const info = await probeMedia(out);
+    expect(info.durationSec!).toBeCloseTo(5, 0); // 10 s at 2x
+    expect(plan.durationSec).toBe(5);
+    expect(regionLuma(out, 1, 210, 110, 60, 40)).toBeLessThan(20); // the redaction box
+    expect(regionMaxLuma(out, 1, 12, 10, 56, 4)).toBeGreaterThan(40); // the callout's top edge
+
+    // export_gif tail: stage one writes an mp4, the ladder writes the GIF.
+    const stage = p("pipe-stage.mp4");
+    const gifPlan = planPipeline(av, stage, [{ op: "trim", start: 0, duration: 2 }, { op: "export_gif", width: 160, fps: 8 }], {
+      width: 320, height: 240, fps: 30, durationSec: 10, hasAudio: true,
+    });
+    expect(gifPlan.gif).toEqual({ width: 160, fps: 8 });
+    await runFfmpeg(gifPlan.args);
+    const gif = await exportAnimation(stage, p("pipe.gif"), gifPlan.gif!);
+    expect(gif.withinBudget).toBe(true);
+    expect((await probeMedia(p("pipe.gif"))).width).toBe(160);
   });
 
   it("cut_idle removes a frozen, silent stretch and keeps audio in sync (#122)", async () => {
