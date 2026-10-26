@@ -7,6 +7,26 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.37.0]
+
+### Added
+
+- `wait_for_change` and live-target `find_text` return `origin`, the desktop position of the returned screenshot, so its boxes can be converted to screen coordinates (#233).
+- `SCREENCAST_PS_TIMEOUT_MS` overrides the PowerShell helper timeouts (#183).
+
+### Changed
+
+- `wait_for_change` `regions` are now in the screenshot's pixels, matching `find_text` and `screen_diff`. They used to be desktop coordinates, so a box drawn on the returned screenshot missed whenever the target wasn't at (0,0). Add `origin` to get the old values (#233).
+- `screen_diff` and `wait_for_change` analyse frames at about a quarter of the source width (320 to 1600 px) instead of a fixed 320 px. A small change such as a 100x16 label is now detected on 4K monitors and multi-monitor `full` targets too (#234).
+
+### Fixed
+
+- `window:` targets no longer match cloaked windows (a suspended Settings app, a window on another virtual desktop) for screen capture. A visible match always wins; a cloaked-only match fails with a clear error, and `backend: "wgc"` can still capture it, with a warning (#227).
+- `screenshot` and `find_text` with `backend: "wgc"` repaint the window while they wait, so an idle or covered window returns a frame in about a second instead of failing after 20 s (#228).
+- The PowerShell helpers that list monitors and windows and run OCR now time out (20 s, or 60 s for OCR) with a clear error instead of hanging the tool, and each OCR WinRT call has a finite wait (#183).
+- Settle mode in `wait_for_change` also compares each frame with the start of the quiet stretch, so slow progress such as a creeping progress bar no longer reads as settled (#234).
+- `screen_diff` maps boxes onto `b` per axis, so they land on the change when the two images have different aspect ratios (#211).
+
 ## [0.36.0]
 
 ### Added

@@ -173,3 +173,42 @@ describe("window:hwnd= and window:exe= (#107: not only by title)", () => {
     expect(() => selectWindow(q, "exe=slack")).toThrow(/slack\.exe/);
   });
 });
+
+describe("cloaked windows (#227)", () => {
+  const settings = { title: "Settings", left: 100, top: 100, right: 900, bottom: 700, minimized: false, hwnd: 11, exe: "SystemSettings.exe", cloaked: true };
+  const visible = { title: "Settings", left: 200, top: 200, right: 600, bottom: 500, minimized: false, hwnd: 22, exe: "Code.exe" };
+
+  it("never picks a cloaked window over a visible one, even when it is higher in Z-order", () => {
+    const r = selectWindow(q([settings, visible]), "Settings");
+    expect(r.hwnd).toBe(22);
+    expect(r.matchCount).toBe(1);
+    expect(r.cloaked).toBeUndefined();
+  });
+
+  it("prefers a visible substring match to a cloaked exact one", () => {
+    const r = selectWindow(q([settings, { ...visible, title: "Settings - Editor" }]), "Settings");
+    expect(r.matchedTitle).toBe("Settings - Editor");
+  });
+
+  it("refuses a cloaked-only match for screen capture and points at wgc", () => {
+    expect(() => selectWindow(q([settings]), "Settings")).toThrow(/is cloaked/);
+    expect(() => selectWindow(q([settings]), "hwnd=11")).toThrow(/is cloaked/);
+    expect(() => selectWindow(q([settings]), "exe=systemsettings")).toThrow(/is cloaked/);
+    try {
+      selectWindow(q([settings]), "Settings");
+    } catch (err) {
+      expect((err as { hint?: string }).hint).toMatch(/backend: "wgc"/);
+    }
+  });
+
+  it("allows a cloaked-only match for wgc, flagged in the report", () => {
+    const r = selectWindow(q([settings]), "Settings", { allowCloaked: true });
+    expect(r).toMatchObject({ hwnd: 11, cloaked: true });
+    expect(windowMatchReport(r).windowWarning).toMatch(/cloaked/);
+    expect(selectWindow(q([settings, visible]), "Settings", { allowCloaked: true }).hwnd).toBe(22);
+  });
+
+  it("keeps the usual error when nothing matches at all", () => {
+    expect(() => selectWindow(q([settings]), "Notepad")).toThrow(/No visible window matching title "Notepad"/);
+  });
+});

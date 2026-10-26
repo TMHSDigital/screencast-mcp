@@ -7,7 +7,7 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg, runFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
 import { captureStill } from "../utils/still.js";
-import { buildHighlightArgs } from "../utils/diff.js";
+import { buildHighlightArgs, targetSize } from "../utils/diff.js";
 import { recognize, mergePasses, findMatches, redactionRects, passScales } from "../utils/ocr.js";
 import { windowMatchReport } from "../utils/windows.js";
 import { subdir, stamp, rand, stillOutput } from "../utils/paths.js";
@@ -58,7 +58,8 @@ export function register(server: McpServer): void {
     "Read text on screen or in an image/video frame with the OCR engine built into Windows " +
       "(no install), with each line's and match's bounding box. Find where a label or button " +
       "is, check what the screen says, or locate secrets (e.g. regex 'sk-|ghp_|api.?key') and get " +
-      "redact_region rectangles for them. Best-effort detection: always review.",
+      "redact_region rectangles for them. Boxes are in the image's pixels; for a live target, add " +
+      "`origin` for desktop coordinates. Best-effort detection: always review.",
     inputSchema,
     async (args) => {
       try {
@@ -71,11 +72,17 @@ export function register(server: McpServer): void {
           // 1. Get the source as one PNG frame.
           let source: string;
           let windowReport: Record<string, unknown> = {};
+          let origin: { x: number; y: number } | undefined;
           if (args.target !== undefined) {
-            const resolved = await resolveCaptureTarget(args.target, { exactTitle: args.exactTitle });
+            const resolved = await resolveCaptureTarget(args.target, { exactTitle: args.exactTitle, backend: args.backend });
             source = join(subdir("screenshots"), `ocr-${stamp()}-${rand()}.png`);
-            await captureStill(resolved, source, args.backend ?? "gdigrab");
+            const backend = args.backend ?? "gdigrab";
+            await captureStill(resolved, source, backend);
             if (resolved.window) windowReport = windowMatchReport(resolved.window);
+            // Where the image sits on the desktop: boxes are image pixels (#233).
+            // A WGC still is the window's client area.
+            const area = targetSize(resolved.target, resolved.monitors);
+            origin = backend === "wgc" && resolved.window?.client ? resolved.window.client : { x: area.x, y: area.y };
           } else {
             if (!existsSync(args.input!)) throw new ScreencastError(`Input file not found: ${args.input}`);
             const isImage = IMAGE_EXTENSIONS.has(extname(args.input!).toLowerCase());
@@ -112,6 +119,7 @@ export function register(server: McpServer): void {
             {
               ...(args.target !== undefined ? { screenshotPath: source } : { input: args.input }),
               imageSize: { width, height },
+              ...(origin ? { origin } : {}),
               ...(args.query
                 ? {
                     query: args.query,

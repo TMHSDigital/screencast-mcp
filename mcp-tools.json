@@ -162,7 +162,7 @@
       "properties": {
         "a": { "type": "string", "description": "The before image (or video: its first frame)" },
         "b": { "type": "string", "description": "The after image (or video); scaled to a's size if it differs" },
-        "pixelThreshold": { "type": "number", "description": "How different (0-255 mean per 8 px cell) an area must be to count as changed (default 12)" },
+        "pixelThreshold": { "type": "number", "description": "How different (0-255 mean) a cell of about 32x32 image pixels must be to count as changed (default 12)" },
         "returnImage": { "type": "boolean", "description": "Also return b inline with changed regions outlined (default true)" }
       },
       "required": ["a", "b"]
@@ -170,7 +170,7 @@
   },
   {
     "name": "wait_for_change",
-    "description": "Watch part of the screen and return when it changes (mode change) or when it has stopped changing (mode settle), instead of guessing a sleep. Reports how long it took, where the screen changed, and the final state as an inline screenshot.",
+    "description": "Watch part of the screen and return when it changes (mode change) or when it has stopped changing (mode settle), instead of guessing a sleep. Reports how long it took, where the screen changed, and the final state as an inline screenshot. regions are in the screenshot's pixels (like find_text and screen_diff); add origin for desktop coordinates.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -180,7 +180,7 @@
         "timeoutSec": { "type": "number", "description": "Give up after this many seconds (default 30, max 600); a timeout is a normal result" },
         "settleSec": { "type": "number", "description": "Mode settle: how long the screen must stay still (default 1)" },
         "intervalMs": { "type": "integer", "description": "Pause between checks in ms (default 250)" },
-        "pixelThreshold": { "type": "number", "description": "How different an 8 px cell must be to count as changed (default 12)" },
+        "pixelThreshold": { "type": "number", "description": "How different (0-255 mean) a cell of about 32x32 screen pixels must be to count as changed (default 12)" },
         "returnImage": { "type": "boolean", "description": "Also return a screenshot of the final state inline (default true)" }
       },
       "required": ["target"]
@@ -188,7 +188,7 @@
   },
   {
     "name": "find_text",
-    "description": "Read text on screen or in an image/video frame with the OCR engine built into Windows (no install), with each line's and match's bounding box. Find where a label or button is, check what the screen says, or locate secrets and get redact_region rectangles for them. Best-effort detection: always review.",
+    "description": "Read text on screen or in an image/video frame with the OCR engine built into Windows (no install), with each line's and match's bounding box. Find where a label or button is, check what the screen says, or locate secrets and get redact_region rectangles for them. Boxes are in the image's pixels; for a live target, add origin for desktop coordinates. Best-effort detection: always review.",
     "inputSchema": {
       "type": "object",
       "properties": {

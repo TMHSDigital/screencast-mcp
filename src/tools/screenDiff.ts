@@ -4,7 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg, runCapture, runFfmpeg, runFfmpegBuffer, probeMedia } from "../utils/ffmpeg.js";
 import {
-  analysisSize,
+  detectionSize,
   diffFrames,
   buildRawFrameArgs,
   buildSsimArgs,
@@ -25,8 +25,8 @@ const inputSchema = {
     .max(255)
     .optional()
     .describe(
-      `How different (0-255 mean per 8 px cell, at ~320 px analysis width) an area must be to ` +
-        `count as changed (default ${DEFAULT_PIXEL_THRESHOLD}).`,
+      `How different (0-255 mean) a cell of about 32x32 image pixels must be to count as changed ` +
+        `(default ${DEFAULT_PIXEL_THRESHOLD}: catches a changed label or a toast).`,
     ),
   returnImage: z
     .boolean()
@@ -50,16 +50,17 @@ export function register(server: McpServer): void {
         }
         const [ia, ib] = await Promise.all([probeMedia(args.a), probeMedia(args.b)]);
         if (!ia.width || !ia.height) throw new ScreencastError(`Could not read the size of ${args.a}.`);
-        const size = analysisSize(ia.width, ia.height);
+        const size = detectionSize(ia.width, ia.height);
         const [ra, rb, ssimRun] = await Promise.all([
           runFfmpegBuffer(buildRawFrameArgs(args.a, size)),
           runFfmpegBuffer(buildRawFrameArgs(args.b, size)),
           runCapture(requireFfmpeg().ffmpeg, buildSsimArgs(args.a, args.b, size), 30_000),
         ]);
-        // Map boxes onto b's own pixels so they can be drawn on (and clicked in) b.
-        const scale = (ib.width ?? ia.width) / size.width;
+        // Map boxes onto b's own pixels so they can be drawn on (and clicked in)
+        // b, per axis: b was stretched to a's aspect ratio (#211).
         const diff = diffFrames(ra, rb, size.width, size.height, {
-          scale,
+          scaleX: (ib.width ?? ia.width) / size.width,
+          scaleY: (ib.height ?? ia.height) / size.height,
           pixelThreshold: args.pixelThreshold,
         });
 

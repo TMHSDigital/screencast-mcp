@@ -26,6 +26,8 @@ export interface ResolvedTarget {
 export interface ResolveOptions {
   /** For window: targets, refuse the substring fallback (#89). */
   exactTitle?: boolean;
+  /** The capture backend: "wgc" may pick a cloaked window, gdigrab may not (#227). */
+  backend?: "gdigrab" | "wgc";
 }
 
 /** Resolve a raw target spec into builder-ready (target, monitors). */
@@ -35,7 +37,10 @@ export async function resolveCaptureTarget(
 ): Promise<ResolvedTarget> {
   const parsed = parseTarget(spec);
   if (parsed.kind === "window") {
-    const w = await resolveWindowBounds(parsed.title, { exactOnly: opts.exactTitle });
+    const w = await resolveWindowBounds(parsed.title, {
+      exactOnly: opts.exactTitle,
+      allowCloaked: opts.backend === "wgc",
+    });
     return {
       target: { kind: "region", x: w.x, y: w.y, w: w.width, h: w.height },
       monitors: [],

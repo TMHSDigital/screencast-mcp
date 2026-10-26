@@ -5,10 +5,12 @@ import { requireFfmpeg, runFfmpeg, runFfmpegBuffer } from "../utils/ffmpeg.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
 import { buildScreenshotArgs } from "../utils/targets.js";
 import {
-  analysisSize,
+  detectionSize,
   targetSize,
   diffFrames,
   buildRawGrabArgs,
+  SettleTracker,
+  targetDiffOptions,
   DEFAULT_PIXEL_THRESHOLD,
   type Rect,
 } from "../utils/diff.js";
@@ -54,7 +56,10 @@ const inputSchema = {
     .min(0)
     .max(255)
     .optional()
-    .describe(`How different an 8 px cell must be to count as changed (default ${DEFAULT_PIXEL_THRESHOLD}).`),
+    .describe(
+      `How different (0-255 mean) a cell of about 32x32 screen pixels must be to count as changed ` +
+        `(default ${DEFAULT_PIXEL_THRESHOLD}: catches a changed label or a toast).`,
+    ),
   returnImage: z
     .boolean()
     .optional()
@@ -68,7 +73,8 @@ export function register(server: McpServer): void {
     "wait_for_change",
     "Watch part of the screen and return when it changes (mode 'change') or when it has " +
       "stopped changing (mode 'settle'), instead of guessing a sleep. Reports how long it " +
-      "took, where the screen changed, and the final state as an inline screenshot.",
+      "took, where the screen changed, and the final state as an inline screenshot. `regions` " +
+      "are in the screenshot's pixels (like find_text and screen_diff); add `origin` for desktop coordinates.",
     inputSchema,
     async (args, extra) => {
       try {
@@ -80,13 +86,13 @@ export function register(server: McpServer): void {
         // The target (and a window's rectangle) is resolved once, up front.
         const { target, monitors, window } = await resolveCaptureTarget(args.target, { exactTitle: args.exactTitle });
         const area = targetSize(target, monitors);
-        const size = analysisSize(area.width, area.height);
+        const size = detectionSize(area.width, area.height);
         const grab = () => runFfmpegBuffer(buildRawGrabArgs(target, monitors, size), 15_000);
-        const opts = { scale: area.width / size.width, origin: { x: area.x, y: area.y }, pixelThreshold: args.pixelThreshold };
+        const opts = targetDiffOptions(area, size, args.pixelThreshold);
 
         const started = Date.now();
         const baseline = await grab();
-        let previous = baseline;
+        const settle = new SettleTracker(baseline, size.width, size.height, opts);
         let lastChangeAt = started;
         let everChanged = false;
         let regions: Rect[] = [];
@@ -107,16 +113,15 @@ export function register(server: McpServer): void {
               break;
             }
           } else {
-            const d = diffFrames(previous, current, size.width, size.height, opts);
-            if (d.regions.length > 0) {
+            const changed = settle.push(current);
+            if (changed.length > 0) {
               everChanged = true;
               lastChangeAt = Date.now();
-              regions = d.regions;
+              regions = changed;
             } else if (Date.now() - lastChangeAt >= settleMs) {
               outcome = "settled";
               break;
             }
-            previous = current;
           }
         }
 
@@ -126,6 +131,7 @@ export function register(server: McpServer): void {
           elapsedSec: Number(((Date.now() - started) / 1000).toFixed(2)),
           ...(mode === "settle" ? { changedWhileWaiting: everChanged } : {}),
           regions,
+          origin: { x: area.x, y: area.y },
           ...(window ? windowMatchReport(window) : {}),
         };
         const images = [];

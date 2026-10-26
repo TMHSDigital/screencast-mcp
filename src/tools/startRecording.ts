@@ -140,6 +140,7 @@ export function register(server: McpServer): void {
         const { ffmpeg } = requireFfmpeg();
         const { target, monitors, window } = await resolveCaptureTarget(args.target, {
           exactTitle: args.exactTitle,
+          backend: args.backend,
         });
         const backend = args.backend ?? "gdigrab";
         if (backend === "wgc") {

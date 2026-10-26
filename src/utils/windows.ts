@@ -31,6 +31,10 @@ export interface RawWindow {
    * recording's frame starts (#113). */
   clientX?: number;
   clientY?: number;
+  /** DWM has cloaked the window (DWMWA_CLOAKED): it is "visible" to user32 but
+   * not on screen, e.g. a suspended Settings app or a window on another
+   * virtual desktop (#227). gdigrab would record whatever is at its rectangle. */
+  cloaked?: boolean;
 }
 
 export interface WindowQuery {
@@ -58,11 +62,16 @@ export interface WindowBounds {
   hwnd?: number;
   /** Screen position of the matched window's client area (#113). */
   client?: { x: number; y: number };
+  /** Set when the matched window is cloaked (only with allowCloaked, #227). */
+  cloaked?: true;
 }
 
 export interface SelectWindowOptions {
   /** Refuse the substring fallback: only a case-insensitive exact title matches. */
   exactOnly?: boolean;
+  /** Allow cloaked windows when no visible one matches: the WGC backend
+   * captures a window's own surface, so it can record them (#227). */
+  allowCloaked?: boolean;
 }
 
 /** How many candidate titles a match reports. */
@@ -94,7 +103,40 @@ export function selectWindow(
   wanted: string,
   opts: SelectWindowOptions = {},
 ): WindowBounds {
-  const all = Array.isArray(query.windows) ? query.windows : [];
+  const windows = Array.isArray(query.windows) ? query.windows : [];
+  const visible = windows.filter((w) => !w.cloaked);
+  // Cloaked windows are never chosen over a visible match (#227). Without
+  // allowCloaked they are not chosen at all, only named in the error.
+  try {
+    return matchWindow(query, visible, wanted, opts);
+  } catch (err) {
+    if (!(err instanceof NoWindowMatch) || visible.length === windows.length) throw err;
+    let hit: WindowBounds;
+    try {
+      hit = matchWindow(query, windows, wanted, opts);
+    } catch {
+      throw err;
+    }
+    if (!opts.allowCloaked) {
+      throw new ScreencastError(
+        `Window "${hit.matchedTitle}" is cloaked: Windows reports it as open but it is not on screen ` +
+          "(a suspended app, or a window on another virtual desktop), so a screen capture would record whatever is there instead.",
+        "Bring the window up on this desktop, or use backend: \"wgc\", which captures the window's own surface.",
+      );
+    }
+    return { ...hit, cloaked: true };
+  }
+}
+
+/** No window matched at all (as opposed to a match that can't be captured). */
+class NoWindowMatch extends ScreencastError {}
+
+function matchWindow(
+  query: WindowQuery,
+  all: RawWindow[],
+  wanted: string,
+  opts: SelectWindowOptions,
+): WindowBounds {
   const selector = parseWindowSelector(wanted);
   if (selector) {
     const hits =
@@ -102,7 +144,7 @@ export function selectWindow(
         ? all.filter((w) => w.hwnd === selector.hwnd)
         : all.filter((w) => (w.exe ?? "").toLowerCase().replace(/\.exe$/, "") === selector.exe);
     if (hits.length === 0) {
-      throw new ScreencastError(
+      throw new NoWindowMatch(
         selector.kind === "hwnd"
           ? `No visible top-level window with handle ${wanted.trim().slice(5)}. It may have closed; handles change when an app restarts.`
           : `No visible window belonging to ${selector.exe}.exe. Is the app running with a window open (and not minimized)?`,
@@ -116,7 +158,7 @@ export function selectWindow(
   const quote = (ws: RawWindow[]) => ws.slice(0, MAX_CANDIDATES).map((w) => `"${w.title}"`).join(", ");
 
   if (exact.length === 0 && opts.exactOnly) {
-    throw new ScreencastError(
+    throw new NoWindowMatch(
       `No visible window titled exactly "${wanted}" (exactTitle is on).` +
         (substring.length > 0 ? ` Windows containing it: ${quote(substring)}.` : ""),
     );
@@ -125,7 +167,7 @@ export function selectWindow(
   const matches = exact.length > 0 ? exact : substring;
 
   if (matches.length === 0) {
-    throw new ScreencastError(
+    throw new NoWindowMatch(
       `No visible window matching title "${wanted}". Open the window (it must ` +
         `be on screen and not minimized), or use an exact/substring of its title, ` +
         `or target it by window:exe=<app.exe> or window:hwnd=<handle>.`,
@@ -181,6 +223,7 @@ export function windowMatchReport(w: WindowBounds): Record<string, unknown> {
   const reasons: string[] = [];
   if (w.matchKind === "substring") reasons.push("the title matched only as a substring");
   if (w.matchCount > 1) reasons.push(`${w.matchCount} windows matched and the topmost was used`);
+  if (w.cloaked) reasons.push("the window is cloaked (not on screen: suspended, or on another virtual desktop)");
   return {
     matchedWindow: w.matchedTitle,
     matchCount: w.matchCount,
@@ -227,6 +270,8 @@ public class WinShim{
  public static string T(IntPtr h){int n=GetWindowTextLength(h);if(n==0)return "";var s=new StringBuilder(n+1);GetWindowText(h,s,s.Capacity);return s.ToString();}
  [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr h,int a,out RECT r,int n);
  public static int[] R(IntPtr h){RECT r;if(DwmGetWindowAttribute(h,9,out r,Marshal.SizeOf(typeof(RECT)))!=0){GetWindowRect(h,out r);}return new int[]{r.Left,r.Top,r.Right,r.Bottom};}
+ [DllImport("dwmapi.dll",EntryPoint="DwmGetWindowAttribute")] public static extern int DwmInt(IntPtr h,int a,out int v,int n);
+ public static bool Ck(IntPtr h){int v;return DwmInt(h,14,out v,4)==0&&v!=0;}
  public static bool Ic(IntPtr h){return IsIconic(h);}
  public static bool Vis(IntPtr h){return IsWindowVisible(h);}
  public static int SM(int i){return GetSystemMetrics(i);}
@@ -245,7 +290,7 @@ foreach($h in [WinShim]::Z()){
  $procId=[WinShim]::P($h)
  $c=[WinShim]::C($h)
  if(-not $exes.ContainsKey($procId)){$exes[$procId]=try{(Get-Process -Id $procId -ErrorAction Stop).ProcessName+'.exe'}catch{''}}
- [void]$ws.Add([pscustomobject]@{title=$t;left=$r[0];top=$r[1];right=$r[2];bottom=$r[3];minimized=[bool][WinShim]::Ic($h);hwnd=[int64]$h;exe=$exes[$procId];clientX=$c[0];clientY=$c[1]})
+ [void]$ws.Add([pscustomobject]@{title=$t;left=$r[0];top=$r[1];right=$r[2];bottom=$r[3];minimized=[bool][WinShim]::Ic($h);hwnd=[int64]$h;exe=$exes[$procId];clientX=$c[0];clientY=$c[1];cloaked=[WinShim]::Ck($h)})
 }
 $v=[pscustomobject]@{x=[WinShim]::SM(76);y=[WinShim]::SM(77);w=[WinShim]::SM(78);h=[WinShim]::SM(79)}
 [pscustomobject]@{virtual=$v;windows=@($ws)}|ConvertTo-Json -Compress -Depth 4

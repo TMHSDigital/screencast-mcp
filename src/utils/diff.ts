@@ -1,8 +1,8 @@
 /**
  * Frame differencing for screen_diff and wait_for_change (#116).
  *
- * Frames are compared as small grayscale bitmaps (about 320 px wide). The image
- * is split into a grid of cells; a cell counts as changed when its mean
+ * Frames are compared as small grayscale bitmaps (detectionSize: about a
+ * quarter of the source width, 320-1600 px). The image is split into a grid of cells; a cell counts as changed when its mean
  * absolute difference passes a threshold, and touching changed cells are
  * grouped into bounding boxes mapped back to the source's pixel coordinates.
  * Everything here is pure, so it is unit-tested on synthetic bitmaps.
@@ -12,8 +12,15 @@ import type { Monitor } from "./monitors.js";
 import { targetInputArgs, SCREENSHOT_GRAB_FPS, type Target } from "./targets.js";
 import { stillOutput } from "./paths.js";
 
-/** Width frames are analysed at. */
+/** Width frames are analysed at by analysisSize (auto-zoom's whole-video scan). */
 export const ANALYSIS_WIDTH = 320;
+/** screen_diff and wait_for_change analyse at one pixel per this many source
+ * pixels, so a cell covers the same ~32 source px on a 4K monitor or a
+ * three-monitor desktop as on a laptop, and a small label change still
+ * passes the threshold (#234). */
+export const SOURCE_PX_PER_ANALYSIS_PX = 4;
+/** Cap on detectionSize's width, for cost (a 5760 px desktop analyses at 1440). */
+export const MAX_DETECTION_WIDTH = 1600;
 /** Cell size in analysis pixels. */
 export const CELL = 8;
 /** A cell's mean |a - b| (0-255) above this counts as changed. Low enough to
@@ -32,6 +39,16 @@ export interface Rect {
 export function analysisSize(width: number, height: number): { width: number; height: number } {
   if (!(width > 0) || !(height > 0)) throw new ScreencastError("Image has no size.");
   const w = Math.min(ANALYSIS_WIDTH, width);
+  const h = Math.max(2, Math.round((height * w) / width / 2) * 2);
+  return { width: Math.max(2, Math.round(w / 2) * 2), height: h };
+}
+
+/** Analysis size for change detection (#234): SOURCE_PX_PER_ANALYSIS_PX
+ * source pixels per analysis pixel, between ANALYSIS_WIDTH and
+ * MAX_DETECTION_WIDTH wide (never wider than the source), aspect kept. */
+export function detectionSize(width: number, height: number): { width: number; height: number } {
+  if (!(width > 0) || !(height > 0)) throw new ScreencastError("Image has no size.");
+  const w = Math.min(width, Math.max(ANALYSIS_WIDTH, Math.min(MAX_DETECTION_WIDTH, Math.ceil(width / SOURCE_PX_PER_ANALYSIS_PX))));
   const h = Math.max(2, Math.round((height * w) / width / 2) * 2);
   return { width: Math.max(2, Math.round(w / 2) * 2), height: h };
 }
@@ -76,14 +93,26 @@ export interface DiffResult {
   regions: Rect[];
 }
 
-/** Compare two `width` x `height` grayscale bitmaps. `scale` maps analysis
- * pixels to source pixels; `origin` offsets the boxes (e.g. a region's x/y). */
+export interface DiffOptions {
+  /** Analysis-to-source pixel factor for both axes. */
+  scale?: number;
+  /** Per-axis factors (override scale), for a source not scaled uniformly (#211). */
+  scaleX?: number;
+  scaleY?: number;
+  /** Offset added to every box. */
+  origin?: { x: number; y: number };
+  pixelThreshold?: number;
+  maxRegions?: number;
+}
+
+/** Compare two `width` x `height` grayscale bitmaps. `scale` (or `scaleX` /
+ * `scaleY`) maps analysis pixels to source pixels; `origin` offsets the boxes. */
 export function diffFrames(
   a: Uint8Array,
   b: Uint8Array,
   width: number,
   height: number,
-  opts: { scale?: number; origin?: { x: number; y: number }; pixelThreshold?: number; maxRegions?: number } = {},
+  opts: DiffOptions = {},
 ): DiffResult {
   if (a.length !== width * height || b.length !== width * height) {
     throw new ScreencastError("Frame size does not match its dimensions.");
@@ -140,7 +169,8 @@ export function diffFrames(
     boxes.push(box);
   }
 
-  const scale = opts.scale ?? 1;
+  const sx = opts.scaleX ?? opts.scale ?? 1;
+  const sy = opts.scaleY ?? opts.scale ?? 1;
   const ox = opts.origin?.x ?? 0;
   const oy = opts.origin?.y ?? 0;
   const regions = boxes
@@ -152,15 +182,56 @@ export function diffFrames(
       const w = Math.min(width, (bx.x1 + 1) * CELL) - x;
       const h = Math.min(height, (bx.y1 + 1) * CELL) - y;
       return {
-        x: ox + Math.round(x * scale),
-        y: oy + Math.round(y * scale),
-        width: Math.round(w * scale),
-        height: Math.round(h * scale),
+        x: ox + Math.round(x * sx),
+        y: oy + Math.round(y * sy),
+        width: Math.round(w * sx),
+        height: Math.round(h * sy),
       };
     });
 
   const changedCount = changed.reduce((s, v) => s + v, 0);
   return { meanDiff: meanDifference(a, b), changedFraction: changedCount / changed.length, regions };
+}
+
+/** Diff options mapping analysis boxes onto a captured target's own pixels,
+ * i.e. onto the screenshot of it, not the desktop (#233): callers report the
+ * target's x/y as `origin` instead. */
+export function targetDiffOptions(
+  area: { width: number; height: number },
+  size: { width: number; height: number },
+  pixelThreshold?: number,
+): DiffOptions {
+  return { scaleX: area.width / size.width, scaleY: area.height / size.height, pixelThreshold };
+}
+
+/**
+ * Settle detection for wait_for_change (#234). Each frame is compared with the
+ * previous one and with the first frame of the current quiet stretch, so a
+ * change too slow to pass the threshold between two frames (a progress bar
+ * creeping along) still ends the quiet stretch once it adds up.
+ */
+export class SettleTracker {
+  private previous: Uint8Array;
+  private anchor: Uint8Array;
+
+  constructor(
+    first: Uint8Array,
+    private readonly width: number,
+    private readonly height: number,
+    private readonly opts: DiffOptions = {},
+  ) {
+    this.previous = first;
+    this.anchor = first;
+  }
+
+  /** Feed the next frame; returns the changed regions, empty when still quiet. */
+  push(frame: Uint8Array): Rect[] {
+    const step = diffFrames(this.previous, frame, this.width, this.height, this.opts).regions;
+    const drift = step.length > 0 ? step : diffFrames(this.anchor, frame, this.width, this.height, this.opts).regions;
+    this.previous = frame;
+    if (drift.length > 0) this.anchor = frame;
+    return drift;
+  }
 }
 
 /** Grab args that decode one frame of a still or video file to a raw gray

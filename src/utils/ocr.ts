@@ -12,7 +12,7 @@
  * The PowerShell/WinRT call is impure; parsing, merging, and matching are pure.
  */
 import { ScreencastError } from "./errors.js";
-import { runPowerShell } from "./monitors.js";
+import { runPowerShell, psTimeoutMs } from "./monitors.js";
 import type { Rect } from "./diff.js";
 
 /** Upscale factors for the two recognition passes. */
@@ -35,7 +35,9 @@ export async function recognize(paths: string[], scales: number[]): Promise<OcrL
     throw new ScreencastError("find_text uses the Windows OCR engine and runs on Windows only.");
   }
   const list = Buffer.from(JSON.stringify(paths), "utf8").toString("base64");
-  const stdout = await runPowerShell(PS_OCR.replace("__PATHS__", list), "text (OCR)");
+  const stdout = await runPowerShell(PS_OCR.replace("__PATHS__", list), "text (OCR)", {
+    timeoutMs: psTimeoutMs(OCR_TIMEOUT_MS),
+  });
   let raw: unknown;
   try {
     raw = JSON.parse(stdout);
@@ -211,6 +213,11 @@ export function passScales(width: number, height: number): number[] {
   return [...new Set(scales.length ? scales : [Math.min(1, cap)])];
 }
 
+/** Limit for one OCR run (all passes of all images) (#183). */
+export const OCR_TIMEOUT_MS = 60_000;
+/** Limit for one WinRT call inside it (open, decode, recognise). */
+export const OCR_STEP_TIMEOUT_MS = 20_000;
+
 // Windows PowerShell 5.1 + WinRT: decode each image, recognise it with the
 // user's profile languages, and print one JSON object per image.
 const PS_OCR = `
@@ -220,7 +227,7 @@ $null = [Windows.Storage.StorageFile, Windows.Storage, ContentType = WindowsRunt
 $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsRuntime]
 $null = [Windows.Graphics.Imaging.BitmapDecoder, Windows.Foundation, ContentType = WindowsRuntime]
 $asTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' })[0]
-function Await($op, [Type]$t) { $task = $asTask.MakeGenericMethod($t).Invoke($null, @($op)); $task.Wait(-1) | Out-Null; $task.Result }
+function Await($op, [Type]$t) { $task = $asTask.MakeGenericMethod($t).Invoke($null, @($op)); if (-not $task.Wait(${OCR_STEP_TIMEOUT_MS})) { throw "The OCR engine did not answer within ${OCR_STEP_TIMEOUT_MS / 1000} s." }; $task.Result }
 $paths = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PATHS__')) | ConvertFrom-Json
 $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
 $out = foreach ($p in $paths) {

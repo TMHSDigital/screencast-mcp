@@ -82,17 +82,47 @@ let cache: { at: number; monitors: Promise<Monitor[]> } | null = null;
  * titles stopped matching and OCR output stopped parsing as JSON. */
 export const PS_UTF8_PREAMBLE = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n";
 
+/** Default limit for one enumeration script (monitors, windows) (#183). */
+export const PS_TIMEOUT_MS = 20_000;
+/** Overrides every PowerShell helper's limit, in ms. */
+export const PS_TIMEOUT_ENV = "SCREENCAST_PS_TIMEOUT_MS";
+
+/** The env override when it is a positive integer, else `fallback`. */
+export function psTimeoutMs(fallback: number, env: NodeJS.ProcessEnv = process.env): number {
+  const override = Number(env[PS_TIMEOUT_ENV]);
+  return Number.isInteger(override) && override > 0 ? override : fallback;
+}
+
+export interface RunPowerShellOptions {
+  /** Kill the script after this long (default PS_TIMEOUT_MS, or the env override). */
+  timeoutMs?: number;
+  /** Tests: run this command and args instead of powershell. */
+  command?: { file: string; args: string[] };
+}
+
 /** Run a base64-encoded PowerShell script without blocking the event loop and
- * return its stdout (UTF-8). Shared by window enumeration and OCR. */
-export function runPowerShell(script: string, what: string): Promise<string> {
+ * return its stdout (UTF-8). Shared by window enumeration and OCR. A script
+ * that runs past the timeout is killed, so a stuck WinRT or user32 call fails
+ * the tool instead of hanging it (#183). */
+export function runPowerShell(script: string, what: string, opts: RunPowerShellOptions = {}): Promise<string> {
   const encoded = Buffer.from(PS_UTF8_PREAMBLE + script, "utf16le").toString("base64");
+  const timeout = opts.timeoutMs ?? psTimeoutMs(PS_TIMEOUT_MS);
+  const file = opts.command?.file ?? "powershell";
+  const args = opts.command?.args ?? ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded];
   return new Promise((resolve, reject) => {
     execFile(
-      "powershell",
-      ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
-      { encoding: "utf8", windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
+      file,
+      args,
+      { encoding: "utf8", windowsHide: true, maxBuffer: 8 * 1024 * 1024, timeout, killSignal: "SIGKILL" },
       (err, stdout, stderr) => {
-        if (err || !stdout) {
+        if (err && (err as { killed?: boolean }).killed) {
+          reject(
+            new ScreencastError(
+              `Timed out reading ${what} after ${timeout / 1000} s (PowerShell did not answer).`,
+              `Retry; if it keeps happening, restart the app being captured or raise ${PS_TIMEOUT_ENV}.`,
+            ),
+          );
+        } else if (err || !stdout) {
           reject(new ScreencastError(`Could not enumerate ${what}: ${stderr?.trim() || err?.message || "powershell failed"}`));
         } else {
           resolve(stdout);

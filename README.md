@@ -189,6 +189,7 @@ Edit and produce tools write to a `<name>.partial.<ext>` file next to the output
 | `SCREENCAST_MAX_RECORDING_SEC` | `3600` | Default recording cap (`0` disables it) |
 | `SCREENCAST_JOB_TIMEOUT_MS` | scales with length | Override the edit job timeout |
 | `SCREENCAST_WHISPER_MODEL` | none | whisper.cpp model for `transcribe` |
+| `SCREENCAST_PS_TIMEOUT_MS` | 20000 (OCR 60000) | Limit for the PowerShell helpers that list monitors and windows and run OCR |
 | `FFMPEG_PATH` / `FFPROBE_PATH` | `PATH` lookup | Explicit ffmpeg / ffprobe binaries |
 
 ## Usage
