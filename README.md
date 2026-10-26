@@ -4,7 +4,7 @@
 
 **An MCP server that lets an agent record the screen, _watch_ the footage, and make minimal ffmpeg edits — over stdio, on Windows.**
 
-Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, redact, annotate, zoom toward clicks, and export for GitHub or social. No cloud, no streaming: ffmpeg and ffprobe behind 41 typed tools.
+Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, redact, annotate, zoom toward clicks, and export for GitHub or social. No cloud service, no telemetry: ffmpeg and ffprobe behind 41 typed tools.
 
 <br />
 
@@ -29,6 +29,8 @@ Capture the desktop, a monitor, a window, or a region; sample a recording into f
 <img src="https://raw.githubusercontent.com/TMHSDigital/screencast-mcp/main/docs/media/zoom-after.gif" width="480" alt="A settings window recorded by screencast-mcp: the camera glides in on the Save button as the cursor clicks it, a red ring marks the click, then the view eases back out as a green Saved banner appears." />
 
 <sub>Made with the tool: <code>start_recording</code> with <code>events: true</code>, one click, then <code>zoom { highlightClicks: true }</code> and <code>export_gif</code>. <a href="https://tmhsdigital.github.io/screencast-mcp/workflows/zoom-clicks.html">How it was made</a> · <a href="https://tmhsdigital.github.io/screencast-mcp/workflows/">more workflows</a></sub>
+
+[Quick start](#quick-start) · [Tools](#tools) · [Configuration](#configuration) · [Usage](#usage) · [Privacy](#privacy) · [Threat model](#threat-model)
 
 </div>
 
@@ -92,7 +94,7 @@ What it can do beyond record-and-look:
 | `get_session` | Inspect a single session by id. |
 | `review_recording` | **Review player** in clients that support MCP Apps: an inline player where a person scrubs the recording, drags trim handles, and draws redaction boxes, then exports a trimmed, redacted copy (one `pipeline` call). `stop_recording` results open it too. Elsewhere it returns the video's details. |
 | `player_frames` | Preview JPEG frames for the review player; called by the player (app-only), not by agents. |
-| `read_events` | Read a recording's input event log (clicks, scroll, cursor, key presses) on the video's clock. Opt in with `start_recording` `events: true`. |
+| `read_events` | Read a recording's input event log (clicks, scroll, cursor, shortcuts, typing bursts) on the video's clock. Opt in with `start_recording` `events: true`. |
 | `screenshot` | Capture a single PNG of a `target`, and return it inline as an image the model can view. |
 | `list_audio_devices` | List the DirectShow audio devices ffmpeg can see and flag a likely system-audio loopback device for `start_recording`. |
 
@@ -104,7 +106,7 @@ What it can do beyond record-and-look:
 | `contact_sheet` | Tile timestamped frames into **one** image (evenly spaced, or at the scene changes) so the agent sees a whole recording in a single look; returned inline. `poster: true` writes one representative frame instead. |
 | `screen_diff` | Compare two screenshots/frames: SSIM score, share changed, and **bounding boxes of what changed**, with the changes outlined in an inline image. Verify a UI change happened, and only where expected. |
 | `wait_for_change` | Watch a target and return when it **changes** (a dialog opened) or **settles** (a build or page finished), instead of guessing a sleep. Reports elapsed time, changed regions, and the final state inline. |
-| `find_text` | **Read text** on screen or in a frame with the OCR engine built into Windows (no install): every line and match with its bounding box. Locate a button by its label, check what the screen says, or find secrets (`regex: "sk-|ghp_"`) and get `redact_region` rectangles with `redact: true`. Best-effort; review before relying on it. |
+| `find_text` | **Read text** on screen or in a frame with the OCR engine built into Windows (no install): every line and match with its bounding box. Locate a button by its label, check what the screen says, or find secrets (`regex: "sk-|ghp_"`) and get `redact_region` rectangles with `redact: true`; `scanEverySec` checks a whole video, with a time window per match. Best-effort; review before relying on it. |
 | `get_media_info` | ffprobe wrapper: duration, resolution, fps, codecs, container format, and size. |
 
 ### Minimal edit
@@ -143,7 +145,7 @@ These tools re-encode (a filter rewrites pixels, so stream copy does not apply).
 | `redact_region` | Cover declared rectangles in a video. `style` is `box` (default, a solid irreversible fill), `blur`, or `pixelate`; each region may be limited to a `start`/`end` window and expanded with `pad`. |
 
 > [!IMPORTANT]
-> `redact_region` covers the regions **you** declare. It is not automatic secret detection, so it cannot find a secret you did not point it at. The default `box` style is a solid fill, which is irreversible; `blur` and `pixelate` are softer but can be partially recovered, so prefer `box` for real secrets. A region that falls outside the frame is rejected rather than silently doing nothing.
+> `redact_region` covers the regions **you** declare. It is not automatic secret detection, so it cannot find a secret you did not point it at. The default `box` style is a solid fill, which is irreversible; `blur` and `pixelate` are softer but can be partially recovered, so prefer `box` for real secrets. They have minimum strengths: blur uses a radius of at least 8 px (or half the region's smaller side) applied three times, and pixelate uses blocks of at least 16 px. Coordinates are in the displayed frame, after any rotation the file carries, and `pipeline` refuses a `redact` placed after `zoom`. A region that falls outside the frame is rejected rather than silently doing nothing.
 
 ### Produce
 
@@ -189,6 +191,7 @@ Edit and produce tools write to a `<name>.partial.<ext>` file next to the output
 | `SCREENCAST_MAX_RECORDING_SEC` | `3600` | Default recording cap (`0` disables it) |
 | `SCREENCAST_JOB_TIMEOUT_MS` | scales with length | Override the edit job timeout |
 | `SCREENCAST_WHISPER_MODEL` | none | whisper.cpp model for `transcribe` |
+| `SCREENCAST_RETENTION_DAYS` | off | Delete screenshots, frames, and leftover raw event logs older than this many days at startup (never recordings or edits) |
 | `SCREENCAST_PS_TIMEOUT_MS` | 20000 (OCR 60000) | Limit for the PowerShell helpers that list monitors and windows and run OCR |
 | `FFMPEG_PATH` / `FFPROBE_PATH` | `PATH` lookup | Explicit ffmpeg / ffprobe binaries |
 
@@ -242,17 +245,33 @@ It also offers **resources**, so a client can list and attach recordings without
 - **Fullscreen-exclusive apps** often produce black frames under `gdigrab`; run the source in borderless-windowed mode for reliable capture.
 - **System audio needs a loopback device.** `gdigrab` is video-only, so `start_recording` with `audio.source` = `system` captures from a separate dshow input. Windows has no native loopback, so this needs a virtual-audio device (enable Stereo Mix, or install a driver such as screen-capture-recorder's `virtual-audio-capturer` or VB-CABLE). Run `list_audio_devices` to find it. Microphone capture is intentionally not supported.
 
+## Privacy
+
+- **The server makes no network requests and has no telemetry.** It runs ffmpeg, ffprobe, and PowerShell on your machine and talks to your MCP client over stdio.
+- **What a tool returns goes to your model provider.** Inline screenshots and frames, OCR text, event summaries, and every other tool result reach your agent, and your client sends them to the model like any other tool result. Files on disk stay on disk unless a tool returns them or you share them.
+- **What is stored, and where.** Everything goes under `SCREENCAST_HOME` (default `<homedir>/.screencast-mcp`) unless a call names another path:
+  - `recordings/`: recordings, plus each one's `.events.jsonl` when the event log is on
+  - `screenshots/`: `screenshot` output, and `find_text` / `wait_for_change` captures only with `keep: true`
+  - `frames/`: `sample_frames` and `contact_sheet` output
+  - `edits/`: edit and produce output
+  - `sessions.json`: the session registry (ids, targets, paths, times)
+
+  `find_text`, `wait_for_change`, and `screen_diff` delete their captures after the call by default, since a secret scan's screenshot shows the secret.
+- **What the event log records.** Only with `start_recording` `events: true`, and only while that recording runs. Mouse input is recorded system-wide, not only over the recorded window: clicks, scrolls, and the cursor position (sampled about 30 times a second), each with its time. Typing is recorded only as bursts, a start time and a length on a 0.5 s grid, with no key names and no per-key times: `masked` (default) records nothing more. `shortcuts` also records chords made with Ctrl, Alt, or Win by name (`Ctrl+S`), with their times; Ctrl+Alt+key that types a character on AltGr layouts stays typing. No mode records typed text. If the log has gaps (Windows removed the hook, input went to an elevated window or the lock screen, or the helper stopped), `read_events` reports `truncated: true` and lists them.
+- **Microphone capture is not supported.** System audio is recorded only with `audio.source` = `system`.
+- **Deleting stored data.** Delete files under `SCREENCAST_HOME`, or the whole folder while nothing is recording. Set `SCREENCAST_RETENTION_DAYS` to delete screenshots, frames, and leftover raw event logs older than that each time the server starts. Recordings and edits are never deleted automatically.
+
 ## Threat model
 
 > [!WARNING]
 > Screen capture can record **anything** on screen at the moment of capture — passwords, tokens, private messages, and other secrets. `window:` captures the screen rectangle a window occupies, so overlays, notifications, or another window drawn over it are captured too. Treat recordings, screenshots, and sampled frames as sensitive by default.
 
 - **Capture is always explicit.** Nothing auto-fires; capture is gated behind an explicit tool call.
-- **Output stays local.** Files are written to the local filesystem only — never uploaded, streamed, or transmitted anywhere.
+- **The server makes no network requests.** Files are written to the local filesystem only. What a tool returns to your agent (frames, OCR text, event summaries) is sent to your model provider like any other tool result; see [Privacy](#privacy).
 - **Public repo, private captures.** The `.gitignore` blocks recordings, frames, screenshots, and common video/image output so test media cannot be committed by accident.
 - **Review before sharing.** Sample frames or inspect a recording before handing a file to another tool or person, so you know what it contains. In clients that support MCP Apps, `stop_recording` and `review_recording` open an inline player where a person can scrub the whole recording and draw redaction boxes before anything leaves the machine. The player gets frames through the MCP connection; no local web server is started.
-- **Redaction covers what you declare.** `redact_region` covers only the rectangles you specify. `find_text` can help find them: OCR with a query such as `regex: "sk-|ghp_|api.?key"` and `redact: true` returns ready-made rectangles. But OCR is best-effort; it can miss small or stylised text, so treat it as an aid, not a guarantee. Use the default `box` style for a solid irreversible fill, and still review the output before sharing.
-- **The input event log never records what you type.** `start_recording` `events: true` hooks mouse and keyboard input for that recording only, in a helper that exits with it (or with the server). Keys are `masked` by default: the log says a key went down, not which. `keys: "shortcuts"` also names chords held with Ctrl, Alt, or Win (`Ctrl+S`); plain typing, Shift+letter, and AltGr characters stay masked, and no mode records text. Cursor positions and clicks still reveal what you pointed at, so treat `.events.jsonl` like the recording beside it.
+- **Redaction covers what you declare.** `redact_region` covers only the rectangles you specify. `find_text` can help find them: OCR with a query such as `regex: "sk-|ghp_|api.?key"` and `redact: true` returns ready-made rectangles, and `scanEverySec` checks a whole video rather than one frame. But OCR is best-effort; it can miss small or stylised text, so treat it as an aid, not a guarantee. Use the default `box` style for a solid irreversible fill, and still review the output before sharing.
+- **The input event log never records what you type.** `start_recording` `events: true` hooks mouse and keyboard input system-wide for that recording only, in a helper that exits with it (or with the server). Typing is logged only as bursts on a 0.5 s grid, never key by key, so the log does not reveal which keys were pressed, how many, or their timing. `keys: "shortcuts"` also names chords held with Ctrl, Alt, or Win (`Ctrl+S`). Cursor positions and clicks still reveal what you pointed at, so treat `.events.jsonl` like the recording beside it. See [Privacy](#privacy) for exactly what each mode records.
 - **System audio is sensitive too.** When `audio.source` = `system`, the recording captures everything playing on the machine (call audio, notifications, media). Treat audio-bearing recordings with the same care as the video.
 
 ## Project structure

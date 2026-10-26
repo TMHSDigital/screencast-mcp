@@ -82,3 +82,19 @@ describe("planPipeline", () => {
     expect(p.args).toContain("18"); // the "high" CRF
   });
 });
+
+describe("pipeline redaction safety (#204)", () => {
+  const zoom: PipelineStep = { op: "zoom", keyframes: [{ t: 1, x: 0, y: 0, width: 640, height: 360 }] };
+  const redact: PipelineStep = { op: "redact", regions: [{ x: 10, y: 10, width: 100, height: 20 }] };
+  it("refuses a redact after a zoom, which moves the content under the box", () => {
+    expect(() => plan([zoom, redact])).toThrow(/redact comes after zoom/);
+    expect(() => plan([redact, zoom])).not.toThrow();
+  });
+  it("encodes a redacting pipeline at high quality, like redact_region", () => {
+    const high = plan([{ op: "scale", width: 640 }], SRC);
+    const red = plan([redact]);
+    const crf = (a: string[]) => a[a.indexOf("-crf") + 1];
+    expect(crf(red.args)).not.toBe(crf(high.args));
+    expect(crf(red.args)).toBe(crf(planPipeline("in.mp4", "out.mp4", [{ op: "scale", width: 640 }], SRC, {}, "high").args));
+  });
+});

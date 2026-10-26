@@ -21,6 +21,7 @@ import {
   buildSpeedArgs,
   buildOverlayArgs,
   blurRadius,
+  pixelateFilter,
   editOutputExt,
   assertEditContainer,
   isAudioOnlyPath,
@@ -360,12 +361,35 @@ describe("scene sampling (#114)", () => {
 
 describe("blurRadius (#188)", () => {
   it("keeps both planes' radii legal on tiny regions", () => {
-    expect(blurRadius({ w: 4, h: 4 })).toBe("lr=2:cr=1");
-    expect(blurRadius({ w: 2, h: 6 })).toBe("lr=1:cr=0");
+    expect(blurRadius({ w: 4, h: 4 })).toBe("lr=2:lp=3:cr=1:cp=3");
+    expect(blurRadius({ w: 2, h: 6 })).toBe("lr=1:lp=3:cr=0:cp=3");
   });
-  it("matches the old strength on normal regions", () => {
-    expect(blurRadius({ w: 40, h: 40 })).toBe("lr=10:cr=10");
-    expect(blurRadius({ w: 400, h: 300 })).toBe("lr=20:cr=20");
+  it("never goes below the minimum radius where the region allows it (#204)", () => {
+    expect(blurRadius({ w: 300, h: 18 })).toBe("lr=8:lp=3:cr=4:cp=3"); // was lr=4, often readable
+    expect(blurRadius({ w: 40, h: 40 })).toBe("lr=10:lp=3:cr=10:cp=3");
+    expect(blurRadius({ w: 400, h: 300 })).toBe("lr=20:lp=3:cr=20:cp=3");
+  });
+});
+
+describe("pixelate blocks (#204)", () => {
+  it("uses blocks of at least 16 px, square, whatever the region's size", () => {
+    expect(pixelateFilter({ w: 64, h: 16 })).toBe("scale=4:1:flags=area,scale=64:16:flags=neighbor");
+    expect(pixelateFilter({ w: 300, h: 18 })).toBe("scale=16:1:flags=area,scale=300:18:flags=neighbor");
+    expect(pixelateFilter({ w: 800, h: 400 })).toBe("scale=16:8:flags=area,scale=800:400:flags=neighbor");
+    expect(pixelateFilter({ w: 8, h: 8 })).toBe("scale=1:1:flags=area,scale=8:8:flags=neighbor");
+  });
+});
+
+describe("display size of rotated video (#204)", () => {
+  const probe = (side: unknown) => ({
+    streams: [{ codec_type: "video", width: 320, height: 240, side_data_list: side } as never],
+    format: {},
+  });
+  it("swaps width and height for a 90-degree display matrix", () => {
+    const info = parseMediaInfo(probe([{ side_data_type: "Display Matrix", rotation: -90 }]));
+    expect(info).toMatchObject({ width: 240, height: 320, rotation: -90 });
+    expect(parseMediaInfo(probe([{ rotation: 180 }]))).toMatchObject({ width: 320, height: 240, rotation: 180 });
+    expect(parseMediaInfo(probe(undefined)).rotation).toBeUndefined();
   });
 });
 

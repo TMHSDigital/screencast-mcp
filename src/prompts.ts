@@ -15,7 +15,7 @@ export const PROMPT_TEXT = {
 
 1. start_recording { target: "${target}", quality: "standard" }, then tell me to reproduce the bug (or reproduce it yourself if you can drive the app), and stop_recording when done.
 2. sample_frames { input: <recording>, mode: "scenes" } to see what happened, and describe the moment the bug appears.
-3. find_text { input: <recording>, timestamp: <a frame that shows it>, query: "sk-|ghp_|api.?key|token|password", regex: true, redact: true }. If anything sensitive is visible, redact_region it before sharing.
+3. find_text { input: <recording>, scanEverySec: 1, query: "sk-|ghp_|api.?key|token|password", regex: true, redact: true } to check the whole clip, not one frame. If anything sensitive shows up, redact_region its redactRegions (each has its own start/end) with style "box" before sharing. OCR can miss text, so also look at the frames yourself.
 4. trim (or clip) to the few seconds around the bug, and callout to box or point at it.
 5. export_gif { input: <clip>, maxBytes: 10000000 } so it can be pasted into an issue or PR.
 Report the final file path, what the clip shows, and anything you redacted.`,

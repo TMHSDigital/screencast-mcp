@@ -11,7 +11,7 @@ export function buildManifest(p, toolList) {
     long_description:
       "Record the screen, sample frames the model can see, and edit with ffmpeg: trim, annotate, redact, " +
       "export GIFs, normalize audio, read on-screen text, and wait for the screen to change. " +
-      "Requires ffmpeg and ffprobe (Windows: `winget install Gyan.FFmpeg`). Recordings stay on this computer.",
+      "Requires ffmpeg and ffprobe (Windows: `winget install Gyan.FFmpeg`). The server makes no network requests; what its tools return to your agent goes to your model provider like any tool result.",
     author: { name: "TMHSDigital", url: "https://github.com/TMHSDigital" },
     homepage: "https://tmhsdigital.github.io/screencast-mcp/",
     repository: { type: "git", url: "https://github.com/TMHSDigital/screencast-mcp" },

@@ -7,6 +7,31 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.38.0]
+
+### Added
+
+- `find_text` `scanEverySec` (with `maxFrames`) reads a frame every N seconds across a whole video, so a secret shown at any moment is found. Each match carries its time, and `redactRegions` carry a `start`/`end` window spanning the samples on either side. The `bug-repro-clip` prompt now scans the whole clip instead of one frame (#204).
+- `SCREENCAST_RETENTION_DAYS` deletes screenshots, frames, and leftover raw event logs older than that many days when the server starts. Recordings and edits are never deleted automatically (#209).
+- `find_text` and `wait_for_change` take `keep: true` to keep their capture on disk and return its path (#209).
+- A Privacy section in the README covers what is stored and where, what the event log records in each mode, and how to delete it (#215).
+
+### Changed
+
+- **The event log no longer records per-key timing.** Typing is logged as `typing` bursts, a start and a length on a 0.5 s grid, in both modes; `key` events now only name shortcuts in `keys: "shortcuts"` mode. The `read_events` summary counts `shortcuts` and `typingBursts` instead of `keys` (#210).
+- `find_text`, `wait_for_change`, and `screen_diff` no longer leave their captures on disk by default. `find_text` and `wait_for_change` return `screenshotPath` only with `keep: true` (#209).
+- The privacy claim is now precise in the README, the docs site, and the `.mcpb` description: the server makes no network requests, and what a tool returns to your agent goes to your model provider (#215).
+
+### Fixed
+
+- Redaction no longer under-covers silently (#204):
+  - Media info reports the displayed size of a rotated video, so redact, crop, and pipeline coordinates match the frame ffmpeg actually filters.
+  - Blur uses a radius of at least 8 px (where the region allows it), applied three times, and pixelate uses blocks of at least 16 px; a thin text line used to get a readable radius-4 blur or 4 px blocks.
+  - `pipeline` refuses a `redact` step after `zoom`, which moves content out from under a fixed box, and encodes a redacting pipeline at high quality, like `redact_region`.
+  - Integration tests now check blur, pixelate, and box strength, per-region time windows, and a rotated input on real output pixels.
+- `find_text` regex queries also match through `_`/`-` misreads, so the documented `sk-|ghp_|api.?key` pattern finds a `ghp_` token that OCR read as `ghp-` (#236).
+- The event log helper no longer writes to disk inside its input hooks, which could make Windows silently remove them. It now releases keys whose key-up went to the lock screen or an elevated window, and treats Ctrl+Alt+key that types a character on AltGr layouts as typing. It also writes out its buffer on stop instead of being killed. Gaps (a removed hook, input it could not see, or a stalled or stopped helper) become `gap` events, and `read_events` reports them with `truncated: true` (#210).
+
 ## [0.37.0]
 
 ### Added

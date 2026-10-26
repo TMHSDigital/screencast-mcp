@@ -8,6 +8,7 @@ import {
   parseEventsJsonl,
   selectEvents,
   summarizeEvents,
+  eventGaps,
 } from "../utils/events.js";
 import { getStore } from "../context.js";
 
@@ -26,7 +27,10 @@ const inputSchema = {
   types: z
     .array(z.enum(EVENT_TYPES))
     .optional()
-    .describe("Only these types: down / up (mouse buttons), move (sampled cursor), wheel, key. Clicks are down."),
+    .describe(
+      "Only these types: down / up (mouse buttons), move (sampled cursor), wheel, key (a named shortcut), " +
+        "typing (a burst of typing: start and length only), gap (events may be missing). Clicks are down.",
+    ),
   inFrameOnly: z.boolean().optional().describe("Drop events whose cursor was outside the recorded area."),
   limit: z
     .number()
@@ -41,7 +45,7 @@ export function register(server: McpServer): void {
   server.tool(
     "read_events",
     "Read the input event log of a recording made with start_recording events: true: " +
-      "mouse clicks, scroll, cursor positions, and key presses, each with its video " +
+      "mouse clicks, scroll, cursor positions, shortcuts, and typing bursts, each with its video " +
       "time in seconds and position in video pixels. Filter by time range and type, " +
       "e.g. types: ['down'] for the clicks, then sample_frames at those times.",
     inputSchema,
@@ -72,12 +76,22 @@ export function register(server: McpServer): void {
         const all = parseEventsJsonl(readFileSync(path, "utf8"));
         const matched = selectEvents(all, args);
         const limit = args.limit ?? DEFAULT_EVENT_LIMIT;
+        const gaps = eventGaps(all);
         return okResponse({
           eventsPath: path,
           total: all.length,
           matched: matched.length,
           returned: Math.min(limit, matched.length),
           summary: summarizeEvents(all),
+          ...(gaps.length > 0
+            ? {
+                truncated: true,
+                gaps,
+                warning:
+                  "The log is missing events in the gaps listed: Windows removed the input hook, input went to an " +
+                  "elevated window or the lock screen, or the helper stopped. Do not read silence there as no activity.",
+              }
+            : {}),
           events: matched.slice(0, limit),
           ...(matched.length > limit
             ? { note: `${matched.length - limit} more matched; narrow from/to or types, or raise limit.` }

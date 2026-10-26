@@ -104,7 +104,7 @@ const inputSchema = {
     .boolean()
     .optional()
     .describe(
-      "Also log mouse clicks, scroll, cursor positions, and key presses to " +
+      "Also log mouse clicks, scroll, cursor positions, and typing to " +
         "<recording>.events.jsonl, timed to the video and in video pixels (default " +
         "false). Read it with read_events. Adds about a second to start.",
     ),
@@ -112,9 +112,9 @@ const inputSchema = {
     .enum(["masked", "shortcuts"])
     .optional()
     .describe(
-      "With events: masked (default) logs that a key was pressed, never which. " +
-        "shortcuts also names chords made with Ctrl, Alt, or Win (e.g. Ctrl+S); " +
-        "typed text is never logged.",
+      "With events: masked (default) logs typing only as bursts (start and length on a 0.5 s grid), " +
+        "never which keys or when each one was pressed. shortcuts also names chords made with Ctrl, Alt, " +
+        "or Win (e.g. Ctrl+S), with their times; typed text is never logged.",
     ),
   backend: z
     .enum(["gdigrab", "wgc"])

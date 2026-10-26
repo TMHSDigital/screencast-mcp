@@ -10,6 +10,7 @@ import {
   parseEventsJsonl,
   selectEvents,
   summarizeEvents,
+  eventGaps,
 } from "../utils/events.js";
 import { captureFrame } from "../utils/targets.js";
 
@@ -66,7 +67,7 @@ describe("convertEvents", () => {
     expect(selectEvents(back, { types: ["down"] }).map((e) => e.t)).toEqual([0.25, 0.7]);
     expect(selectEvents(back, { from: 0.3, to: 0.6 })).toHaveLength(3);
     expect(selectEvents(back, { types: ["key"], inFrameOnly: true })).toHaveLength(1);
-    expect(summarizeEvents(back)).toEqual({ clicks: 2, scrolls: 2, keys: 2 });
+    expect(summarizeEvents(back)).toEqual({ clicks: 2, scrolls: 2, shortcuts: 2 });
   });
 });
 
@@ -88,7 +89,46 @@ describe("hook helper script", () => {
   it("names keys only inside a Ctrl/Alt/Win chord, never plain typing or AltGr", () => {
     const s = buildHookScript("p", "shortcuts", 1);
     expect(s).toContain("if(sc&&!Down(0xA5))"); // right Alt = AltGr: stay masked
-    expect(s).toContain("if((ctl||alt||win)&&nm!=null)");
+    expect(s).toContain("if((ctl||alt||win)&&nm!=null&&!(ctl&&alt&&!win&&Types(k,sh)))"); // AltGr layouts (#210)
+  });
+  it("logs plain typing as bursts and does no file I/O inside the hooks (#210)", () => {
+    const s = buildHookScript("p", "masked", 1);
+    expect(s).toContain("if(chord.Length>0)Put(\"key\",cx,cy,chord);else Typed();");
+    const hooks = s.slice(s.indexOf("static IntPtr Mouse("), s.indexOf("public static void Run("));
+    expect(hooks).not.toMatch(/w\.Write|Drain\(|Flush\(/);
+    expect(s).not.toContain("AutoFlush=true");
+    expect(s).toContain('Pump(path+".stop")');
+    expect(s).toContain("held.Remove(vk)"); // stuck keys are released by the pump
+  });
+});
+
+describe("typing bursts and gaps (#210)", () => {
+  const frame = { x: 0, y: 0, w: 640, h: 360 };
+  it("turns typing lines into bursts with a length and no per-key times", () => {
+    const raw = ["1500.0,typing,10,20,1500", "2000.0,hb,0,0,", "3000.0,hb,0,0,"].join("\n");
+    const ev = convertEvents(raw, { startMs: 1000, frame, endSec: 3 });
+    expect(ev).toEqual([{ t: 0.5, type: "typing", x: 10, y: 20, inFrame: true, durationSec: 1.5 }]);
+    expect(summarizeEvents(ev)).toEqual({ typingBursts: 1 });
+  });
+  it("marks input the hooks missed, until they resume or the recording ends", () => {
+    const raw = ["2000.0,miss,5,5,", "4500.0,resume,5,5,", "6000.0,miss,5,5,"].join("\n");
+    const ev = convertEvents(raw, { startMs: 1000, frame, endSec: 7 });
+    expect(eventGaps(ev)).toEqual([
+      { t: 1, durationSec: 2.5, reason: "input_not_seen" },
+      { t: 5, durationSec: 2, reason: "input_not_seen" },
+    ]);
+  });
+  it("marks a stalled or stopped helper from its heartbeat", () => {
+    const beats = [1000, 2000, 3000, 8000, 9000].map((t) => `${t}.0,hb,0,0,`).join("\n");
+    const ev = convertEvents(beats, { startMs: 1000, frame, endSec: 20 });
+    expect(eventGaps(ev)).toEqual([
+      { t: 2, durationSec: 5, reason: "helper_stalled" },
+      { t: 8, durationSec: 12, reason: "helper_stopped" },
+    ]);
+    expect(summarizeEvents(ev)).toEqual({ gaps: 2 });
+  });
+  it("adds no gaps to logs from helpers without a heartbeat", () => {
+    expect(eventGaps(convertEvents("1500.4,down,1,1,left", { startMs: 1000, frame, endSec: 60 }))).toEqual([]);
   });
 });
 

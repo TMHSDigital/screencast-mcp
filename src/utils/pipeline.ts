@@ -76,6 +76,17 @@ export function planPipeline(
       throw new ScreencastError(`${s.op} must be the last step (it is step ${i + 1} of ${steps.length}).`);
     }
   });
+  // A zoom moves the content within the frame over time, so a fixed redact
+  // box after it would slide off the secret (#204).
+  const zoomAt = steps.findIndex((s) => s.op === "zoom");
+  const lateRedact = zoomAt === -1 ? -1 : steps.findIndex((s, i) => i > zoomAt && s.op === "redact");
+  if (lateRedact !== -1) {
+    throw new ScreencastError(
+      `step ${lateRedact + 1}: redact comes after zoom (step ${zoomAt + 1}), which moves the content under a fixed box. ` +
+        "Put redact before zoom, in the source's coordinates.",
+    );
+  }
+  const redacts = steps.some((s) => s.op === "redact");
 
   let W = src.width;
   let H = src.height;
@@ -216,8 +227,9 @@ export function planPipeline(
   if (finalEncode) {
     args.push(...finalEncode);
   } else {
-    // An export_gif tail reads this file once, so give it more quality.
-    args.push(...resolveQuality(gif ? "high" : quality));
+    // An export_gif tail reads this file once, so give it more quality; a
+    // redaction gets it too, like redact_region, so its edges stay crisp (#204).
+    args.push(...resolveQuality(gif || redacts ? "high" : quality));
     if (src.hasAudio) args.push(...(audioReencode ? ["-c:a", "aac", "-b:a", "160k"] : ["-c:a", "copy"]));
     args.push("-movflags", "+faststart");
   }

@@ -96,6 +96,22 @@ function regionLuma(path: string, t: number, x: number, y: number, w: number, h:
   return px.length > 0 ? px.reduce((s, v) => s + v, 0) / px.length : -1;
 }
 
+/** Share of left/right neighbours in a rectangle that differ by more than 16
+ * levels: how many sharp edges (text strokes) survive. A blur spreads edges
+ * into gentle ramps and a mosaic keeps them only at block borders. */
+function regionDetail(path: string, t: number, x: number, y: number, w: number, h: number): number {
+  const px = regionPixels(path, t, x, y, w, h);
+  let sum = 0;
+  let n = 0;
+  for (let row = 0; row < h; row++) {
+    for (let col = 1; col < w; col++) {
+      sum += Math.abs(px[row * w + col] - px[row * w + col - 1]) > 16 ? 1 : 0;
+      n++;
+    }
+  }
+  return n > 0 && px.length === w * h ? sum / n : -1;
+}
+
 /** Brightest pixel in a rectangle: answers "is any text drawn here". */
 function regionMaxLuma(path: string, t: number, x: number, y: number, w: number, h: number): number {
   const px = regionPixels(path, t, x, y, w, h);
@@ -596,6 +612,66 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     // testsrc is bright/colourful in the top-left; a solid black box reads ~0.
     expect(regionLuma(out, 1, 8, 8, 48, 48)).toBeLessThan(10);
     expect(regionLuma(av, 1, 8, 8, 48, 48)).toBeGreaterThan(20);
+  });
+
+  it("blur and pixelate wipe the detail of a thin text-line region (#204)", async () => {
+    // Dense noise: nearly every pixel is a sharp edge, like small text.
+    const noisy = p("noise.mp4");
+    await runFfmpeg([
+      "-y", "-f", "lavfi", "-i", "color=c=gray:size=320x240:rate=30:d=2,noise=alls=100:allf=t",
+      "-c:v", "libx264", "-preset", "ultrafast", "-crf", "10", "-pix_fmt", "yuv420p", noisy,
+    ]);
+    // A text line (blur used to get radius 4) and a short token (pixelate used
+    // to make 4 px blocks, about two per character).
+    const shapes = [
+      { x: 10, y: 100, width: 300, height: 18 },
+      { x: 40, y: 160, width: 64, height: 16 },
+    ];
+    // A mosaic keeps edges only at its block borders: 1 in 16 columns at most.
+    const limits = { blur: 0.02, pixelate: 1 / 12, box: 0.001 } as const;
+    for (const [n, r] of shapes.entries()) {
+      const inner = (f: string) => regionDetail(f, 1, r.x + 4, r.y + 2, r.width - 8, r.height - 4);
+      expect(inner(noisy)).toBeGreaterThan(0.5);
+      for (const style of ["blur", "pixelate", "box"] as const) {
+        const out = p(`strength-${n}-${style}.mp4`);
+        await runFfmpeg(buildRedactArgs(noisy, out, [r], { style }, { width: 320, height: 240 }));
+        expect(inner(out), `${style} ${r.width}x${r.height}`).toBeLessThan(limits[style]);
+      }
+    }
+  });
+
+  it("redacts several regions, each only inside its own time window (#204)", async () => {
+    const out = p("redact-windows.mp4");
+    await runFfmpeg(
+      buildRedactArgs(
+        av,
+        out,
+        [
+          { x: 0, y: 0, width: 64, height: 64, start: 0, end: 3 },
+          { x: 200, y: 100, width: 64, height: 64, start: 5 },
+        ],
+        {},
+        { width: 320, height: 240 },
+      ),
+    );
+    expect(regionLuma(out, 1, 8, 8, 48, 48)).toBeLessThan(10);
+    expect(regionLuma(out, 6, 8, 8, 48, 48)).toBeGreaterThan(20);
+    expect(regionLuma(out, 6, 208, 108, 48, 48)).toBeLessThan(10);
+    expect(regionLuma(out, 1, 208, 108, 48, 48)).toBeGreaterThan(20);
+  });
+
+  it("redacts a rotated input in its displayed frame (#204)", async () => {
+    // A 320x240 file tagged to display rotated by 90 degrees, i.e. as 240x320.
+    const rot = p("rotated.mp4");
+    await runFfmpeg(["-y", "-display_rotation", "90", "-i", vOnly, "-c", "copy", rot]);
+    const info = await probeMedia(rot);
+    expect([info.width, info.height]).toEqual([240, 320]);
+    // Only inside the displayed frame: y + h = 314 > the stored height of 240.
+    const box = { x: 176, y: 250, width: 64, height: 64 };
+    const out = p("rotated-redact.mp4");
+    await runFfmpeg(buildRedactArgs(rot, out, [box], {}, info));
+    expect(regionMaxLuma(out, 1, box.x, box.y, box.width, box.height)).toBeLessThan(20);
+    expect(regionLuma(rot, 1, box.x, box.y, box.width, box.height)).toBeGreaterThan(20);
   });
 
   it("fps sampling honours a clamped plan and the -frames:v backstop (#80)", async () => {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg, runCapture, runFfmpeg, runFfmpegBuffer, probeMedia } from "../utils/ffmpeg.js";
@@ -12,7 +12,8 @@ import {
   parseSsim,
   DEFAULT_PIXEL_THRESHOLD,
 } from "../utils/diff.js";
-import { subdir, stamp, rand } from "../utils/paths.js";
+import { stamp, rand } from "../utils/paths.js";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js";
 
@@ -66,9 +67,14 @@ export function register(server: McpServer): void {
 
         const images = [];
         if (args.returnImage !== false) {
-          const highlighted = join(subdir("frames"), `diff-${stamp()}-${rand()}.png`);
-          await runFfmpeg(buildHighlightArgs(args.b, diff.regions, highlighted), 30_000);
-          images.push(...(await encodeInlineImages([highlighted], DEFAULT_MAX_IMAGE_WIDTH, 1)).images);
+          // Only returned inline, so it is not left on disk (#209).
+          const highlighted = join(tmpdir(), `screencast-diff-${stamp()}-${rand()}.png`);
+          try {
+            await runFfmpeg(buildHighlightArgs(args.b, diff.regions, highlighted), 30_000);
+            images.push(...(await encodeInlineImages([highlighted], DEFAULT_MAX_IMAGE_WIDTH, 1)).images);
+          } finally {
+            rmSync(highlighted, { force: true });
+          }
         }
         return okResponse(
           {

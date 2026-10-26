@@ -17,6 +17,8 @@ import {
 import { windowMatchReport } from "../utils/windows.js";
 import { subdir, stamp, rand } from "../utils/paths.js";
 import { join } from "node:path";
+import { rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js";
 
 const inputSchema = {
@@ -64,6 +66,10 @@ const inputSchema = {
     .boolean()
     .optional()
     .describe("Also return a screenshot of the final state inline (default true)."),
+  keep: z
+    .boolean()
+    .optional()
+    .describe("Keep the final screenshot on disk and return its path (default false: it is only returned inline)."),
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -136,10 +142,17 @@ export function register(server: McpServer): void {
         };
         const images = [];
         if (args.returnImage !== false && outcome !== "cancelled") {
-          const shot = join(subdir("screenshots"), `wait-${stamp()}-${rand()}.png`);
-          await runFfmpeg(buildScreenshotArgs(target, shot, monitors), 60_000);
-          result.screenshotPath = shot;
-          images.push(...(await encodeInlineImages([shot], DEFAULT_MAX_IMAGE_WIDTH, 1)).images);
+          // Not kept by default, so screenshots do not pile up on disk (#209).
+          const shot = args.keep
+            ? join(subdir("screenshots"), `wait-${stamp()}-${rand()}.png`)
+            : join(tmpdir(), `screencast-wait-${stamp()}-${rand()}.png`);
+          try {
+            await runFfmpeg(buildScreenshotArgs(target, shot, monitors), 60_000);
+            if (args.keep) result.screenshotPath = shot;
+            images.push(...(await encodeInlineImages([shot], DEFAULT_MAX_IMAGE_WIDTH, 1)).images);
+          } finally {
+            if (!args.keep) rmSync(shot, { force: true });
+          }
         }
         return okResponse(result, images);
       } catch (error) {

@@ -57,6 +57,7 @@ import { register as registerPipeline } from "./tools/pipeline.js";
 import { register as registerExportPreset } from "./tools/exportPreset.js";
 import { registerResources } from "./resources.js";
 import { registerPrompts } from "./prompts.js";
+import { pruneCaptures, retentionDays, RETENTION_ENV } from "./utils/retention.js";
 
 // Resolves from src/ in dev and dist/ in the published package alike; keeps
 // the advertised version from drifting from package.json (the hardcoded
@@ -125,6 +126,13 @@ async function main(): Promise<void> {
     process.stderr.write(
       `Orphan reaping skipped: ${err instanceof Error ? err.message : String(err)}\n`,
     );
+  }
+  const days = retentionDays();
+  if (days !== null) {
+    const pruned = pruneCaptures(days);
+    if (pruned.removed > 0) {
+      process.stderr.write(`Deleted ${pruned.removed} capture file(s) older than ${days} day(s) (${RETENTION_ENV}).\n`);
+    }
   }
 
   const transport = new StdioServerTransport();

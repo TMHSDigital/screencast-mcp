@@ -35,8 +35,9 @@ export async function recognize(paths: string[], scales: number[]): Promise<OcrL
     throw new ScreencastError("find_text uses the Windows OCR engine and runs on Windows only.");
   }
   const list = Buffer.from(JSON.stringify(paths), "utf8").toString("base64");
+  // The limit grows with the image count, so a whole-clip scan gets the time it needs.
   const stdout = await runPowerShell(PS_OCR.replace("__PATHS__", list), "text (OCR)", {
-    timeoutMs: psTimeoutMs(OCR_TIMEOUT_MS),
+    timeoutMs: psTimeoutMs(OCR_TIMEOUT_MS + Math.max(0, paths.length - 2) * OCR_PER_IMAGE_MS),
   });
   let raw: unknown;
   try {
@@ -145,8 +146,18 @@ export function findMatches(lines: OcrLine[], query: string, regex = false): Tex
       } catch (err) {
         throw new ScreencastError(`Invalid regex: ${(err as Error).message}`);
       }
-      for (const m of text.matchAll(re)) {
-        if (m[0].length > 0) ranges.push([m.index!, m.index! + m[0].length]);
+      // Also try the text with `_` and `-` swapped either way: the engine
+      // often reads one as the other, and a secret pattern like `ghp_` must
+      // still match `ghp-` (#236). Same length, so offsets map to words as is.
+      const seen = new Set<string>();
+      for (const variant of [text, text.replace(/-/g, "_"), text.replace(/_/g, "-")]) {
+        for (const m of variant.matchAll(re)) {
+          const key = `${m.index}:${m[0].length}`;
+          if (m[0].length > 0 && !seen.has(key)) {
+            seen.add(key);
+            ranges.push([m.index!, m.index! + m[0].length]);
+          }
+        }
       }
     } else {
       // normalizeForMatch keeps string length except for collapsing runs of
@@ -160,9 +171,11 @@ export function findMatches(lines: OcrLine[], query: string, regex = false): Tex
         from = at + needle.length;
       }
     }
+    const boxed = new Set<OcrWord>();
     for (const [start, end] of ranges) {
       const words = spans.filter((s) => s.start < end && s.end > start).map((s) => s.word);
-      if (words.length === 0) continue;
+      if (words.length === 0 || words.every((w) => boxed.has(w))) continue;
+      words.forEach((w) => boxed.add(w));
       out.push({ text: words.map((w) => w.text).join(" "), line: line.text, ...unionRect(words) });
     }
   }
@@ -215,6 +228,8 @@ export function passScales(width: number, height: number): number[] {
 
 /** Limit for one OCR run (all passes of all images) (#183). */
 export const OCR_TIMEOUT_MS = 60_000;
+/** Extra time per image beyond the first two (a whole-clip scan, #204). */
+export const OCR_PER_IMAGE_MS = 5_000;
 /** Limit for one WinRT call inside it (open, decode, recognise). */
 export const OCR_STEP_TIMEOUT_MS = 20_000;
 

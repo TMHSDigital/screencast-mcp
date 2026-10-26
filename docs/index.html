@@ -252,12 +252,17 @@
       <h2>The screen is sensitive. Treat it that way.</h2>
       <div class="note">
         <strong>Screen capture can record anything on screen, including secrets.</strong>
-        Capture is always explicit (a tool call, never automatic), output stays on
-        the local filesystem, and this public repo ignores captured media so test
-        recordings cannot be committed by accident. Review frames before sharing
-        a file, and use <code>redact_region</code> before anything leaves the
-        machine. The optional input event log never records typed text: keys are
-        masked by default, and at most Ctrl/Alt/Win shortcuts are named.
+        Capture is always explicit (a tool call, never automatic), and this public
+        repo ignores captured media so test recordings cannot be committed by
+        accident. The server makes no network requests and has no telemetry;
+        anything a tool returns to your agent (frames, OCR text, event summaries)
+        is sent to your model provider like any other tool result. Review frames
+        before sharing a file, and use <code>redact_region</code> before anything
+        leaves the machine. The optional input event log never records typed text:
+        typing is logged only as bursts on a 0.5 s grid, and at most Ctrl/Alt/Win
+        shortcuts are named. See the README's
+        <a href="https://github.com/TMHSDigital/screencast-mcp#privacy">Privacy</a>
+        section for what is stored and how to delete it.
       </div>
     </section>
 

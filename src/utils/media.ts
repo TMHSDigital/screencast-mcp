@@ -19,8 +19,12 @@ export interface MediaInfo {
   /** The video stream's own duration (falls back to the container's), the
    * length to cut and crossfade on when audio and video differ (#205). */
   videoDurationSec: number | null;
+  /** Display size: after the stream's rotation, which ffmpeg applies before
+   * any filter, so it is the frame edits and redaction work on (#204). */
   width: number | null;
   height: number | null;
+  /** Rotation in degrees the player applies, when the file carries one. */
+  rotation?: number;
   fps: number | null;
   videoCodec: string | null;
   audioCodec: string | null;
@@ -45,6 +49,8 @@ interface FfprobeStream {
   nb_frames?: string;
   sample_rate?: string;
   channels?: number;
+  side_data_list?: Array<{ side_data_type?: string; rotation?: number | string }>;
+  tags?: { rotate?: string };
 }
 
 function numberOrNull(v: string | number | undefined): number | null {
@@ -69,6 +75,15 @@ export function parseFrameRate(value: string | undefined): number | null {
   return Math.round((n / d) * 1000) / 1000;
 }
 
+/** The display rotation of a video stream in degrees (display-matrix side
+ * data, or the older `rotate` tag), or null. */
+function streamRotation(video: FfprobeStream | undefined): number | null {
+  const side = video?.side_data_list?.find((d) => d.rotation !== undefined)?.rotation;
+  const raw = side ?? video?.tags?.rotate;
+  const n = raw === undefined ? NaN : Number(raw);
+  return Number.isFinite(n) ? Math.round(n) % 360 : null;
+}
+
 /** Reduce a parsed ffprobe JSON document to a flat MediaInfo. */
 export function parseMediaInfo(probe: FfprobeJson): MediaInfo {
   const streams = probe.streams ?? [];
@@ -77,11 +92,15 @@ export function parseMediaInfo(probe: FfprobeJson): MediaInfo {
   const duration = probe.format?.duration;
   const size = probe.format?.size;
   const durationSec = duration !== undefined ? Number(duration) : null;
+  const rotation = streamRotation(video);
+  // ffmpeg auto-rotates on decode, so a 90-degree file filters as height x width.
+  const turned = rotation !== null && Math.abs(rotation) % 180 === 90;
   return {
     durationSec,
     videoDurationSec: video ? (numberOrNull(video.duration) ?? durationSec) : null,
-    width: video?.width ?? null,
-    height: video?.height ?? null,
+    width: (turned ? video?.height : video?.width) ?? null,
+    height: (turned ? video?.width : video?.height) ?? null,
+    ...(rotation ? { rotation } : {}),
     fps: parseFrameRate(video?.avg_frame_rate) ?? parseFrameRate(video?.r_frame_rate),
     videoCodec: video?.codec_name ?? null,
     audioCodec: audio?.codec_name ?? null,
@@ -752,14 +771,33 @@ function normalizeRegions(
   });
 }
 
-/** boxblur radii scaled to the region so small boxes do not exceed the limit:
- * a radius must stay within half the plane's smaller side, and the yuv420p
- * chroma plane is half the size, so it gets its own radius (#188). */
+/** Smallest blur radius in px, where the region allows it (#204). */
+export const MIN_BLUR_RADIUS = 8;
+/** Times the box blur is applied: three passes approach a Gaussian, so the
+ * blur is several times stronger than its radius suggests. */
+export const BLUR_PASSES = 3;
+/** Smallest pixelate block in px: about two characters of UI text (#204). */
+export const MIN_PIXEL_BLOCK = 16;
+
+/** boxblur settings for a region: a radius of at least MIN_BLUR_RADIUS (a
+ * thin text line used to get 4, which stayed readable), applied BLUR_PASSES
+ * times. A radius must stay within half the plane's smaller side, and the
+ * yuv420p chroma plane is half the size, so it gets its own radius (#188). */
 export function blurRadius(r: { w: number; h: number }): string {
   const m = Math.min(r.w, r.h);
-  const lr = Math.min(Math.floor(m / 2), Math.max(2, Math.min(20, Math.floor(m / 4))));
+  const lr = Math.min(Math.floor(m / 2), Math.max(MIN_BLUR_RADIUS, Math.min(20, Math.floor(m / 4))));
   const cr = Math.min(lr, Math.floor(Math.ceil(m / 2) / 2));
-  return `lr=${lr}:cr=${cr}`;
+  return `lr=${lr}:lp=${BLUR_PASSES}:cr=${cr}:cp=${BLUR_PASSES}`;
+}
+
+/** The pixelate filter for a region: square blocks of at least
+ * MIN_PIXEL_BLOCK px (and at most 16 across the longer side), instead of 16
+ * across whatever the width was, which left a 64 px secret in 4 px blocks. */
+export function pixelateFilter(r: { w: number; h: number }): string {
+  const block = Math.max(MIN_PIXEL_BLOCK, Math.ceil(Math.max(r.w, r.h) / 16));
+  const cols = Math.max(1, Math.round(r.w / block));
+  const rows = Math.max(1, Math.round(r.h / block));
+  return `scale=${cols}:${rows}:flags=area,scale=${r.w}:${r.h}:flags=neighbor`;
 }
 
 export interface RedactOptions {
@@ -810,7 +848,7 @@ export function redactSteps(
     const soften =
       style === "blur"
         ? `boxblur=${blurRadius(r)}`
-        : `scale='max(1,iw/16)':'max(1,ih/16)':flags=neighbor,scale=${r.w}:${r.h}:flags=neighbor`;
+        : pixelateFilter(r);
     steps.push(`[${tag}s${i}]${crop},${soften}[${tag}b${i}]`);
   });
   let prev = `${tag}base`;

@@ -67,6 +67,14 @@ describe("OCR helpers (#117)", () => {
     expect(() => findMatches(lines, "(", true)).toThrow(/Invalid regex/);
   });
 
+  it("matches the documented secret pattern through _ / - misreads (#236)", () => {
+    const lines = [line([word("token:", 0), word("ghp-AbC123xyz", 60), word("sk_live", 200)])];
+    const hits = findMatches(lines, "sk-|ghp_|api.?key", true);
+    expect(hits.map((m) => m.text)).toEqual(["ghp-AbC123xyz", "sk_live"]);
+    // A match found in several variants is reported once.
+    expect(findMatches([line([word("sk-abc", 0)])], "sk-", true)).toHaveLength(1);
+  });
+
   it("pads redaction rectangles and clamps them to the frame", () => {
     expect(redactionRects([{ x: 2, y: 5, width: 50, height: 10 }], { width: 54, height: 100 })).toEqual([
       { x: 0, y: 1, width: 54, height: 18 },

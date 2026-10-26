@@ -22,8 +22,8 @@
         "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
         "maxDurationSec": { "type": "integer", "minimum": 0, "maximum": 604800, "description": "Stop automatically after this many seconds, finalizing the file (default 3600, or SCREENCAST_MAX_RECORDING_SEC; at most 604800, 7 days). 0 = no cap" },
         "backend": { "type": "string", "enum": ["gdigrab", "wgc"], "description": "gdigrab (default) records the screen rectangle. wgc (window: targets, FFmpeg 8+) records the window's own surface through Windows Graphics Capture: covered, moved, or background windows keep recording; frames only its client area. No audio with wgc" },
-        "events": { "type": "boolean", "description": "Also log mouse clicks, scroll, cursor positions, and key presses to <recording>.events.jsonl, timed to the video and in video pixels (default false). Read it with read_events" },
-        "keys": { "type": "string", "enum": ["masked", "shortcuts"], "description": "With events: masked (default) logs that a key was pressed, never which; shortcuts also names Ctrl/Alt/Win chords (e.g. Ctrl+S). Typed text is never logged" }
+        "events": { "type": "boolean", "description": "Also log mouse clicks, scroll, cursor positions, and typing to <recording>.events.jsonl, timed to the video and in video pixels (default false). Read it with read_events" },
+        "keys": { "type": "string", "enum": ["masked", "shortcuts"], "description": "With events: masked (default) logs typing only as bursts (start and length on a 0.5 s grid), never which keys or per-key times; shortcuts also names Ctrl/Alt/Win chords (e.g. Ctrl+S) with their times. Typed text is never logged" }
       },
       "required": ["target"]
     }
@@ -57,7 +57,7 @@
   },
   {
     "name": "read_events",
-    "description": "Read the input event log of a recording made with start_recording events: true: mouse clicks, scroll, cursor positions, and key presses, each with its video time and position in video pixels. Filter by time range and type.",
+    "description": "Read the input event log of a recording made with start_recording events: true: mouse clicks, scroll, cursor positions, shortcuts, and typing bursts, each with its video time and position in video pixels. Filter by time range and type. Reports truncated: true with the gaps when events may be missing.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -65,7 +65,7 @@
         "input": { "type": "string", "description": "Or a recording path (its sibling .events.jsonl is read) or the .events.jsonl itself" },
         "from": { "type": "number", "minimum": 0, "description": "Only events at or after this video time, in seconds" },
         "to": { "type": "number", "minimum": 0, "description": "Only events at or before this video time, in seconds" },
-        "types": { "type": "array", "items": { "type": "string", "enum": ["down", "up", "move", "wheel", "key"] }, "description": "Only these event types; clicks are down" },
+        "types": { "type": "array", "items": { "type": "string", "enum": ["down", "up", "move", "wheel", "key", "typing", "gap"] }, "description": "Only these event types; clicks are down, key is a named shortcut, typing a burst of typing, gap a stretch where events may be missing" },
         "inFrameOnly": { "type": "boolean", "description": "Drop events whose cursor was outside the recorded area" },
         "limit": { "type": "integer", "minimum": 1, "maximum": 5000, "description": "Most events to return (default 200)" }
       }
@@ -181,25 +181,29 @@
         "settleSec": { "type": "number", "description": "Mode settle: how long the screen must stay still (default 1)" },
         "intervalMs": { "type": "integer", "description": "Pause between checks in ms (default 250)" },
         "pixelThreshold": { "type": "number", "description": "How different (0-255 mean) a cell of about 32x32 screen pixels must be to count as changed (default 12)" },
-        "returnImage": { "type": "boolean", "description": "Also return a screenshot of the final state inline (default true)" }
+        "returnImage": { "type": "boolean", "description": "Also return a screenshot of the final state inline (default true)" },
+        "keep": { "type": "boolean", "description": "Keep the final screenshot on disk and return its path (default false: only returned inline)" }
       },
       "required": ["target"]
     }
   },
   {
     "name": "find_text",
-    "description": "Read text on screen or in an image/video frame with the OCR engine built into Windows (no install), with each line's and match's bounding box. Find where a label or button is, check what the screen says, or locate secrets and get redact_region rectangles for them. Boxes are in the image's pixels; for a live target, add origin for desktop coordinates. Best-effort detection: always review.",
+    "description": "Read text on screen or in an image/video frame with the OCR engine built into Windows (no install), with each line's and match's bounding box. Find where a label or button is, check what the screen says, or locate secrets and get redact_region rectangles for them; for a video, scanEverySec checks the whole clip. Boxes are in the image's pixels; for a live target, add origin for desktop coordinates. Best-effort detection: always review.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "target": { "type": "string", "description": "Read live from the screen: full | monitor:<index> | window:<title> (or window:exe=<app.exe> / window:hwnd=<handle>) | region:<x>,<y>,<w>,<h> (one of target / input)" },
         "input": { "type": "string", "description": "Or read from an image or video file" },
         "timestamp": { "type": "number", "description": "For a video input: the second to read (default 0)" },
+        "scanEverySec": { "type": "number", "description": "For a video input: read a frame every N seconds across the whole clip; each match gets its time and redactRegions get start/end" },
+        "maxFrames": { "type": "integer", "minimum": 1, "maximum": 120, "description": "With scanEverySec: most frames to read (default 30)" },
         "exactTitle": { "type": "boolean", "description": "For window: targets, match the title exactly (default false)" },
         "backend": { "type": "string", "enum": ["gdigrab", "wgc"], "description": "For a live target: gdigrab (default) reads what is visible; wgc (window: targets, FFmpeg 8+) reads the window itself even when covered" },
-        "query": { "type": "string", "description": "Text to look for; case-insensitive and tolerant of OCR misreads (_ vs -, I vs l, O vs 0)" },
+        "query": { "type": "string", "description": "Text to look for; case-insensitive and tolerant of OCR misreads (_ vs -, I vs l, O vs 0; regexes get the _ vs - tolerance)" },
         "regex": { "type": "boolean", "description": "Treat query as a regular expression" },
         "redact": { "type": "boolean", "description": "Also return padded rectangles around matches, ready for redact_region" },
+        "keep": { "type": "boolean", "description": "For a live target: keep the captured screenshot and return its path (default false: deleted after reading)" },
         "returnImage": { "type": "boolean", "description": "Return the image inline with matches outlined (default true when there is a query)" }
       },
       "required": []
