@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Re-run on any ref, e.g. when a push to main started no runs; a green
+  # dispatched run on main also releases.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,19 +20,58 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         node-version: [22, 24]
+    env:
+      # The Windows leg runs the integration suite against FFmpeg 8 (the
+      # whisper filter, gfxcapture) plus a real capture smoke test (#192).
+      FFMPEG_VERSION: "8.1.1"
+      FFMPEG_SHA256: 7a6c3e86f54b0dd3bceff31f81bf3b70397171fcf35d1a13b9ed9cbf1040fc18
+      WHISPER_MODEL: ggml-tiny.en.bin
+      WHISPER_SHA256: 921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
       # The ffmpeg-backed integration suite (src/__tests__/integration) needs
-      # ffmpeg; install it on the Linux leg and make its absence a failure there.
-      # The Windows leg skips that suite.
+      # ffmpeg; both legs install it and make its absence a failure.
       - name: Install ffmpeg (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Cache FFmpeg and the whisper model (Windows)
+        if: runner.os == 'Windows'
+        id: wincache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/media-tools
+          key: media-tools-ffmpeg-${{ env.FFMPEG_VERSION }}-${{ env.WHISPER_MODEL }}
+      - name: Download FFmpeg 8 and the whisper model (Windows)
+        if: runner.os == 'Windows' && steps.wincache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/media-tools"
+          mkdir -p "$dir"
+          cd "$dir"
+          archive="ffmpeg-${FFMPEG_VERSION}-full_build-shared.7z"
+          curl -fsSL --retry 3 -o "$archive" "https://github.com/GyanD/codexffmpeg/releases/download/${FFMPEG_VERSION}/${archive}"
+          echo "${FFMPEG_SHA256}  ${archive}" | sha256sum -c -
+          7z x -y "$archive" > /dev/null
+          mv ffmpeg-*-full_build-shared ffmpeg
+          rm "$archive"
+          curl -fsSL --retry 3 -o "$WHISPER_MODEL" "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${WHISPER_MODEL}"
+          echo "${WHISPER_SHA256}  ${WHISPER_MODEL}" | sha256sum -c -
+      - name: Put FFmpeg 8 on PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          dir="$(cygpath -m "$RUNNER_TEMP")/media-tools"
+          echo "$dir/ffmpeg/bin" >> "$GITHUB_PATH"
+          echo "SCREENCAST_WHISPER_MODEL=$dir/$WHISPER_MODEL" >> "$GITHUB_ENV"
+          "$dir/ffmpeg/bin/ffmpeg.exe" -hide_banner -version | head -1
+
       - run: npm ci
       # Report advisories in shipped (non-dev) dependencies without blocking
       # the build; a new upstream advisory should not fail an unrelated PR.
@@ -46,4 +88,5 @@ jobs:
       - run: npm run typecheck
       - run: npm test
         env:
-          REQUIRE_FFMPEG: ${{ runner.os == 'Linux' && '1' || '' }}
+          REQUIRE_FFMPEG: "1"
+          RUN_CAPTURE_SMOKE: ${{ runner.os == 'Windows' && '1' || '' }}

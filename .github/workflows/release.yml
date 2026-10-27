@@ -1,13 +1,15 @@
 name: Release
 
+# Runs only after CI passes on a push to main, and releases exactly the
+# commit CI tested (#190). A manual dispatch releases the dispatched ref.
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch: {}
 
-permissions:
-  contents: write
-  actions: write
+permissions: {}
 
 concurrency:
   group: release
@@ -16,14 +18,19 @@ concurrency:
 jobs:
   tag-and-release:
     name: Tag and release
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && contains(fromJSON('["push", "workflow_dispatch"]'), github.event.workflow_run.event))
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
     steps:
       # The default GITHUB_TOKEN (contents: write) pushes tags and creates the
-      # release. main is protected and is NEVER written to by CI; bump the
-      # version in your PR. A GITHUB_TOKEN release does not trigger publish.yml,
+      # release. CI never writes to main; bump the version in the commit
+      # itself. A GITHUB_TOKEN release does not trigger publish.yml,
       # so this job dispatches it explicitly afterward.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
 
       - name: Read version from package.json
@@ -54,21 +61,28 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag "v$v"
-          git tag -f "v$major"
-          git tag -f "v$major.$minor"
           git push origin "v$v"
-          git push origin "v$major" --force
-          git push origin "v$major.$minor" --force
-          gh release create "v$v" --title "v$v" --generate-notes
-          # publish.yml is idempotent (skips an already-published version), so a
-          # duplicate dispatch is harmless.
-          gh workflow run publish.yml --ref main
+          # A CI run that finishes late can release an older version after a
+          # newer one; the floating tags move only for the newest release.
+          newest=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1)
+          if [ "$newest" = "v$v" ]; then
+            git tag -f "v$major"
+            git tag -f "v$major.$minor"
+            git push origin "v$major" --force
+            git push origin "v$major.$minor" --force
+          fi
+          latest=$([ "$newest" = "v$v" ] && echo true || echo false)
+          gh release create "v$v" --title "v$v" --generate-notes --latest="$latest"
+          # Publish builds the tag, not main: main may already be at a newer
+          # version by the time it runs (#190). publish.yml is idempotent
+          # (skips an already-published version), so a duplicate is harmless.
+          gh workflow run publish.yml --ref "v$v"
 
       # Attach a one-click Claude Desktop bundle (.mcpb) to the release (#127).
       # It does not depend on npm, so it ships even if the npm publish fails.
       - name: Set up Node for the bundle
         if: steps.check.outputs.skip == 'false'
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 22
           cache: npm

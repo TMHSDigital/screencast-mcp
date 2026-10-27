@@ -7,6 +7,21 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.39.0]
+
+### Added
+
+- Tool-layer tests that drive the server through a real MCP client over an in-memory transport (#192). They check that the registered tools match `mcp-tools.json` (now in every CI run, so a tool missing from the manifest fails CI), that every tool answers invalid arguments with an `isError` result, and that `screenshot`, `start_recording`, `find_text`, and `wait_for_change` report missing, minimized, cloaked, and off-desktop targets cleanly. A handler test also checks that `start_recording` kills its capture when the session registry cannot be written (#207).
+- The Windows CI leg runs the ffmpeg integration suite against FFmpeg 8 (a pinned, checksum-verified gyan.dev build, cached), runs the `transcribe` whisper test with a cached model, and runs a capture smoke test: a full-desktop `screenshot` and a 2 s gdigrab recording (#192).
+- CodeQL code scanning for JavaScript/TypeScript on pushes, PRs, and weekly (#191).
+- A `main protection` ruleset blocks force pushes and deletion of `main`; `.github/workflows/README.md` records the workflows and repository rules (#218).
+
+### Changed
+
+- Releases wait for CI. `release.yml` runs only after a green CI run on `main` and tags exactly the commit CI tested, and `publish.yml` builds that tag rather than whatever `main` is by then, so every tag's npm package and registry entry come from the tag's own commit. A late release of an older version no longer moves the floating tags, the GitHub "latest" release, or npm's `latest` tag (#190).
+- Workflow hardening (#191): every action is pinned to a commit SHA, npm in the publish job is pinned to major 11, and each workflow grants permissions per job. The leftover label-sync workflow, which labeled paths that do not exist and failed on fork PRs, is replaced by `actions/labeler` on `pull_request_target`, which never checks out PR code.
+- Tool registration moved from `src/index.ts` to `src/server.ts` (`createServer()`), so tests can build the server without stdio.
+
 ## [0.38.0]
 
 ### Added

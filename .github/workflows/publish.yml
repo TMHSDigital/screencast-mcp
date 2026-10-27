@@ -5,13 +5,14 @@ on:
     types: [published]
   workflow_dispatch: {}
 
-permissions:
-  contents: read
-  id-token: write
+permissions: {}
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     env:
       # NPM_TOKEN is provisioned, so the publish step runs. The guard remains so
       # that if the secret is ever rotated out or removed, the publish step skips
@@ -22,13 +23,15 @@ jobs:
       # then authenticates with GitHub OIDC (id-token: write): no token, no OTP.
       TRUSTED: ${{ vars.NPM_TRUSTED_PUBLISHING == 'true' }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
           cache: npm
-      - run: npm install -g npm@latest
+      # Trusted publishing needs npm 11.5+; a major pin keeps an unreviewed npm
+      # major out of the job that holds the OIDC token (#191).
+      - run: npm install -g npm@11
       - run: npm ci
       - run: npm run build
       - run: npm test
@@ -45,6 +48,11 @@ jobs:
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
+          # A late release of an older version must not move npm's latest tag
+          # back (#190).
+          current=$(npm view "$name" version 2>/dev/null || echo 0.0.0)
+          newest=$(printf '%s\n%s\n' "$current" "$ver" | sort -V | tail -1)
+          echo "dist_tag=$([ "$newest" = "$ver" ] && echo latest || echo backport)" >> "$GITHUB_OUTPUT"
 
       - name: Skip publish (no NPM_TOKEN or trusted publishing configured)
         if: env.HAS_NPM_TOKEN != 'true' && env.TRUSTED != 'true'
@@ -58,7 +66,7 @@ jobs:
         if: steps.pub.outputs.skip == 'false' && (env.HAS_NPM_TOKEN == 'true' || env.TRUSTED == 'true')
         run: |
           set -o pipefail
-          if npm publish --provenance --access public 2>&1 | tee publish.log; then exit 0; fi
+          if npm publish --provenance --access public --tag "${{ steps.pub.outputs.dist_tag }}" 2>&1 | tee publish.log; then exit 0; fi
           if grep -q EOTP publish.log; then
             echo "::error::npm asked for a one-time password: NPM_TOKEN is a 2FA-protected token, which CI cannot use. Configure npm trusted publishing (npmjs.com > package > Settings > Trusted publishing: GitHub Actions, this repo, publish.yml) and set the repository variable NPM_TRUSTED_PUBLISHING=true."
           fi

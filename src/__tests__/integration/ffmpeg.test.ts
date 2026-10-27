@@ -574,9 +574,10 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     expect(regionMaxLuma(out, 0.5, 60, 240, 520, 110)).toBeLessThan(30);
   });
 
-  it.runIf(!!process.env.SCREENCAST_WHISPER_MODEL)("transcribe writes recognisable text with the whisper filter (#120)", async () => {
+  it.runIf(process.platform === "win32" && !!process.env.SCREENCAST_WHISPER_MODEL)("transcribe writes recognisable text with the whisper filter (#120)", async () => {
     const speech = p("speech.wav");
-    // TTS is not available in CI, so this runs only where a model is set up locally.
+    // Windows speech synthesis makes the input; CI's Windows leg caches a
+    // whisper model and sets SCREENCAST_WHISPER_MODEL (#192).
     const { spawnSync } = await import("node:child_process");
     spawnSync("powershell", ["-NoProfile", "-Command",
       `Add-Type -AssemblyName System.Speech;$s=New-Object System.Speech.Synthesis.SpeechSynthesizer;$s.SetOutputToWaveFile('${speech.replace(/'/g, "''")}');$s.Speak('Open the settings page');$s.Dispose()`]);

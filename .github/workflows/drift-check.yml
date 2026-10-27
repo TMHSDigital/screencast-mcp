@@ -7,6 +7,8 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   drift-check:
     name: Ecosystem drift check
@@ -14,8 +16,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: TMHSDigital/Developer-Tools-Directory/.github/actions/drift-check@v1.20
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: TMHSDigital/Developer-Tools-Directory/.github/actions/drift-check@f10dd5e060ffcd30e44b950c09af970f96579ff8 # v1.20.0
         with:
           mode: self
           format: gh-summary

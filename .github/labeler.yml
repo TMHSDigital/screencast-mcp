@@ -1,0 +1,16 @@
+# Path labels for pull requests (actions/labeler, workflows/labeler.yml).
+tools:
+  - changed-files:
+      - any-glob-to-any-file: src/tools/**
+utils:
+  - changed-files:
+      - any-glob-to-any-file: src/utils/**
+testing:
+  - changed-files:
+      - any-glob-to-any-file: src/__tests__/**
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: [docs/**, README.md, CONTRIBUTING.md, CHANGELOG.md]
+ci:
+  - changed-files:
+      - any-glob-to-any-file: .github/**

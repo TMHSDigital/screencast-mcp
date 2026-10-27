@@ -1,0 +1,20 @@
+name: Label PRs
+
+# pull_request_target runs in the base repository, so fork PRs get a token
+# that can label (#191). It never checks out or runs the PR's code: labeler
+# reads only the list of changed paths and .github/labeler.yml from main.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+  label:
+    name: Label by path
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0

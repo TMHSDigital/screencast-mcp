@@ -5,15 +5,16 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch:
 
-permissions:
-  issues: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   stale:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
     steps:
-      - uses: actions/stale@v10
+      - uses: actions/stale@1e223db275d687790206a7acac4d1a11bd6fe629 # v10.4.0
         with:
           # Issues are the backlog: they are labelled stale as a nudge but never
           # auto-closed (this previously closed an unfixed bug, #55, and the

@@ -75,13 +75,6 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     return { isError: !!res.isError, text, json, images };
   }
 
-  it("exposes exactly the tools declared in mcp-tools.json", async () => {
-    const tools = (await client.listTools()).tools.map((t) => t.name).sort();
-    const declared = (JSON.parse(readFileSync(join(process.cwd(), "mcp-tools.json"), "utf8")) as Array<{ name: string }>)
-      .map((t) => t.name).sort();
-    expect(tools).toEqual(declared);
-  });
-
   it("records a region, stops gracefully, and leaves a non-truncated mp4", async () => {
     const start = await call("start_recording", { target: "region:0,0,640,480", quality: "draft", fps: 15 });
     expect(start.isError).toBe(false);

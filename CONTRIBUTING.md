@@ -26,7 +26,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 
 ### Tools
 
-- One tool per file in `src/tools/`, exporting `register(server)`; wire it up in `src/index.ts`
+- One tool per file in `src/tools/`, exporting `register(server)`; wire it up in `src/server.ts`
 - Keep ffmpeg argument building in pure helpers under `src/utils/` (string in, args out) so it is unit-testable without ffmpeg
 - Add it to `mcp-tools.json` (a test checks the manifest matches the registered tools)
 - Add vitest tests: unit tests for the builder, plus an ffmpeg-backed case in `src/__tests__/integration/` for anything that produces media
@@ -35,7 +35,9 @@ Capture is Windows-only today (gdigrab, see `src/utils/targets.ts`); there is no
 
 ### Tests
 
-- `npm test` runs the unit tests, plus the ffmpeg integration suite when ffmpeg is on PATH (it skips otherwise; set `REQUIRE_FFMPEG=1` to make a missing ffmpeg fail, as CI's Linux job does)
+- `npm test` runs the unit tests, plus the ffmpeg integration suite when ffmpeg is on PATH (it skips otherwise; set `REQUIRE_FFMPEG=1` to make a missing ffmpeg fail, as CI does)
+- `src/__tests__/server.test.ts` drives the tool handlers through an in-memory MCP client, with monitors and windows faked; add a case there for a tool that resolves a capture target
+- `RUN_CAPTURE_SMOKE=1 npm test` (Windows) takes a real screenshot and a 2 s recording through the handlers; CI's Windows leg sets it
 - `RUN_LOCAL_CAPTURE_TESTS=1 npm test` (after `npm run build`) drives the built server through real gdigrab capture; Windows with a display only
 
 Bump the version in `package.json` in your PR (e.g. `npm version <patch|minor|major> --no-git-tag-version`); CI tags and publishes it on merge.

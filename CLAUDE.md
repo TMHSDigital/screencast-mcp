@@ -26,7 +26,7 @@ Screencast MCP -- MCP server for Windows screen recording, frame sampling, and m
 - Use conventional commits (`feat:`, `fix:`, `chore:`, `docs:`)
 - Bump the version in `package.json` in your PR (`npm version <patch|minor|major> --no-git-tag-version`, keeps the lockfile in sync and avoids a stray tag); `release.yml` tags and publishes that version on merge
 - Add a matching entry to `CHANGELOG.md` under the new version heading
-- Tools live in `src/tools/` (one `register(server)` per file, wired in `src/index.ts`); pure helpers live in `src/utils/`
+- Tools live in `src/tools/` (one `register(server)` per file, wired in `src/server.ts`); pure helpers live in `src/utils/`
 - Keep `mcp-tools.json` in sync with the registered tools
 
 ## Testing
