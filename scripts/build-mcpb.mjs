@@ -8,10 +8,12 @@
  * It stages the same files the npm package ships (package.json, dist/, assets/,
  * README, LICENSE) plus production node_modules, writes manifest.json from
  * package.json and mcp-tools.json (so the version and tool list never drift),
- * and packs it with the pinned @anthropic-ai/mcpb CLI.
+ * and packs it with the pinned @anthropic-ai/mcpb CLI. It also writes an
+ * unversioned screencast-mcp.mcpb copy, which the release attaches so
+ * releases/latest/download/screencast-mcp.mcpb is a stable link.
  */
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildManifest } from "./mcpb-manifest.mjs";
@@ -42,4 +44,8 @@ rmSync(join(stage, "package-lock.json"));
 const bundle = join(outDir, `screencast-mcp-${pkg.version}.mcpb`);
 execFileSync(npx, ["--yes", MCPB_CLI, "validate", join(stage, "manifest.json")], { stdio: "inherit", shell: process.platform === "win32" });
 execFileSync(npx, ["--yes", MCPB_CLI, "pack", stage, bundle], { stdio: "inherit", shell: process.platform === "win32" });
-console.log(`\nBuilt ${bundle}`);
+// An unversioned copy gives a stable link (#216):
+// https://github.com/TMHSDigital/screencast-mcp/releases/latest/download/screencast-mcp.mcpb
+const stable = join(outDir, "screencast-mcp.mcpb");
+copyFileSync(bundle, stable);
+console.log(`\nBuilt ${bundle}\nand ${stable}`);

@@ -3,6 +3,7 @@ import { existsSync, readFileSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia, runFfmpegBuffer } from "../utils/ffmpeg.js";
 import { jobTimeoutMs } from "../utils/jobs.js";
 import { tempPath } from "../utils/paths.js";
@@ -63,6 +64,7 @@ export function register(server: McpServer): void {
   server.registerTool(
     "review_recording",
     {
+      title: "Review Recording",
       description:
         "Open a recording for a person to review. In clients that support MCP Apps it shows an " +
         "inline player: scrub the timeline, drag trim handles, and draw redaction boxes, then export " +
@@ -72,6 +74,15 @@ export function register(server: McpServer): void {
         input: z.string().optional().describe("Path to the video."),
         sessionId: z.string().optional().describe("Or the session id of a stopped recording."),
       },
+      outputSchema: looseOutput({
+        input: z.string(),
+        durationSec: z.number().nullable(),
+        width: z.number().nullable(),
+        height: z.number().nullable(),
+        fps: z.number().nullable(),
+        hasAudio: z.boolean(),
+      }),
+      annotations: READ_ONLY,
       _meta: PLAYER_TOOL_META,
     },
     async (args) => {
@@ -103,6 +114,7 @@ export function register(server: McpServer): void {
   const playerFrames = server.registerTool(
     "player_frames",
     {
+      title: "Player Frames",
       description:
         "Preview frames for the review player: JPEGs on an even grid over the video plus frames at " +
         "scene changes, with their real times. Used by the inline player; agents should use " +
@@ -112,6 +124,7 @@ export function register(server: McpServer): void {
         maxFrames: z.number().int().min(1).max(MAX_PLAYER_FRAMES).optional().describe(`Frames on the even grid (default ${DEFAULT_PLAYER_FRAMES}); scene-change frames come on top, up to as many again.`),
         width: z.number().int().min(64).max(1280).optional().describe(`Frame width (default ${DEFAULT_PLAYER_WIDTH}).`),
       },
+      annotations: READ_ONLY,
       _meta: { ui: { visibility: ["app"] } },
     },
     async (args, extra) => {

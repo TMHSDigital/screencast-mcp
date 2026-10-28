@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { DEFAULT_ANIM_FPS, DEFAULT_ANIM_WIDTH, DEFAULT_MAX_BYTES, type AnimFormat } from "../utils/anim.js";
 import { exportAnimation } from "../utils/animExport.js";
@@ -37,12 +38,18 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "export_gif",
-    "Export a video as an optimized animated GIF or WebP that fits a file-size budget " +
-      "(default: GitHub's 10 MB image limit), for PRs, issues, and READMEs. Steps fps, " +
-      "width, and palette/quality down until it fits and reports the settings used.",
-    inputSchema,
+    {
+      title: "Export GIF or WebP",
+      description:
+        "Export a video as an optimized animated GIF or WebP that fits a file-size budget " +
+        "(default: GitHub's 10 MB image limit), for PRs, issues, and READMEs. Steps fps, " +
+        "width, and palette/quality down until it fits and reports the settings used.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

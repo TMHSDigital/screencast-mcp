@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpeg, probeMedia, hasFilter } from "../utils/ffmpeg.js";
 import { jobTimeoutMs } from "../utils/jobs.js";
 import {
@@ -26,12 +27,18 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "transcribe",
-    "Transcribe a recording's speech to an SRT subtitle file, locally, with FFmpeg 8's " +
-      "whisper filter (needs a whisper.cpp model file). Returns the SRT path and the text. " +
-      "Pair with burn_subtitles to caption the video.",
-    inputSchema,
+    {
+      title: "Transcribe Speech",
+      description:
+        "Transcribe a recording's speech to an SRT subtitle file, locally, with FFmpeg 8's " +
+        "whisper filter (needs a whisper.cpp model file). Returns the SRT path and the text. " +
+        "Pair with burn_subtitles to caption the video.",
+      inputSchema,
+      outputSchema: looseOutput({ srtPath: z.string(), cues: z.number().int(), text: z.string() }),
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

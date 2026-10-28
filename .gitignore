@@ -92,3 +92,6 @@ Desktop.ini
 mcpb-out/
 *.mcpb
 .playwright-mcp/
+
+# Personal agent instructions (machine-local, never committed)
+CLAUDE.local.md

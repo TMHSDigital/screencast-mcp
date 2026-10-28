@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildCalloutArgs, type Callout } from "../utils/callout.js";
@@ -76,14 +77,20 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "callout",
-    "Annotate a video with timed boxes, text labels, and arrows (e.g. 'click here', a box " +
-      "around the bug), each shown between two timestamps. Returns the output path. Text uses " +
-      "the bundled Inter font; text Inter cannot draw (CJK, emoji, Arabic, Indic, ...) " +
-      "automatically uses a Windows system font that covers it (listed in fallbackFonts), " +
-      "and characters no font covers are reported in warnings instead of silently drawn as boxes.",
-    inputSchema,
+    {
+      title: "Add Callouts",
+      description:
+        "Annotate a video with timed boxes, text labels, and arrows (e.g. 'click here', a box " +
+        "around the bug), each shown between two timestamps. Returns the output path. Text uses " +
+        "the bundled Inter font; text Inter cannot draw (CJK, emoji, Arabic, Indic, ...) " +
+        "automatically uses a Windows system font that covers it (listed in fallbackFonts), " +
+        "and characters no font covers are reported in warnings instead of silently drawn as boxes.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

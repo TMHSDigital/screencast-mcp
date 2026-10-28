@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildMusicBedArgs } from "../utils/produce.js";
@@ -20,13 +21,19 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "music_bed",
-    "Lay a music track under a video: the music is looped/trimmed to the video " +
-      "length, faded in and out, and leveled. When the video already has audio " +
-      "the two are mixed, optionally ducking the music under the original. The " +
-      "video stream is copied; only audio is re-encoded.",
-    inputSchema,
+    {
+      title: "Add Music Bed",
+      description:
+        "Lay a music track under a video: the music is looped/trimmed to the video " +
+        "length, faded in and out, and leveled. When the video already has audio " +
+        "the two are mixed, optionally ducking the music under the original. The " +
+        "video stream is copied; only audio is re-encoded.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

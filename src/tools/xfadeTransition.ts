@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildXfadeArgs, clipLength, DEFAULT_TRANSITION_DUR } from "../utils/produce.js";
@@ -24,13 +25,19 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "xfade_transition",
-    "Crossfade two videos into one with an xfade transition. Both clips are " +
-      "auto-normalized to a common resolution, fps, and audio rate first, so " +
-      "they need not match. Offsets follow each clip's video length; audio is " +
-      "crossfaded, with silence standing in for a clip that has no track.",
-    inputSchema,
+    {
+      title: "Crossfade Transition",
+      description:
+        "Crossfade two videos into one with an xfade transition. Both clips are " +
+        "auto-normalized to a common resolution, fps, and audio rate first, so " +
+        "they need not match. Offsets follow each clip's video length; audio is " +
+        "crossfaded, with silence standing in for a clip that has no track.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

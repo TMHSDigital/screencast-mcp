@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildClipArgs, editOutputExt, assertEditContainer } from "../utils/media.js";
@@ -26,12 +27,18 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "clip",
-    "Extract one or more frame-accurate sub-segments to separate files. Unlike " +
-      "trim (fast stream copy that snaps to a keyframe), clip re-encodes so cuts " +
-      "land exactly on the given times.",
-    inputSchema,
+    {
+      title: "Extract Clips",
+      description:
+        "Extract one or more frame-accurate sub-segments to separate files. Unlike " +
+        "trim (fast stream copy that snaps to a keyframe), clip re-encodes so cuts " +
+        "land exactly on the given times.",
+      inputSchema,
+      outputSchema: looseOutput({ outputs: z.array(z.string()), count: z.number().int() }),
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

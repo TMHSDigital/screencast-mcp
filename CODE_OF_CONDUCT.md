@@ -21,7 +21,15 @@ Examples of unacceptable behavior:
 
 ## Enforcement
 
-Instances of unacceptable behavior may be reported by contacting the project team at contact@users.noreply.github.com. All complaints will be reviewed and investigated.
+Report unacceptable behavior to GitHub with the "Report content" option on any
+comment, issue, or user, or with GitHub's
+[report abuse form](https://github.com/contact/report-abuse); the maintainer
+(@TMHSDigital) is notified of reports on this repository. Please do not use
+public issues for conduct reports. All reports will be reviewed and
+investigated, and the reporter's identity is kept confidential.
+
+Security vulnerabilities are not conduct reports: use
+[private vulnerability reporting](SECURITY.md) instead.
 
 ## Attribution
 

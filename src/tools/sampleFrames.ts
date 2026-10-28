@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { mkdirSync, readdirSync, existsSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
 import { jobTimeoutMs } from "../utils/jobs.js";
 import {
@@ -99,13 +100,24 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "sample_frames",
-    "Sample frames from a video so the agent can actually view what happened: " +
-      "either at a fixed rate (fps) or at explicit timestamps. Writes PNG frames " +
-      "to a folder and returns their paths, plus the first few frames inline so " +
-      "the model can view them directly (disable with returnImages: false).",
-    inputSchema,
+    {
+      title: "Sample Frames",
+      description:
+        "Sample frames from a video so the agent can actually view what happened: " +
+        "either at a fixed rate (fps) or at explicit timestamps. Writes PNG frames " +
+        "to a folder and returns their paths, plus the first few frames inline so " +
+        "the model can view them directly (disable with returnImages: false).",
+      inputSchema,
+      outputSchema: looseOutput({
+        frameDir: z.string(),
+        frameCount: z.number().int(),
+        frames: z.array(z.string()),
+        mode: z.string(),
+      }),
+      annotations: READ_ONLY,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

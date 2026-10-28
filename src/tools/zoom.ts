@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync, readFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpegFrames, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob, jobTimeoutMs } from "../utils/jobs.js";
 import { analysisSize } from "../utils/diff.js";
@@ -93,13 +94,19 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "zoom",
-    "Smooth animated zoom-and-pan, Screen Studio style: zoom into where the action is and back " +
-      "out. Give keyframes (rectangles by time), or let it plan them from the clicks in the " +
-      "recording's input event log or from where the screen changes. highlightClicks rings each " +
-      "click. dryRun returns the plan so it can be adjusted. Returns the output path.",
-    inputSchema,
+    {
+      title: "Zoom and Pan",
+      description:
+        "Smooth animated zoom-and-pan, Screen Studio style: zoom into where the action is and back " +
+        "out. Give keyframes (rectangles by time), or let it plan them from the clicks in the " +
+        "recording's input event log or from where the screen changes. highlightClicks rings each " +
+        "click. dryRun returns the plan so it can be adjusted. Returns the output path.",
+      inputSchema,
+      outputSchema: looseOutput({ keyframes: z.array(z.unknown()) }),
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

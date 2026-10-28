@@ -3,6 +3,7 @@ import { extname, resolve } from "node:path";
 import { existsSync, writeFileSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import {
@@ -25,14 +26,20 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "concat",
-    "Concatenate two or more videos into a single file. Matching inputs are " +
-      "joined by stream copy (fast, lossless). Inputs that differ in codec, size, " +
-      "pixel format, frame rate or audio layout, or that hold frames hidden behind " +
-      "an edit list (a trim with exact: false), are re-encoded with hard cuts " +
-      "instead, so the result is always a valid file; `mode` in the result says which.",
-    inputSchema,
+    {
+      title: "Concatenate Videos",
+      description:
+        "Concatenate two or more videos into a single file. Matching inputs are " +
+        "joined by stream copy (fast, lossless). Inputs that differ in codec, size, " +
+        "pixel format, frame rate or audio layout, or that hold frames hidden behind " +
+        "an edit list (a trim with exact: false), are re-encoded with hard cuts " +
+        "instead, so the result is always a valid file; `mode` in the result says which.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

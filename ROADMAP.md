@@ -2,133 +2,121 @@
 
 # Roadmap
 
-**Current:** v0.33.2 shipped (Phase 3 complete; a second hardening round is
-underway, see below and CHANGELOG). Cross-platform capture is the next feature
-phase.
+**Current:** see `package.json` and the [CHANGELOG](CHANGELOG.md). The
+[issue tracker](https://github.com/TMHSDigital/screencast-mcp/issues) is the
+source of truth for open work; this page groups it.
 
-Screencast MCP ships in phases. Phase 1 is the capture / watch / minimal-edit
-core. Phase 2 adds the full edit surface, safety redaction, and system audio.
-Phase 3 adds the produce / trailer layer. Phases 1 to 3 are shipped; the work
-since has been correctness hardening. Phase 4 onward is proposed below.
+Versions below are npm versions. Tags 0.11.0 to 0.27.3 (and 0.1.0, 0.2.0,
+0.8.13) never reached npm (#190); everything they carried first shipped on npm
+in 0.33.0.
 
-## Phase 1 -- Capture, watch, minimal edit (shipped)
+## Shipped
 
-- [x] stdio MCP server (`@modelcontextprotocol/sdk`), npm-publishable
-- [x] ffmpeg / ffprobe detection with a clear install hint when missing
-- [x] Capture: `start_recording`, `stop_recording`, `list_sessions`,
-      `get_session`, `screenshot`
-- [x] Session registry (in memory + on disk) with graceful stop and orphan reaping
-- [x] Multi-monitor offsets and window-by-title via gdigrab
-- [x] Watch: `sample_frames`, `get_media_info`
-- [x] Minimal edit: `trim`, `concat`, `convert` (mp4 / gif / webm)
-- [x] Quality presets (draft / standard / high) instead of raw ffmpeg flags
-- [x] Threat-model documentation
+**Capture, watch, minimal edit.** stdio server; ffmpeg/ffprobe detection with an
+install hint; `start_recording`, `stop_recording`, `list_sessions`,
+`get_session`, `screenshot`; a locked, cross-process session registry with orphan
+reaping; multi-monitor, region, and window targets (by title, `exe=`, `hwnd=`),
+DPI-aware; `sample_frames` returning image content; `get_media_info`; `trim`,
+`concat`, `convert`; quality presets.
 
-## Phase 2 -- Full edit surface and audio (shipped)
+**Full edit surface and audio.** `crop`, `scale`, `speed`, `overlay`,
+`compress`, `clip`, `extract_audio`, `redact_region` (solid box by default),
+system-audio capture and `list_audio_devices`.
 
-- [x] `crop`, `scale`, `speed`, `overlay`, `compress`
-- [x] `extract_audio` (extract the audio track) and `clip` (frame-accurate
-      segment extraction; `extract` split into these two non-overlapping tools)
-- [x] Re-encode trim option for frame-accurate cuts (delivered as `clip`; `trim`
-      stays the fast stream-copy single cut)
-- [x] `redact_region` safety redaction (declared regions, irreversible solid box)
-- [x] System audio capture (dshow loopback) via the `start_recording` audio
-      option and `list_audio_devices`. Microphone capture is deferred indefinitely.
+**Produce.** `assemble_highlights`, `xfade_transition`, `title_card`,
+`music_bed`, `reframe`, `export_preset`, `export_gif`, `contact_sheet`, and
+`pipeline` (several edits as one ffmpeg process).
 
-## Phase 3 -- Produce / trailer layer (shipped)
+**Captions, annotation, audio polish** (0.33.0). `transcribe` (FFmpeg 8
+whisper) and `burn_subtitles` (#120); `zoom`, including zoom toward clicks and
+click rings (#119); the input event log and `read_events` (#118); `callout`
+(#121); `cut_idle` (#122); `normalize_audio` and `denoise` (#123).
 
-- [x] `assemble_highlights` (stitch clips with cuts or transitions) and
-      `xfade_transition` (crossfade two clips), with auto-normalized inputs
-- [x] `title_card` (bundled font) and `music_bed` (loop, fade, mix, duck)
-- [x] Aspect variants (`reframe`) and platform export presets (`export_preset`)
+**Agent loop.** `wait_for_change`, `screen_diff`, `find_text` (Windows OCR,
+whole-clip scans), the review player MCP App with `review_recording` and
+`player_frames` (#128), MCP prompts and resources (#126), and the Windows
+Graphics Capture backend for covered windows (`backend: "wgc"`, #113).
 
-## Hardening -- correctness rounds (ongoing, v0.8.1+)
+**Distribution and hardening.** npm with provenance, the MCP Registry listing
+(#90), a one-click Claude Desktop bundle (#127), the docs site with workflow
+recipes (#129), ffmpeg-backed integration and tool-layer tests on Windows with
+FFmpeg 8 (#78, #192), CodeQL, releases gated on green CI (#190), and several
+correctness rounds (A/V sync, job timeouts and cancellation, privacy and
+retention, see CHANGELOG).
 
-Bug-fix and robustness work on top of Phase 3, one focused PR per issue. Details
-in CHANGELOG; representative items:
+## Now
 
-- [x] Recording lifecycle: a second server instance no longer kills another's
-      live recording (#16); concurrency-aware, bounded session registry (#17)
-- [x] Produce edge cases: `assemble_highlights` clip-duration vs transition
-      validation (#18) and audio preservation on mixed inputs (#19)
-- [x] `sample_frames` returns only frames this run actually wrote, in both fps
-      (#20) and timestamps (#35) mode
-- [x] Capture geometry: DPI-aware monitor enumeration (#39), odd region
-      dimensions rounded to even for recording (#34), off-desktop region offsets
-      rejected with a clear error (#41)
-- [x] Audio device enumeration is capped and gives an actionable error instead
-      of a 30s hang (#40)
-- [x] Filter-string validation up front (#22); temp working files written to the
-      OS temp dir (#24); ESLint + Windows CI + typecheck in CI (#21, #23)
-- [x] Odd output dimensions in edit/produce tools rejected clearly (#47),
-      `concat` relative input paths (#48), `extract_audio` `copy` container
-      mismatch (#36), overwrite protection for explicit output paths (#37)
+- Typed tool metadata: `registerTool` with titles, annotations, and output schemas (#212)
+- Setup friction: FFmpeg 8 up front, a `doctor` / capabilities tool, a slimmer tarball (#195), and `list_targets` (#213)
+- Docs, positioning, and release process: #193, #194, #196, #216, #217, #219, #224
+- Protect `main` with a ruleset that requires CI (#218)
 
-## Hardening round 2 (v0.9.1+)
+## Next
 
-From the September 2026 end-to-end review. Tracked as issues; high priority first.
+Agent workflows
 
-- [x] Edit correctness: `trim` end/duration (#75), `music_bed` loudness (#77),
-      `title_card` path escaping (#87), and an ffmpeg-backed integration suite in
-      CI so builders are tested against real output (#78) -- v0.9.1
-- [x] Recording lifecycle: finalize recordings and exit on client disconnect
-      (#76); default `maxDurationSec` cap (#82) -- v0.10.0
-- [x] Cross-process session-registry locking (#55) -- v0.14.3
-- [x] Watching: return frames as MCP image content (#79) -- v0.11.0; cap
-      `sample_frames` output (#80) -- v0.11.1
-- [x] Long jobs: duration-scaled timeouts, no partial outputs, progress
-      notifications (#81) -- v0.13.0
-- [x] Capture: exact / reported window matching (#89) -- v0.14.0; non-blocking,
-      cached target resolution (#88) -- v0.14.2
-- [x] Runtime and deps: drop EOL Node 20, test Node 24, clean `npm audit` (#86)
-      -- v0.12.0
-- [ ] Reach: MCP Registry listing (#90, wired up in v0.14.1; lists once npm
-      publishing works again) and a README demo (#90)
+- `bug_report`: one call from recording to redacted repro package (#198)
+- Instant replay: a rolling buffer and `save_replay` (#197)
+- `index_recording` / `search_recording`: a searchable text timeline (#245)
+- `step_guide`: a recording into a step-by-step how-to (#172)
+- A smaller tool surface: server instructions, opt-in toolsets, merged tools (#214)
 
-## Phase 4 -- Cross-platform capture (next, #15)
+Editing and polish
 
-Capture today is Windows-only: gdigrab is hard-wired in `src/utils/targets.ts`.
-The first step is to introduce a capture-backend interface (gdigrab as its first
-implementation), then add backends so the same tools work on macOS and Linux.
+- Pipeline ops for `cut_idle`, audio, subtitles, click zoom, plus named recipes (#244)
+- `keystroke_overlay` (#169), a re-rendered cursor with spotlight (#170), `backdrop` (#171)
+- Transcript-based editing (#173), markers and chapters (#174), `narrate` voiceover (#175)
 
-- [ ] macOS capture via avfoundation (screen + window + region)
-- [ ] Linux capture via x11grab, plus a PipeWire/Wayland path where X11 is absent
-- [ ] Per-platform monitor/window enumeration behind one resolver (today's
-      PowerShell shims are the Windows implementation of that seam)
-- [ ] Capability reporting so a tool returns a clear "not supported on this
-      platform" instead of a cryptic backend failure
-- [ ] CI capture smoke tests on the macOS and Linux runners
+Capture
 
-## Phase 5 -- Captions and annotation (proposed)
+- GPU capture: `ddagrab` and hardware encoders (#199)
+- `pause_recording` / `resume_recording` and webcam picture-in-picture (#200)
+- Windows on ARM64 (#246)
 
-Screencast-native polish that turns a raw capture into something watchable.
+Safety and quality
 
-- [x] `burn_subtitles` -- burn an SRT/ASS track into the video (styleable) (#120) -- v0.25.0
-- [x] `transcribe` -- optional speech-to-text to an SRT sidecar (FFmpeg 8 whisper,
-      opt-in, no bundled model), feeding `burn_subtitles` (#120) -- v0.25.0
-- [x] `zoom` -- animated zoom-and-pan from keyframes or planned from screen changes (#119) -- v0.27.0
-- [x] Input event log -- `start_recording` `events: true` + `read_events`: clicks, scroll, cursor, and masked keys / Ctrl-Alt-Win shortcuts on the video clock (#118) -- v0.28.0
-- [x] Zoom toward clicks + click rings -- `zoom` `follow: "clicks"` (default when the event log has clicks) and `highlightClicks` (#119) -- v0.29.0
-- [ ] Cursor spotlight (dim everything but the cursor; positions are in the event log, #118)
-- [x] `callout` -- timed text/arrow/box annotations over the video (#121) -- v0.21.0
-- [ ] `keystroke_overlay` -- render captured keystrokes/clicks as on-screen badges
-      (requires a capture-time input hook; scope TBD)
+- Confine output paths to MCP roots or `SCREENCAST_ALLOWED_DIRS` (#221)
+- Opt-in capture consent through elicitation (#222)
+- Typed tests and stricter TypeScript (#220); an agent eval harness (#223)
 
-## Phase 6 -- Audio polish and delivery (proposed)
+Reach
 
-- [x] `normalize_audio` -- EBU R128 loudness normalization (`loudnorm`) (#123) -- v0.22.0
-- [x] `denoise` -- background-noise reduction for narration (#123) -- v0.22.0
-- [x] `thumbnail` / `contact_sheet` -- single poster frame or a grid of frames
-      (#115) -- v0.16.0
-- [x] Optimized GIF/WebP export (palette tuning, size budget) beyond `convert`
-      (#124, `export_gif`) -- v0.17.0
-- [ ] Chapter markers / cue points written into the container
-- [x] `pipeline` -- chain several edits as one ffmpeg process (one re-encode, no intermediate files), ending in `export_preset` or `export_gif` (#125) -- v0.30.0
+- Directory listings and install badges (#178), a Claude Code plugin (#177), a headless CLI and GitHub Action (#179), sharing via S3-compatible storage (#176)
+- Generated tool reference pages and `llms.txt` (#202); a commercial-use path (#201)
 
-## Cross-cutting backlog
+## Not planned
 
-Not tied to a single phase; pull in opportunistically.
+- **Cross-platform capture** (x11grab / avfoundation, #15). Capture stays
+  Windows-only. The watch, edit, and produce tools already run on any OS with
+  ffmpeg.
+- **Microphone capture.** System audio only.
 
-- [x] Document the supported Node range in CONTRIBUTING once #86 settles it
-- [ ] Consistent input-path resolution (absolute) across all tools (#48 fixed
-      `concat`; the other tools still pass paths through as given)
+## Path to 1.0
+
+1.0 is a promise about the tool interface, not a feature milestone.
+
+**What freezes at 1.0**
+
+- Tool names, and the names, types, and meaning of existing parameters and
+  result fields.
+- Environment variable names and the default output layout under
+  `SCREENCAST_HOME`.
+- Prompt and resource names.
+
+Adding a tool, an optional parameter, or a result field stays a minor release.
+
+**Deprecation policy (from 1.0)**
+
+- A tool or parameter to be removed is first marked deprecated in its
+  description and in the CHANGELOG, and keeps working for at least one minor
+  release.
+- Removal or an incompatible change only happens in a major release.
+
+**Criteria for 1.0**
+
+- Tool metadata settled (#212) and the tool surface consolidated (#214), since
+  both rename or merge tools.
+- Tool-layer tests cover every tool through an MCP client (#192 started this).
+- No open `bug` issues at high priority.
+- Release hygiene: curated, dated release notes and no docs-only releases
+  (#219).

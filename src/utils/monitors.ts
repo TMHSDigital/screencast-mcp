@@ -25,6 +25,8 @@ export interface Monitor {
   width: number;
   height: number;
   primary: boolean;
+  /** Effective DPI (96 = 100% scaling), when Windows reported it (#213). */
+  dpi?: number;
 }
 
 interface RawScreen {
@@ -33,6 +35,7 @@ interface RawScreen {
   Width?: number;
   Height?: number;
   Primary?: boolean;
+  Dpi?: number;
 }
 
 /** Normalize raw PowerShell screen objects into ordered Monitor records.
@@ -45,6 +48,7 @@ export function parseMonitors(raw: unknown): Monitor[] {
     width: Number(s.Width ?? 0),
     height: Number(s.Height ?? 0),
     primary: Boolean(s.Primary),
+    ...(Number(s.Dpi) > 0 ? { dpi: Number(s.Dpi) } : {}),
   }));
   screens.sort((a, b) => {
     if (a.primary !== b.primary) return a.primary ? -1 : 1;
@@ -60,12 +64,16 @@ export function parseMonitors(raw: unknown): Monitor[] {
 const PS_SCRIPT = `
 Add-Type @"
 using System;using System.Runtime.InteropServices;
-public class DpiShim{ [DllImport("user32.dll")] public static extern IntPtr SetProcessDpiAwarenessContext(IntPtr v); }
+public class DpiShim{ [DllImport("user32.dll")] public static extern IntPtr SetProcessDpiAwarenessContext(IntPtr v);
+ public struct PT{public int X,Y;}
+ [DllImport("user32.dll")] public static extern IntPtr MonitorFromPoint(PT p,uint f);
+ [DllImport("shcore.dll")] public static extern int GetDpiForMonitor(IntPtr m,int t,out uint x,out uint y);
+ public static int Dpi(int x,int y){try{PT p=new PT();p.X=x;p.Y=y;uint dx,dy;if(GetDpiForMonitor(MonitorFromPoint(p,2),0,out dx,out dy)==0)return (int)dx;}catch{}return 0;} }
 "@
 try{[void][DpiShim]::SetProcessDpiAwarenessContext([IntPtr](-4))}catch{}
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Screen]::AllScreens | ForEach-Object {
-  [pscustomobject]@{ X=$_.Bounds.X; Y=$_.Bounds.Y; Width=$_.Bounds.Width; Height=$_.Bounds.Height; Primary=$_.Primary }
+  [pscustomobject]@{ X=$_.Bounds.X; Y=$_.Bounds.Y; Width=$_.Bounds.Width; Height=$_.Bounds.Height; Primary=$_.Primary; Dpi=[DpiShim]::Dpi($_.Bounds.X,$_.Bounds.Y) }
 } | ConvertTo-Json -Compress
 `;
 

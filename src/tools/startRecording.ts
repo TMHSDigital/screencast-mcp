@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, wgcAvailable } from "../utils/ffmpeg.js";
 import { fileURLToPath } from "node:url";
 import {
@@ -128,14 +129,25 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "start_recording",
-    "Start a screen recording (Windows gdigrab) as a background ffmpeg process. " +
-      "Returns a session id and output path. Recording is explicit and never " +
-      "auto-starts. Use stop_recording with the id to finalize the file. " +
-      "Audio is video-only by default; set audio.source = 'system' to also " +
-      "capture system (loopback) audio. Microphone capture is not supported.",
-    inputSchema,
+    {
+      title: "Start Recording",
+      description:
+        "Start a screen recording (Windows gdigrab) as a background ffmpeg process. " +
+        "Returns a session id and output path. Recording is explicit and never " +
+        "auto-starts. Use stop_recording with the id to finalize the file. " +
+        "Audio is video-only by default; set audio.source = 'system' to also " +
+        "capture system (loopback) audio. Microphone capture is not supported.",
+      inputSchema,
+      outputSchema: looseOutput({
+        sessionId: z.string(),
+        status: z.string(),
+        backend: z.string(),
+        outputPath: z.string(),
+      }),
+      annotations: WRITES_FILE,
+    },
     async (args) => {
       try {
         const { ffmpeg } = requireFfmpeg();

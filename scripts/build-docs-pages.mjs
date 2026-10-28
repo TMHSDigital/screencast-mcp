@@ -57,7 +57,7 @@ function page({ path, title, description, root, crumbs, body }) {
 ${body}
     <footer>
       <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
-      <span>CC-BY-NC-ND-4.0</span>
+      <span>License: <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/LICENSE">CC BY-NC-ND 4.0</a> &middot; free for non-commercial use</span>
     </footer>
   </main>
 
@@ -192,6 +192,15 @@ const RECIPES = [
   },
 ];
 
+// Under reduced motion, an animated output shows a still frame instead (#224).
+// Every animated output has a <name>-still.webp beside it in docs/media.
+const media = (o) => {
+  const img = `<img src="${o.src}" width="${o.w}" height="${o.h}" alt="${o.alt}" loading="lazy">`;
+  if (!/\.(gif|webp)$/.test(o.src)) return img;
+  const still = o.src.replace(/\.(gif|webp)$/, "-still.webp");
+  return `<picture><source srcset="${still}" media="(prefers-reduced-motion: reduce)">${img}</picture>`;
+};
+
 RECIPES.forEach((r, i) => {
   const prev = RECIPES[i - 1];
   const next = RECIPES[i + 1];
@@ -215,7 +224,7 @@ ${r.takes.join("\n")}
     <section class="chapter">
       <div class="tc-mark"><span class="tc">00:30</span><span>THE OUTPUT</span></div>
 ${(r.outputs ?? [r.output]).map((o) => `      <figure class="output">
-        <div class="frame"><img src="${o.src}" width="${o.w}" height="${o.h}" alt="${o.alt}" loading="lazy"></div>
+        <div class="frame">${media(o)}</div>
         <figcaption>${o.cap}</figcaption>
       </figure>`).join("\n")}
       ${r.after}
@@ -252,19 +261,31 @@ ${RECIPES.map((r) => `        <li><a href="${r.slug}.html"><span class="tc">REC 
 const json = (o) => JSON.stringify(o, null, 2);
 const NPX = { command: "npx", args: ["-y", "@tmhs/screencast-mcp"] };
 const pre = (code) => `      <pre class="copyable"><code>${code.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</code></pre>`;
+// The stable, unversioned Claude Desktop bundle the release attaches (#216).
+const BUNDLE = "https://github.com/TMHSDigital/screencast-mcp/releases/latest/download/screencast-mcp.mcpb";
+// `code --add-mcp` JSON, quoted for cmd.exe (and for PowerShell after --%, which
+// hands the line to code.cmd verbatim): "..." with every inner quote as \" (#217).
+const ADD_MCP = JSON.stringify({ name: "screencast", ...NPX });
+const cmdQuote = (s) => `"${s.replace(/"/g, '\\"')}"`;
+const VSCODE_INSTALL = "https://insiders.vscode.dev/redirect/mcp/install?name=screencast&config=" +
+  encodeURIComponent(JSON.stringify(NPX));
 const CLIENTS = [
   { id: "claude-code", name: "Claude Code", body: `      <p>One command. On native Windows, <code>npx</code> needs the <code>cmd /c</code> wrapper:</p>
 ${pre("claude mcp add screencast -- cmd /c npx -y @tmhs/screencast-mcp")}
       <p>Add <code>--scope user</code> to make it available in every project, or <code>--scope project</code> to share it through a checked-in <code>.mcp.json</code>. Check it with <code>claude mcp list</code>, or <code>/mcp</code> inside a session.</p>` },
-  { id: "claude-desktop", name: "Claude Desktop", body: `      <p><strong>One click:</strong> download <code>screencast-mcp-&lt;version&gt;.mcpb</code> from the <a href="https://github.com/TMHSDigital/screencast-mcp/releases/latest">latest release</a> and open it, or drag it into <strong>Settings &rsaquo; Extensions</strong>. Claude Desktop runs it with its own Node, and lets you pick an output folder and point at <code>ffmpeg.exe</code> if it is not on <code>PATH</code>.</p>
+  { id: "claude-desktop", name: "Claude Desktop", body: `      <p><strong>One click:</strong> download <a href="${BUNDLE}"><code>screencast-mcp.mcpb</code></a> (always the <a href="https://github.com/TMHSDigital/screencast-mcp/releases/latest">latest release</a>) and open it, or drag it into <strong>Settings &rsaquo; Extensions</strong>. Claude Desktop runs it with its own Node and lets you set every option without editing JSON: the output folder, <code>ffmpeg.exe</code> and <code>ffprobe.exe</code> if they are not on <code>PATH</code>, a Whisper model for <code>transcribe</code>, the default recording cap, the edit job timeout, capture retention, and the PowerShell helper timeout.</p>
       <p>Or by hand: <strong>Settings &rsaquo; Developer &rsaquo; Edit Config</strong> opens <code>%APPDATA%\\Claude\\claude_desktop_config.json</code>. Add:</p>
 ${pre(json({ mcpServers: { screencast: NPX } }))}
       <p>Restart Claude Desktop after saving.</p>` },
   { id: "cursor", name: "Cursor", body: `      <p>Add to <code>~/.cursor/mcp.json</code> for every project, or <code>.cursor/mcp.json</code> in one project:</p>
 ${pre(json({ mcpServers: { screencast: NPX } }))}
       <p>Then check that it is enabled in Cursor's MCP settings. The inline images that <code>screenshot</code> and <code>sample_frames</code> return show up in the chat.</p>` },
-  { id: "vs-code", name: "VS Code", body: `      <p>From a terminal:</p>
-${pre(`code --add-mcp '${JSON.stringify({ name: "screencast", ...NPX })}'`)}
+  { id: "vs-code", name: "VS Code", body: `      <p><strong>One click:</strong> <a href="${VSCODE_INSTALL}">Install in VS Code</a> (it asks before adding the server).</p>
+      <p>Or from a terminal. The JSON needs different quoting in each Windows shell; <code>--%</code> makes PowerShell pass the rest of the line through unchanged.</p>
+      <p class="shell">PowerShell (Windows PowerShell 5.1 and PowerShell 7):</p>
+${pre(`code --% --add-mcp ${cmdQuote(ADD_MCP)}`)}
+      <p class="shell">Command Prompt (cmd.exe):</p>
+${pre(`code --add-mcp ${cmdQuote(ADD_MCP)}`)}
       <p>Or add <code>.vscode/mcp.json</code> to a workspace. VS Code uses <code>servers</code>, not <code>mcpServers</code>:</p>
 ${pre(json({ servers: { screencast: { type: "stdio", ...NPX } } }))}
       <p>Use it from Copilot Chat in agent mode. The server's prompts appear as <code>/mcp.screencast.*</code> slash commands.</p>` },

@@ -49,6 +49,7 @@
         <h1>Give your agent<br>eyes on <span class="amber">the screen</span>.</h1>
         <span class="dims" aria-hidden="true">1920 &times; 1080 @ 30fps</span>
       </div>
+      <p class="for"><span class="slate">FOR</span> Developers who want their coding agent to see and prove UI changes on Windows: bug repros, UI checks, and demo clips the agent records, watches, and edits itself.</p>
       <p class="sub"><strong>screencast-mcp</strong> records the Windows screen, samples
       footage into frames an agent can actually look at, and cuts the result with
       ffmpeg &mdash; from a quick trim to a platform-ready export. It speaks MCP
@@ -74,7 +75,7 @@
           <span class="handle tr" aria-hidden="true"></span>
           <span class="handle bl" aria-hidden="true"></span>
           <span class="handle br" aria-hidden="true"></span>
-          <div class="vf-frame" role="img" aria-label="A frame from a recording of a settings window"></div>
+          <div class="vf-frame" role="img" aria-label="Frame at 0.00 seconds of a recording of a settings window"></div>
           <span class="vf-readout" aria-hidden="true"><span class="vf-rec">&#9679;</span> <span id="vf-tc">00:00:00;00</span></span>
         </div>
         <div class="vf-strip">
@@ -84,8 +85,9 @@
           <span class="vf-head-line" aria-hidden="true"></span>
           <input class="vf-range" type="range" min="0" max="27" step="1" value="0" aria-label="Scrub the recording" aria-valuetext="0.00 seconds">
         </div>
+        <p class="sr-only" id="vf-live" aria-live="polite"></p>
         <p class="vf-call"><code id="vf-call">sample_frames { "input": "rec.mp4", "timestamps": [0.00] }</code></p>
-        <p class="vf-note" id="vf-note" aria-live="polite">Every frame here came from <code>sample_frames</code> on a real recording. The amber mark is where <code>mode: "scenes"</code> picks a frame; the red one is the click <code>read_events</code> logged.</p>
+        <p class="vf-note" id="vf-note">Every frame here came from <code>sample_frames</code> on a real recording. The amber mark is where <code>mode: "scenes"</code> picks a frame; the red one is the click <code>read_events</code> logged.</p>
       </figure>
       <p id="prerequisites" class="sub small">
       Needs Windows 10 or 11 and <code>ffmpeg</code> / <code>ffprobe</code> on <code>PATH</code>
@@ -99,6 +101,20 @@
     }
   }
 }</code></pre>
+    </section>
+
+    <section class="chapter" id="why">
+      <div class="tc-mark"><span class="tc">00:01</span><span>SLATE / WHY NOT JUST&hellip;</span></div>
+      <h2>A recorder the agent drives, not you.</h2>
+      <table class="compare">
+        <thead><tr><th>Instead of</th><th>The difference</th></tr></thead>
+        <tbody>
+          <tr><td>OBS, ShareX, Game Bar</td><td>Built for a person at the controls. Here the agent starts and stops the recording, looks at the frames, and makes the edits through typed tools, with no GUI step.</td></tr>
+          <tr><td>Playwright video</td><td>Browser pages only, and the video is a file the model never sees. Here: any window or monitor, frames returned to the model, plus <code>wait_for_change</code>, <code>find_text</code>, and <code>screen_diff</code> to check what happened.</td></tr>
+          <tr><td>Screenshot-only MCPs</td><td>Single stills. Here: video over time, an input event log, scene-change sampling, redaction, and export, so the agent can show a sequence, not one moment.</td></tr>
+        </tbody>
+      </table>
+      <p>Capture is Windows-only. The watch, edit, and produce tools work on any OS with ffmpeg, so a Mac or Linux agent can still trim, redact, caption, and export a recording made elsewhere.</p>
     </section>
 
     <div class="finder" role="search">
@@ -127,6 +143,8 @@
             <tr><td><code>player_frames</code></td><td>Preview frames for the review player (called by the player, not the agent).</td></tr>
             <tr><td><code>read_events</code></td><td>Read a recording&rsquo;s input event log: clicks, scroll, cursor, and key presses on the video&rsquo;s clock. Opt in with <code>start_recording</code> <code>events: true</code>.</td></tr>
             <tr><td><code>list_audio_devices</code></td><td>List DirectShow audio devices and flag a likely system-audio loopback device for start_recording.</td></tr>
+            <tr><td><code>list_targets</code></td><td>List what can be captured &mdash; the desktop, each monitor, each window &mdash; with a ready-to-use <code>target</code> string and whether it can be captured.</td></tr>
+            <tr><td><code>doctor</code></td><td>Check the setup: ffmpeg version (FFmpeg 8+), the filters that gate tools, Windows OCR, folders and settings, with a fix for each problem.</td></tr>
           </tbody>
         </table>
       </section>
@@ -266,9 +284,21 @@
       </div>
     </section>
 
+    <section class="chapter" id="license">
+      <div class="tc-mark"><span class="tc">00:58</span><span>APPENDIX / LICENSE</span></div>
+      <h2>Can I use it at work?</h2>
+      <p>screencast-mcp is free under <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/">CC BY-NC-ND 4.0</a>:
+      use and share it for non-commercial purposes, with attribution, without
+      distributing modified versions. If your use is commercial (inside a paid
+      product or service, or work done mainly for commercial advantage), or you
+      are not sure, <a href="https://github.com/TMHSDigital/screencast-mcp/issues">open an issue</a>
+      to ask about a commercial license. The model behind it is in the
+      <a href="https://github.com/TMHSDigital/Developer-Tools-Directory/blob/main/standards/licensing.md">TMHSDigital licensing standard</a>.</p>
+    </section>
+
     <footer>
       <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
-      <span>CC-BY-NC-ND-4.0</span>
+      <span>License: <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/LICENSE">CC BY-NC-ND 4.0</a> &middot; free for non-commercial use</span>
     </footer>
   </main>
 

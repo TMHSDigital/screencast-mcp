@@ -124,6 +124,17 @@
     var thumbs = vf.querySelector(".vf-thumbs"), vtc = document.getElementById("vf-tc");
     var call = document.getElementById("vf-call"), note = document.getElementById("vf-note");
     var intro = note.innerHTML, version = "before", touched = false, current = 0;
+    // The visible note changes on every frame, so it is not a live region.
+    // A hidden one speaks the note once scrubbing pauses, and never during the
+    // intro animation (#224).
+    var live = document.getElementById("vf-live"), liveTimer = 0;
+    var announce = function () {
+      if (!live) return;
+      clearTimeout(liveTimer);
+      liveTimer = setTimeout(function () {
+        live.textContent = (current / fps).toFixed(2) + " seconds. " + note.textContent;
+      }, 600);
+    };
     var pos = function (i) { return (i / (n - 1)) * 100 + "%"; };
     // A readable strip: one thumbnail per second (every fourth frame).
     var per = 4;
@@ -153,10 +164,12 @@
       vtc.textContent = timecode(t);
       range.value = String(i);
       range.setAttribute("aria-valuetext", t.toFixed(2) + " seconds");
+      frame.setAttribute("aria-label", "Frame at " + t.toFixed(2) + " seconds of a " +
+        (version === "after" ? "zoomed " : "") + "recording of a settings window");
       call.textContent = 'sample_frames { "input": "' + (version === "after" ? "zoom.mp4" : "rec.mp4") + '", "timestamps": [' + t.toFixed(2) + "] }";
       note.innerHTML = noteFor(i);
     };
-    range.addEventListener("input", function () { touched = true; show(Number(range.value)); });
+    range.addEventListener("input", function () { touched = true; show(Number(range.value)); announce(); });
     vf.querySelectorAll(".vf-toggle button").forEach(function (b) {
       b.addEventListener("click", function () {
         touched = true;
@@ -164,6 +177,7 @@
         vf.dataset.version = version;
         vf.querySelectorAll(".vf-toggle button").forEach(function (o) { o.setAttribute("aria-pressed", String(o === b)); });
         show(current);
+        announce();
       });
     });
     show(0);

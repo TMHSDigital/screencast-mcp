@@ -1,15 +1,11 @@
 # Screencast MCP
 
-This is a mcp-server repository for Screencast MCP development.
-
-## Project structure
-
-- `src/` -- TypeScript source
-- `package.json` -- npm package manifest
+A stdio MCP server (TypeScript) for Windows screen recording, frame sampling, and ffmpeg edits.
+Read AGENTS.md first: it is the single source for layout, conventions, and the release process.
 
 ## Conventions
 
 - Use conventional commits (feat:, fix:, chore:, docs:)
-- Bump the version in package.json in your PR; CI tags and publishes it
-- Keep mcp-tools.json in sync with the registered tools
-- Provider adapters live in src/providers/; tools live in src/tools/
+- One tool per file in src/tools/ exporting register(server), wired in src/server.ts; pure helpers in src/utils/
+- Keep mcp-tools.json, the README tools table, and docs/index.html in sync with the registered tools
+- Add a CHANGELOG.md entry under "## Unreleased"; version bumps happen once per release batch, never for docs/CI/chore-only work (see CONTRIBUTING.md#releases)

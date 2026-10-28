@@ -3,6 +3,7 @@ import { extname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildTrimArgs, editOutputExt, assertEditContainer } from "../utils/media.js";
@@ -26,12 +27,18 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "trim",
-    "Trim a video to a sub-clip by start + (end or duration). Re-encodes by default, " +
-      "so the cut is frame-exact and the removed content is really gone; set exact: false " +
-      "for a fast stream copy that keeps hidden frames from before start in the file.",
-    inputSchema,
+    {
+      title: "Trim Video",
+      description:
+        "Trim a video to a sub-clip by start + (end or duration). Re-encodes by default, " +
+        "so the cut is frame-exact and the removed content is really gone; set exact: false " +
+        "for a fast stream copy that keeps hidden frames from before start in the file.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

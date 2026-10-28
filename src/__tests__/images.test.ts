@@ -39,4 +39,9 @@ describe("okResponse", () => {
   it("returns a single text block when there are no images", () => {
     expect(okResponse("hi").content).toEqual([{ type: "text", text: "hi" }]);
   });
+  it("mirrors an object result as structuredContent, as the JSON text reads it (#212)", () => {
+    expect(okResponse({ a: 1, gone: undefined }).structuredContent).toEqual({ a: 1 });
+    expect(okResponse("hi").structuredContent).toBeUndefined();
+    expect(okResponse([1, 2]).structuredContent).toBeUndefined();
+  });
 });

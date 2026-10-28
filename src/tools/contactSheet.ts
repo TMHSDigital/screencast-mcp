@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
 import { jobTimeoutMs } from "../utils/jobs.js";
 import {
@@ -79,13 +80,19 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "contact_sheet",
-    "Tile timestamped frames of a video into ONE image, so the agent can see a whole " +
-      "recording in a single look: evenly spaced, or at the scene changes. Returns the " +
-      "image path and the sheet inline. poster: true writes a single representative " +
-      "frame instead.",
-    inputSchema,
+    {
+      title: "Contact Sheet",
+      description:
+        "Tile timestamped frames of a video into ONE image, so the agent can see a whole " +
+        "recording in a single look: evenly spaced, or at the scene changes. Returns the " +
+        "image path and the sheet inline. poster: true writes a single representative " +
+        "frame instead.",
+      inputSchema,
+      outputSchema: looseOutput({ outputPath: z.string(), inlineImages: z.number().int() }),
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         const { ffmpeg } = requireFfmpeg();

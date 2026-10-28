@@ -3,12 +3,13 @@
  * and mcp-tools.json, so it cannot drift from the server it ships.
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const readme = readFileSync(join(root, "README.md"), "utf8");
 const tools = JSON.parse(readFileSync(join(root, "mcp-tools.json"), "utf8")) as Array<{ name: string; description: string }>;
 // A plain .mjs build helper: imported by URL, typed by hand.
 const { buildManifest } = (await import(pathToFileURL(join(root, "scripts", "mcpb-manifest.mjs")).href)) as {
@@ -40,4 +41,25 @@ describe("MCPB manifest (#127)", () => {
       expect(m.user_config[key!].required).toBe(false);
     }
   });
+
+  it("has an icon that ships in the bundle (#216)", () => {
+    expect(m.icon).toBe("assets/icon.png");
+    expect(existsSync(join(root, m.icon))).toBe(true);
+  });
+
+  it("exposes every environment variable the README documents (#216)", () => {
+    expect(Object.keys(m.server.mcp_config.env).sort()).toEqual(readmeEnvVars(readme));
+  });
 });
+
+/** The variable names in the README's Configuration table, sorted. */
+function readmeEnvVars(md: string): string[] {
+  const section = md.split(/^## Configuration\s*$/m)[1]?.split(/^## /m)[0] ?? "";
+  const names = new Set<string>();
+  for (const line of section.split("\n")) {
+    const firstCell = line.startsWith("|") ? line.split("|")[1] : "";
+    for (const [, name] of firstCell.matchAll(/`([A-Z][A-Z0-9_]+)`/g)) names.add(name);
+  }
+  expect(names.size).toBeGreaterThan(0);
+  return [...names].sort();
+}

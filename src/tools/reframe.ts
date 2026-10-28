@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildReframeArgs, type Aspect, type ReframeFit } from "../utils/produce.js";
@@ -22,12 +23,18 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "reframe",
-    "Re-aspect a video to a target ratio (16:9, 9:16, 1:1, 4:5). 'pad' " +
-      "letterboxes so nothing is lost; 'crop' fills the frame and trims the " +
-      "overflow. Returns the output path.",
-    inputSchema,
+    {
+      title: "Reframe Aspect Ratio",
+      description:
+        "Re-aspect a video to a target ratio (16:9, 9:16, 1:1, 4:5). 'pad' " +
+        "letterboxes so nothing is lost; 'crop' fills the frame and trims the " +
+        "overflow. Returns the output path.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

@@ -1,5 +1,7 @@
+import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
+import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import {
   listDshowAudioDevices,
@@ -8,13 +10,23 @@ import {
 } from "../utils/audioDevices.js";
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "list_audio_devices",
-    "List the DirectShow audio devices ffmpeg can see on this machine, and flag a " +
-      "likely system-audio loopback device. Use the returned name as the `audio` " +
-      "device for start_recording. System audio needs a loopback device (Stereo " +
-      "Mix or a virtual-audio driver); microphone capture is not supported.",
-    {},
+    {
+      title: "List Audio Devices",
+      description:
+        "List the DirectShow audio devices ffmpeg can see on this machine, and flag a " +
+        "likely system-audio loopback device. Use the returned name as the `audio` " +
+        "device for start_recording. System audio needs a loopback device (Stereo " +
+        "Mix or a virtual-audio driver); microphone capture is not supported.",
+      inputSchema: {},
+      outputSchema: looseOutput({
+        devices: z.array(z.unknown()),
+        loopbackDevice: z.string().nullable(),
+        note: z.string(),
+      }),
+      annotations: READ_ONLY,
+    },
     async () => {
       try {
         requireFfmpeg();

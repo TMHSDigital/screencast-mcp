@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildConvertArgs, type ConvertFormat } from "../utils/media.js";
@@ -19,11 +20,17 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "convert",
-    "Convert a video between mp4, gif, and webm. mp4 uses H.264, webm uses VP9, " +
-      "and gif uses a palette filter for quality. Returns the output path.",
-    inputSchema,
+    {
+      title: "Convert Format",
+      description:
+        "Convert a video between mp4, gif, and webm. mp4 uses H.264, webm uses VP9, " +
+        "and gif uses a palette filter for quality. Returns the output path.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

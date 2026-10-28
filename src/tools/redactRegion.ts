@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildRedactArgs, type RedactStyle, editOutputExt, assertEditContainer } from "../utils/media.js";
@@ -39,14 +40,20 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "redact_region",
-    "Redact declared rectangles in a video so secrets on screen are covered. " +
-      "This covers regions you specify; it is NOT automatic secret detection. " +
-      "The default style is a solid box, which is irreversible (a blur or mosaic " +
-      "can be partially recovered). A region that falls outside the frame is " +
-      "rejected rather than silently doing nothing.",
-    inputSchema,
+    {
+      title: "Redact Regions",
+      description:
+        "Redact declared rectangles in a video so secrets on screen are covered. " +
+        "This covers regions you specify; it is NOT automatic secret detection. " +
+        "The default style is a solid box, which is irreversible (a blur or mosaic " +
+        "can be partially recovered). A region that falls outside the frame is " +
+        "rejected rather than silently doing nothing.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

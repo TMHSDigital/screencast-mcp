@@ -1,0 +1,27 @@
+name: Feature request
+description: A new tool, parameter, or workflow.
+title: "[feature] "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [roadmap](https://github.com/TMHSDigital/screencast-mcp/blob/main/ROADMAP.md) and open issues first. Cross-platform capture is [not planned](https://github.com/TMHSDigital/screencast-mcp/blob/main/ROADMAP.md#not-planned).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task your agent is working on and where the current tools fall short.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The tool or parameter you have in mind, ideally as an example call and result.
+      render: json
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Workarounds and alternatives
+      description: What you do today (other tools, raw ffmpeg, several calls chained).

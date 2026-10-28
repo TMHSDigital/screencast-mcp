@@ -1,0 +1,79 @@
+name: Bug report
+description: A tool call failed, hung, or produced the wrong output.
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Capture bugs depend heavily on the machine, so the details below matter.
+        **Security problem?** Do not file it here: use [private vulnerability reporting](https://github.com/TMHSDigital/screencast-mcp/security/advisories/new).
+        **Never attach a recording or screenshot that shows secrets.** Run `redact_region` first, or describe what you saw.
+  - type: input
+    id: version
+    attributes:
+      label: Screencast MCP version
+      description: From `npm ls -g @tmhs/screencast-mcp`, your MCP config, or the `.mcpb` file name.
+      placeholder: "0.42.0"
+    validations:
+      required: true
+  - type: input
+    id: ffmpeg
+    attributes:
+      label: ffmpeg version
+      description: The first line of `ffmpeg -version`.
+      placeholder: "ffmpeg version 8.0-full_build-www.gyan.dev"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: From `winver` (edition, version, and OS build). Write "not Windows" for an edit-only tool on another OS.
+      placeholder: "Windows 11 Pro 24H2, build 26100"
+    validations:
+      required: true
+  - type: input
+    id: displays
+    attributes:
+      label: Displays
+      description: Monitor count, resolution, and display scaling (DPI) of each.
+      placeholder: "2 monitors: 3840x2160 at 150%, 1920x1080 at 100%"
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: MCP client
+      description: The client and how you installed the server (npx, global npm, Claude Desktop bundle).
+      placeholder: "Claude Desktop 1.2 via the .mcpb bundle"
+    validations:
+      required: true
+  - type: textarea
+    id: call
+    attributes:
+      label: Tool call
+      description: The tool name and its arguments as JSON, including `target` and `backend` for capture tools.
+      render: json
+      placeholder: |
+        { "tool": "start_recording", "arguments": { "target": "window:exe=Code.exe", "backend": "wgc", "fps": 30 } }
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: What happened
+      description: The error text or result the tool returned, and what you expected instead.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Anything else needed to see it again (what was on screen, window state, how long the recording ran).
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Media info (`get_media_info`), logs, or a redacted frame.

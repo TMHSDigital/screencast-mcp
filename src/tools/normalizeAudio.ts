@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob, jobTimeoutMs } from "../utils/jobs.js";
 import {
@@ -28,12 +29,18 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "normalize_audio",
-    "Normalize a recording's loudness to a delivery target (EBU R128, two-pass loudnorm) so " +
-      "narration and system audio are neither too quiet nor clipping. Video is copied " +
-      "untouched. Reports the loudness before and after.",
-    inputSchema,
+    {
+      title: "Normalize Loudness",
+      description:
+        "Normalize a recording's loudness to a delivery target (EBU R128, two-pass loudnorm) so " +
+        "narration and system audio are neither too quiet nor clipping. Video is copied " +
+        "untouched. Reports the loudness before and after.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         const { ffmpeg } = requireFfmpeg();

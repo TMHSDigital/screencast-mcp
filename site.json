@@ -1,8 +1,8 @@
 {
-  "accent": "#7c3aed",
-  "accentLight": "#a78bfa",
-  "heroGradientFrom": "#0d1117",
-  "heroGradientTo": "#161b22",
+  "accent": "#FF4545",
+  "accentLight": "#FFB454",
+  "heroGradientFrom": "#0A0D12",
+  "heroGradientTo": "#11161E",
   "links": {
     "github": "https://github.com/TMHSDigital/screencast-mcp"
   },

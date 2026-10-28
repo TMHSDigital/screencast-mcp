@@ -8,12 +8,12 @@
     "source": "github"
   },
   "websiteUrl": "https://tmhsdigital.github.io/screencast-mcp/",
-  "version": "0.42.0",
+  "version": "0.43.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@tmhs/screencast-mcp",
-      "version": "0.42.0",
+      "version": "0.43.0",
       "transport": {
         "type": "stdio"
       },
@@ -35,6 +35,42 @@
           "description": "Path to ffprobe if it is not on PATH",
           "isRequired": false,
           "isSecret": false
+        },
+        {
+          "name": "SCREENCAST_WHISPER_MODEL",
+          "description": "whisper.cpp model file (ggml-*.bin) used by transcribe when a call passes no model",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "SCREENCAST_MAX_RECORDING_SEC",
+          "description": "Default recording cap in seconds when a call sets no maxDurationSec (default 3600; 0 disables it)",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "number",
+          "default": "3600"
+        },
+        {
+          "name": "SCREENCAST_JOB_TIMEOUT_MS",
+          "description": "Override the edit job timeout in milliseconds (default scales with the media length)",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "number"
+        },
+        {
+          "name": "SCREENCAST_RETENTION_DAYS",
+          "description": "At startup, delete screenshots, frames, and leftover raw event logs older than this many days (never recordings or edits; off by default)",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "number"
+        },
+        {
+          "name": "SCREENCAST_PS_TIMEOUT_MS",
+          "description": "Limit in milliseconds for the PowerShell helpers that list monitors and windows and run OCR (default 20000; OCR 60000)",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "number"
         }
       ]
     }

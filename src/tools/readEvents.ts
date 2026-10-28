@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync, readFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import {
   EVENT_TYPES,
   eventPaths,
@@ -42,13 +43,25 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "read_events",
-    "Read the input event log of a recording made with start_recording events: true: " +
-      "mouse clicks, scroll, cursor positions, shortcuts, and typing bursts, each with its video " +
-      "time in seconds and position in video pixels. Filter by time range and type, " +
-      "e.g. types: ['down'] for the clicks, then sample_frames at those times.",
-    inputSchema,
+    {
+      title: "Read Input Events",
+      description:
+        "Read the input event log of a recording made with start_recording events: true: " +
+        "mouse clicks, scroll, cursor positions, shortcuts, and typing bursts, each with its video " +
+        "time in seconds and position in video pixels. Filter by time range and type, " +
+        "e.g. types: ['down'] for the clicks, then sample_frames at those times.",
+      inputSchema,
+      outputSchema: looseOutput({
+        eventsPath: z.string(),
+        total: z.number().int(),
+        matched: z.number().int(),
+        returned: z.number().int(),
+        summary: z.record(z.string(), z.number()),
+      }),
+      annotations: READ_ONLY,
+    },
     async (args) => {
       try {
         let path: string;

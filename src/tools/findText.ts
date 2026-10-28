@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { jobTimeoutMs } from "../utils/jobs.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
@@ -113,15 +114,23 @@ async function readFrames(
 }
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "find_text",
-    "Read text on screen or in an image/video frame with the OCR engine built into Windows " +
-      "(no install), with each line's and match's bounding box. Find where a label or button " +
-      "is, check what the screen says, or locate secrets (e.g. regex 'sk-|ghp_|api.?key') and get " +
-      "redact_region rectangles for them; for a video, scanEverySec checks the whole clip. Boxes are " +
-      "in the image's pixels; for a live target, add `origin` for desktop coordinates. Best-effort " +
-      "detection: always review.",
-    inputSchema,
+    {
+      title: "Find Text (OCR)",
+      description:
+        "Read text on screen or in an image/video frame with the OCR engine built into Windows " +
+        "(no install), with each line's and match's bounding box. Find where a label or button " +
+        "is, check what the screen says, or locate secrets (e.g. regex 'sk-|ghp_|api.?key') and get " +
+        "redact_region rectangles for them; for a video, scanEverySec checks the whole clip. Boxes are " +
+        "in the image's pixels; for a live target, add `origin` for desktop coordinates. Best-effort " +
+        "detection: always review.",
+      inputSchema,
+      outputSchema: looseOutput({
+        imageSize: looseOutput({ width: z.number(), height: z.number() }),
+      }),
+      annotations: READ_ONLY,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

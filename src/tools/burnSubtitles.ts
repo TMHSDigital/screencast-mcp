@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia, hasFilter } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildBurnSubtitlesArgs, type CaptionStyle } from "../utils/captions.js";
@@ -25,11 +26,17 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "burn_subtitles",
-    "Burn subtitles (an SRT from transcribe, or any SRT/ASS) permanently into a video, in " +
-      "the bundled font, in a clean or social-media style. Returns the output path.",
-    inputSchema,
+    {
+      title: "Burn In Subtitles",
+      description:
+        "Burn subtitles (an SRT from transcribe, or any SRT/ASS) permanently into a video, in " +
+        "the bundled font, in a clean or social-media style. Returns the output path.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

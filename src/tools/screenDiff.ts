@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runCapture, runFfmpeg, runFfmpegBuffer, probeMedia } from "../utils/ffmpeg.js";
 import {
   detectionSize,
@@ -36,13 +37,25 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "screen_diff",
-    "Compare two screenshots or frames: returns an SSIM similarity score, the share of the " +
-      "image that changed, and bounding boxes of the changed areas in b's pixel coordinates, " +
-      "plus b inline with those areas outlined. Use it to check that a UI change happened " +
-      "(and only where expected).",
-    inputSchema,
+    {
+      title: "Screen Diff",
+      description:
+        "Compare two screenshots or frames: returns an SSIM similarity score, the share of the " +
+        "image that changed, and bounding boxes of the changed areas in b's pixel coordinates, " +
+        "plus b inline with those areas outlined. Use it to check that a UI change happened " +
+        "(and only where expected).",
+      inputSchema,
+      outputSchema: looseOutput({
+        identical: z.boolean(),
+        ssim: z.number().nullable(),
+        meanDiff: z.number(),
+        changedFraction: z.number(),
+        regions: z.array(z.unknown()),
+      }),
+      annotations: READ_ONLY,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

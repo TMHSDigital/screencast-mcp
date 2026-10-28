@@ -72,13 +72,29 @@ jobs:
             git push origin "v$major.$minor" --force
           fi
           latest=$([ "$newest" = "v$v" ] && echo true || echo false)
-          gh release create "v$v" --title "v$v" --generate-notes --latest="$latest"
+          # The release body is this version's curated CHANGELOG section (#219):
+          # everything under "## [x.y.z]" (an optional " - YYYY-MM-DD" date may
+          # follow) up to the next "## " heading. Without a section, fall back
+          # to GitHub's generated notes so a release never ships empty.
+          awk -v want="## [$v]" '
+            index($0, want) == 1 { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md > release-notes.md
+          if grep -q '[^[:space:]]' release-notes.md; then
+            gh release create "v$v" --title "v$v" --notes-file release-notes.md --latest="$latest"
+          else
+            echo "::warning::CHANGELOG.md has no [$v] section; using generated notes."
+            gh release create "v$v" --title "v$v" --generate-notes --latest="$latest"
+          fi
           # Publish builds the tag, not main: main may already be at a newer
           # version by the time it runs (#190). publish.yml is idempotent
           # (skips an already-published version), so a duplicate is harmless.
           gh workflow run publish.yml --ref "v$v"
 
-      # Attach a one-click Claude Desktop bundle (.mcpb) to the release (#127).
+      # Attach a one-click Claude Desktop bundle (.mcpb) to the release (#127),
+      # plus an unversioned screencast-mcp.mcpb copy so
+      # releases/latest/download/screencast-mcp.mcpb is a stable link (#216).
       # It does not depend on npm, so it ships even if the npm publish fails.
       - name: Set up Node for the bundle
         if: steps.check.outputs.skip == 'false'

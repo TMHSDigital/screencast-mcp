@@ -6,7 +6,7 @@
  * and window enumeration are faked, so no Windows desktop is needed.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -133,7 +133,7 @@ describe("MCP tool layer (#192)", () => {
       if (!res.isError || !/invalid|required|expected/i.test(res.text)) failures.push(`${tool.name}: ${res.text.slice(0, 120)}`);
     }
     expect(failures).toEqual([]);
-    expect(checked).toBeGreaterThan(tools.length - 3);
+    expect(checked).toBeGreaterThan(tools.length - 4); // list_sessions, list_audio_devices, doctor take no arguments
   });
 
   describe("target resolution", () => {
@@ -185,6 +185,121 @@ describe("MCP tool layer (#192)", () => {
       const res = await call("start_recording", { target: "region:0,0,640,480", backend: "wgc" });
       expect(res.isError).toBe(true);
       expect(res.text).toMatch(/window: target/);
+    });
+  });
+});
+
+describe("tool metadata (#212)", () => {
+  const HINTS = ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"] as const;
+
+  /** Every tool, including the app-only ones. */
+  async function allTools() {
+    const { createServer } = await import("../server.js");
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await createServer().connect(serverSide);
+    const apps = new Client(
+      { name: "meta-test", version: "0.0.0" },
+      { capabilities: { extensions: { [MCP_APPS_EXTENSION]: { mimeTypes: [MCP_APP_MIME] } } } },
+    );
+    await apps.connect(clientSide);
+    try {
+      await vi.waitFor(async () => {
+        expect((await apps.listTools()).tools.map((t) => t.name)).toEqual(expect.arrayContaining(APP_ONLY));
+      });
+      return (await apps.listTools()).tools;
+    } finally {
+      await apps.close();
+    }
+  }
+
+  it("registers every tool with registerTool, never the deprecated server.tool", () => {
+    const dir = join(process.cwd(), "src", "tools");
+    const offenders = readdirSync(dir)
+      .filter((f) => f.endsWith(".ts") && /\bserver\.tool\(/.test(readFileSync(join(dir, f), "utf8")));
+    expect(offenders).toEqual([]);
+  });
+
+  it("gives every tool a title and all four annotation hints, none open-world", async () => {
+    const failures: string[] = [];
+    for (const tool of await allTools()) {
+      if (!tool.title) failures.push(`${tool.name}: no title`);
+      for (const hint of HINTS) {
+        if (typeof tool.annotations?.[hint] !== "boolean") failures.push(`${tool.name}: no ${hint}`);
+      }
+      // The server makes no network requests.
+      if (tool.annotations?.openWorldHint !== false) failures.push(`${tool.name}: open-world`);
+      if (tool.annotations?.readOnlyHint && tool.annotations.destructiveHint) failures.push(`${tool.name}: read-only yet destructive`);
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it("marks a tool that can overwrite a file destructive", async () => {
+    for (const tool of await allTools()) {
+      const props = (tool.inputSchema as JsonSchema).properties ?? {};
+      if ("overwrite" in props) expect({ tool: tool.name, destructive: tool.annotations?.destructiveHint }).toEqual({ tool: tool.name, destructive: true });
+    }
+  });
+
+  it("mirrors each tool's title and annotations in mcp-tools.json", async () => {
+    const declared = JSON.parse(readFileSync(join(process.cwd(), "mcp-tools.json"), "utf8")) as Array<{
+      name: string;
+      title?: string;
+      annotations?: Record<string, boolean>;
+    }>;
+    const live = new Map((await allTools()).map((t) => [t.name, t]));
+    for (const entry of declared) {
+      const tool = live.get(entry.name);
+      expect({ name: entry.name, title: entry.title, annotations: entry.annotations }).toEqual({
+        name: entry.name,
+        title: tool?.title,
+        annotations: tool?.annotations,
+      });
+    }
+  });
+
+  it("publishes loose output schemas, so optional result fields never fail a client's validation", async () => {
+    const withSchema = (await allTools()).filter((t) => t.outputSchema);
+    expect(withSchema.length).toBeGreaterThan(30);
+    for (const tool of withSchema) {
+      expect({ tool: tool.name, additional: tool.outputSchema?.additionalProperties }).not.toEqual({ tool: tool.name, additional: false });
+    }
+  });
+
+  describe("structured results", () => {
+    const outputPath = join(home, "meta.mp4");
+
+    beforeAll(async () => {
+      const { getStore } = await import("../context.js");
+      getStore().create({
+        id: "rec-meta",
+        target: "full",
+        outputPath,
+        fps: 30,
+        quality: "standard",
+        pid: null,
+        status: "stopped",
+        startedAt: new Date().toISOString(),
+      });
+    });
+
+    // The client validates structuredContent against the tool's outputSchema
+    // and throws on a mismatch, so a clean call is itself the schema check.
+    it.each([
+      ["list_sessions", {}],
+      ["get_session", { sessionId: "rec-meta" }],
+      ["stop_recording", { sessionId: "rec-meta" }],
+    ] as const)("%s returns structuredContent that matches its JSON text", async (name, args) => {
+      const res = await client.callTool({ name, arguments: args });
+      expect(res.isError).toBeFalsy();
+      const text = (res.content as Array<{ type: string; text: string }>)[0].text;
+      expect(res.structuredContent).toEqual(JSON.parse(text));
+      expect(JSON.stringify(res.structuredContent)).toContain(outputPath.replace(/\\/g, "\\\\"));
+    });
+
+    it("leaves error results without structuredContent", async () => {
+      const res = await client.callTool({ name: "get_session", arguments: { sessionId: "no-such-session" } });
+      expect(res.isError).toBe(true);
+      expect(res.structuredContent).toBeUndefined();
     });
   });
 });

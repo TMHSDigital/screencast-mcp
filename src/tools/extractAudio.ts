@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, runCapture } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
 import {
@@ -32,11 +33,17 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "extract_audio",
-    "Extract the audio track of a media file to its own file (mp3, aac, wav, " +
-      "or copy). Returns the output path.",
-    inputSchema,
+    {
+      title: "Extract Audio",
+      description:
+        "Extract the audio track of a media file to its own file (mp3, aac, wav, " +
+        "or copy). Returns the output path.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         const { ffprobe } = requireFfmpeg();

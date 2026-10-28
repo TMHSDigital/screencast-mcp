@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob, jobTimeoutMs } from "../utils/jobs.js";
 import { buildDenoiseArgs, buildNoiseFloorArgs, parseNoiseFloor, type DenoiseStrength } from "../utils/audio.js";
@@ -19,11 +20,17 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "denoise",
-    "Reduce steady background noise (fan, hum, hiss) in a recording's audio with an " +
-      "adaptive FFT denoiser. Video is copied untouched. Returns the output path.",
-    inputSchema,
+    {
+      title: "Denoise Audio",
+      description:
+        "Reduce steady background noise (fan, hum, hiss) in a recording's audio with an " +
+        "adaptive FFT denoiser. Video is copied untouched. Returns the output path.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

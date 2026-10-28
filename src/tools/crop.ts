@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildCropArgs, editOutputExt, assertEditContainer } from "../utils/media.js";
@@ -18,11 +19,17 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "crop",
-    "Crop a video to a pixel rectangle (x, y, width, height) and re-encode. A " +
-      "rectangle that runs off the source frame is rejected.",
-    inputSchema,
+    {
+      title: "Crop Video",
+      description:
+        "Crop a video to a pixel rectangle (x, y, width, height) and re-encode. A " +
+        "rectangle that runs off the source frame is rejected.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob, jobTimeoutMs } from "../utils/jobs.js";
 import {
@@ -42,12 +43,17 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "cut_idle",
-    "Remove dead air: cut stretches where the screen is frozen (and, if there is audio, " +
-      "silent), keeping a short pad at each edge. Agent recordings are full of these pauses. " +
-      "dryRun reports what would be cut first. Returns the output path and the time saved.",
-    inputSchema,
+    {
+      title: "Cut Idle Stretches",
+      description:
+        "Remove dead air: cut stretches where the screen is frozen (and, if there is audio, " +
+        "silent), keeping a short pad at each edge. Agent recordings are full of these pauses. " +
+        "dryRun reports what would be cut first. Returns the output path and the time saved.",
+      inputSchema,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         const { ffmpeg } = requireFfmpeg();

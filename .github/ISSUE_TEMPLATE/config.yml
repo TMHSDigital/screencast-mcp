@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation and workflow recipes
+    url: https://tmhsdigital.github.io/screencast-mcp/
+    about: Setup, every tool, and step-by-step recipes for agents.
+  - name: Report a security vulnerability
+    url: https://github.com/TMHSDigital/screencast-mcp/security/advisories/new
+    about: Report privately. Do not open a public issue for security problems.
+  - name: Question or idea
+    url: https://github.com/TMHSDigital/screencast-mcp/issues/new?template=feature_request.yml
+    about: Discussions are off; open a feature request and describe what you want to do.

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildSpeedArgs, editOutputExt, assertEditContainer } from "../utils/media.js";
@@ -15,11 +16,17 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "speed",
-    "Change playback speed by a factor (>1 faster, <1 slower) and re-encode. " +
-      "Audio is retempo'd to match when the source has an audio track.",
-    inputSchema,
+    {
+      title: "Change Speed",
+      description:
+        "Change playback speed by a factor (>1 faster, <1 slower) and re-encode. " +
+        "Audio is retempo'd to match when the source has an audio track.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

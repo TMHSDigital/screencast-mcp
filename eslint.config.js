@@ -35,7 +35,7 @@ export default tseslint.config(
       sourceType: "script",
       globals: {
         window: "readonly", document: "readonly", navigator: "readonly", location: "readonly",
-        history: "readonly", performance: "readonly", requestAnimationFrame: "readonly", setTimeout: "readonly",
+        history: "readonly", performance: "readonly", requestAnimationFrame: "readonly", setTimeout: "readonly", clearTimeout: "readonly",
         IntersectionObserver: "readonly", scrollY: "readonly", innerHeight: "readonly", addEventListener: "readonly",
       },
     },

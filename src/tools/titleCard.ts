@@ -2,6 +2,7 @@ import { z } from "zod";
 import { writeFileSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildTitleCardArgs, DEFAULT_TITLE_DURATION } from "../utils/produce.js";
@@ -25,16 +26,22 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "title_card",
-    "Generate a standalone title card: centered text on a solid background, with " +
-      "a silent audio track so it composes with audio-bearing clips (use " +
-      "assemble_highlights to stitch it in). Text is rendered with the bundled " +
-      "Inter font, so no system font is required for Latin, Greek or Cyrillic; other " +
-      "scripts and emoji automatically use a Windows system font that covers them " +
-      "(returned as fontFile), and characters no font covers are reported in " +
-      "warnings instead of silently drawn as boxes.",
-    inputSchema,
+    {
+      title: "Title Card",
+      description:
+        "Generate a standalone title card: centered text on a solid background, with " +
+        "a silent audio track so it composes with audio-bearing clips (use " +
+        "assemble_highlights to stitch it in). Text is rendered with the bundled " +
+        "Inter font, so no system font is required for Latin, Greek or Cyrillic; other " +
+        "scripts and emoji automatically use a Windows system font that covers them " +
+        "(returned as fontFile), and characters no font covers are reported in " +
+        "warnings instead of silently drawn as boxes.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

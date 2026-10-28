@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildOverlayArgs, editOutputExt, assertEditContainer } from "../utils/media.js";
@@ -21,13 +22,19 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "overlay",
-    "Composite an image or video (logo, watermark, picture-in-picture) onto a " +
-      "base video at a pixel position, optionally scaled and time-limited. A " +
-      "video overlay starts playing at start and holds its last frame if it ends " +
-      "early; the output keeps the base video's audio and length.",
-    inputSchema,
+    {
+      title: "Overlay Image or Video",
+      description:
+        "Composite an image or video (logo, watermark, picture-in-picture) onto a " +
+        "base video at a pixel position, optionally scaled and time-limited. A " +
+        "video overlay starts playing at start and holds its last frame if it ends " +
+        "early; the output keeps the base video's audio and length.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

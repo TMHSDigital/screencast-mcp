@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildAssembleArgs, clipLength, DEFAULT_TRANSITION_DUR } from "../utils/produce.js";
@@ -29,12 +30,18 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "assemble_highlights",
-    "Stitch two or more clips into a single video, with hard cuts or an xfade " +
-      "transition between each. Clips are auto-normalized to a common " +
-      "resolution, fps, and audio rate, so they need not match.",
-    inputSchema,
+    {
+      title: "Assemble Highlights",
+      description:
+        "Stitch two or more clips into a single video, with hard cuts or an xfade " +
+        "transition between each. Clips are auto-normalized to a common " +
+        "resolution, fps, and audio rate, so they need not match.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

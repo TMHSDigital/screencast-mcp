@@ -38,6 +38,8 @@ import { register as registerClip } from "./tools/clip.js";
 import { register as registerCutIdle } from "./tools/cutIdle.js";
 import { register as registerRedactRegion } from "./tools/redactRegion.js";
 import { register as registerListAudioDevices } from "./tools/listAudioDevices.js";
+import { register as registerListTargets } from "./tools/listTargets.js";
+import { register as registerDoctor } from "./tools/doctor.js";
 import { register as registerXfadeTransition } from "./tools/xfadeTransition.js";
 import { register as registerAssembleHighlights } from "./tools/assembleHighlights.js";
 import { register as registerTitleCard } from "./tools/titleCard.js";
@@ -94,6 +96,8 @@ export function createServer(): McpServer {
   registerCutIdle(server);
   registerRedactRegion(server);
   registerListAudioDevices(server);
+  registerListTargets(server);
+  registerDoctor(server);
   registerXfadeTransition(server);
   registerAssembleHighlights(server);
   registerTitleCard(server);

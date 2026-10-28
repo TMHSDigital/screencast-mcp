@@ -4,7 +4,9 @@
 
 **An MCP server that lets an agent record the screen, _watch_ the footage, and make minimal ffmpeg edits — over stdio, on Windows.**
 
-Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, redact, annotate, zoom toward clicks, and export for GitHub or social. No cloud service, no telemetry: ffmpeg and ffprobe behind 41 typed tools.
+Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, redact, annotate, zoom toward clicks, and export for GitHub or social. No cloud service, no telemetry: ffmpeg and ffprobe behind 43 typed tools.
+
+**For developers who want their coding agent to see and prove UI changes on Windows**: bug repros, UI verification, and demo clips the agent records, checks, and edits itself. Capture is Windows-only; the watch and edit tools work on any OS with ffmpeg. Free for non-commercial use ([CC BY-NC-ND 4.0](#license)); [why not OBS, Playwright, or a screenshot MCP?](#why-not-just)
 
 <br />
 
@@ -36,14 +38,14 @@ Capture the desktop, a monitor, a window, or a region; sample a recording into f
 
 ## Quick start
 
-**You need** Windows 10 or 11, [Node.js](https://nodejs.org) 22+, and ffmpeg on `PATH` (`winget install Gyan.FFmpeg`). Capture is Windows-only; the watch, edit, and produce tools work anywhere ffmpeg runs.
+**You need** Windows 10 or 11, [Node.js](https://nodejs.org) 22+, and **FFmpeg 8 or newer** on `PATH` (`winget install Gyan.FFmpeg`, the full build). Older builds run most tools, but `transcribe` (the `whisper` filter) and `backend: "wgc"` (`gfxcapture`) need FFmpeg 8, and essentials or distro builds can lack them (Ubuntu LTS `apt install ffmpeg` gives 6.x). Capture is Windows-only; the watch, edit, and produce tools work anywhere ffmpeg runs. After connecting, ask the agent to run `doctor`: it reports the ffmpeg version, the filters and devices it has, OCR, and anything missing.
 
 **Add it to your client:**
 
 | Client | How |
 | --- | --- |
 | Claude Code | `claude mcp add screencast -- cmd /c npx -y @tmhs/screencast-mcp` |
-| Claude Desktop | Download the `.mcpb` from the [latest release](https://github.com/TMHSDigital/screencast-mcp/releases/latest) and open it (one click) |
+| Claude Desktop | Download [`screencast-mcp.mcpb`](https://github.com/TMHSDigital/screencast-mcp/releases/latest/download/screencast-mcp.mcpb) from the latest release and open it (one click) |
 | Cursor, VS Code, others | The JSON config below, or step-by-step on [Connect your client](https://tmhsdigital.github.io/screencast-mcp/connect.html) |
 
 ```json
@@ -80,9 +82,17 @@ What it can do beyond record-and-look:
 - **One call, one encode.** `pipeline` runs trim, crop, redact, callouts, and an export as a single ffmpeg pass.
 - **Record a covered window.** `backend: "wgc"` records a window's own surface through Windows Graphics Capture.
 
+### Why not just...
+
+| Instead of | The difference |
+| --- | --- |
+| OBS, ShareX, Game Bar | Built for a person at the controls. Here the agent starts and stops the recording, looks at the frames, and makes the edits through typed tools, with no GUI step. |
+| Playwright or Puppeteer video | Browser pages only, and the video is a file the model never sees. Here: any window or monitor, frames returned to the model, plus `wait_for_change`, `find_text`, and `screen_diff` for checking what happened. |
+| A screenshot-only MCP server | Single stills. Here: video over time, an input event log, scene-change sampling, redaction, and export, so the agent can show a sequence, not one moment. |
+
 ## Tools
 
-41 tools in six groups. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface; tests keep it, this README, and the docs site in sync with `src/tools/`.
+43 tools in six groups. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface; tests keep it, this README, and the docs site in sync with `src/tools/`.
 
 ### Capture
 
@@ -97,6 +107,8 @@ What it can do beyond record-and-look:
 | `read_events` | Read a recording's input event log (clicks, scroll, cursor, shortcuts, typing bursts) on the video's clock. Opt in with `start_recording` `events: true`. |
 | `screenshot` | Capture a single PNG of a `target`, and return it inline as an image the model can view. |
 | `list_audio_devices` | List the DirectShow audio devices ffmpeg can see and flag a likely system-audio loopback device for `start_recording`. |
+| `list_targets` | List what can be captured: the desktop, each monitor (bounds, DPI scale), and each window (title, exe, pid, hwnd, bounds, minimized, cloaked, and whether gdigrab and `wgc` can capture it). Every entry carries a `target` string (`window:hwnd=<handle>` for windows) to pass as-is to `screenshot` or `start_recording`; filter with `exe` / `titleContains`. |
+| `doctor` | Check the setup: ffmpeg/ffprobe path and version (FFmpeg 8+?), key filters (`whisper`, `gfxcapture`, `subtitles`, `drawtext`, ...), `gdigrab`/`dshow` devices, Windows OCR, `SCREENCAST_HOME`, and the env settings in effect, with a `problems` list naming each fix. |
 
 ### Watch
 
@@ -183,7 +195,7 @@ Edit and produce tools write to a `<name>.partial.<ext>` file next to the output
 
 ## Configuration
 
-`ffmpeg` and `ffprobe` must be on `PATH`, or pointed at with `FFMPEG_PATH` / `FFPROBE_PATH`; the server checks per call and returns an install hint if either is missing (macOS: `brew install ffmpeg`; Linux: `apt install ffmpeg`, for the non-capture tools).
+`ffmpeg` and `ffprobe` must be on `PATH`, or pointed at with `FFMPEG_PATH` / `FFPROBE_PATH`; the server checks per call and returns an install hint if either is missing (macOS: `brew install ffmpeg`; Linux: `apt install ffmpeg`, for the non-capture tools; distro packages may predate FFmpeg 8, so `transcribe` needs a newer static build). `doctor` shows what the ffmpeg in use supports.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -324,6 +336,8 @@ Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) 
 ## License
 
 Released under the [CC-BY-NC-ND-4.0](LICENSE) license: free to use and share for non-commercial purposes, with attribution and without modification. For other uses, [open an issue](https://github.com/TMHSDigital/screencast-mcp/issues).
+
+**Can I use it at work?** Only for non-commercial purposes under this license. If your use is commercial (inside a paid product or service, or work done mainly for commercial advantage), or you are not sure, [open an issue](https://github.com/TMHSDigital/screencast-mcp/issues) to ask about a commercial license. The licensing model is described in the [TMHSDigital licensing standard](https://github.com/TMHSDigital/Developer-Tools-Directory/blob/main/standards/licensing.md).
 
 <div align="center">
 <br />

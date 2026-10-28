@@ -18,7 +18,7 @@ the integration suite, `ffmpeg` and `ffprobe` on `PATH`.
 
 Use [Conventional Commits](https://www.conventionalcommits.org/):
 
-- `feat:` -- new feature, provider adapter, or tool
+- `feat:` -- new feature or tool
 - `fix:` -- bug fix
 - `docs:` -- documentation changes
 - `chore:` -- maintenance, dependency updates
@@ -31,7 +31,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 - Add it to `mcp-tools.json` (a test checks the manifest matches the registered tools)
 - Add vitest tests: unit tests for the builder, plus an ffmpeg-backed case in `src/__tests__/integration/` for anything that produces media
 
-Capture is Windows-only today (gdigrab, see `src/utils/targets.ts`); there is no capture-backend abstraction yet. Cross-platform capture is tracked in #15.
+Capture is Windows-only (gdigrab, plus Windows Graphics Capture for `backend: "wgc"`; see `src/utils/targets.ts`), and cross-platform capture is not planned (see the [roadmap](ROADMAP.md#not-planned)). The watch, edit, and produce tools run anywhere ffmpeg runs.
 
 ### Tests
 
@@ -40,13 +40,41 @@ Capture is Windows-only today (gdigrab, see `src/utils/targets.ts`); there is no
 - `RUN_CAPTURE_SMOKE=1 npm test` (Windows) takes a real screenshot and a 2 s recording through the handlers; CI's Windows leg sets it
 - `RUN_LOCAL_CAPTURE_TESTS=1 npm test` (after `npm run build`) drives the built server through real gdigrab capture; Windows with a display only
 
-Bump the version in `package.json` in your PR (e.g. `npm version <patch|minor|major> --no-git-tag-version`); CI tags and publishes it on merge.
-
 ## Pull Request Process
 
 1. Ensure CI passes (`npm run lint`, `npm run build`, `npm run typecheck`, `npm test`)
-2. Update `CHANGELOG.md` if the change is user-facing
-3. Use a descriptive PR title following conventional commit format
+2. Add a `CHANGELOG.md` entry under `## Unreleased` if the change is user-facing
+3. Do not bump the version; the maintainer does that when cutting a release (see below)
+4. Use a descriptive PR title following conventional commit format
+
+The PR template carries this checklist. Bug reports and feature requests use the
+issue forms; security problems go through [private vulnerability reporting](SECURITY.md).
+
+## Releases
+
+A version bump is a release: after CI passes on `main`, `release.yml` tags and
+releases any `package.json` version that has no tag yet, publishes it to npm and
+the MCP Registry, and attaches the Claude Desktop bundle. A commit that does not
+change the version releases nothing (the docs site deploys on its own).
+
+- **When to bump.** The maintainer commits to `main` in batches and bumps the
+  version once per batch that changes what users install: tools, parameters,
+  results, the bundle, or runtime behavior. A batch of only `docs:`, `ci:`,
+  `chore:`, `test:`, or `refactor:` work does not bump and does not publish;
+  its CHANGELOG entries (if any) wait under `## Unreleased`.
+- **How.** Rename `## Unreleased` to `## [x.y.z] - YYYY-MM-DD`, add a fresh empty
+  `## Unreleased` above it, and run `npm version <patch|minor|major> --no-git-tag-version`.
+  Before 1.0, `feat:` bumps the minor version and everything else the patch; a
+  breaking change also bumps the minor and is called out under `### Changed`.
+- **Release notes.** The GitHub Release body is that version's CHANGELOG
+  section, so write entries for users. GitHub's generated notes are only a
+  fallback when the section is missing.
+- **Floating tags.** Each release also moves `vMAJOR` and `vMAJOR.MINOR` to the
+  newest release in that line (the ecosystem standard this repo follows), so a
+  git reference can track a release line. They only move forward and are never
+  used to publish.
+- **1.0.** What freezes at 1.0, the deprecation policy, and the criteria are in
+  the [roadmap](ROADMAP.md#path-to-10).
 
 ## Inbound license grant and DCO
 
@@ -61,8 +89,9 @@ By submitting a contribution to this repository, you certify that you have the r
 Every commit in a pull request must carry a `Signed-off-by:` trailer matching the commit author. Sign at commit time with the `-s` flag:
 
 ```bash
-git commit -s -m "feat: add new tool"```
+git commit -s -m "feat: add new tool"
+```
 
-This appends a line like `Signed-off-by: Jane Developer <jane@example.com>` to the commit message. The GitHub DCO App enforces this on every PR.
+This appends a line like `Signed-off-by: Jane Developer <jane@example.com>` to the commit message. Pull requests whose commits lack a matching sign-off are not merged until they are re-signed (`git rebase --signoff main`).
 
 For the full inbound/outbound model and rationale, see [`standards/licensing.md`](https://github.com/TMHSDigital/Developer-Tools-Directory/blob/main/standards/licensing.md) in the Developer-Tools-Directory meta-repo.

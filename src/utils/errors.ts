@@ -38,11 +38,19 @@ export interface ToolResult {
 }
 
 /** Wrap a JSON-serializable value as a successful tool result, optionally
- * followed by image blocks. */
+ * followed by image blocks. An object value is also returned as
+ * `structuredContent` (what a tool's outputSchema describes); the JSON text
+ * block stays for clients that read only `content` (#212). */
 export function okResponse(value: unknown, images: ImageContent[] = []): ToolResult {
   const text =
     typeof value === "string" ? value : JSON.stringify(value, null, 2);
-  return { content: [{ type: "text", text }, ...images] };
+  const result: ToolResult = { content: [{ type: "text", text }, ...images] };
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    // Parsed back from the text so the two can never disagree (undefined
+    // fields dropped, Dates as strings).
+    result.structuredContent = JSON.parse(text) as Record<string, unknown>;
+  }
+  return result;
 }
 
 /** Wrap any thrown value as an error tool result, appending a hint if present. */

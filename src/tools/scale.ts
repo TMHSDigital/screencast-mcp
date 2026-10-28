@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildScaleArgs, editOutputExt, assertEditContainer } from "../utils/media.js";
@@ -16,11 +17,17 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "scale",
-    "Resize a video to a target width and/or height and re-encode. Provide one " +
-      "side to keep the aspect ratio, or both to set an exact size.",
-    inputSchema,
+    {
+      title: "Scale Video",
+      description:
+        "Resize a video to a target width and/or height and re-encode. Provide one " +
+        "side to keep the aspect ratio, or both to set an exact size.",
+      inputSchema,
+      outputSchema: OUTPUT_PATH,
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

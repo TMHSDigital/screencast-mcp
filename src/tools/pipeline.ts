@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { planPipeline, MAX_PIPELINE_STEPS, type PipelineStep } from "../utils/pipeline.js";
@@ -74,13 +75,19 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "pipeline",
-    "Run several edits as one ffmpeg process: one re-encode and no intermediate files, instead of a " +
-      "tool call and a re-encode per edit. Steps use the same options as the standalone tools " +
-      "(trim, crop, scale, speed, redact, callout, reframe, zoom) and may end with export_preset or " +
-      "export_gif. The same steps can be saved and re-run on another recording. dryRun returns the plan.",
-    inputSchema,
+    {
+      title: "Edit Pipeline",
+      description:
+        "Run several edits as one ffmpeg process: one re-encode and no intermediate files, instead of a " +
+        "tool call and a re-encode per edit. Steps use the same options as the standalone tools " +
+        "(trim, crop, scale, speed, redact, callout, reframe, zoom) and may end with export_preset or " +
+        "export_gif. The same steps can be saved and re-run on another recording. dryRun returns the plan.",
+      inputSchema,
+      outputSchema: looseOutput({ processes: z.number().int(), steps: z.array(z.string()) }),
+      annotations: WRITES_FILE,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

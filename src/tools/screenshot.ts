@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
+import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { captureStill } from "../utils/still.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
@@ -56,12 +57,23 @@ const inputSchema = {
 };
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "screenshot",
-    "Capture a single still frame (PNG) of a target (full screen, a monitor, a " +
-      "window by title, or a region). Returns the image path, plus the image " +
-      "inline so the model can view it directly (disable with returnImage: false).",
-    inputSchema,
+    {
+      title: "Take Screenshot",
+      description:
+        "Capture a single still frame (PNG) of a target (full screen, a monitor, a " +
+        "window by title, or a region). Returns the image path, plus the image " +
+        "inline so the model can view it directly (disable with returnImage: false).",
+      inputSchema,
+      outputSchema: looseOutput({
+        outputPath: z.string(),
+        target: z.string(),
+        backend: z.string(),
+        inlineImages: z.number().int(),
+      }),
+      annotations: WRITES_FILE,
+    },
     async (args) => {
       try {
         requireFfmpeg();

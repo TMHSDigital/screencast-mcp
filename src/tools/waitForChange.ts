@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
+import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpeg, runFfmpegBuffer } from "../utils/ffmpeg.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
 import { buildScreenshotArgs } from "../utils/targets.js";
@@ -75,13 +76,25 @@ const inputSchema = {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function register(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "wait_for_change",
-    "Watch part of the screen and return when it changes (mode 'change') or when it has " +
-      "stopped changing (mode 'settle'), instead of guessing a sleep. Reports how long it " +
-      "took, where the screen changed, and the final state as an inline screenshot. `regions` " +
-      "are in the screenshot's pixels (like find_text and screen_diff); add `origin` for desktop coordinates.",
-    inputSchema,
+    {
+      title: "Wait for Screen Change",
+      description:
+        "Watch part of the screen and return when it changes (mode 'change') or when it has " +
+        "stopped changing (mode 'settle'), instead of guessing a sleep. Reports how long it " +
+        "took, where the screen changed, and the final state as an inline screenshot. `regions` " +
+        "are in the screenshot's pixels (like find_text and screen_diff); add `origin` for desktop coordinates.",
+      inputSchema,
+      outputSchema: looseOutput({
+        outcome: z.string(),
+        mode: z.string(),
+        elapsedSec: z.number(),
+        regions: z.array(z.unknown()),
+        origin: looseOutput({ x: z.number(), y: z.number() }),
+      }),
+      annotations: READ_ONLY,
+    },
     async (args, extra) => {
       try {
         requireFfmpeg();

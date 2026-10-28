@@ -61,7 +61,7 @@
       </div>
       <div class="panel" role="tabpanel" id="claude-desktop" aria-labelledby="tab-claude-desktop">
         <h3>Claude Desktop</h3>
-      <p><strong>One click:</strong> download <code>screencast-mcp-&lt;version&gt;.mcpb</code> from the <a href="https://github.com/TMHSDigital/screencast-mcp/releases/latest">latest release</a> and open it, or drag it into <strong>Settings &rsaquo; Extensions</strong>. Claude Desktop runs it with its own Node, and lets you pick an output folder and point at <code>ffmpeg.exe</code> if it is not on <code>PATH</code>.</p>
+      <p><strong>One click:</strong> download <a href="https://github.com/TMHSDigital/screencast-mcp/releases/latest/download/screencast-mcp.mcpb"><code>screencast-mcp.mcpb</code></a> (always the <a href="https://github.com/TMHSDigital/screencast-mcp/releases/latest">latest release</a>) and open it, or drag it into <strong>Settings &rsaquo; Extensions</strong>. Claude Desktop runs it with its own Node and lets you set every option without editing JSON: the output folder, <code>ffmpeg.exe</code> and <code>ffprobe.exe</code> if they are not on <code>PATH</code>, a Whisper model for <code>transcribe</code>, the default recording cap, the edit job timeout, capture retention, and the PowerShell helper timeout.</p>
       <p>Or by hand: <strong>Settings &rsaquo; Developer &rsaquo; Edit Config</strong> opens <code>%APPDATA%\Claude\claude_desktop_config.json</code>. Add:</p>
       <pre class="copyable"><code>{
   "mcpServers": {
@@ -94,8 +94,12 @@
       </div>
       <div class="panel" role="tabpanel" id="vs-code" aria-labelledby="tab-vs-code">
         <h3>VS Code</h3>
-      <p>From a terminal:</p>
-      <pre class="copyable"><code>code --add-mcp '{"name":"screencast","command":"npx","args":["-y","@tmhs/screencast-mcp"]}'</code></pre>
+      <p><strong>One click:</strong> <a href="https://insiders.vscode.dev/redirect/mcp/install?name=screencast&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40tmhs%2Fscreencast-mcp%22%5D%7D">Install in VS Code</a> (it asks before adding the server).</p>
+      <p>Or from a terminal. The JSON needs different quoting in each Windows shell; <code>--%</code> makes PowerShell pass the rest of the line through unchanged.</p>
+      <p class="shell">PowerShell (Windows PowerShell 5.1 and PowerShell 7):</p>
+      <pre class="copyable"><code>code --% --add-mcp "{\"name\":\"screencast\",\"command\":\"npx\",\"args\":[\"-y\",\"@tmhs/screencast-mcp\"]}"</code></pre>
+      <p class="shell">Command Prompt (cmd.exe):</p>
+      <pre class="copyable"><code>code --add-mcp "{\"name\":\"screencast\",\"command\":\"npx\",\"args\":[\"-y\",\"@tmhs/screencast-mcp\"]}"</code></pre>
       <p>Or add <code>.vscode/mcp.json</code> to a workspace. VS Code uses <code>servers</code>, not <code>mcpServers</code>:</p>
       <pre class="copyable"><code>{
   "servers": {
@@ -122,7 +126,7 @@
 
     <footer>
       <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
-      <span>CC-BY-NC-ND-4.0</span>
+      <span>License: <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/LICENSE">CC BY-NC-ND 4.0</a> &middot; free for non-commercial use</span>
     </footer>
   </main>
 

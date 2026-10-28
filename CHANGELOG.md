@@ -7,6 +7,28 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.43.0]
+
+### Added
+
+- `list_targets`: the desktop, each monitor (bounds, DPI scale, primary), and each visible window (title, exe, pid, hwnd, bounds, minimized, cloaked, and whether gdigrab and `wgc` can capture it), topmost first, each with a `target` string (`window:hwnd=<handle>` for windows) that `screenshot` and `start_recording` accept as-is. Filter with `exe`, `titleContains`, or `capturableOnly` (#213).
+- `doctor`: the ffmpeg and ffprobe in use (path, version, whether it is FFmpeg 8+), the filters that gate tools, the `gdigrab` and `dshow` devices, Windows OCR, `SCREENCAST_HOME`, and the settings in effect, with a `problems` list naming each fix (#195).
+- The Claude Desktop bundle and the MCP Registry entry expose every documented environment variable (Whisper model, recording cap, job timeout, retention, PowerShell timeout). The bundle has an icon, and each release attaches an unversioned `screencast-mcp.mcpb`, so `releases/latest/download/screencast-mcp.mcpb` is a stable link (#216).
+- Issue forms, a PR checklist, and CODEOWNERS (#194). Who it's for, a "Why not just OBS / Playwright / a screenshot MCP" comparison, and a visible license in the README and on the docs site (#196). A release policy and a Path to 1.0 in CONTRIBUTING and ROADMAP (#219).
+
+### Changed
+
+- Every tool registers with `registerTool` and carries a title and annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`), so clients can auto-approve read-only tools and confirm ones that can overwrite a file. Tools with a JSON result declare an `outputSchema` and return `structuredContent` alongside the JSON text; `mcp-tools.json` mirrors the titles and annotations (#212).
+- The README states the FFmpeg 8 requirement up front (#195). The npm package ships only `dist/**/*.js`, without type declarations, source maps, or comments (1.82 MB to 1.18 MB unpacked, 334 to 96 files) (#195).
+- GitHub Release notes are the version's CHANGELOG section. Docs, CI, and chore-only changes no longer bump the version or publish (#219).
+- AGENTS.md describes the real layout and is the source CLAUDE.md and `.cursorrules` point to; the ROADMAP is regrouped as Shipped / Now / Next / Not planned (#193).
+
+### Fixed
+
+- The VS Code install command on the Connect page works in cmd.exe and Windows PowerShell 5.1 as well as PowerShell 7, and there is a one-click install link (#217).
+- The docs hero no longer floods screen readers while scrubbing, workflow GIFs show a still frame under reduced motion, and the site accent matches the REC identity (#224).
+- The Code of Conduct points to a working reporting channel, and agent docs no longer reference a nonexistent `src/providers` (#193, #194).
+
 ## [0.42.0]
 
 ### Added

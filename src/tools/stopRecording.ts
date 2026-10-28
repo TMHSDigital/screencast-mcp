@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { STOPS_SESSION, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { probeDuration, stopSession } from "../utils/lifecycle.js";
 import { getStore } from "../context.js";
@@ -14,6 +15,7 @@ export function register(server: McpServer): void {
   server.registerTool(
     "stop_recording",
     {
+      title: "Stop Recording",
       description:
         "Stop a recording by session id. Sends ffmpeg a graceful quit so the file " +
         "is finalized rather than truncated, then returns the final path and " +
@@ -21,6 +23,13 @@ export function register(server: McpServer): void {
         "handle was lost (for example after a server restart). Pass the session " +
         "id to review_recording to open the review player.",
       inputSchema,
+      outputSchema: looseOutput({
+        sessionId: z.string(),
+        status: z.string(),
+        outputPath: z.string(),
+        durationSec: z.number().nullable(),
+      }),
+      annotations: STOPS_SESSION,
     },
     async (args) => {
       try {
