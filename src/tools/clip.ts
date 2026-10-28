@@ -47,8 +47,7 @@ export function register(server: McpServer): void {
         const ext = editOutputExt(args.input);
         const single = args.segments.length === 1;
         const outputs: string[] = [];
-        for (let i = 0; i < args.segments.length; i++) {
-          const seg = args.segments[i];
+        for (const [i, seg] of args.segments.entries()) {
           const output = resolveOutput(
             single ? args.output : undefined,
             subdir("edits"),

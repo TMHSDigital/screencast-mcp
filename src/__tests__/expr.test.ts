@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { defined } from "./testUtils.js";
 import { sumExpr, SUM_GROUP } from "../utils/expr.js";
 import { scriptLongFilters, MAX_INLINE_FILTER } from "../utils/ffmpeg.js";
 import { existsSync, readFileSync } from "node:fs";
@@ -24,10 +25,11 @@ describe("scriptLongFilters (#225)", () => {
     const { args, cleanup } = scriptLongFilters(["-i", "in.mp4", "-vf", "scale=2:2", "-filter_complex", long, "o.mp4"]);
     expect(args.slice(0, 4)).toEqual(["-i", "in.mp4", "-vf", "scale=2:2"]);
     expect(args[4]).toBe("-/filter_complex");
-    expect(readFileSync(args[5], "utf8")).toBe(long);
+    const script = defined(args[5]);
+    expect(readFileSync(script, "utf8")).toBe(long);
     expect(args[6]).toBe("o.mp4");
     cleanup();
-    expect(existsSync(args[5])).toBe(false);
+    expect(existsSync(script)).toBe(false);
   });
 
   it("leaves short args untouched", () => {

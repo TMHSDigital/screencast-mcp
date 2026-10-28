@@ -64,7 +64,7 @@ export interface FallbackFamily {
 /** Windows system fonts by script (#231). drawtext opens face 0 of a .ttc,
  * which for each of these is the face wanted (verified against ffmpeg). Emoji
  * render in monochrome: drawtext draws the outlines, not the colour layers. */
-export const FALLBACK_FAMILIES: Record<string, FallbackFamily> = {
+export const FALLBACK_FAMILIES = {
   // Arabic, Hebrew, Armenian, Georgian and extended Latin/Greek/Cyrillic.
   segoe: { name: "Segoe UI", regular: ["segoeui.ttf"], bold: ["segoeuib.ttf", "segoeui.ttf"] },
   japanese: {
@@ -80,9 +80,11 @@ export const FALLBACK_FAMILIES: Record<string, FallbackFamily> = {
   ethiopic: { name: "Ebrima", regular: ["ebrima.ttf"], bold: ["ebrimabd.ttf", "ebrima.ttf"] },
   emoji: { name: "Segoe UI Emoji", regular: ["seguiemj.ttf"], bold: ["seguiemj.ttf"] },
   symbol: { name: "Segoe UI Symbol", regular: ["seguisym.ttf"], bold: ["seguisym.ttf"] },
-};
+} satisfies Record<string, FallbackFamily>;
 
-const DEFAULT_ORDER = [
+type FallbackKey = keyof typeof FALLBACK_FAMILIES;
+
+const DEFAULT_ORDER: readonly FallbackKey[] = [
   "segoe", "japanese", "chineseSimplified", "chineseTraditional", "korean",
   "indic", "thai", "ethiopic", "emoji", "symbol",
 ];
@@ -92,7 +94,7 @@ const DEFAULT_ORDER = [
  * them decides: kana means Japanese, Hangul means Korean, Han alone means
  * (simplified) Chinese. Pure. */
 export function fallbackOrder(text: string): FallbackFamily[] {
-  const front: string[] = [];
+  const front: FallbackKey[] = [];
   if (/[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9f]/u.test(text)) front.push("japanese");
   if (/[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/u.test(text)) front.push("korean");
   if (/\p{Script=Han}/u.test(text)) front.push("chineseSimplified");

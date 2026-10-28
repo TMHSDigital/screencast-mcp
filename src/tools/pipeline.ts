@@ -99,7 +99,8 @@ export function register(server: McpServer): void {
           durationSec: info.durationSec,
           hasAudio: info.audioCodec !== null,
         };
-        const last = steps[steps.length - 1];
+        const last = steps.at(-1);
+        if (!last) throw new ScreencastError("Provide at least one step.");
         const ext = last.op === "export_gif" ? `.${last.format ?? "gif"}` : ".mp4";
         const output = resolveOutput(args.output, subdir("edits"), `pipeline-${stamp()}-${rand()}${ext}`, args.overwrite);
 
@@ -110,8 +111,7 @@ export function register(server: McpServer): void {
           const assets: Record<number, CalloutAssets> = {};
           const fallbackFonts: Array<{ step: number; item: number; fontFile: string }> = [];
           const warnings: string[] = [];
-          for (let i = 0; i < steps.length; i++) {
-            const s = steps[i];
+          for (const [i, s] of steps.entries()) {
             if (s.op !== "callout") continue;
             const a = args.dryRun
               ? { fontFile: "<font>", textFiles: s.items.map((c) => (c.type === "text" ? "<text>" : null)), arrowFiles: s.items.map((c) => (c.type === "arrow" ? "<arrow.png>" : null)), ...calloutFonts(s.items, s.fontFile) }

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { defined } from "./testUtils.js";
 import {
   analysisSize,
   detectionSize,
@@ -143,7 +144,7 @@ describe("change detection on large targets (#234)", () => {
         scaleY: src.height / size.height,
       });
       expect(d.regions.length).toBeGreaterThan(0);
-      const r = d.regions[0];
+      const r = defined(d.regions[0]);
       // The box sits on the label, in source pixels, within one cell of its edges.
       const cell = (src.width / size.width) * 8;
       expect(r.x).toBeLessThan(label.x + label.w);
@@ -190,10 +191,12 @@ describe("screen_diff boxes with mismatched aspect ratios (#211)", () => {
     const b = { width: 1920, height: 1200 };
     const change = { x: 800, y: 900, w: 100, h: 60 }; // in b's pixels
     const [ra, rb] = shrunkChange(b, size, change, 200);
-    const r = diffFrames(ra, rb, size.width, size.height, {
-      scaleX: b.width / size.width,
-      scaleY: b.height / size.height,
-    }).regions[0];
+    const r = defined(
+      diffFrames(ra, rb, size.width, size.height, {
+        scaleX: b.width / size.width,
+        scaleY: b.height / size.height,
+      }).regions[0],
+    );
     expect(r.y).toBeLessThanOrEqual(change.y);
     expect(r.y + r.height).toBeGreaterThanOrEqual(change.y + change.h);
     expect(r.y + r.height).toBeLessThan(change.y + change.h + 40);
@@ -209,7 +212,7 @@ describe("wait_for_change boxes match its screenshot (#233)", () => {
     const size = detectionSize(area.width, area.height);
     const change = { x: 400, y: 200, w: 120, h: 40 }; // in screenshot pixels
     const [a, b] = shrunkChange(area, size, change, 200);
-    const r = diffFrames(a, b, size.width, size.height, targetDiffOptions(area, size)).regions[0];
+    const r = defined(diffFrames(a, b, size.width, size.height, targetDiffOptions(area, size)).regions[0]);
     expect(r.x).toBeGreaterThanOrEqual(change.x - 32);
     expect(r.x).toBeLessThanOrEqual(change.x);
     expect(r.y).toBeGreaterThanOrEqual(change.y - 32);

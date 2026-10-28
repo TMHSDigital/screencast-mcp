@@ -48,6 +48,10 @@ export function register(server: McpServer): void {
           if (!existsSync(f)) throw new ScreencastError(`Input file not found: ${f}`);
         }
         const infos = await Promise.all(inputs.map((f) => probeMedia(f)));
+        // The schema requires two or more inputs; this guard just narrows.
+        const [firstInput] = inputs;
+        const [first] = infos;
+        if (firstInput === undefined || first === undefined) throw new ScreencastError("concat needs at least two inputs.");
         const durations = infos.map((i) => clipLength(i));
         const durationSec = durations.every((d) => d !== null) ? durations.reduce((a, d) => a + d!, 0) : null;
         // Mismatched inputs make the concat demuxer write a broken file (#206),
@@ -55,8 +59,7 @@ export function register(server: McpServer): void {
         const reason = concatCopyBlocker(inputs, infos);
         if (reason !== null) {
           assertEditContainer(args.output);
-          const output = resolveOutput(args.output, subdir("edits"), `concat-${stamp()}-${rand()}${editOutputExt(inputs[0])}`, args.overwrite);
-          const first = infos[0];
+          const output = resolveOutput(args.output, subdir("edits"), `concat-${stamp()}-${rand()}${editOutputExt(firstInput)}`, args.overwrite);
           const even = (n: number | null) => (n !== null && n >= 2 ? n - (n % 2) : undefined);
           const ffArgs = buildAssembleArgs(
             inputs,
@@ -68,7 +71,7 @@ export function register(server: McpServer): void {
           await runEditJob(ffArgs, { output, durationSec, extra });
           return okResponse({ outputPath: output, inputCount: inputs.length, mode: "reencode", reason });
         }
-        const ext = extname(inputs[0]) || ".mp4";
+        const ext = extname(firstInput) || ".mp4";
         const output = resolveOutput(args.output, subdir("edits"), `concat-${stamp()}-${rand()}${ext}`, args.overwrite);
         const listFile = tempPath(".txt");
         writeFileSync(listFile, buildConcatListContent(inputs));

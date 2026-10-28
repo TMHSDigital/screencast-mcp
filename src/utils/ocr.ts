@@ -106,8 +106,9 @@ export function mergePasses(passes: OcrLine[][]): OcrLine[] {
   for (const pass of passes) {
     for (const line of pass) {
       const i = kept.findIndex((k) => overlapRatio(k, line) > 0.5);
-      if (i === -1) kept.push(line);
-      else if (line.text.length > kept[i].text.length) kept[i] = line;
+      const match = kept[i];
+      if (!match) kept.push(line);
+      else if (line.text.length > match.text.length) kept[i] = line;
     }
   }
   return kept.sort((a, b) => a.y - b.y || a.x - b.x);
@@ -195,7 +196,7 @@ export function findMatches(lines: OcrLine[], query: string, regex = false): Tex
   rebuilt.forEach(({ line, spans }, i) => {
     let ranges: Array<[number, number]> = [];
     if (regexHits) {
-      ranges = regexHits[i];
+      ranges = regexHits[i] ?? [];
     } else {
       // normalizeForMatch keeps string length except for collapsing runs of
       // separators, so search the normalized text and map back word by word.
@@ -238,7 +239,7 @@ function normalizedRangeToText(
     }
     pos += len + 1;
   }
-  return [textStart === -1 ? 0 : textStart, textEnd === -1 ? spans[spans.length - 1].end : textEnd];
+  return [textStart === -1 ? 0 : textStart, textEnd === -1 ? (spans.at(-1)?.end ?? 0) : textEnd];
 }
 
 /** Padded rectangles for redact_region, clamped to the frame. Pure. */

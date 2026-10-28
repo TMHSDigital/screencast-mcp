@@ -57,8 +57,8 @@ function readmeEnvVars(md: string): string[] {
   const section = md.split(/^## Configuration\s*$/m)[1]?.split(/^## /m)[0] ?? "";
   const names = new Set<string>();
   for (const line of section.split("\n")) {
-    const firstCell = line.startsWith("|") ? line.split("|")[1] : "";
-    for (const [, name] of firstCell.matchAll(/`([A-Z][A-Z0-9_]+)`/g)) names.add(name);
+    const firstCell = (line.startsWith("|") ? line.split("|")[1] : "") ?? "";
+    for (const [, name = ""] of firstCell.matchAll(/`([A-Z][A-Z0-9_]+)`/g)) names.add(name);
   }
   expect(names.size).toBeGreaterThan(0);
   return [...names].sort();

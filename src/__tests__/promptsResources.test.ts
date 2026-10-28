@@ -3,6 +3,7 @@
  * in-memory transport (no ffmpeg or Windows needed, except the poster read).
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { defined } from "./testUtils.js";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -48,7 +49,7 @@ describe("MCP prompts and resources (#126)", () => {
 
   it("fills a prompt's arguments into its workflow", async () => {
     const r = await client.getPrompt({ name: "verify-ui-change", arguments: { target: "window:App", expectation: "the Save button turns green" } });
-    const text = (r.messages[0].content as { text: string }).text;
+    const text = (defined(r.messages[0]).content as { text: string }).text;
     expect(text).toContain('wait_for_change { target: "window:App", mode: "settle" }');
     expect(text).toContain("the Save button turns green");
   });
@@ -60,7 +61,7 @@ describe("MCP prompts and resources (#126)", () => {
       PROMPT_TEXT.verifyUiChange("full", ""),
       PROMPT_TEXT.reviewRecording("x.mp4"),
     ].join("\n");
-    const named = [...texts.matchAll(/\b([a-z]+(?:_[a-z]+)+)\b(?= \{|\b)/g)].map((m) => m[1]).filter((n) => /^[a-z]+_[a-z_]+$/.test(n));
+    const named = [...texts.matchAll(/\b([a-z]+(?:_[a-z]+)+)\b(?= \{|\b)/g)].map((m) => defined(m[1])).filter((n) => /^[a-z]+_[a-z_]+$/.test(n));
     const unknown = [...new Set(named)].filter((n) => !toolNames.has(n) && !["fileExists"].includes(n));
     expect(unknown).toEqual([]);
     for (const t of ["start_recording", "export_gif", "find_text", "contact_sheet", "screen_diff"]) expect(named).toContain(t);

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { argAfter } from "./testUtils.js";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -75,7 +76,7 @@ describe("captions (#120)", () => {
 
   it("burns subtitles with the bundled fonts and a style", () => {
     const a = buildBurnSubtitlesArgs("in.mp4", "C:\\s\\a.srt", "o.mp4", "C:\\fonts", "social");
-    const vf = a[a.indexOf("-vf") + 1];
+    const vf = argAfter(a, "-vf");
     expect(vf.startsWith("subtitles=filename=C\\\\:/s/a.srt:fontsdir=C\\\\:/fonts:force_style='FontName=Inter,Bold=1")).toBe(true);
     expect(vf).toContain("BorderStyle=3");
     expect(() => buildBurnSubtitlesArgs("i", "s", "o", "f", "neon" as never)).toThrow(/Unknown caption style/);

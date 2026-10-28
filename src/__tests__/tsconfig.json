@@ -1,0 +1,12 @@
+{
+  // Type-checks all of src/ including these vitest suites, which the build
+  // config (../../tsconfig.json) excludes. Never emits. It lives here, not at
+  // the repo root, so typescript-eslint's projectService (which picks the
+  // nearest tsconfig.json) resolves test files to this project.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["../**/*"],
+  "exclude": []
+}

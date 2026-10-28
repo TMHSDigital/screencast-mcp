@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { argAfter } from "./testUtils.js";
 import { buildIdleScanArgs, parseFreezes, parseSilences, intersect, cutsFor, buildCutIdleArgs } from "../utils/idle.js";
 
 // What ffmpeg printed for a clip with a frozen, silent stretch from 2 s to 6 s.
@@ -47,7 +48,7 @@ describe("cut_idle (#122)", () => {
   it("groups a long cut list so ffmpeg can parse it (#225)", () => {
     const cuts = Array.from({ length: 150 }, (_, i) => ({ start: i * 2, end: i * 2 + 1 }));
     const a = buildCutIdleArgs("in.mp4", "o.mp4", cuts, false);
-    const vf = a[a.indexOf("-vf") + 1];
+    const vf = argAfter(a, "-vf");
     expect(vf.startsWith("select='not((between(t,0,1)+")).toBe(true);
   });
 });

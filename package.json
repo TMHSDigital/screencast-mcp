@@ -1,6 +1,6 @@
 {
   "name": "@tmhs/screencast-mcp",
-  "version": "0.44.0",
+  "version": "0.44.1",
   "description": "Let AI agents record the Windows screen, watch it as frames, and edit it with ffmpeg",
   "mcpName": "io.github.TMHSDigital/screencast-mcp",
   "type": "module",
@@ -19,12 +19,14 @@
   },
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p src/__tests__",
     "lint": "eslint .",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "eval": "tsx evals/run.ts",
+    "typecheck:evals": "tsc -p evals/tsconfig.json",
     "prepublishOnly": "npm run build"
   },
   "author": "TMHSDigital",

@@ -157,8 +157,10 @@ export function covers(cov: Coverage, cp: number): boolean {
   let hi = cov.length - 1;
   while (lo <= hi) {
     const mid = (lo + hi) >> 1;
-    if (cp < cov[mid][0]) hi = mid - 1;
-    else if (cp > cov[mid][1]) lo = mid + 1;
+    // 0 <= lo <= mid <= hi < cov.length while the loop runs.
+    const [first, last] = cov[mid]!;
+    if (cp < first) hi = mid - 1;
+    else if (cp > last) lo = mid + 1;
     else return true;
   }
   return false;

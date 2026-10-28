@@ -147,12 +147,18 @@ export function register(server: McpServer): void {
         } finally {
           rmSync(log, { force: true });
         }
-        if (frames.length === 0) throw new ScreencastError("ffmpeg returned no preview frames.");
+        const [firstFrame] = frames;
+        if (!firstFrame) throw new ScreencastError("ffmpeg returned no preview frames.");
         // Scene-change frames on top of the grid: at most as many again.
-        const keep = pickPlayerFrames(frames, plan.count);
-        const t0 = frames[0].timeSec;
-        const frameTimes = keep.map((i) => Math.round((frames[i].timeSec - t0) * 1000) / 1000);
-        const sceneFrames = keep.flatMap((i, k) => (frames[i].scene ? [k] : []));
+        // frames was trimmed to jpegs.length above, so every index has both.
+        const keep = pickPlayerFrames(frames, plan.count).flatMap((i) => {
+          const frame = frames[i];
+          const jpeg = jpegs[i];
+          return frame && jpeg ? [{ frame, jpeg }] : [];
+        });
+        const t0 = firstFrame.timeSec;
+        const frameTimes = keep.map(({ frame }) => Math.round((frame.timeSec - t0) * 1000) / 1000);
+        const sceneFrames = keep.flatMap(({ frame }, k) => (frame.scene ? [k] : []));
         return {
           content: [
             {
@@ -168,7 +174,7 @@ export function register(server: McpServer): void {
                 sceneFrames,
               }),
             },
-            ...keep.map((i) => ({ type: "image" as const, data: jpegs[i].toString("base64"), mimeType: "image/jpeg" })),
+            ...keep.map(({ jpeg }) => ({ type: "image" as const, data: jpeg.toString("base64"), mimeType: "image/jpeg" })),
           ],
         };
       } catch (error) {

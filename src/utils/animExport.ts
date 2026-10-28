@@ -42,15 +42,17 @@ export async function exportAnimation(input: string, output: string, opts: AnimE
   try {
     let index: number | null = 0;
     while (index !== null && attempts.length < MAX_ATTEMPTS) {
+      const settings = ladder[index];
+      if (!settings) break;
       const path = attemptPath(attempts.length);
       const clip = { start: opts.start, duration: opts.duration };
-      await runEditJob(buildAnimArgs(input, path, format, ladder[index], clip), {
+      await runEditJob(buildAnimArgs(input, path, format, settings, clip), {
         output: path,
         durationSec: clipSec,
         extra,
       });
       const size = statSync(path).size;
-      attempts.push({ path, size, settings: ladder[index] });
+      attempts.push({ path, size, settings });
       if (size <= maxBytes) break;
       index = nextLadderIndex(index, size, maxBytes, ladder.length);
     }

@@ -86,11 +86,12 @@ export function parseTarget(spec: string): Target {
         `region must be x,y,w,h (4 integers), got "${rest}".`,
       );
     }
+    const [px = "", py = "", pw = "", ph = ""] = parts;
     const [x, y, w, h] = [
-      parseIntStrict(parts[0], "region x"),
-      parseIntStrict(parts[1], "region y"),
-      parseIntStrict(parts[2], "region w"),
-      parseIntStrict(parts[3], "region h"),
+      parseIntStrict(px, "region x"),
+      parseIntStrict(py, "region y"),
+      parseIntStrict(pw, "region w"),
+      parseIntStrict(ph, "region h"),
     ];
     if (w <= 0 || h <= 0) {
       throw new ScreencastError("region width and height must be positive.");

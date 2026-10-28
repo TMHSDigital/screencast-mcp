@@ -15,6 +15,7 @@
  * `title=` surface. A near-black average luma fails the test.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { defined } from "./testUtils.js";
 import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -36,7 +37,12 @@ function ffprobe(path: string): Probe {
 /** Average luma (0-255) of an image; ~0 means a blank/black capture. */
 function meanLuma(path: string): number {
   const r = spawnSync("ffmpeg", ["-v", "error", "-i", path, "-vf", "scale=1:1,format=gray", "-f", "rawvideo", "-"], { maxBuffer: 1024 });
-  return r.stdout && r.stdout.length > 0 ? r.stdout[0] : -1;
+  return r.stdout?.[0] ?? -1;
+}
+/** The first pixel of rgb24 raw video, failing if ffmpeg wrote none. */
+function firstRgb(raw: Buffer): [number, number, number] {
+  const [r, g, b] = raw;
+  return [defined(r, "red"), defined(g, "green"), defined(b, "blue")];
 }
 function openWindows(): string[] {
   const r = spawnSync("powershell", ["-NoProfile", "-Command", "Get-Process | Where-Object {$_.MainWindowTitle -ne ''} | ForEach-Object { $_.MainWindowTitle }"], { encoding: "utf8" });
@@ -125,7 +131,7 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     expect(shot.isError).toBe(false);
     expect(shot.json.inlineImages).toBe(1);
     expect(shot.images).toHaveLength(1);
-    expect(shot.images[0].mimeType).toBe("image/jpeg");
+    expect(shot.images[0]?.mimeType).toBe("image/jpeg");
   }, 30_000);
 
   it("monitor:0 captures physical pixels, matching full on a single-monitor host (#39)", async () => {
@@ -195,7 +201,7 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
       "$f.ShowDialog()"], { windowsHide: false });
     const isRed = async () => {
       const s = await call("screenshot", { target: "region:110,110,120,80", returnImage: false });
-      const [r, g, b] = [...spawnSync("ffmpeg", ["-v", "error", "-i", s.json.outputPath, "-vf", "scale=1:1,format=rgb24", "-f", "rawvideo", "-"]).stdout];
+      const [r, g, b] = firstRgb(spawnSync("ffmpeg", ["-v", "error", "-i", s.json.outputPath, "-vf", "scale=1:1,format=rgb24", "-f", "rawvideo", "-"]).stdout);
       return r > 200 && g < 60 && b < 60;
     };
     try {
@@ -248,7 +254,7 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
       "$f=New-Object Windows.Forms.Form;$f.Text='SC-WGC-TARGET';$f.StartPosition='Manual';$f.Location='100,100';$f.Size='400,300';$f.BackColor='Lime';" +
       "$c=New-Object Windows.Forms.Form;$c.Text='SC-WGC-COVER';$c.StartPosition='Manual';$c.Location='80,80';$c.Size='460,360';$c.BackColor='Magenta';$c.TopMost=$true;" +
       "$f.Show();$c.Show();[Windows.Forms.Application]::Run($c)"], { windowsHide: false });
-    const meanRgb = (path: string) => [...spawnSync("ffmpeg", ["-v", "error", "-i", path, "-vf", "scale=1:1,format=rgb24", "-f", "rawvideo", "-"]).stdout];
+    const meanRgb = (path: string) => firstRgb(spawnSync("ffmpeg", ["-v", "error", "-i", path, "-vf", "scale=1:1,format=rgb24", "-f", "rawvideo", "-"]).stdout);
     try {
       await sleep(2000);
       const wgc = await call("screenshot", { target: "window:SC-WGC-TARGET", exactTitle: true, backend: "wgc", returnImage: false });
@@ -346,7 +352,7 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
       `$t=New-Object Windows.Forms.Timer;$t.Interval=100;$t.Add_Tick({if(Test-Path '${flag}'){$f.Location='340,330';$f.BackColor='Blue';$t.Stop()}});$t.Start();` +
       "$f.Show();$c.Show();[Windows.Forms.Application]::Run($c)"], { windowsHide: false });
     const centre = (path: string, t: number) =>
-      [...spawnSync("ffmpeg", ["-v", "error", "-ss", String(t), "-i", path, "-vf", "crop=iw/2:ih/2:iw/4:ih/4,scale=1:1,format=rgb24", "-frames:v", "1", "-f", "rawvideo", "-"]).stdout];
+      firstRgb(spawnSync("ffmpeg", ["-v", "error", "-ss", String(t), "-i", path, "-vf", "crop=iw/2:ih/2:iw/4:ih/4,scale=1:1,format=rgb24", "-frames:v", "1", "-f", "rawvideo", "-"]).stdout);
     try {
       await sleep(3000);
       const rec = await call("start_recording", { target: "window:SC-WGC-REC", exactTitle: true, backend: "wgc", fps: 15 });
@@ -436,7 +442,7 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     await sleep(1200);
     const stillAlive = spawnSync("tasklist", ["/FI", `PID eq ${ff.pid}`, "/FO", "CSV", "/NH"], { encoding: "utf8" }).stdout.includes("ffmpeg");
     const sess = await c2.callTool({ name: "get_session", arguments: { sessionId: "rec-orphan" } });
-    const status = JSON.parse((sess.content as Array<{ text: string }>)[0].text).status;
+    const status = JSON.parse(defined((sess.content as Array<{ text: string }>)[0]).text).status;
     await c2.close();
     rmSync(h, { recursive: true, force: true });
     expect(stillAlive).toBe(false);

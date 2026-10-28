@@ -74,7 +74,7 @@ describe("progressReporter", () => {
     report(0.5);
     report(2); // clamped to 100
     expect(sendNotification.mock.calls.map((c) => c[0].params.progress)).toEqual([10, 50, 100]);
-    expect(sendNotification.mock.calls[0][0]).toMatchObject({
+    expect(sendNotification.mock.calls[0]?.[0]).toMatchObject({
       method: "notifications/progress",
       params: { progressToken: "tok", total: 100 },
     });

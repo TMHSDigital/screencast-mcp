@@ -6,6 +6,7 @@
  * and window enumeration are faked, so no Windows desktop is needed.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { defined } from "./testUtils.js";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -88,7 +89,7 @@ function invalidArgs(schema: JsonSchema): Record<string, unknown> {
   if ((schema.required ?? []).length > 0) return {};
   const [name, prop] = Object.entries(schema.properties ?? {})[0] ?? [];
   if (!name) return {};
-  return { [name]: prop.type === "object" ? 12345 : { not: "valid" } };
+  return { [name]: prop?.type === "object" ? 12345 : { not: "valid" } };
 }
 
 describe("MCP tool layer (#192)", () => {
@@ -291,7 +292,7 @@ describe("tool metadata (#212)", () => {
     ] as const)("%s returns structuredContent that matches its JSON text", async (name, args) => {
       const res = await client.callTool({ name, arguments: args });
       expect(res.isError).toBeFalsy();
-      const text = (res.content as Array<{ type: string; text: string }>)[0].text;
+      const text = defined((res.content as Array<{ type: string; text: string }>)[0]).text;
       expect(res.structuredContent).toEqual(JSON.parse(text));
       expect(JSON.stringify(res.structuredContent)).toContain(outputPath.replace(/\\/g, "\\\\"));
     });

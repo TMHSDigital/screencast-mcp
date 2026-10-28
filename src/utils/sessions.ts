@@ -149,7 +149,7 @@ export function isSameServer(
 /** Parse `<image>|<start ms>` from processInfo's PowerShell. Pure. */
 export function parseProcessInfo(stdout: string): { image: string; startMs: number } | null {
   const m = /^(.+)\|(\d+)\s*$/m.exec(stdout.trim());
-  return m ? { image: m[1].trim(), startMs: Number(m[2]) } : null;
+  return m?.[1] && m[2] ? { image: m[1].trim(), startMs: Number(m[2]) } : null;
 }
 
 /** Image name and start time of a running pid (Windows), or null when it is

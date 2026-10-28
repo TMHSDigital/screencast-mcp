@@ -62,8 +62,9 @@ export interface LoudnessMeasurement {
 /** Pull the last loudnorm JSON block out of ffmpeg's stderr. Pure. */
 export function parseLoudnorm(stderr: string): LoudnessMeasurement {
   const blocks = stderr.match(/\{[^{}]*"input_i"[^{}]*\}/g);
-  if (!blocks) throw new ScreencastError("Could not measure loudness (no loudnorm report). Does the file have audio?");
-  const raw = JSON.parse(blocks[blocks.length - 1]) as Record<string, string>;
+  const lastBlock = blocks?.at(-1);
+  if (lastBlock === undefined) throw new ScreencastError("Could not measure loudness (no loudnorm report). Does the file have audio?");
+  const raw = JSON.parse(lastBlock) as Record<string, string>;
   const num = (k: string) => Number(raw[k]);
   const m: LoudnessMeasurement = {
     input_i: num("input_i"),
@@ -136,7 +137,7 @@ export function parseNoiseFloor(stdout: string): number | null {
   const levels = [...stdout.matchAll(/RMS_level=(-?[\d.]+)/g)].map((m) => Number(m[1])).filter(Number.isFinite);
   if (levels.length === 0) return null;
   levels.sort((a, b) => a - b);
-  return levels[Math.floor(levels.length * 0.1)];
+  return levels[Math.floor(levels.length * 0.1)] ?? null;
 }
 
 /** afftdn's `nf` for a measured floor. afftdn only removes what it believes is

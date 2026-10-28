@@ -53,7 +53,7 @@ export function keyframesToViews(kfs: ZoomKeyframe[], W: number, H: number, maxZ
     const z = Math.max(1, Math.min(maxZoom, W / k.width, H / k.height));
     return { t: k.t, z, cx: (k.x ?? 0) + k.width / 2, cy: (k.y ?? 0) + k.height / 2 };
   });
-  if (views[0].t > 0) views.unshift({ t: 0, z: 1, cx: W / 2, cy: H / 2 });
+  if (views[0] && views[0].t > 0) views.unshift({ t: 0, z: 1, cx: W / 2, cy: H / 2 });
   return views;
 }
 
@@ -64,13 +64,18 @@ const n = (v: number) => Number(v.toFixed(4)).toString();
  * keyframe. Written as the first value plus one clipped ease term per change,
  * summed in groups, so any number of keyframes parses (#225). Pure. */
 export function viewExpr(views: View[], key: "z" | "cx" | "cy", transition: number): string {
-  const terms = [n(views[0][key])];
-  for (let i = 0; i < views.length - 1; i++) {
-    const a = views[i][key];
-    const b = views[i + 1][key];
+  const [first, ...rest] = views;
+  if (!first) throw new ScreencastError("Give at least one keyframe.");
+  const terms = [n(first[key])];
+  let prev = first;
+  for (const next of rest) {
+    const a = prev[key];
+    const b = next[key];
+    const start = prev.t;
+    prev = next;
     if (a === b) continue;
-    const end = views[i + 1].t;
-    const T = Math.max(0.001, Math.min(transition, end - views[i].t));
+    const end = next.t;
+    const T = Math.max(0.001, Math.min(transition, end - start));
     const s = `clip((it-${n(end - T)})/${n(T)},0,1)`;
     terms.push(`(${n(b - a)})*${s}*${s}*(3-2*${s})`);
   }
@@ -292,8 +297,7 @@ export function planClickZoom(clicks: ClickPoint[], W: number, H: number, opts: 
   const kfs: ZoomKeyframe[] = [];
   let lastT = 0;
   let runEnd = -Infinity;
-  for (let i = 0; i < sorted.length; i++) {
-    const c = sorted[i];
+  for (const c of sorted) {
     const view = fitView({ x: c.x - pad, y: c.y - pad, width: 2 * pad, height: 2 * pad }, W, H, minW, minH);
     const prev = kfs[kfs.length - 1];
     // Already well inside the current view: no pan, just extend the run.

@@ -1,5 +1,6 @@
 /** #228: a WGC still runs the repaint nudge while it waits for a frame. */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { defined } from "./testUtils.js";
 import { ScreencastError } from "../utils/errors.js";
 
 const kill = vi.fn();
@@ -31,7 +32,7 @@ describe("WGC still nudge (#228)", () => {
     expect(file).toBe("powershell");
     expect(args.at(-1)).toContain("RedrawWindow([IntPtr]4242");
     expect(args.at(-1)).toContain(`Get-Process -Id ${process.pid}`);
-    expect(runFfmpeg.mock.calls[0][0].join(" ")).toContain("gfxcapture=hwnd=4242");
+    expect(defined(runFfmpeg.mock.calls[0])[0].join(" ")).toContain("gfxcapture=hwnd=4242");
     expect(kill).toHaveBeenCalledTimes(1);
   });
 

@@ -75,9 +75,10 @@ function encodeArgs(quality: Quality): string[] {
 export function xfadeOffsets(durations: number[], transitionDur: number): number[] {
   const offsets: number[] = [];
   let running = 0;
-  for (let m = 1; m < durations.length; m++) {
-    running += durations[m - 1];
-    offsets.push(Math.max(0, round3(running - m * transitionDur)));
+  // Every clip but the last is followed by a join.
+  for (const [k, d] of durations.slice(0, -1).entries()) {
+    running += d;
+    offsets.push(Math.max(0, round3(running - (k + 1) * transitionDur)));
   }
   return offsets;
 }
@@ -160,11 +161,11 @@ export function buildAssembleArgs(
     if (clipHasAudio[i]) {
       // Pad or trim each track to its clip's video length, so audio joins
       // where the video does (#205).
-      const dur = durations[i];
+      const dur = durations[i] ?? Number.NaN;
       const fit = Number.isFinite(dur) && dur > 0 ? `,apad,atrim=duration=${round3(dur)}` : "";
       parts.push(`[${i}:a]${af}${fit}[a${i}]`);
     } else {
-      const dur = durations[i];
+      const dur = durations[i] ?? Number.NaN;
       if (!Number.isFinite(dur) || dur <= 0) {
         throw new ScreencastError(
           `clip ${i} has no audio track and its duration is unknown, so a ` +

@@ -16,7 +16,7 @@ describe("parseMonitors", () => {
   it("handles a single (object, not array) screen", () => {
     const mons = parseMonitors({ X: 0, Y: 0, Width: 1920, Height: 1080, Primary: true });
     expect(mons).toHaveLength(1);
-    expect(mons[0].index).toBe(0);
+    expect(mons[0]?.index).toBe(0);
   });
 
   it("returns an empty list for nullish input", () => {
@@ -32,6 +32,6 @@ describe("parseMonitors", () => {
     ];
     const mons = parseMonitors(raw);
     expect(mons.map((m) => m.x)).toEqual([3840, 0, 1920]);
-    expect(mons[0].primary).toBe(true);
+    expect(mons[0]?.primary).toBe(true);
   });
 });

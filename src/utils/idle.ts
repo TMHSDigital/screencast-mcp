@@ -65,11 +65,14 @@ export function intersect(a: Interval[], b: Interval[]): Interval[] {
   const out: Interval[] = [];
   let i = 0;
   let j = 0;
-  while (i < a.length && j < b.length) {
-    const start = Math.max(a[i].start, b[j].start);
-    const end = Math.min(a[i].end, b[j].end);
+  while (true) {
+    const x = a[i];
+    const y = b[j];
+    if (!x || !y) break;
+    const start = Math.max(x.start, y.start);
+    const end = Math.min(x.end, y.end);
     if (end > start) out.push({ start, end });
-    if (a[i].end < b[j].end) i++;
+    if (x.end < y.end) i++;
     else j++;
   }
   return out;

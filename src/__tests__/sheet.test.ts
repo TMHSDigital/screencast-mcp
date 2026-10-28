@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { argAfter } from "./testUtils.js";
 import {
   evenTimes,
   formatTimecode,
@@ -32,7 +33,7 @@ describe("contact sheet helpers (#115)", () => {
   it("grabs a tile with an accurate seek, a scale, and a label from a file", () => {
     const a = buildTileArgs("in.mp4", 2.5, "t.png", 320, "C:\\f\\Inter.ttf", "C:\\tmp\\l.txt");
     expect(a.slice(a.indexOf("-ss"), a.indexOf("-ss") + 4)).toEqual(["-ss", "2.5", "-i", "in.mp4"]);
-    const vf = a[a.indexOf("-vf") + 1];
+    const vf = argAfter(a, "-vf");
     expect(vf.startsWith("scale=320:-2,drawtext=")).toBe(true);
     expect(vf).toContain("textfile=C\\\\:/tmp/l.txt");
     expect(() => buildTileArgs("in.mp4", 0, "t.png", 10, "f", "l")).toThrow(/at least 64/);

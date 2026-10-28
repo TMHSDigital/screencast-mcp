@@ -353,12 +353,12 @@ export function concatCopyBlocker(paths: string[], infos: MediaInfo[]): string |
     ["channels", "audio channels"],
   ];
   const first = infos[0];
-  for (let i = 0; i < infos.length; i++) {
-    if (hasHiddenFrames(infos[i])) return `${paths[i]} holds hidden frames behind an edit list`;
-    if (i === 0) continue;
+  for (const [i, info] of infos.entries()) {
+    if (hasHiddenFrames(info)) return `${paths[i]} holds hidden frames behind an edit list`;
+    if (i === 0 || !first) continue;
     for (const [key, label] of fields) {
-      if (infos[i][key] !== first[key]) {
-        return `${label} differs: ${paths[0]} has ${first[key] ?? "none"}, ${paths[i]} has ${infos[i][key] ?? "none"}`;
+      if (info[key] !== first[key]) {
+        return `${label} differs: ${paths[0]} has ${first[key] ?? "none"}, ${paths[i]} has ${info[key] ?? "none"}`;
       }
     }
   }
@@ -875,9 +875,10 @@ export function buildRedactArgs(
 ): string[] {
   const { steps, out } = redactSteps(regions, opts, dims, "[0:v]", "");
   // A crisp re-encode keeps the redaction edges sharp.
-  if ((opts.style ?? "box") === "box") {
+  const [chain] = steps;
+  if ((opts.style ?? "box") === "box" && chain !== undefined) {
     // One linear chain: a plain -vf, without the graph labels.
-    const vf = steps[0].slice("[0:v]".length, -out.length);
+    const vf = chain.slice("[0:v]".length, -out.length);
     return ["-y", "-i", input, "-vf", vf, ...resolveQuality("high"), "-c:a", "copy", output];
   }
   return [

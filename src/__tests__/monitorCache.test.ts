@@ -3,6 +3,7 @@
  * MONITOR_CACHE_MS. execFile is mocked so this runs on any OS.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { argAfter, defined } from "./testUtils.js";
 
 const execFile = vi.fn();
 vi.mock("node:child_process", () => ({ execFile: (...a: unknown[]) => execFile(...a) }));
@@ -51,13 +52,13 @@ describe("getMonitors cache (#88)", () => {
 
   it("never blocks: the query runs through the async execFile", async () => {
     await getMonitors(20);
-    expect(execFile.mock.calls[0][0]).toBe("powershell");
+    expect(execFile.mock.calls[0]?.[0]).toBe("powershell");
   });
 
   it("makes PowerShell write UTF-8, so non-ASCII text survives the pipe", async () => {
     await getMonitors(30);
-    const args = execFile.mock.calls[0][1] as string[];
-    const script = Buffer.from(args[args.indexOf("-EncodedCommand") + 1], "base64").toString("utf16le");
+    const args = defined(execFile.mock.calls[0])[1] as string[];
+    const script = Buffer.from(argAfter(args, "-EncodedCommand"), "base64").toString("utf16le");
     expect(script.startsWith("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n")).toBe(true);
   });
 });

@@ -12,6 +12,7 @@
  * failure instead of a silent skip.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { defined } from "../testUtils.js";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -65,6 +66,10 @@ const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
 const FFPROBE = process.env.FFPROBE_PATH || "ffprobe";
 const AVAILABLE = binaryWorks(FFMPEG) && binaryWorks(FFPROBE);
 const REQUIRED = !!process.env.REQUIRE_FFMPEG;
+// The BtbN Windows ARM64 build CI uses ships without libvpx (#246); the .webm
+// fixture needs it, so that one case skips there instead of failing.
+const HAS_LIBVPX =
+  AVAILABLE && /\blibvpx-vp9\b/.test(spawnSync(FFMPEG, ["-hide_banner", "-encoders"], { encoding: "utf8" }).stdout ?? "");
 
 describe("ffmpeg availability", () => {
   it.runIf(REQUIRED)("ffmpeg and ffprobe are installed (REQUIRE_FFMPEG=1)", () => {
@@ -106,7 +111,7 @@ function regionDetail(path: string, t: number, x: number, y: number, w: number, 
   let n = 0;
   for (let row = 0; row < h; row++) {
     for (let col = 1; col < w; col++) {
-      sum += Math.abs(px[row * w + col] - px[row * w + col - 1]) > 16 ? 1 : 0;
+      sum += Math.abs((px[row * w + col] ?? 0) - (px[row * w + col - 1] ?? 0)) > 16 ? 1 : 0;
       n++;
     }
   }
@@ -305,7 +310,7 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     expect(hasHiddenFrames(await probeMedia(exact))).toBe(false);
   });
 
-  it("edits a .webm input into an .mp4, and normalizes audio to a .wav (#187)", async () => {
+  it.runIf(HAS_LIBVPX)("edits a .webm input into an .mp4, and normalizes audio to a .wav (#187)", async () => {
     const webm = p("in.webm");
     await runFfmpeg([
       "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=320x240:rate=30",
@@ -555,8 +560,8 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     const scan = await runCapture(FFMPEG, buildIdleScanArgs(idle, 1.5, true));
     const cuts = cutsFor(intersect(parseFreezes(scan.stderr, 7), parseSilences(scan.stderr, 7)), 1.5, 0.3);
     expect(cuts).toHaveLength(1);
-    expect(cuts[0].start).toBeCloseTo(2.3, 1);
-    expect(cuts[0].end).toBeCloseTo(4.7, 1);
+    expect(cuts[0]?.start).toBeCloseTo(2.3, 1);
+    expect(cuts[0]?.end).toBeCloseTo(4.7, 1);
     const out = p("idle-cut.mp4");
     await runFfmpeg(buildCutIdleArgs(idle, out, cuts, true, "draft"));
     const info = await probeMedia(out);
@@ -656,14 +661,16 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
 
   it("callout draws a box, a text label with a %, and an arrow, each only in its window (#121)", async () => {
     const arrow = p("arrow.png");
+    const text = { type: "text" as const, x: 120, y: 150, text: "100% done", size: 24, from: 1, to: 3 };
+    const arrowItem = { type: "arrow" as const, x1: 200, y1: 60, x2: 300, y2: 60, color: "white", thickness: 10, from: 1, to: 3 };
     const items = [
       { type: "box" as const, x: 10, y: 10, width: 60, height: 40, fill: true, color: "white", from: 1, to: 3 },
-      { type: "text" as const, x: 120, y: 150, text: "100% done", size: 24, from: 1, to: 3 },
-      { type: "arrow" as const, x1: 200, y1: 60, x2: 300, y2: 60, color: "white", thickness: 10, from: 1, to: 3 },
+      text,
+      arrowItem,
     ];
-    await runFfmpeg(buildArrowImageArgs(items[2], arrow));
+    await runFfmpeg(buildArrowImageArgs(arrowItem, arrow));
     const label = p("label.txt");
-    writeFileSync(label, items[1].text);
+    writeFileSync(label, text.text);
     const out = p("callout.mp4");
     await runFfmpeg(buildCalloutArgs(vOnly, out, items, { fontFile: bundledFontPath("bold"), textFiles: [null, label, null], arrowFiles: [null, null, arrow] }, "draft"));
     // Inside the window every annotation is visible ...
@@ -692,8 +699,8 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
         await runFfmpeg(buildCalloutArgs(black, out, items, assets, "high"));
         return { out, assets };
       };
-      const meanDiff = (a: Buffer, b: Buffer) => a.reduce((s, v, i) => s + Math.abs(v - b[i]), 0) / a.length;
-      const glyphs = (out: string) => [regionPixels(out, 0.5, 16, 16, 96, 96), regionPixels(out, 0.5, 16, 128, 96, 96)];
+      const meanDiff = (a: Buffer, b: Buffer) => a.reduce((s, v, i) => s + Math.abs(v - (b[i] ?? 0)), 0) / a.length;
+      const glyphs = (out: string): [Buffer, Buffer] => [regionPixels(out, 0.5, 16, 16, 96, 96), regionPixels(out, 0.5, 16, 128, 96, 96)];
 
       const tofu = await render("ja-tofu", bundledFontPath("bold"));
       expect(tofu.assets.warnings.join(" ")).toMatch(/no glyph for 日/);
@@ -800,10 +807,10 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     const work = p("sheet-work");
     mkdirSync(work);
     const times = evenTimes(10, 6);
-    for (let i = 0; i < times.length; i++) {
+    for (const [i, t] of times.entries()) {
       const label = join(work, `l${i}.txt`);
-      writeFileSync(label, formatTimecode(times[i]));
-      await runFfmpeg(buildTileArgs(av, times[i], join(work, `tile_${String(i).padStart(3, "0")}.png`), 160, bundledFontPath("bold"), label));
+      writeFileSync(label, formatTimecode(t));
+      await runFfmpeg(buildTileArgs(av, t, join(work, `tile_${String(i).padStart(3, "0")}.png`), 160, bundledFontPath("bold"), label));
     }
     const grid = sheetGrid(times.length);
     const sheet = p("sheet.png");
@@ -826,7 +833,7 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     const ladder = animLadder("gif", 12, 320);
     const big = p("big.gif");
     const small = p("small.gif");
-    await runFfmpeg(buildAnimArgs(av, big, "gif", ladder[0], { duration: 3 }));
+    await runFfmpeg(buildAnimArgs(av, big, "gif", defined(ladder[0]), { duration: 3 }));
     await runFfmpeg(buildAnimArgs(av, small, "gif", ladder.at(-1)!, { duration: 3 }));
     const bigInfo = await probeMedia(big);
     expect(bigInfo.videoCodec).toBe("gif");
@@ -834,7 +841,7 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     expect(statSync(small).size).toBeLessThan(statSync(big).size / 2);
 
     const webp = p("anim.webp");
-    await runFfmpeg(buildAnimArgs(av, webp, "webp", animLadder("webp", 12, 320)[0], { duration: 3 }));
+    await runFfmpeg(buildAnimArgs(av, webp, "webp", defined(animLadder("webp", 12, 320)[0]), { duration: 3 }));
     expect(readFileSync(webp).subarray(8, 12).toString("ascii")).toBe("WEBP");
     expect(statSync(webp).size).toBeGreaterThan(1000);
   });
@@ -849,7 +856,7 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     expect(ra.length).toBe(size.width * size.height);
     const d = diffFrames(ra, rb, size.width, size.height, { scale: 640 / size.width });
     expect(d.regions).toHaveLength(1);
-    const r = d.regions[0];
+    const r = defined(d.regions[0]);
     // The box (400,100)-(480,160) must lie inside the reported region, give or take one cell.
     expect(r.x).toBeLessThanOrEqual(400);
     expect(r.y).toBeLessThanOrEqual(100);
@@ -934,9 +941,9 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     const { images, omitted } = await encodeInlineImages([frame, frame, frame], 200, 2);
     expect(images).toHaveLength(2);
     expect(omitted).toBe(1);
-    expect(images[0].mimeType).toBe("image/jpeg");
+    expect(images[0]?.mimeType).toBe("image/jpeg");
     const decoded = p("decoded.jpg");
-    writeFileSync(decoded, Buffer.from(images[0].data, "base64"));
+    writeFileSync(decoded, Buffer.from(defined(images[0]).data, "base64"));
     const info = await probeMedia(decoded);
     expect([info.width, info.height]).toEqual([200, 150]);
   });

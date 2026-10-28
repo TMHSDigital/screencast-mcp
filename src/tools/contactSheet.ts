@@ -131,11 +131,11 @@ export function register(server: McpServer): void {
           const work = mkdtempSync(join(tmpdir(), "screencast-sheet-"));
           try {
             const font = bundledFontPath("bold");
-            for (let i = 0; i < times.length; i++) {
+            for (const [i, t] of times.entries()) {
               const labelFile = join(work, `label_${i}.txt`);
-              writeFileSync(labelFile, formatTimecode(times[i]));
+              writeFileSync(labelFile, formatTimecode(t));
               const tile = join(work, `tile_${String(i).padStart(3, "0")}.png`);
-              await runFfmpeg(buildTileArgs(args.input, times[i], tile, tileWidth, font, labelFile), 60_000, {
+              await runFfmpeg(buildTileArgs(args.input, t, tile, tileWidth, font, labelFile), 60_000, {
                 signal: extra.signal,
               });
             }

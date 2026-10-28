@@ -5,6 +5,7 @@
  * without updating the site, or documents a tool that does not exist.
  */
 import { describe, it, expect } from "vitest";
+import { defined } from "./testUtils.js";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,7 +20,7 @@ const registered = (
 
 const html = readFileSync(join(root, "docs", "index.html"), "utf8");
 const documented = [...html.matchAll(/<td><code>([a-z_]+)<\/code><\/td>/g)].map(
-  (m) => m[1],
+  (m) => defined(m[1]),
 );
 
 describe("docs/index.html tools table stays in sync with mcp-tools.json", () => {
@@ -58,7 +59,7 @@ describe("docs pages", () => {
     const broken: string[] = [];
     for (const page of pages) {
       const src = readFileSync(join(root, "docs", page), "utf8");
-      for (const [, ref] of src.matchAll(/srcset="([^"]*)"/g)) {
+      for (const [, ref = ""] of src.matchAll(/srcset="([^"]*)"/g)) {
         if (!existsSync(join(root, "docs", dirname(page), ref))) broken.push(`${page} -> ${ref}`);
       }
     }
@@ -68,7 +69,7 @@ describe("docs pages", () => {
     const missing: string[] = [];
     for (const page of pages) {
       const src = readFileSync(join(root, "docs", page), "utf8");
-      for (const [tag, ref] of src.matchAll(/<img src="([^"]+\.gif)"[^>]*>/g)) {
+      for (const [tag, ref = ""] of src.matchAll(/<img src="([^"]+\.gif)"[^>]*>/g)) {
         if (!src.includes(`<source srcset="${ref.replace(/\.gif$/, "-still.webp")}" media="(prefers-reduced-motion: reduce)">${tag}`)) missing.push(`${page}: ${ref}`);
       }
     }
@@ -78,7 +79,7 @@ describe("docs pages", () => {
     const unknown: string[] = [];
     for (const page of pages.filter((p) => p.startsWith("workflows/"))) {
       const src = readFileSync(join(root, "docs", page), "utf8");
-      for (const [, tool] of src.matchAll(/<b>([a-z_]+)<\/b>/g)) {
+      for (const [, tool = ""] of src.matchAll(/<b>([a-z_]+)<\/b>/g)) {
         if (!registered.includes(tool)) unknown.push(`${page}: ${tool}`);
       }
     }
@@ -115,7 +116,7 @@ describe("agent docs", () => {
   it.each(files)("%s references no nonexistent src/ path and no maintainer-only tools", (file) => {
     const text = readFileSync(join(root, file), "utf8");
     expect(text).not.toMatch(/src\/providers|ProviderManager|ctx_execute|context-mode/);
-    for (const [, path] of text.matchAll(/`(src\/[\w./-]+?)\/?`/g)) {
+    for (const [, path = ""] of text.matchAll(/`(src\/[\w./-]+?)\/?`/g)) {
       if (path.includes("<")) continue;
       expect(existsSync(join(root, path)), `${file} mentions ${path}`).toBe(true);
     }

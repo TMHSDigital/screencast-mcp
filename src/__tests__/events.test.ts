@@ -1,5 +1,6 @@
 /** #118: input event log - alignment, coordinate mapping, and selection. */
 import { describe, it, expect } from "vitest";
+import { defined } from "./testUtils.js";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -57,13 +58,13 @@ describe("convertEvents", () => {
   it("maps desktop pixels to video pixels and flags the off-frame ones", () => {
     expect(events[0]).toMatchObject({ type: "down", button: "left", x: 200, y: 200, inFrame: true });
     expect(events[4]).toMatchObject({ type: "key", x: 700, y: 450, inFrame: false });
-    expect(events[4].keys).toBeUndefined();
+    expect(defined(events[4]).keys).toBeUndefined();
   });
   it("keeps wheel direction and chords", () => {
     expect(events[2]).toMatchObject({ type: "wheel", axis: "vertical", delta: -2 });
     expect(events[3]).toMatchObject({ axis: "horizontal", delta: 1 });
-    expect(events[5].keys).toBe("Ctrl+S");
-    expect(events[6].button).toBe("right");
+    expect(events[5]?.keys).toBe("Ctrl+S");
+    expect(events[6]?.button).toBe("right");
   });
   it("round-trips through JSONL and selects by time, type, and frame", () => {
     const back = parseEventsJsonl(formatEventsJsonl(events) + "{torn");

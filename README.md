@@ -278,6 +278,7 @@ It also offers **resources**, so a client can list and attach recordings without
 - **Windows Graphics Capture (`backend: "wgc"`, FFmpeg 8+).** Captures a window's **own surface** by handle, even when other windows cover it. On `screenshot` and `find_text` it takes 1-2 s instead of ~0.2 s, so it is opt-in. On `start_recording` it records the window's client area while it is covered, moved, or in the background. `gfxcapture` only emits a frame when the window presents, so a small recorder process repaints one pixel of the window every 200 ms and repeats the latest frame at the requested fps; it stops on `q` like ffmpeg, so `stop_recording` and `maxDurationSec` work the same. The first frame takes a second or two, and `start_recording` returns once it is captured. No audio with `wgc` yet.
 - **Fullscreen-exclusive apps** often produce black frames under `gdigrab`; run the source in borderless-windowed mode for reliable capture.
 - **System audio needs a loopback device.** `gdigrab` is video-only, so `start_recording` with `audio.source` = `system` captures from a separate dshow input. Windows has no native loopback, so this needs a virtual-audio device (enable Stereo Mix, or install a driver such as screen-capture-recorder's `virtual-audio-capturer` or VB-CABLE). Run `list_audio_devices` to find it. Microphone capture is intentionally not supported.
+- **Windows on ARM64.** CI runs the unit, ffmpeg-integration and gdigrab capture-smoke suites on a native `windows-11-arm` runner with arm64 Node. gyan.dev has no arm64 build; CI uses [BtbN's](https://github.com/BtbN/FFmpeg-Builds/releases) FFmpeg 8.1 `winarm64-gpl-shared` build (from a month-end `autobuild-*` release, which are kept), which has `gdigrab`, `gfxcapture` (WGC) and `drawtext` but is built without whisper and libvpx: `transcribe` and `.webm` output need another build. Run `node scripts/platform-probe.mjs` after `npm run build` to see what your machine supports (`doctor` now reports `arch`).
 
 ## Privacy
 
@@ -349,6 +350,13 @@ The capture path can't be exercised on CI's headless Linux runners, so an end-to
 
 ```bash
 RUN_LOCAL_CAPTURE_TESTS=1 npm test   # Windows + ffmpeg + a real display
+```
+
+Agent evals (`evals/`) score tool selection, argument validity and outcomes on scripted tasks against lavfi-generated fixtures, through the built server over MCP. The default oracle mode replays known-good calls and needs no model or network; `--agent anthropic` runs a real model (install the SDK ad hoc with `npm install --no-save @anthropic-ai/sdk`; `EVAL_MODEL` defaults to `claude-sonnet-5-5`). Live-capture tools are always blocked.
+
+```bash
+npm run build && npm run eval                  # oracle mode
+npm run eval -- --agent anthropic --json evals/results/baseline.json
 ```
 
 ## Contributing

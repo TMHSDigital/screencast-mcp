@@ -184,16 +184,16 @@ export function register(server: McpServer): void {
             .map((f) => join(dir, f));
         } else {
           const ts = mode === "scenes" ? sceneTimes : args.timestamps!;
-          for (let i = 0; i < ts.length; i++) {
-            const out = join(dir, `frame_${String(i).padStart(3, "0")}_${ts[i]}s.png`);
+          for (const [i, t] of ts.entries()) {
+            const out = join(dir, `frame_${String(i).padStart(3, "0")}_${t}s.png`);
             // Clear any stale file at this path (reused outputDir) so existence
             // after the run reflects only what this invocation wrote.
             rmSync(out, { force: true });
-            await runFfmpeg(buildSampleAtTimestampArgs(args.input, ts[i], out), 60_000, { signal: extra.signal });
+            await runFfmpeg(buildSampleAtTimestampArgs(args.input, t, out), 60_000, { signal: extra.signal });
             // A timestamp past the end of the video makes ffmpeg exit 0 without
             // writing a file. Report only frames that actually exist (#35).
             if (existsSync(out)) frames.push(out);
-            else skipped.push(ts[i]);
+            else skipped.push(t);
           }
         }
 

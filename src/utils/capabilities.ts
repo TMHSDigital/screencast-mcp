@@ -39,7 +39,7 @@ export function parseDevices(text: string): string[] {
   const body = text.split(/^\s*---\s*$/m).slice(1).join("\n") || text;
   for (const line of body.split(/\r?\n/)) {
     const m = /^\s{0,2}[D ][E ]\s?[d ]?\s+([a-z0-9_,]+)\s/i.exec(line);
-    if (m) for (const name of m[1].split(",")) out.add(name);
+    if (m?.[1]) for (const name of m[1].split(",")) out.add(name);
   }
   return [...out];
 }

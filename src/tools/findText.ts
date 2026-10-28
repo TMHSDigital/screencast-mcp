@@ -84,16 +84,20 @@ async function readFrames(
   work: string,
   signal: AbortSignal,
 ): Promise<Array<{ lines: OcrLine[]; width: number; height: number }>> {
-  const sized = await Promise.all(sources.map((s) => probeMedia(s)));
+  const sized = await Promise.all(
+    sources.map(async (source) => {
+      const { width, height } = await probeMedia(source);
+      if (!width || !height) throw new ScreencastError("Could not read the image size.");
+      return { source, width, height };
+    }),
+  );
   const passes: string[] = [];
   const passScaleList: number[] = [];
   const owner: number[] = [];
-  for (let f = 0; f < sources.length; f++) {
-    const { width, height } = sized[f];
-    if (!width || !height) throw new ScreencastError("Could not read the image size.");
+  for (const [f, { source, width, height }] of sized.entries()) {
     for (const [i, scale] of passScales(width, height).entries()) {
       const out = join(work, `pass${f}-${i}.png`);
-      await runFfmpeg(["-y", "-v", "error", "-i", sources[f], "-vf", `scale=iw*${scale}:ih*${scale}:flags=lanczos`, out], 60_000, {
+      await runFfmpeg(["-y", "-v", "error", "-i", source, "-vf", `scale=iw*${scale}:ih*${scale}:flags=lanczos`, out], 60_000, {
         signal,
       });
       passes.push(out);
@@ -102,10 +106,10 @@ async function readFrames(
     }
   }
   const results = await recognize(passes, passScaleList);
-  return sources.map((_, f) => ({
+  return sized.map(({ width, height }, f) => ({
     lines: mergePasses(results.filter((_r, i) => owner[i] === f)),
-    width: sized[f].width!,
-    height: sized[f].height!,
+    width,
+    height,
   }));
 }
 
@@ -162,7 +166,9 @@ export function register(server: McpServer): void {
           }
 
           // 2. Upscaled copies for each recognition pass, then OCR them in one run.
-          const [{ lines, width, height }] = await readFrames([source], work, extra.signal);
+          const [frame] = await readFrames([source], work, extra.signal);
+          if (!frame) throw new ScreencastError("Could not read the frame.");
+          const { lines, width, height } = frame;
 
           // 3. Match, and optionally outline / suggest redactions.
           const matches = args.query ? findMatches(lines, args.query, args.regex === true) : [];
@@ -236,9 +242,12 @@ async function scanClip(args: Args, work: string, signal: AbortSignal) {
   const frames = readdirSync(work).filter((f) => f.startsWith("scan_")).sort().map((f) => join(work, f));
   if (frames.length === 0) throw new ScreencastError("Could not read any frames from the video.");
   const step = 1 / plan.fps;
-  const times = frames.map((_, i) => Math.round(i * step * 1000) / 1000);
-  const end = info.videoDurationSec ?? info.durationSec ?? times[times.length - 1] + step;
+  const timeAt = (i: number) => Math.round(i * step * 1000) / 1000;
+  const end = info.videoDurationSec ?? info.durationSec ?? timeAt(frames.length - 1) + step;
   const read = await readFrames(frames, work, signal);
+  // Every sampled frame has the same size.
+  const [size] = read;
+  if (!size) throw new ScreencastError("Could not read any frames from the video.");
 
   const matches: Array<TextMatch & { t: number }> = [];
   const redactRegions: Array<ReturnType<typeof redactionRects>[number] & { start: number; end: number }> = [];
@@ -247,27 +256,31 @@ async function scanClip(args: Args, work: string, signal: AbortSignal) {
     for (const l of frame.lines) seenLines.add(l.text);
     if (!args.query) return;
     const hits = findMatches(frame.lines, args.query, args.regex === true);
-    const start = Math.max(0, Math.round((times[i] - step) * 1000) / 1000);
-    const stop = Math.min(end, Math.round((times[i] + step) * 1000) / 1000);
-    for (const [k, rect] of redactionRects(hits, frame).entries()) {
-      matches.push({ t: times[i], ...hits[k] });
-      redactRegions.push({ ...rect, start, end: stop });
+    const t = timeAt(i);
+    const start = Math.max(0, Math.round((t - step) * 1000) / 1000);
+    const stop = Math.min(end, Math.round((t + step) * 1000) / 1000);
+    // redactionRects maps hits one to one.
+    const rects = redactionRects(hits, frame);
+    for (const [k, hit] of hits.entries()) {
+      matches.push({ t, ...hit });
+      const rect = rects[k];
+      if (rect) redactRegions.push({ ...rect, start, end: stop });
     }
   });
 
   const images = [];
   const first = matches[0];
-  if ((args.returnImage ?? Boolean(args.query)) && first) {
-    const i = times.indexOf(first.t);
+  const firstFrame = first && frames.find((_, i) => timeAt(i) === first.t);
+  if ((args.returnImage ?? Boolean(args.query)) && first && firstFrame) {
     const shown = join(work, "shown.png");
-    await runFfmpeg(buildHighlightArgs(frames[i], matches.filter((m) => m.t === first.t), shown), 30_000, { signal });
+    await runFfmpeg(buildHighlightArgs(firstFrame, matches.filter((m) => m.t === first.t), shown), 30_000, { signal });
     images.push(...(await encodeInlineImages([shown], DEFAULT_MAX_IMAGE_WIDTH, 1)).images);
   }
   const text = [...seenLines].join("\n");
   return okResponse(
     {
       input: args.input,
-      imageSize: { width: read[0].width, height: read[0].height },
+      imageSize: { width: size.width, height: size.height },
       scan: {
         everySec: Math.round(step * 1000) / 1000,
         framesScanned: frames.length,

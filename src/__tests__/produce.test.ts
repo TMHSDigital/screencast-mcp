@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { argAfter } from "./testUtils.js";
 import {
   xfadeOffsets,
   videoNormalizeChain,
@@ -212,7 +213,7 @@ describe("buildExportPresetArgs / PLATFORM_PRESETS", () => {
   });
   it("vertical_reel: footage centred over a blurred fill, normalised audio, fit ignored (#107)", () => {
     const a = buildExportPresetArgs("in.mp4", "o.mp4", "vertical_reel", "crop");
-    const vf = a[a.indexOf("-vf") + 1];
+    const vf = argAfter(a, "-vf");
     expect(vf.startsWith("split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur")).toBe(true);
     expect(vf).toContain("[fg]scale=1080:1080:force_original_aspect_ratio=decrease:force_divisible_by=2[f]");
     expect(vf).toContain("[b][f]overlay=(W-w)/2:(H-h)/2,setsar=1,fps=30,format=yuv420p");

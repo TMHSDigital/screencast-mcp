@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { defined } from "./testUtils.js";
 import {
   parseOcrPass,
   mergePasses,
@@ -15,20 +16,20 @@ const word = (text: string, x: number, y = 0, width = text.length * 10, height =
 function line(words: ReturnType<typeof word>[]): OcrLine {
   const x0 = Math.min(...words.map((w) => w.x));
   const x1 = Math.max(...words.map((w) => w.x + w.width));
-  return { text: words.map((w) => w.text).join(" "), words, x: x0, y: words[0].y, width: x1 - x0, height: 12 };
+  return { text: words.map((w) => w.text).join(" "), words, x: x0, y: defined(words[0]).y, width: x1 - x0, height: 12 };
 }
 
 describe("OCR helpers (#117)", () => {
   it("parses a pass and divides out the upscale", () => {
     const lines = parseOcrPass({ lines: [{ text: "Deploy now", words: [{ text: "Deploy", x: 20, y: 40, width: 120, height: 24 }, { text: "now", x: 150, y: 40, width: 60, height: 24 }] }] }, 2);
     expect(lines).toHaveLength(1);
-    expect(lines[0].words[0]).toEqual({ text: "Deploy", x: 10, y: 20, width: 60, height: 12 });
+    expect(lines[0]?.words[0]).toEqual({ text: "Deploy", x: 10, y: 20, width: 60, height: 12 });
     expect(lines[0]).toMatchObject({ text: "Deploy now", x: 10, y: 20, width: 95, height: 12 });
   });
 
   it("accepts PowerShell's single-object (non-array) words and empty passes", () => {
     const lines = parseOcrPass({ lines: [{ text: "OK", words: { text: "OK", x: 0, y: 0, width: 10, height: 10 } }] }, 1);
-    expect(lines[0].words).toHaveLength(1);
+    expect(lines[0]?.words).toHaveLength(1);
     expect(parseOcrPass({}, 1)).toEqual([]);
   });
 

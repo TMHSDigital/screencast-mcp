@@ -32,7 +32,7 @@ const binary = z.looseObject({
 const outputSchema = looseOutput({
   ok: z.boolean(),
   problems: z.array(z.string()),
-  server: z.looseObject({ version: z.string(), node: z.string(), platform: z.string() }),
+  server: z.looseObject({ version: z.string(), node: z.string(), platform: z.string(), arch: z.string() }),
   ffmpeg: binary.extend({ meetsFfmpeg8: z.boolean().nullable() }),
   ffprobe: binary,
   filters: z.record(z.string(), z.boolean()),
@@ -46,7 +46,7 @@ const outputSchema = looseOutput({
 /** An error's message and hint on one line. */
 function errorText(err: unknown): string {
   const first = errorResponse(err).content[0];
-  return first.type === "text" ? first.text.replace(/\s*\n+\s*/g, " ") : String(err);
+  return first?.type === "text" ? first.text.replace(/\s*\n+\s*/g, " ") : String(err);
 }
 
 function describeBinary(bin: string) {
@@ -133,7 +133,7 @@ export function register(server: McpServer): void {
         return okResponse({
           ok: problems.length === 0,
           problems,
-          server: { version: serverVersion, node: process.version, platform: process.platform },
+          server: { version: serverVersion, node: process.version, platform: process.platform, arch: process.arch },
           ffmpeg: { ...ffmpeg, meetsFfmpeg8 },
           ffprobe,
           filters,

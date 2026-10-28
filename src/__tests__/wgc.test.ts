@@ -1,5 +1,6 @@
 /** #113: recording one window through Windows Graphics Capture. */
 import { describe, it, expect } from "vitest";
+import { defined } from "./testUtils.js";
 import { buildWgcEncodeArgs, buildWgcGrabArgs, framesDue, nudgeScript, parseRawSize, startBanner, yuv420FrameBytes, wgcStopFile } from "../utils/wgc.js";
 import { parseCaptureStart } from "../utils/events.js";
 
@@ -23,7 +24,7 @@ describe("wgc recorder helpers", () => {
       "  Stream #0:0: Video: rawvideo (I420 / 0x30323449), yuv420p(progressive), 402x332, q=2-31, 30 fps",
     ].join("\n");
     expect(parseRawSize(stderr)).toEqual({ width: 402, height: 332 });
-    expect(parseRawSize(stderr.split("Output")[0])).toBeNull();
+    expect(parseRawSize(defined(stderr.split("Output")[0]))).toBeNull();
     expect(yuv420FrameBytes(402, 332)).toBe(200196);
   });
 

@@ -7,6 +7,18 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.44.1]
+
+### Added
+
+- Windows on ARM64 in CI (#246). A `windows-11-arm` job runs the unit and ffmpeg integration suites and the gdigrab capture smoke test on arm64 Node, against BtbN's FFmpeg 8.1 `winarm64-gpl-shared` build (pinned by SHA-256; gyan.dev ships no arm64 build). That build has `gdigrab`, `gfxcapture` and `drawtext` but no whisper or libvpx, so `transcribe` and `.webm` output need another build; the README lists the gaps. The job does not block releases until it has passed on the hosted runner. `doctor` reports `arch`, and `scripts/platform-probe.mjs` reports what works on a machine (doctor, an OCR round trip, and with `--capture` gdigrab and WGC screenshots).
+- Agent eval harness (#223). `npm run eval` drives the built server over MCP through scripted tasks (repro GIF under 2 MB, cut dead air, redact a key, verify a button turned green, and more) against fixtures generated with ffmpeg at run time, and scores tool selection, argument validity, and outcome checks. The default oracle mode needs no model or network; `--agent anthropic` scores a real model (`EVAL_MODEL`, default `claude-sonnet-5-5`). Live-capture tools are always blocked.
+
+### Changed
+
+- The tests are type-checked: `npm run typecheck` (and so CI) also compiles `src/__tests__`, and `noUncheckedIndexedAccess` is on, with index reads guarded or narrowed instead of asserted. ESLint adds a type-aware layer on `src/` and `evals/` (`no-floating-promises`, `no-misused-promises`, `await-thenable`) (#220).
+- The `.webm` integration case skips when ffmpeg lacks libvpx, instead of failing (#246).
+
 ## [0.44.0]
 
 ### Security

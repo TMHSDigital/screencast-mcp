@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { defined } from "./testUtils.js";
 import { buildTargetList } from "../utils/targetList.js";
 import { parseTarget } from "../utils/targets.js";
 import { selectWindow, type WindowQuery } from "../utils/windows.js";
@@ -79,8 +80,8 @@ describe("buildTargetList (#213)", () => {
 describe("parseMonitors DPI (#213)", () => {
   it("keeps a reported DPI and drops a missing one", () => {
     const ms = parseMonitors([{ X: 0, Y: 0, Width: 1920, Height: 1080, Primary: true, Dpi: 120 }, { X: 1920, Y: 0, Width: 1920, Height: 1080, Dpi: 0 }]);
-    expect(ms[0].dpi).toBe(120);
-    expect("dpi" in ms[1]).toBe(false);
+    expect(ms[0]?.dpi).toBe(120);
+    expect("dpi" in defined(ms[1])).toBe(false);
   });
 });
 

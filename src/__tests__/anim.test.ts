@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { defined } from "./testUtils.js";
 import { animLadder, nextLadderIndex, buildAnimArgs } from "../utils/anim.js";
 
 describe("animated export (#124)", () => {
@@ -6,9 +7,10 @@ describe("animated export (#124)", () => {
     const l = animLadder("gif", 12, 960);
     expect(l[0]).toEqual({ fps: 12, width: 960, colors: 256 });
     expect(l.at(-1)).toEqual({ fps: 4, width: 316, colors: 16 });
-    for (let i = 1; i < l.length; i++) {
-      expect(l[i].width).toBeLessThan(l[i - 1].width);
-      expect(l[i].width % 2).toBe(0);
+    for (const [i, step] of l.entries()) {
+      if (i === 0) continue;
+      expect(step.width).toBeLessThan(defined(l[i - 1]).width);
+      expect(step.width % 2).toBe(0);
     }
   });
 

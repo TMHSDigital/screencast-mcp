@@ -197,17 +197,18 @@ export const MAX_INLINE_FILTER = 8_000;
  * syntax (FFmpeg 7+). Returns the new args and a cleanup that deletes the files. */
 export function scriptLongFilters(args: string[]): { args: string[]; cleanup: () => void } {
   let dir: string | null = null;
-  const out = args.map((a, i) => (i > 0 && SCRIPTABLE_OPTS.has(args[i - 1]) && a.length > MAX_INLINE_FILTER ? null : a));
-  for (let i = 1; i < args.length; i++) {
-    if (out[i] !== null) continue;
+  const out = [...args];
+  for (const [i, a] of args.entries()) {
+    const opt = args[i - 1];
+    if (opt === undefined || !SCRIPTABLE_OPTS.has(opt) || a.length <= MAX_INLINE_FILTER) continue;
     dir ??= mkdtempSync(join(tmpdir(), "screencast-filter-"));
     const file = join(dir, `filter${i}.txt`);
-    writeFileSync(file, args[i]);
-    out[i - 1] = `-/${args[i - 1].slice(1)}`;
+    writeFileSync(file, a);
+    out[i - 1] = `-/${opt.slice(1)}`;
     out[i] = file;
   }
   const d = dir;
-  return { args: out as string[], cleanup: () => d && rmSync(d, { recursive: true, force: true }) };
+  return { args: out, cleanup: () => d && rmSync(d, { recursive: true, force: true }) };
 }
 
 /** Options for runFfmpegBuffer / runFfmpegFrames. */

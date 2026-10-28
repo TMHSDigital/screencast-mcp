@@ -5,6 +5,7 @@
  * round-trips through screenshot to the listed monitor or window.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { defined } from "./testUtils.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -128,7 +129,7 @@ describe("list_targets (#213)", () => {
       captured.length = 0;
       const res = await call("screenshot", { target: e.target, backend: e.backend, returnImage: false });
       expect(res.isError, `${e.target}: ${res.text}`).toBe(false);
-      const { resolved } = captured[0];
+      const { resolved } = defined(captured[0]);
       if ("hwnd" in e) expect(resolved.window?.hwnd).toBe(e.hwnd);
       else if ("index" in e) expect(resolved.target).toEqual({ kind: "monitor", index: e.index });
       else expect(resolved.target.kind).toBe("full");

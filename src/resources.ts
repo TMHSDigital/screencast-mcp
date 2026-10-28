@@ -74,6 +74,7 @@ export function registerResources(server: McpServer): void {
       try {
         await runFfmpeg(["-y", "-v", "error", "-ss", String((durationSec ?? 0) / 2), "-i", s.outputPath, "-frames:v", "1", frame], 30_000);
         const [image] = (await encodeInlineImages([frame], 960, 1)).images;
+        if (!image) throw new ScreencastError(`Could not extract a thumbnail frame from ${s.outputPath}`);
         return { contents: [{ uri: uri.href, mimeType: image.mimeType, blob: image.data }] };
       } finally {
         rmSync(frame, { force: true });

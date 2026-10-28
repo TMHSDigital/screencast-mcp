@@ -66,9 +66,10 @@ export function parseSrt(srt: string): Cue[] {
   for (const block of srt.replace(/\r\n/g, "\n").split(/\n\s*\n/)) {
     const lines = block.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
     const i = lines.findIndex((l) => l.includes("-->"));
-    if (i === -1) continue;
-    const [a, b] = lines[i].split("-->");
-    const sa = a.match(TIME);
+    const header = lines[i];
+    if (header === undefined) continue;
+    const [a, b] = header.split("-->");
+    const sa = a?.match(TIME);
     const sb = b?.match(TIME);
     if (!sa || !sb) continue;
     const text = lines.slice(i + 1).join("\n");

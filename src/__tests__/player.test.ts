@@ -5,6 +5,7 @@
  * in jsdom against a fake host (#243).
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { defined } from "./testUtils.js";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -105,7 +106,7 @@ describe("review player as an MCP App (#128)", () => {
     const r = await client.callTool({ name: "player_frames", arguments: { input, width } });
     expect(r.isError).toBeFalsy();
     const content = r.content as Content;
-    return { meta: JSON.parse(content[0].text!) as FramesMeta, images: content.filter((c) => c.type === "image") };
+    return { meta: JSON.parse(defined(content[0]?.text)) as FramesMeta, images: content.filter((c) => c.type === "image") };
   };
 
   it("serves the player as a ui:// resource with the MCP App MIME type", async () => {
@@ -144,7 +145,7 @@ describe("review player as an MCP App (#128)", () => {
     const { meta, images } = await frames(src, 160);
     expect(meta).toMatchObject({ durationSec: 3, width: 320, height: 180, hasAudio: false, intervalSec: 0.25 });
     expect(images).toHaveLength(meta.frameTimes.length);
-    const jpeg = Buffer.from(images[0].data!, "base64");
+    const jpeg = Buffer.from(defined(images[0]?.data), "base64");
     expect([jpeg[0], jpeg[1], jpeg.at(-2), jpeg.at(-1)]).toEqual([0xff, 0xd8, 0xff, 0xd9]);
     // Ground truth: every decoded frame's pts, from ffprobe.
     const probe = spawnSync(FFPROBE, ["-v", "error", "-select_streams", "v:0", "-show_entries", "frame=pts_time", "-of", "csv=p=0", src], { encoding: "utf8" });
@@ -158,7 +159,7 @@ describe("review player as an MCP App (#128)", () => {
     expect(meta.frameTimes).toEqual([...meta.frameTimes].sort((a, b) => a - b));
     expect(meta.sceneFrames.length).toBeLessThanOrEqual(12);
     const rv = await client.callTool({ name: "review_recording", arguments: { input: src } });
-    expect(JSON.parse((rv.content as Array<{ text: string }>)[0].text)).toMatchObject({ input: src, durationSec: 3, width: 320 });
+    expect(JSON.parse(defined((rv.content as Array<{ text: string }>)[0]).text)).toMatchObject({ input: src, durationSec: 3, width: 320 });
   });
 
   it.skipIf(!hasFfmpeg)("shows a 3 s on-screen change in a 10-minute recording that the 5 s grid misses (#232)", async () => {
@@ -174,7 +175,7 @@ describe("review player as an MCP App (#128)", () => {
     expect(meta.frameTimes.filter((t) => t % 5 === 0)).toHaveLength(120);
     const centre = (i: number) => {
       const f = join(home, `f${i}.jpg`);
-      writeFileSync(f, Buffer.from(images[i].data!, "base64"));
+      writeFileSync(f, Buffer.from(defined(images[i]?.data), "base64"));
       return spawnSync(FFMPEG, ["-v", "error", "-i", f, "-vf", "format=gray,crop=1:1:80:45", "-f", "rawvideo", "-pix_fmt", "gray", "-"]).stdout[0];
     };
     const shown = meta.frameTimes.findIndex((t) => t >= 301 && t <= 304);
@@ -197,8 +198,10 @@ describe("the player page's script in jsdom (#243)", () => {
     dom = new JSDOM(playerHtml(), {
       runScripts: "dangerously",
       beforeParse(w) {
+        // jsdom's DOMWindow is the page's window at runtime but not lib.dom's Window type.
+        const source = w as unknown as Window;
         const reply = (msg: object) =>
-          setTimeout(() => w.dispatchEvent(new w.MessageEvent("message", { data: { jsonrpc: "2.0", ...msg }, source: w })), 0);
+          setTimeout(() => w.dispatchEvent(new w.MessageEvent("message", { data: { jsonrpc: "2.0", ...msg }, source })), 0);
         const text = (o: object) => ({ content: [{ type: "text", text: JSON.stringify(o) }] });
         w.postMessage = ((m: { id?: number; method: string; params: { name: string; arguments: Record<string, unknown> } }) => {
           if (m.method === "ui/initialize") reply({ id: m.id, result: {} });
@@ -267,7 +270,7 @@ describe("the player page's script in jsdom (#243)", () => {
 
   it("adds redaction boxes from the numeric form, clamped to the video", () => {
     const fill = (x: string, y: string, w: string, h: string) => {
-      for (const [id, v] of [["bx", x], ["by", y], ["bw", w], ["bh", h]]) ($(id) as HTMLInputElement).value = v;
+      for (const [id, v] of [["bx", x], ["by", y], ["bw", w], ["bh", h]] as const) ($(id) as HTMLInputElement).value = v;
       ($("boxForm") as HTMLFormElement).requestSubmit();
     };
     expect(($("boxFields") as HTMLFieldSetElement).disabled).toBe(false);
@@ -279,7 +282,7 @@ describe("the player page's script in jsdom (#243)", () => {
     expect($("status").className).toBe("err");
     const items = [...$("boxList").children].map((li) => li.firstChild!.textContent);
     expect(items).toEqual([`#1 50${String.fromCharCode(0xd7)}30 at 10,20`, `#2 20${String.fromCharCode(0xd7)}10 at 300,170`]);
-    $("boxList").querySelectorAll("button")[1].click();
+    defined($("boxList").querySelectorAll("button")[1]).click();
     expect($("boxList").children).toHaveLength(1);
     expect(dom.window.document.activeElement).toBe($("boxList").querySelector("button"));
   });

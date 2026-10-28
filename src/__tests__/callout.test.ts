@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { argAfter } from "./testUtils.js";
 import { arrowGeometry, buildArrowImageArgs, buildCalloutArgs } from "../utils/callout.js";
 
 const assets = { fontFile: "C:\\f\\Inter.ttf", textFiles: [] as Array<string | null>, arrowFiles: [] as Array<string | null> };
@@ -32,7 +33,7 @@ describe("callout (#121)", () => {
       { ...assets, textFiles: [null, "C:\\t\\a.txt", null], arrowFiles: [null, null, "C:\\t\\arrow.png"] },
     );
     expect(args.slice(0, 7)).toEqual(["-y", "-i", "in.mp4", "-loop", "1", "-i", "C:\\t\\arrow.png"]);
-    const fc = args[args.indexOf("-filter_complex") + 1].split(";");
+    const fc = argAfter(args, "-filter_complex").split(";");
     expect(fc[0]).toBe("[0:v]drawbox=x=1:y=2:w=30:h=40:color=yellow:t=4:enable='between(t,1,2)'[c0]");
     expect(fc[1]).toContain("[c0]drawtext=fontfile=C\\\\:/f/Inter.ttf:textfile=C\\\\:/t/a.txt:expansion=none:");
     expect(fc[1]).toContain(":box=1:boxcolor=black@0.6");
@@ -59,7 +60,7 @@ describe("callout (#121)", () => {
       ],
       { ...assets, textFiles: ["C:\\t\\a.txt", "C:\\t\\b.txt"], fontFiles: [null, "C:\\Windows\\Fonts\\YuGothB.ttc"] },
     );
-    const fc = args[args.indexOf("-filter_complex") + 1].split(";");
+    const fc = argAfter(args, "-filter_complex").split(";");
     expect(fc[0]).toContain("drawtext=fontfile=C\\\\:/f/Inter.ttf:");
     expect(fc[1]).toContain("drawtext=fontfile=C\\\\:/Windows/Fonts/YuGothB.ttc:");
   });

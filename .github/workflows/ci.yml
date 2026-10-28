@@ -90,3 +90,66 @@ jobs:
         env:
           REQUIRE_FFMPEG: "1"
           RUN_CAPTURE_SMOKE: ${{ runner.os == 'Windows' && '1' || '' }}
+
+  # Windows on ARM64 (#246): unit + ffmpeg integration suites and the gdigrab
+  # capture smoke test on a native arm64 runner and arm64 Node. gyan.dev ships
+  # no arm64 build, so this uses BtbN's FFmpeg 8.1 winarm64 GPL shared build
+  # from a month-end autobuild release (those are kept, unlike the dailies),
+  # pinned by SHA-256. It has gdigrab, gfxcapture and drawtext but is built
+  # --disable-whisper and without libvpx, so transcribe and .webm output are
+  # not covered here. Lint and typecheck are arch-independent and run above.
+  windows-arm64:
+    runs-on: windows-11-arm
+    # Not yet proven green on the hosted ARM runner (#246). release.yml waits
+    # for a successful CI run, so until it is, a failure here must not block
+    # releases. Drop this once the leg has passed.
+    continue-on-error: true
+    env:
+      FFMPEG_ARM64_RELEASE: autobuild-2026-09-30-13-08
+      FFMPEG_ARM64_ASSET: ffmpeg-n8.1.3-9-g29e619e767-winarm64-gpl-shared-8.1
+      FFMPEG_ARM64_SHA256: 31f35037625a8084085248fb47de2958678601ee9ab54e087234693616359c4b
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Use Node.js 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Cache FFmpeg (arm64)
+        id: armcache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ffmpeg-arm64
+          key: ffmpeg-arm64-${{ env.FFMPEG_ARM64_SHA256 }}
+      - name: Download FFmpeg 8.1 (arm64)
+        if: steps.armcache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Join-Path $env:RUNNER_TEMP "$env:FFMPEG_ARM64_ASSET.zip"
+          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/$env:FFMPEG_ARM64_RELEASE/$env:FFMPEG_ARM64_ASSET.zip" -OutFile $zip
+          $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+          if ($hash -ne $env:FFMPEG_ARM64_SHA256) { throw "FFmpeg checksum mismatch: $hash" }
+          Expand-Archive -Path $zip -DestinationPath $env:RUNNER_TEMP
+          Move-Item (Join-Path $env:RUNNER_TEMP $env:FFMPEG_ARM64_ASSET) (Join-Path $env:RUNNER_TEMP 'ffmpeg-arm64')
+          Remove-Item $zip
+      - name: Put FFmpeg on PATH (arm64)
+        shell: pwsh
+        run: |
+          $bin = Join-Path $env:RUNNER_TEMP 'ffmpeg-arm64/bin'
+          Add-Content -Path $env:GITHUB_PATH -Value $bin
+          & (Join-Path $bin 'ffmpeg.exe') -hide_banner -version | Select-Object -First 1
+          node -p "'node ' + process.version + ' ' + process.arch"
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+        env:
+          REQUIRE_FFMPEG: "1"
+          RUN_CAPTURE_SMOKE: "1"
+      # Report what the server sees on arm64: doctor (filters, devices, OCR
+      # languages), an OCR round trip through Windows.Media.Ocr on a rendered
+      # file, and full-screen grabs with gdigrab and WGC. Report-only: WGC on
+      # a hosted runner's session is not something CI should gate on.
+      - name: Platform probe (arm64)
+        continue-on-error: true
+        run: node scripts/platform-probe.mjs --capture

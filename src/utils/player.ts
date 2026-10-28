@@ -122,7 +122,7 @@ export function pickPlayerFrames(frames: PlayerFrame[], maxScene: number): numbe
     .sort((a, b) => b.f.score - a.f.score)
     .slice(0, Math.max(0, maxScene));
   const keep = new Set(scene.map((x) => x.i));
-  return frames.map((_, i) => i).filter((i) => !frames[i].scene || keep.has(i));
+  return frames.flatMap((f, i) => (!f.scene || keep.has(i) ? [i] : []));
 }
 
 /** Split concatenated JPEGs (ffmpeg's mjpeg image2pipe) at their start/end

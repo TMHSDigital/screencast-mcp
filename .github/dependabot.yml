@@ -15,7 +15,8 @@ updates:
       # diffing every tool's tools/list schema before and after, #86).
       - dependency-name: "zod"
         update-types: ["version-update:semver-major"]
-      # Hold the TypeScript 5.x line; 6.x is a transitional major.
+      # Hold the TypeScript 5.x line: a major (6.x, or the native 7.x compiler)
+      # is a deliberate migration, checked against `npm run typecheck` and lint.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
       # engines is >=22 and CI runs Node 22/24; keep @types/node on the oldest

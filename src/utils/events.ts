@@ -126,7 +126,7 @@ export function convertEvents(
       missFrom = null;
       continue;
     }
-    if (type === "gap" || !(EVENT_TYPES as readonly string[]).includes(type)) continue;
+    if (type === undefined || type === "gap" || !(EVENT_TYPES as readonly string[]).includes(type)) continue;
     if (t < 0 || (opts.endSec !== undefined && t > opts.endSec)) continue;
     const x = dx - opts.frame.x;
     const y = dy - opts.frame.y;
@@ -150,12 +150,13 @@ export function convertEvents(
   const lastSec = opts.endSec ?? Math.max(0, ...out.map((e) => e.t), ...beats);
   if (missFrom) gap(missFrom.t, missFrom.x, missFrom.y, lastSec, "input_not_seen");
   // Heartbeats only exist in logs from helpers that write them.
-  if (beats.length > 0) {
-    beats.sort((a, b) => a - b);
-    for (let i = 1; i < beats.length; i++) {
-      if (beats[i] - beats[i - 1] > HEARTBEAT_GAP_SEC) gap(beats[i - 1], 0, 0, beats[i], "helper_stalled");
-    }
-    const last = beats[beats.length - 1];
+  beats.sort((a, b) => a - b);
+  const last = beats.at(-1);
+  if (last !== undefined) {
+    beats.reduce((prev, beat) => {
+      if (beat - prev > HEARTBEAT_GAP_SEC) gap(prev, 0, 0, beat, "helper_stalled");
+      return beat;
+    });
     if (opts.endSec !== undefined && opts.endSec - last > HEARTBEAT_GAP_SEC) gap(last, 0, 0, opts.endSec, "helper_stopped");
   }
   return out.sort((a, b) => a.t - b.t);

@@ -57,7 +57,7 @@ export function parseDshowAudioDevices(stderr: string): string[] {
     const inlineAudio = /\(audio\)/i.test(line);
     const inlineVideo = /\(video\)/i.test(line);
     const isAudio = inlineAudio || (!inlineVideo && section === "audio");
-    if (isAudio) names.push(quoted[1]);
+    if (isAudio && quoted[1]) names.push(quoted[1]);
   }
   return [...new Set(names)];
 }

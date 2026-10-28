@@ -85,7 +85,7 @@ export function parseWindowSelector(wanted: string): { kind: "hwnd"; hwnd: numbe
   const h = /^hwnd=(0x[0-9a-f]+|\d+)$/i.exec(wanted.trim());
   if (h) return { kind: "hwnd", hwnd: Number(h[1]) };
   const e = /^exe=(.+)$/i.exec(wanted.trim());
-  if (e) return { kind: "exe", exe: e[1].trim().toLowerCase().replace(/\.exe$/, "") };
+  if (e?.[1]) return { kind: "exe", exe: e[1].trim().toLowerCase().replace(/\.exe$/, "") };
   return null;
 }
 
@@ -181,6 +181,8 @@ function matchWindow(
 /** The topmost of `matches`, clamped to the desktop and rounded down to even. */
 function toBounds(query: WindowQuery, matches: RawWindow[], matchKind: WindowBounds["matchKind"]): WindowBounds {
   const chosen = matches[0]; // EnumWindows Z-order: index 0 is the topmost.
+  // Both callers throw NoWindowMatch on an empty list first.
+  if (!chosen) throw new NoWindowMatch("No visible window matched.");
   if (chosen.minimized) {
     throw new ScreencastError(
       `Window "${chosen.title}" is minimized. Restore it before capturing - ` +

@@ -51,8 +51,7 @@ export async function prepareCalloutAssets(
     return f;
   });
   const arrowFiles: Array<string | null> = [];
-  for (let i = 0; i < items.length; i++) {
-    const c = items[i];
+  for (const [i, c] of items.entries()) {
     if (c.type !== "arrow") {
       arrowFiles.push(null);
       continue;

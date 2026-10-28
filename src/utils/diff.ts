@@ -80,7 +80,8 @@ export function targetSize(target: Target, monitors: Monitor[]): Rect {
 export function meanDifference(a: Uint8Array, b: Uint8Array): number {
   if (a.length !== b.length || a.length === 0) throw new ScreencastError("Frames differ in size.");
   let sum = 0;
-  for (let i = 0; i < a.length; i++) sum += Math.abs(a[i] - b[i]);
+  // i < a.length === b.length (checked above), so both reads are in range.
+  for (let i = 0; i < a.length; i++) sum += Math.abs(a[i]! - b[i]!);
   return sum / a.length / 255;
 }
 
@@ -128,7 +129,8 @@ export function diffFrames(
       for (let y = cy * CELL; y < Math.min(height, (cy + 1) * CELL); y++) {
         for (let x = cx * CELL; x < Math.min(width, (cx + 1) * CELL); x++) {
           const i = y * width + x;
-          sum += Math.abs(a[i] - b[i]);
+          // x < width and y < height, and both bitmaps are width * height (checked above).
+          sum += Math.abs(a[i]! - b[i]!);
           n++;
         }
       }
