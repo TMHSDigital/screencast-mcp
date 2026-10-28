@@ -89,9 +89,11 @@ describe.skipIf(!RUN)("capture smoke (RUN_CAPTURE_SMOKE)", () => {
     expect(stop.isError, stop.text).toBe(false);
     expect(stop.json.segmentsJoined).toBe(2);
     const info = await probeMedia(start.json.outputPath as string);
-    // About 4 s recorded over about 7 s of wall time.
+    // About 4 s recorded over about 7 s of wall time. The second segment runs
+    // ~2 s plus resume/stop latency (up to ~1.6 s on a hosted runner); keeping
+    // the 3 s pause would put it past recorded + 5.
     expect(info.durationSec!).toBeGreaterThan(recorded + 1);
-    expect(info.durationSec!).toBeLessThan(recorded + 3.5);
+    expect(info.durationSec!).toBeLessThan(recorded + 4.5);
     expect(existsSync(`${start.json.outputPath as string}.parts`)).toBe(false);
   }, 90_000);
 
