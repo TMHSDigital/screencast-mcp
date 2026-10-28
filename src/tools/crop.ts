@@ -10,10 +10,10 @@ import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
-  x: z.number().int().nonnegative().describe("Left edge of the crop in pixels."),
-  y: z.number().int().nonnegative().describe("Top edge of the crop in pixels."),
-  width: z.number().int().positive().describe("Crop width in pixels."),
-  height: z.number().int().positive().describe("Crop height in pixels."),
+  x: z.number().int().nonnegative(),
+  y: z.number().int().nonnegative(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -24,8 +24,7 @@ export function register(server: McpServer): void {
     {
       title: "Crop Video",
       description:
-        "Crop a video to a pixel rectangle (x, y, width, height) and re-encode. A " +
-        "rectangle that runs off the source frame is rejected.",
+        "Crop a video to a pixel rectangle; one running off the frame is rejected.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

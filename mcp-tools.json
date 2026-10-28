@@ -1,9 +1,10 @@
 [
   {
     "name": "start_recording",
+    "toolset": "capture",
     "title": "Start Recording",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Start a screen recording (Windows gdigrab) as a background ffmpeg process. Returns a session id and output path. Recording is explicit and never auto-starts. Audio is video-only by default; set audio.source = system to also capture loopback audio (needs a virtual-audio device; microphone capture is not supported). A window: target records the on-screen rectangle the window occupies, resolved once at start (window must be visible, on top, not minimized); it does not follow a window moved/resized mid-recording.",
+    "description": "Start a background screen recording. Returns a session id; finalize it with stop_recording. Never auto-starts.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -32,9 +33,10 @@
   },
   {
     "name": "stop_recording",
+    "toolset": "capture",
     "title": "Stop Recording",
     "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
-    "description": "Stop a recording by session id. Sends ffmpeg a graceful quit so the file is finalized rather than truncated, then returns the final path and duration.",
+    "description": "Stop a recording gracefully so the file is finalized; returns the path and duration.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -45,6 +47,7 @@
   },
   {
     "name": "list_sessions",
+    "toolset": "capture",
     "title": "List Sessions",
     "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
     "description": "List all recording sessions (active and finished) with their status, target, output path, and whether the process is still alive.",
@@ -52,6 +55,7 @@
   },
   {
     "name": "get_session",
+    "toolset": "capture",
     "title": "Get Session",
     "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
     "description": "Inspect a single recording session by id, including live status and whether its output file exists on disk.",
@@ -65,9 +69,10 @@
   },
   {
     "name": "read_events",
+    "toolset": "capture",
     "title": "Read Input Events",
     "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
-    "description": "Read the input event log of a recording made with start_recording events: true: mouse clicks, scroll, cursor positions, shortcuts, and typing bursts, each with its video time and position in video pixels. Filter by time range and type. Reports truncated: true with the gaps when events may be missing.",
+    "description": "Read the input events (clicks, scroll, cursor, shortcuts, typing bursts) of a recording made with events: true, in video seconds and pixels; e.g. types: ['down'], then sample_frames there.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -83,9 +88,10 @@
   },
   {
     "name": "review_recording",
+    "toolset": "watch",
     "title": "Review Recording",
     "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
-    "description": "Open a recording for a person to review. In clients that support MCP Apps it shows an inline player: scrub the timeline, drag trim handles, and draw redaction boxes, then export a trimmed, redacted copy (their choices run as a pipeline call). Elsewhere it returns the video's details; use contact_sheet or sample_frames to look at it.",
+    "description": "Open a recording for a person to review: in MCP Apps clients an inline player to scrub, trim, and redact, then export; elsewhere just the video's details.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -96,9 +102,10 @@
   },
   {
     "name": "player_frames",
+    "toolset": "watch",
     "title": "Player Frames",
     "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
-    "description": "Preview frames for the review player: JPEGs on an even grid over the video plus frames at scene changes, with their real times. Used by the inline player (MCP Apps visibility: app), and listed only to clients that advertise MCP Apps; agents should use sample_frames or contact_sheet instead.",
+    "description": "Preview frames for the review player: JPEGs on an even grid over the video plus frames at scene changes, with their real times. Used by the inline player; agents should use sample_frames or contact_sheet instead.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -111,9 +118,10 @@
   },
   {
     "name": "screenshot",
+    "toolset": "capture",
     "title": "Take Screenshot",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Capture a single still frame (PNG) of a target (full screen, a monitor, a window, or a region). Returns the image path, plus the image inline so the model can view it directly. A window: target captures the on-screen rectangle the window occupies as currently displayed (it must be visible, on top, and not minimized).",
+    "description": "Capture one PNG of the screen, a monitor, a window, or a region, returned inline and by path.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -130,9 +138,10 @@
   },
   {
     "name": "sample_frames",
+    "toolset": "watch",
     "title": "Sample Frames",
     "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
-    "description": "Sample frames from a video so the agent can view what happened: at a fixed rate (fps), at explicit timestamps, or only where the screen changed (mode scenes). Writes PNG frames to a folder and returns their paths, plus the first few frames inline so the model can view them directly.",
+    "description": "Sample PNG frames from a video (by fps, timestamps, or scene changes) and return the first few inline so the model can see what happened.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -153,9 +162,10 @@
   },
   {
     "name": "contact_sheet",
+    "toolset": "watch",
     "title": "Contact Sheet",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Tile timestamped frames of a video into one image so the agent can see a whole recording in a single look: evenly spaced, or at the scene changes. Returns the image path and the sheet inline. poster: true writes a single representative frame instead.",
+    "description": "Tile timestamped frames of a video into one image to see a whole recording at a glance (the cheapest first look).",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -176,9 +186,10 @@
   },
   {
     "name": "screen_diff",
+    "toolset": "watch",
     "title": "Screen Diff",
     "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
-    "description": "Compare two screenshots or frames: returns an SSIM similarity score, the share of the image that changed, and bounding boxes of the changed areas in b's pixel coordinates, plus b inline with those areas outlined. Use it to check that a UI change happened, and only where expected.",
+    "description": "Compare two screenshots or frames: SSIM score, changed share, and changed boxes in b's pixels, to check a UI change happened only where expected.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -192,9 +203,10 @@
   },
   {
     "name": "wait_for_change",
+    "toolset": "watch",
     "title": "Wait for Screen Change",
     "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
-    "description": "Watch part of the screen and return when it changes (mode change) or when it has stopped changing (mode settle), instead of guessing a sleep. Reports how long it took, where the screen changed, and the final state as an inline screenshot. regions are in the screenshot's pixels (like find_text and screen_diff); add origin for desktop coordinates.",
+    "description": "Wait until part of the screen changes or settles, instead of guessing a sleep. Returns the elapsed time, changed regions (screenshot pixels; add `origin` for desktop), and the final state.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -213,9 +225,10 @@
   },
   {
     "name": "find_text",
+    "toolset": "watch",
     "title": "Find Text (OCR)",
     "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
-    "description": "Read text on screen or in an image/video frame with the OCR engine built into Windows (no install), with each line's and match's bounding box. Find where a label or button is, check what the screen says, or locate secrets and get redact_region rectangles for them; for a video, scanEverySec checks the whole clip. Boxes are in the image's pixels; for a live target, add origin for desktop coordinates. Best-effort detection: always review.",
+    "description": "OCR (built into Windows) on the screen, an image, or video frames, with line and match boxes in image pixels (add `origin` for desktop coordinates). Locate UI text or secrets (e.g. regex 'sk-|ghp_|api.?key') to redact. Best-effort: review results.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -237,6 +250,7 @@
   },
   {
     "name": "get_media_info",
+    "toolset": "core",
     "title": "Get Media Info",
     "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
     "description": "Probe a media file with ffprobe and return duration, resolution, frame rate, codecs, container format, and size.",
@@ -250,9 +264,10 @@
   },
   {
     "name": "trim",
+    "toolset": "edit",
     "title": "Trim Video",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Trim a video to a sub-clip by start + (end or duration). Re-encodes by default, so the cut is frame-exact and the removed content is really gone; set exact: false for a fast stream copy that keeps hidden frames from before start in the file.",
+    "description": "Cut a video down to one sub-clip by start + (end or duration). For several segments use clip; to combine with other edits use pipeline.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -269,9 +284,10 @@
   },
   {
     "name": "concat",
+    "toolset": "edit",
     "title": "Concatenate Videos",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Concatenate two or more videos into a single file. Matching inputs are joined by stream copy (fast, lossless). Inputs that differ in codec, size, pixel format, frame rate or audio layout, or that hold frames hidden behind an edit list (a trim with exact: false), are re-encoded with hard cuts instead, so the result is always a valid file; `mode` in the result says which.",
+    "description": "Join videos end to end with hard cuts: stream copy when they match, else a re-encode (`mode` says which). For transitions use xfade_transition or assemble_highlights.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -284,9 +300,10 @@
   },
   {
     "name": "convert",
+    "toolset": "edit",
     "title": "Convert Format",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Convert a video between mp4, gif, and webm. mp4 uses H.264, webm uses VP9, and gif uses a palette filter for quality. Returns the output path.",
+    "description": "Convert media to mp4, webm, or gif. For a size-bounded GIF/WebP prefer export_gif; for a smaller mp4, compress or export_preset.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -302,9 +319,10 @@
   },
   {
     "name": "export_gif",
+    "toolset": "edit",
     "title": "Export GIF or WebP",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Export a video as an optimized animated GIF or WebP that fits a file-size budget (default: GitHub's 10 MB image limit), for PRs, issues, and READMEs. Steps fps, width, and palette/quality down until it fits and reports the settings used.",
+    "description": "Export an animated GIF or WebP that fits a size budget (for PRs, issues, READMEs), stepping fps, width, and quality down until it fits.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -323,9 +341,10 @@
   },
   {
     "name": "crop",
+    "toolset": "edit",
     "title": "Crop Video",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Crop a video to a pixel rectangle (x, y, width, height) and re-encode. A rectangle that runs off the source frame is rejected rather than silently clamped.",
+    "description": "Crop a video to a pixel rectangle; one running off the frame is rejected.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -342,9 +361,10 @@
   },
   {
     "name": "scale",
+    "toolset": "edit",
     "title": "Scale Video",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Resize a video to a target width and/or height and re-encode. Provide one side to keep the aspect ratio, or both for an exact size.",
+    "description": "Resize a video to a target width and/or height and re-encode. Provide one side to keep the aspect ratio, or both to set an exact size.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -359,6 +379,7 @@
   },
   {
     "name": "speed",
+    "toolset": "edit",
     "title": "Change Speed",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
     "description": "Change playback speed by a factor (>1 faster, <1 slower) and re-encode. Audio is retempo'd to match when the source has an audio track.",
@@ -375,9 +396,10 @@
   },
   {
     "name": "overlay",
+    "toolset": "produce",
     "title": "Overlay Image or Video",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Composite an image or video (logo, watermark, picture-in-picture) onto a base video at a pixel position, optionally scaled and time-limited. A video overlay starts playing at start and holds its last frame if it ends early; the output keeps the base video's audio and length.",
+    "description": "Composite an image or video (logo, watermark, picture-in-picture) onto a video at a pixel position, optionally scaled and time-limited; keeps the base's audio and length.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -397,9 +419,10 @@
   },
   {
     "name": "callout",
+    "toolset": "produce",
     "title": "Add Callouts",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Annotate a video with timed boxes, text labels, and arrows (e.g. a box around the bug, 'click here'), each shown between two timestamps. Returns the output path. Text uses the bundled Inter font; text Inter cannot draw (CJK, emoji, Arabic, Indic, ...) automatically uses a Windows system font that covers it (listed in fallbackFonts), and characters no font covers are reported in warnings instead of silently drawn as boxes.",
+    "description": "Annotate a video with timed boxes, text labels, and arrows. Fallback fonts used are listed in fallbackFonts; characters no font covers are reported in warnings.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -414,9 +437,10 @@
   },
   {
     "name": "compress",
+    "toolset": "edit",
     "title": "Compress Video",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Re-encode a video to a smaller file with a CRF quality ladder (light/medium/heavy) and an optional width cap that only downscales.",
+    "description": "Re-encode a video smaller (H.264 CRF ladder, optional width cap). For a platform target use export_preset.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -431,6 +455,7 @@
   },
   {
     "name": "extract_audio",
+    "toolset": "audio",
     "title": "Extract Audio",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
     "description": "Extract the audio track of a media file to its own file (mp3, aac, wav, or copy). Returns the output path.",
@@ -447,9 +472,10 @@
   },
   {
     "name": "normalize_audio",
+    "toolset": "audio",
     "title": "Normalize Loudness",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Normalize a recording's loudness to a delivery target (EBU R128, two-pass loudnorm) so narration and system audio are neither too quiet nor clipping. Video is copied untouched. Reports the loudness before and after.",
+    "description": "Normalize loudness to a delivery target (two-pass EBU R128 loudnorm); video is copied. Reports loudness before and after.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -463,9 +489,10 @@
   },
   {
     "name": "denoise",
+    "toolset": "audio",
     "title": "Denoise Audio",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Reduce steady background noise (fan, hum, hiss) in a recording's audio with an adaptive FFT denoiser tuned to the file's measured noise floor. Video is copied untouched.",
+    "description": "Reduce steady background noise (fan, hum, hiss) in a recording's audio with an adaptive FFT denoiser. Video is copied untouched. Returns the output path.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -479,6 +506,7 @@
   },
   {
     "name": "transcribe",
+    "toolset": "audio",
     "title": "Transcribe Speech",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
     "description": "Transcribe a recording's speech to an SRT subtitle file, locally, with FFmpeg 8's whisper filter (needs a whisper.cpp model file). Returns the SRT path and the text. Pair with burn_subtitles to caption the video.",
@@ -496,9 +524,10 @@
   },
   {
     "name": "burn_subtitles",
+    "toolset": "produce",
     "title": "Burn In Subtitles",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Burn subtitles (an SRT from transcribe, or any SRT/ASS) permanently into a video, in the bundled font, in a clean or social-media style. Returns the output path.",
+    "description": "Burn SRT/ASS subtitles (e.g. from transcribe) into a video in the bundled font.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -513,9 +542,10 @@
   },
   {
     "name": "clip",
+    "toolset": "edit",
     "title": "Extract Clips",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Extract one or more frame-accurate sub-segments to separate files. Unlike trim (fast stream copy that snaps to a keyframe), clip re-encodes so cuts land exactly on the given times.",
+    "description": "Extract several frame-exact segments, each to its own file. For one segment, trim does the same.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -541,9 +571,10 @@
   },
   {
     "name": "cut_idle",
+    "toolset": "edit",
     "title": "Cut Idle Stretches",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Remove dead air: cut stretches where the screen is frozen (and, if there is audio, silent), keeping a short pad at each edge. Agent recordings are full of these pauses. dryRun reports what would be cut first. Returns the output path and the time saved.",
+    "description": "Remove dead air: cut stretches where the screen is frozen (and silent), keeping a short pad. Returns the time saved.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -560,9 +591,10 @@
   },
   {
     "name": "redact_region",
+    "toolset": "edit",
     "title": "Redact Regions",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Redact declared rectangles in a video so on-screen secrets are covered. This covers regions you specify; it is NOT automatic secret detection. The default style is a solid box, which is irreversible (a blur or mosaic can be partially recovered). A region that falls outside the frame is rejected rather than silently doing nothing.",
+    "description": "Cover given rectangles in a video (e.g. secrets on screen). Not automatic detection: find them with find_text redact: true. Off-frame regions are rejected.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -595,16 +627,18 @@
   },
   {
     "name": "list_audio_devices",
+    "toolset": "capture",
     "title": "List Audio Devices",
     "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
-    "description": "List the DirectShow audio devices ffmpeg can see on this machine and flag a likely system-audio loopback device. Use the returned name as the audio device for start_recording. System audio needs a loopback device (Stereo Mix or a virtual-audio driver); microphone capture is not supported.",
+    "description": "List DirectShow audio devices and flag a likely loopback (Stereo Mix or a virtual-audio driver), for start_recording's audio.device.",
     "inputSchema": { "type": "object", "properties": {}, "required": [] }
   },
   {
     "name": "list_targets",
+    "toolset": "capture",
     "title": "List Capture Targets",
     "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
-    "description": "List what can be captured: the whole desktop, each monitor (bounds, DPI scale, primary), and each visible top-level window (title, exe, pid, hwnd, bounds, minimized, cloaked, and whether the default and the wgc backend can capture it), topmost window first. Every entry has a target string to pass as-is to screenshot, start_recording, find_text, or wait_for_change; windows use window:hwnd=<handle>, so the right window is captured even when titles repeat. Call this instead of guessing a window title.",
+    "description": "List the desktop, monitors, and visible windows (topmost first, with capturability per backend). Each entry has a `target` string to pass as-is to capture tools; use it instead of guessing a title.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -617,16 +651,18 @@
   },
   {
     "name": "doctor",
+    "toolset": "core",
     "title": "Check Setup",
     "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
-    "description": "Report what this machine can do before a tool call fails: the ffmpeg and ffprobe in use (path, version, whether it is FFmpeg 8+), the optional filters that gate tools (whisper for transcribe, gfxcapture for backend wgc, subtitles/libass for burn_subtitles, drawtext, ...), the gdigrab and dshow capture devices, the Windows OCR engine (find_text), SCREENCAST_HOME, and the environment settings in effect. problems lists what is missing and how to fix it. Call it once on first use or when a tool reports a missing feature.",
+    "description": "Check the setup: ffmpeg/ffprobe (FFmpeg 8+?), optional filters, capture devices, Windows OCR, settings, and enabled toolsets; `problems` says what is missing and how to fix it. Call on first use or when a tool reports a missing feature.",
     "inputSchema": { "type": "object", "properties": {}, "required": [] }
   },
   {
     "name": "xfade_transition",
+    "toolset": "produce",
     "title": "Crossfade Transition",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Crossfade two videos into one with an xfade transition. Both clips are auto-normalized to a common resolution, fps, and audio rate first, so they need not match. Offsets follow each clip's video length; audio is crossfaded, with silence standing in for a clip that has no track.",
+    "description": "Join two videos with an xfade transition (audio crossfaded); they need not match in size, fps, or audio. For more clips use assemble_highlights.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -642,9 +678,10 @@
   },
   {
     "name": "assemble_highlights",
+    "toolset": "produce",
     "title": "Assemble Highlights",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Stitch two or more clips into a single video, with hard cuts or an xfade transition between each. Clips are auto-normalized to a common resolution, fps, and audio rate, so they need not match.",
+    "description": "Stitch clips (including title cards) into one video with cuts or xfade transitions; they need not match in size, fps, or audio.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -662,9 +699,10 @@
   },
   {
     "name": "title_card",
+    "toolset": "produce",
     "title": "Title Card",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Generate a standalone title card: centered text on a solid background, with a silent audio track so it composes with audio-bearing clips (stitch it in with assemble_highlights). Text is rendered with the bundled Inter font, so no system font is required for Latin, Greek or Cyrillic; other scripts and emoji automatically use a Windows system font that covers them (returned as fontFile), and characters no font covers are reported in warnings instead of silently drawn as boxes.",
+    "description": "Generate a title card clip (centered text on a solid background, silent audio track) to stitch in with assemble_highlights. Uncoverable characters are reported in warnings.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -686,9 +724,10 @@
   },
   {
     "name": "music_bed",
+    "toolset": "audio",
     "title": "Add Music Bed",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Lay a music track under a video: the music is looped/trimmed to the video length, faded in and out, and leveled. When the video already has audio the two are mixed, optionally ducking the music under the original. The video stream is copied; only audio is re-encoded.",
+    "description": "Lay music under a video: looped or trimmed to length, faded, leveled, and mixed with any existing audio. Video is stream-copied.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -706,9 +745,10 @@
   },
   {
     "name": "reframe",
+    "toolset": "produce",
     "title": "Reframe Aspect Ratio",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Re-aspect a video to a target ratio (16:9, 9:16, 1:1, 4:5). pad letterboxes so nothing is lost; crop fills the frame and trims the overflow.",
+    "description": "Re-aspect a video to 16:9, 9:16, 1:1, or 4:5 by padding or cropping.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -723,9 +763,10 @@
   },
   {
     "name": "zoom",
+    "toolset": "produce",
     "title": "Zoom and Pan",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Smooth animated zoom-and-pan, Screen Studio style: zoom into where the action is and back out. Give keyframes (rectangles by time), or let it plan them from the clicks in the recording's input event log or from where the screen changes. highlightClicks rings each click. dryRun returns the plan so it can be adjusted. Returns the output path.",
+    "description": "Smooth animated zoom-and-pan into the action and back out, from keyframes or planned from logged clicks or screen changes.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -747,9 +788,10 @@
   },
   {
     "name": "pipeline",
+    "toolset": "edit",
     "title": "Edit Pipeline",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Run several edits as one ffmpeg process: one re-encode and no intermediate files, instead of a tool call and a re-encode per edit. Steps use the same options as the standalone tools (trim, crop, scale, speed, redact, callout, reframe, zoom) and may end with export_preset or export_gif. The same steps can be saved and re-run on another recording. dryRun returns the plan.",
+    "description": "Run several edits (trim, crop, scale, speed, redact, callout, reframe, zoom, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -765,9 +807,10 @@
   },
   {
     "name": "export_preset",
+    "toolset": "produce",
     "title": "Export for Platform",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Encode a platform-ready file for youtube, instagram_reel, tiktok, x, square, steam_trailer, or vertical_reel. Reframes to the platform aspect, caps fps, and encodes H.264 at the platform bitrate with faststart.",
+    "description": "Encode a platform-ready H.264 file (aspect, fps, bitrate, faststart) for a named platform.",
     "inputSchema": {
       "type": "object",
       "properties": {

@@ -10,12 +10,12 @@ import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 /** One rectangle to redact; shared with pipeline. */
 export const redactRegionSchema = z.object({
-  x: z.number().int().nonnegative().describe("Left edge in pixels."),
-  y: z.number().int().nonnegative().describe("Top edge in pixels."),
-  width: z.number().int().positive().describe("Region width in pixels."),
-  height: z.number().int().positive().describe("Region height in pixels."),
-  start: z.number().nonnegative().optional().describe("Optional second to start redacting from."),
-  end: z.number().positive().optional().describe("Optional second to stop redacting after."),
+  x: z.number().int().nonnegative(),
+  y: z.number().int().nonnegative(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  start: z.number().nonnegative().optional(),
+  end: z.number().positive().optional(),
 });
 
 const inputSchema = {
@@ -23,18 +23,18 @@ const inputSchema = {
   regions: z
     .array(redactRegionSchema)
     .min(1)
-    .describe("One or more rectangles to redact. Each may be limited to a time window."),
+    .describe("Pixel rectangles (x, y, width, height), each optionally limited to start..end seconds."),
   style: z
     .enum(["box", "blur", "pixelate"])
     .optional()
-    .describe("box (default) draws an irreversible solid fill; blur and pixelate are softer but partially recoverable."),
+    .describe("box (default): irreversible fill; blur/pixelate are partially recoverable."),
   pad: z
     .number()
     .int()
     .nonnegative()
     .optional()
-    .describe("Optional pixels to expand each region by, to cover anti-aliased edges (default 0)."),
-  color: z.string().optional().describe("Fill color for box style (default black)."),
+    .describe("Grow each region by this many px (default 0)."),
+  color: z.string().optional().describe("Box fill color (default black)."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -45,11 +45,8 @@ export function register(server: McpServer): void {
     {
       title: "Redact Regions",
       description:
-        "Redact declared rectangles in a video so secrets on screen are covered. " +
-        "This covers regions you specify; it is NOT automatic secret detection. " +
-        "The default style is a solid box, which is irreversible (a blur or mosaic " +
-        "can be partially recovered). A region that falls outside the frame is " +
-        "rejected rather than silently doing nothing.",
+        "Cover given rectangles in a video (e.g. secrets on screen). Not automatic detection: find " +
+        "them with find_text redact: true. Off-frame regions are rejected.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

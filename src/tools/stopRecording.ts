@@ -17,11 +17,7 @@ export function register(server: McpServer): void {
     {
       title: "Stop Recording",
       description:
-        "Stop a recording by session id. Sends ffmpeg a graceful quit so the file " +
-        "is finalized rather than truncated, then returns the final path and " +
-        "duration. Falls back to terminating the process by pid if the live " +
-        "handle was lost (for example after a server restart). Pass the session " +
-        "id to review_recording to open the review player.",
+        "Stop a recording gracefully so the file is finalized; returns the path and duration.",
       inputSchema,
       outputSchema: looseOutput({
         sessionId: z.string(),

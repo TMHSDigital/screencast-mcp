@@ -27,6 +27,7 @@ export function buildManifest(p, toolList) {
         args: ["${__dirname}/dist/index.js"],
         env: {
           SCREENCAST_HOME: "${user_config.screencast_home}",
+          SCREENCAST_ALLOWED_DIRS: "${user_config.allowed_dirs}",
           FFMPEG_PATH: "${user_config.ffmpeg_path}",
           FFPROBE_PATH: "${user_config.ffprobe_path}",
           SCREENCAST_WHISPER_MODEL: "${user_config.whisper_model}",
@@ -34,6 +35,8 @@ export function buildManifest(p, toolList) {
           SCREENCAST_JOB_TIMEOUT_MS: "${user_config.job_timeout_ms}",
           SCREENCAST_RETENTION_DAYS: "${user_config.retention_days}",
           SCREENCAST_PS_TIMEOUT_MS: "${user_config.ps_timeout_ms}",
+          SCREENCAST_CONFIRM_CAPTURE: "${user_config.confirm_capture}",
+          SCREENCAST_TOOLSETS: "${user_config.toolsets}",
         },
       },
     },
@@ -44,6 +47,14 @@ export function buildManifest(p, toolList) {
         type: "directory",
         title: "Output folder",
         description: "Where recordings, frames, screenshots, and edits are saved (default: ~/.screencast-mcp).",
+        required: false,
+      },
+      allowed_dirs: {
+        type: "string",
+        title: "Allowed output folders",
+        description:
+          "Semicolon-separated folders a call may write outside the output folder. When set (or when the client " +
+          "sends workspace roots), outputs anywhere else are refused.",
         required: false,
       },
       ffmpeg_path: {
@@ -95,6 +106,23 @@ export function buildManifest(p, toolList) {
         description: "Limit for the helpers that list monitors and windows and run OCR (default 20000; OCR 60000).",
         required: false,
         min: 1,
+      },
+      confirm_capture: {
+        type: "boolean",
+        title: "Confirm each capture",
+        description:
+          "Ask before every recording, screenshot, live find_text, and wait_for_change, showing what will be " +
+          "captured. Needs a client that supports MCP elicitation; others are refused.",
+        required: false,
+        default: false,
+      },
+      toolsets: {
+        type: "string",
+        title: "Toolsets",
+        description:
+          "Comma-separated tool groups to load: capture, watch, edit, produce, audio (doctor and get_media_info " +
+          "are always on). Leave empty for all; fewer tools means less context per turn.",
+        required: false,
       },
     },
     compatibility: {

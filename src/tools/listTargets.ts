@@ -62,11 +62,8 @@ export function register(server: McpServer): void {
     {
       title: "List Capture Targets",
       description:
-        "List what can be captured: the whole desktop, each monitor (bounds, DPI scale, primary), and each " +
-        "visible top-level window (title, exe, pid, hwnd, bounds, minimized, cloaked, and whether the default " +
-        "and the wgc backend can capture it), topmost window first. Every entry has a `target` string to pass " +
-        "as-is to screenshot, start_recording, find_text, or wait_for_change; windows use window:hwnd=<handle>, " +
-        "so the right window is captured even when titles repeat. Call this instead of guessing a window title.",
+        "List the desktop, monitors, and visible windows (topmost first, with capturability per backend). " +
+        "Each entry has a `target` string to pass as-is to capture tools; use it instead of guessing a title.",
       inputSchema,
       outputSchema,
       annotations: READ_ONLY,

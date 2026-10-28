@@ -6,7 +6,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
 import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { detectFfmpeg, hasFilter, wgcAvailable, type FfmpegTools } from "../utils/ffmpeg.js";
-import { homeRoot } from "../utils/paths.js";
+import { allowedOutputDirs, envAllowedDirs, homeRoot } from "../utils/paths.js";
 import {
   FFMPEG_FEATURE_MAJOR,
   KEY_FILTERS,
@@ -18,6 +18,7 @@ import {
   parseFfmpegVersion,
   versionText,
 } from "../utils/capabilities.js";
+import { parseToolsets, SELECTABLE_TOOLSETS } from "../utils/toolsets.js";
 
 const { version: serverVersion } = createRequire(import.meta.url)("../../package.json") as { version: string };
 
@@ -66,12 +67,9 @@ export function register(server: McpServer): void {
     {
       title: "Check Setup",
       description:
-        "Report what this machine can do before a tool call fails: the ffmpeg and ffprobe in use (path, " +
-        `version, whether it is FFmpeg ${FFMPEG_FEATURE_MAJOR}+), the optional filters that gate tools ` +
-        "(whisper for transcribe, gfxcapture for backend wgc, subtitles/libass for burn_subtitles, drawtext, " +
-        "...), the gdigrab and dshow capture devices, the Windows OCR engine (find_text), SCREENCAST_HOME, " +
-        "and the environment settings in effect. `problems` lists what is missing and how to fix it. " +
-        "Call it once on first use or when a tool reports a missing feature.",
+        `Check the setup: ffmpeg/ffprobe (FFmpeg ${FFMPEG_FEATURE_MAJOR}+?), optional filters, capture ` +
+        "devices, Windows OCR, settings, and enabled toolsets; `problems` says what is missing and how to " +
+        "fix it. Call on first use or when a tool reports a missing feature.",
       inputSchema: {},
       outputSchema,
       annotations: READ_ONLY,
@@ -124,6 +122,13 @@ export function register(server: McpServer): void {
         const model = env.SCREENCAST_WHISPER_MODEL;
         if (model && !existsSync(model)) problems.push(`SCREENCAST_WHISPER_MODEL points at a missing file: ${model}`);
         const home = homeRoot();
+        for (const dir of envAllowedDirs()) {
+          if (!existsSync(dir)) problems.push(`SCREENCAST_ALLOWED_DIRS names a missing folder: ${dir}`);
+        }
+        const toolsets = parseToolsets(env.SCREENCAST_TOOLSETS ?? undefined);
+        if (toolsets.unknown.length > 0) {
+          problems.push(`SCREENCAST_TOOLSETS names unknown toolsets (ignored): ${toolsets.unknown.join(", ")}.`);
+        }
 
         return okResponse({
           ok: problems.length === 0,
@@ -141,8 +146,12 @@ export function register(server: McpServer): void {
             recordings: join(home, "recordings"),
             screenshots: join(home, "screenshots"),
             edits: join(home, "edits"),
+            // Where caller-chosen outputs may go; null means unconfined (#221).
+            allowedOutputDirs: allowedOutputDirs(),
           },
           env,
+          // Which tool groups this server lists (SCREENCAST_TOOLSETS, #214).
+          toolsets: { enabled: toolsets.enabled, available: ["all", ...SELECTABLE_TOOLSETS] },
         });
       } catch (error) {
         return errorResponse(error);

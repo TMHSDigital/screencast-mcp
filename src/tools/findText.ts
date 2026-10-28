@@ -13,6 +13,7 @@ import { buildHighlightArgs, targetSize } from "../utils/diff.js";
 import { recognize, mergePasses, findMatches, redactionRects, passScales, type OcrLine, type TextMatch } from "../utils/ocr.js";
 import { buildSampleByFpsArgs, planFpsSampling } from "../utils/media.js";
 import { windowMatchReport } from "../utils/windows.js";
+import { confirmCapture, describeTarget } from "../utils/consent.js";
 import { subdir, stamp, rand, stillOutput } from "../utils/paths.js";
 import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js";
 
@@ -26,17 +27,16 @@ const inputSchema = {
   target: z
     .string()
     .optional()
-    .describe("Read text live from the screen: 'full' | 'monitor:<index>' | 'window:<title>' (or window:exe=<app.exe> / window:hwnd=<handle>) | 'region:...'."),
-  input: z.string().optional().describe("Or read text from an image or video file (one of target / input)."),
-  timestamp: z.number().nonnegative().optional().describe("For a video input: the second to read (default 0). Ignored with scanEverySec."),
+    .describe("Live screen target (full | monitor:<i> | window:... | region:...), or pass input."),
+  input: z.string().optional().describe("Image or video file to read instead of a live target."),
+  timestamp: z.number().nonnegative().optional().describe("Video input: second to read (default 0)."),
   scanEverySec: z
     .number()
     .positive()
     .optional()
     .describe(
-      "For a video input: read a frame every N seconds across the whole clip instead of one frame, so " +
-        "text shown at any moment is found (use it to check a clip for secrets before sharing). Each match " +
-        "gets its time, and redactRegions get start/end. The interval widens to stay within maxFrames.",
+      "Video input: scan a frame every N s across the clip (e.g. for secrets before sharing); matches " +
+        "and redactRegions get times. Widens to stay within maxFrames.",
     ),
   maxFrames: z
     .number()
@@ -44,41 +44,37 @@ const inputSchema = {
     .min(1)
     .max(MAX_SCAN_FRAMES)
     .optional()
-    .describe(`With scanEverySec: most frames to read (default ${DEFAULT_SCAN_FRAMES}); each takes about a second.`),
-  exactTitle: z.boolean().optional().describe("For window: targets, match the title exactly (default false)."),
+    .describe(`scanEverySec frame cap (default ${DEFAULT_SCAN_FRAMES}; ~1 s each).`),
+  exactTitle: z.boolean().optional().describe("window: targets match the whole title only (default false)."),
   backend: z
     .enum(["gdigrab", "wgc"])
     .optional()
     .describe(
-      "For a live target: gdigrab (default) reads what is visible; 'wgc' (window: targets, FFmpeg 8+) " +
-        "reads the window's own surface even when other windows cover it.",
+      "Live target: gdigrab (default) = what is visible; wgc (window:, FFmpeg 8+) = the window even if covered.",
     ),
   query: z
     .string()
     .optional()
     .describe(
-      "Text to look for. Case-insensitive, and tolerant of common OCR misreads (_ vs -, I vs l, " +
-        "O vs 0; regexes get the _ vs - tolerance). Without a query, all recognised text is returned.",
+      "Text to find (case-insensitive, tolerates OCR misreads like I/l, O/0, _/-). Omit to return all text.",
     ),
   regex: z.boolean().optional().describe("Treat query as a regular expression (case-insensitive)."),
   redact: z
     .boolean()
     .optional()
     .describe(
-      "Also return padded rectangles around each match, ready to pass to redact_region " +
-        "(regions) to cover them. Detection is best-effort: review the result.",
+      "Also return padded match rectangles ready for redact_region's regions.",
     ),
   keep: z
     .boolean()
     .optional()
     .describe(
-      "For a live target: keep the captured screenshot and return its path (default false: it is " +
-        "deleted after reading, since it may show the secrets being looked for).",
+      "Live target: keep the capture and return its path (default false: deleted after reading).",
     ),
   returnImage: z
     .boolean()
     .optional()
-    .describe("Return the image inline with matches outlined in red (default true when there is a query)."),
+    .describe("Return the image with matches outlined (default: true with a query)."),
 };
 
 /** OCR several frames in one PowerShell run: each frame is upscaled for every
@@ -119,12 +115,9 @@ export function register(server: McpServer): void {
     {
       title: "Find Text (OCR)",
       description:
-        "Read text on screen or in an image/video frame with the OCR engine built into Windows " +
-        "(no install), with each line's and match's bounding box. Find where a label or button " +
-        "is, check what the screen says, or locate secrets (e.g. regex 'sk-|ghp_|api.?key') and get " +
-        "redact_region rectangles for them; for a video, scanEverySec checks the whole clip. Boxes are " +
-        "in the image's pixels; for a live target, add `origin` for desktop coordinates. Best-effort " +
-        "detection: always review.",
+        "OCR (built into Windows) on the screen, an image, or video frames, with line and match boxes " +
+        "in image pixels (add `origin` for desktop coordinates). Locate UI text or secrets (e.g. regex " +
+        "'sk-|ghp_|api.?key') to redact. Best-effort: review results.",
       inputSchema,
       outputSchema: looseOutput({
         imageSize: looseOutput({ width: z.number(), height: z.number() }),
@@ -150,6 +143,7 @@ export function register(server: McpServer): void {
             // Captures go to the work dir and vanish with it unless kept (#209).
             source = args.keep ? join(subdir("screenshots"), `ocr-${stamp()}-${rand()}.png`) : join(work, "capture.png");
             const backend = args.backend ?? "gdigrab";
+            await confirmCapture(server, `Capture ${describeTarget(args.target, resolved.window)} once to read the text on it?`, extra.signal);
             await captureStill(resolved, source, backend);
             if (resolved.window) windowReport = windowMatchReport(resolved.window);
             // Where the image sits on the desktop: boxes are image pixels (#233).

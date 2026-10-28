@@ -36,20 +36,17 @@ const inputSchema = {
     .min(1)
     .max(MAX_SHEET_COUNT)
     .optional()
-    .describe(`How many frames to tile (default ${DEFAULT_SHEET_COUNT}, max ${MAX_SHEET_COUNT}).`),
+    .describe(`Frames to tile (default ${DEFAULT_SHEET_COUNT}).`),
   mode: z
     .enum(["even", "scenes"])
     .optional()
-    .describe(
-      "'even' spreads frames evenly across the video (default); 'scenes' uses the " +
-        "opening frame plus the strongest scene changes, so static stretches take no tiles.",
-    ),
+    .describe("even (default) or scenes (strongest changes; static stretches take no tiles)."),
   sceneThreshold: z
     .number()
     .gt(0)
     .lt(1)
     .optional()
-    .describe(`Mode 'scenes': how much a frame must change to count (default ${DEFAULT_SCENE_THRESHOLD}).`),
+    .describe(`Mode scenes: change needed, 0-1 (default ${DEFAULT_SCENE_THRESHOLD}).`),
   columns: z.number().int().min(1).max(12).optional().describe("Tiles per row (default: roughly square)."),
   tileWidth: z
     .number()
@@ -57,26 +54,23 @@ const inputSchema = {
     .min(64)
     .max(1920)
     .optional()
-    .describe(`Width of each tile in px (default ${DEFAULT_TILE_WIDTH}).`),
+    .describe(`Tile width in px (default ${DEFAULT_TILE_WIDTH}).`),
   poster: z
     .boolean()
     .optional()
-    .describe(
-      "Instead of a sheet, write one representative poster frame (ffmpeg's thumbnail " +
-        "filter over 30 candidates spread across the video), e.g. for a video thumbnail.",
-    ),
+    .describe("Write one representative poster frame instead of a sheet."),
   output: z.string().optional().describe("Optional output .png path. Defaults under SCREENCAST_HOME/frames."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
   returnImage: z
     .boolean()
     .optional()
-    .describe("Also return the sheet inline as an image the model can view directly (default true)."),
+    .describe("Return the sheet inline (default true)."),
   maxImageWidth: z
     .number()
     .int()
     .min(16)
     .optional()
-    .describe(`Downscale the inline image to at most this width (default ${DEFAULT_MAX_IMAGE_WIDTH}).`),
+    .describe(`Max inline image width (default ${DEFAULT_MAX_IMAGE_WIDTH}).`),
 };
 
 export function register(server: McpServer): void {
@@ -85,10 +79,8 @@ export function register(server: McpServer): void {
     {
       title: "Contact Sheet",
       description:
-        "Tile timestamped frames of a video into ONE image, so the agent can see a whole " +
-        "recording in a single look: evenly spaced, or at the scene changes. Returns the " +
-        "image path and the sheet inline. poster: true writes a single representative " +
-        "frame instead.",
+        "Tile timestamped frames of a video into one image to see a whole recording at a glance " +
+        "(the cheapest first look).",
       inputSchema,
       outputSchema: looseOutput({ outputPath: z.string(), inlineImages: z.number().int() }),
       annotations: WRITES_FILE,

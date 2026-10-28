@@ -15,10 +15,8 @@ export function register(server: McpServer): void {
     {
       title: "List Audio Devices",
       description:
-        "List the DirectShow audio devices ffmpeg can see on this machine, and flag a " +
-        "likely system-audio loopback device. Use the returned name as the `audio` " +
-        "device for start_recording. System audio needs a loopback device (Stereo " +
-        "Mix or a virtual-audio driver); microphone capture is not supported.",
+        "List DirectShow audio devices and flag a likely loopback (Stereo Mix or a virtual-audio " +
+        "driver), for start_recording's audio.device.",
       inputSchema: {},
       outputSchema: looseOutput({
         devices: z.array(z.unknown()),

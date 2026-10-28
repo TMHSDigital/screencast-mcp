@@ -13,15 +13,14 @@ const inputSchema = {
   format: z
     .enum(["gif", "webp"])
     .optional()
-    .describe("gif (plays everywhere, default) or webp (animated WebP, usually much smaller)."),
+    .describe("gif (default) or webp (usually much smaller)."),
   maxBytes: z
     .number()
     .int()
     .min(10_000)
     .optional()
     .describe(
-      `File-size budget in bytes (default ${DEFAULT_MAX_BYTES}, under GitHub's 10 MB limit ` +
-        "for images). Quality steps down until the file fits.",
+      `Size budget in bytes (default ${DEFAULT_MAX_BYTES}, under GitHub's 10 MB image limit).`,
     ),
   fps: z.number().positive().max(30).optional().describe(`Starting frame rate (default ${DEFAULT_ANIM_FPS}).`),
   width: z
@@ -30,9 +29,9 @@ const inputSchema = {
     .min(64)
     .max(1920)
     .optional()
-    .describe(`Starting width in px (default ${DEFAULT_ANIM_WIDTH}); height follows the aspect ratio.`),
-  start: z.number().nonnegative().optional().describe("Start at this many seconds into the video."),
-  duration: z.number().positive().optional().describe("Export only this many seconds (default: to the end)."),
+    .describe(`Starting width in px (default ${DEFAULT_ANIM_WIDTH}).`),
+  start: z.number().nonnegative().optional().describe("Start second."),
+  duration: z.number().positive().optional().describe("Seconds to export (default: to the end)."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -43,9 +42,8 @@ export function register(server: McpServer): void {
     {
       title: "Export GIF or WebP",
       description:
-        "Export a video as an optimized animated GIF or WebP that fits a file-size budget " +
-        "(default: GitHub's 10 MB image limit), for PRs, issues, and READMEs. Steps fps, " +
-        "width, and palette/quality down until it fits and reports the settings used.",
+        "Export an animated GIF or WebP that fits a size budget (for PRs, issues, READMEs), stepping " +
+        "fps, width, and quality down until it fits.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

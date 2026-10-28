@@ -18,9 +18,8 @@ const inputSchema = {
     .boolean()
     .optional()
     .describe(
-      "Re-encode so the cut is frame-exact and nothing before start stays in the file (default true). " +
-        "false stream-copies: much faster, but the cut snaps to a keyframe and the frames before start " +
-        "still ship in the file, hidden only by an edit list. Never use false to remove sensitive content.",
+      "Re-encode for a frame-exact cut with the removed content really gone (default true). false = fast " +
+        "stream copy that snaps to a keyframe and keeps hidden earlier frames; never use it to remove secrets.",
     ),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
@@ -32,9 +31,8 @@ export function register(server: McpServer): void {
     {
       title: "Trim Video",
       description:
-        "Trim a video to a sub-clip by start + (end or duration). Re-encodes by default, " +
-        "so the cut is frame-exact and the removed content is really gone; set exact: false " +
-        "for a fast stream copy that keeps hidden frames from before start in the file.",
+        "Cut a video down to one sub-clip by start + (end or duration). For several segments use clip; " +
+        "to combine with other edits use pipeline.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

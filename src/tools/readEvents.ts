@@ -22,15 +22,15 @@ const inputSchema = {
   input: z
     .string()
     .optional()
-    .describe("Or a recording path (its sibling .events.jsonl is read) or the .events.jsonl itself."),
-  from: z.number().min(0).optional().describe("Only events at or after this video time, in seconds."),
-  to: z.number().min(0).optional().describe("Only events at or before this video time, in seconds."),
+    .describe("Or a recording path, or its .events.jsonl."),
+  from: z.number().min(0).optional().describe("Earliest video second."),
+  to: z.number().min(0).optional().describe("Latest video second."),
   types: z
     .array(z.enum(EVENT_TYPES))
     .optional()
     .describe(
-      "Only these types: down / up (mouse buttons), move (sampled cursor), wheel, key (a named shortcut), " +
-        "typing (a burst of typing: start and length only), gap (events may be missing). Clicks are down.",
+      "down/up (mouse buttons; clicks are down), move (sampled cursor), wheel, key (shortcut), " +
+        "typing (burst), gap (events may be missing).",
     ),
   inFrameOnly: z.boolean().optional().describe("Drop events whose cursor was outside the recorded area."),
   limit: z
@@ -39,7 +39,7 @@ const inputSchema = {
     .min(1)
     .max(MAX_EVENT_LIMIT)
     .optional()
-    .describe(`Most events to return (default ${DEFAULT_EVENT_LIMIT}); the result says when more matched.`),
+    .describe(`Most events to return (default ${DEFAULT_EVENT_LIMIT}).`),
 };
 
 export function register(server: McpServer): void {
@@ -48,10 +48,8 @@ export function register(server: McpServer): void {
     {
       title: "Read Input Events",
       description:
-        "Read the input event log of a recording made with start_recording events: true: " +
-        "mouse clicks, scroll, cursor positions, shortcuts, and typing bursts, each with its video " +
-        "time in seconds and position in video pixels. Filter by time range and type, " +
-        "e.g. types: ['down'] for the clicks, then sample_frames at those times.",
+        "Read the input events (clicks, scroll, cursor, shortcuts, typing bursts) of a recording made " +
+        "with events: true, in video seconds and pixels; e.g. types: ['down'], then sample_frames there.",
       inputSchema,
       outputSchema: looseOutput({
         eventsPath: z.string(),

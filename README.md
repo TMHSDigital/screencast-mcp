@@ -147,7 +147,7 @@ These tools re-encode (a filter rewrites pixels, so stream copy does not apply).
 | `denoise` | Reduce **steady** background noise (fan, hum, hiss) with `afftdn`, tuned to the file's measured noise floor. Video is copied. |
 | `transcribe` | **Speech to an SRT file, locally**, with FFmpeg 8's `whisper` filter (needs a whisper.cpp model: pass `model` or set `SCREENCAST_WHISPER_MODEL`). Cues are renumbered and de-overlapped. |
 | `burn_subtitles` | Burn an SRT/ASS into the video in the bundled font: `clean` (outlined line) or `social` (big bold text on a dark box, for muted autoplay). |
-| `clip` | Extract one or more frame-accurate sub-segments to separate files. Unlike `trim`, it re-encodes so cuts land exactly on the given times. |
+| `clip` | Extract one or more frame-accurate sub-segments, each to its own file. For a single segment, `trim` (default `exact: true`) does the same. |
 | `cut_idle` | **Remove dead air**: cut stretches where the screen is frozen and (when there is audio) silent, keeping a short pad at each edge. `dryRun` reports first; speech over a still screen is kept unless `useAudio: false`. |
 
 ### Redact
@@ -189,7 +189,9 @@ Every capture tool takes a single `target` string, so an agent never has to jugg
 
 For `window:` targets, `screenshot` and `start_recording` both report `matchedWindow`, `matchCount`, `matchKind` (`exact`, `substring`, `exe`, or `hwnd`), and the captured `region`. When the title matched only as a substring, or several windows matched, the result carries a `windowWarning` listing the candidate titles, so a generic title like `window:Code` cannot quietly record a different window. Pass `exactTitle: true` to refuse the substring fallback entirely.
 
-Output is written under `SCREENCAST_HOME` (default `<homedir>/.screencast-mcp`) into `recordings/`, `frames/`, `screenshots/`, and `edits/`. Any tool also accepts an explicit output path.
+Output is written under `SCREENCAST_HOME` (default `<homedir>/.screencast-mcp`) into `recordings/`, `frames/`, `screenshots/`, and `edits/`. Any tool also accepts an explicit output path; a relative one resolves under that tool's `SCREENCAST_HOME` subfolder, never the server's working directory.
+
+**Output confinement.** When the client sends workspace roots (the MCP `roots` capability), or `SCREENCAST_ALLOWED_DIRS` is set, an explicit output path (or `sample_frames` `outputDir`) must sit inside `SCREENCAST_HOME`, one of those roots, or one of those folders; anything else is refused with an error naming the allowed folders. The roots are re-read when the client reports they changed. With neither, any path you can write to is accepted, as before. `doctor` reports the folders in effect as `storage.allowedOutputDirs`.
 
 Edit and produce tools write to a `<name>.partial.<ext>` file next to the output and rename it into place only when ffmpeg succeeds, so a failed, timed-out, or cancelled job never leaves a truncated file at `output`. The job timeout scales with the media's length (at least 10 minutes, or 4x the duration); set `SCREENCAST_JOB_TIMEOUT_MS` to override it. Clients that send a progress token get `notifications/progress` updates while a job runs, and cancelling the request stops ffmpeg.
 
@@ -200,12 +202,32 @@ Edit and produce tools write to a `<name>.partial.<ext>` file next to the output
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `SCREENCAST_HOME` | `<homedir>/.screencast-mcp` | Where recordings, frames, screenshots, and edits are written |
+| `SCREENCAST_ALLOWED_DIRS` | none | `;`-separated folders explicit outputs may also go to; when set, or when the client sends roots, outputs outside `SCREENCAST_HOME`, the roots, and these folders are refused |
 | `SCREENCAST_MAX_RECORDING_SEC` | `3600` | Default recording cap (`0` disables it) |
 | `SCREENCAST_JOB_TIMEOUT_MS` | scales with length | Override the edit job timeout |
 | `SCREENCAST_WHISPER_MODEL` | none | whisper.cpp model for `transcribe` |
 | `SCREENCAST_RETENTION_DAYS` | off | Delete screenshots, frames, and leftover raw event logs older than this many days at startup (never recordings or edits) |
 | `SCREENCAST_PS_TIMEOUT_MS` | 20000 (OCR 60000) | Limit for the PowerShell helpers that list monitors and windows and run OCR |
+| `SCREENCAST_CONFIRM_CAPTURE` | off | Set to `1` to ask the user to confirm every live capture (`start_recording`, `screenshot`, `find_text` on a target, `wait_for_change`) through MCP elicitation; clients without elicitation are refused |
+| `SCREENCAST_TOOLSETS` | `all` | Comma-separated toolsets to expose (`capture`, `watch`, `edit`, `produce`, `audio`); the rest are not loaded, which shrinks the tool list the agent pays for on every turn |
 | `FFMPEG_PATH` / `FFPROBE_PATH` | `PATH` lookup | Explicit ffmpeg / ffprobe binaries |
+
+**Toolsets.** The full tool list (`tools/list`) is about 70 KB, roughly 17k tokens of context; `capture` alone is about 16 KB. Set `SCREENCAST_TOOLSETS` to load only the groups an agent needs, for example `capture,watch` for a QA agent that records and looks but never edits. `core` (`doctor`, `get_media_info`) is always on; unset, empty, `all`, or a value naming no known toolset loads everything, and unknown names are ignored with a warning (and listed by `doctor`).
+
+| Toolset | Tools |
+| --- | --- |
+| `capture` | `start_recording`, `stop_recording`, `list_sessions`, `get_session`, `read_events`, `screenshot`, `list_targets`, `list_audio_devices` |
+| `watch` | `sample_frames`, `contact_sheet`, `screen_diff`, `wait_for_change`, `find_text`, `review_recording`, `player_frames` |
+| `edit` | `pipeline`, `trim`, `clip`, `concat`, `convert`, `export_gif`, `crop`, `scale`, `speed`, `compress`, `redact_region`, `cut_idle` |
+| `produce` | `callout`, `overlay`, `zoom`, `reframe`, `title_card`, `xfade_transition`, `assemble_highlights`, `export_preset`, `burn_subtitles` |
+| `audio` | `extract_audio`, `normalize_audio`, `denoise`, `transcribe`, `music_bed` |
+| `core` (always) | `doctor`, `get_media_info` |
+
+The server also sends MCP `instructions` at initialize: the record, look, edit workflow, which tool to reach for when, and the toolsets in effect, so each tool's own description stays short.
+
+**Capture consent.** With `SCREENCAST_CONFIRM_CAPTURE=1`, each live capture first asks the user through the client (MCP elicitation), showing what will be captured: the matched window, the duration, the audio source, and the output path. Only the user can answer, not the model, so a prompt injection cannot approve its own capture. Declining, cancelling, or not answering within 5 minutes captures nothing. A client that does not support elicitation fails closed: the tool returns an error and nothing is captured.
+
+**Log messages.** The server declares the MCP `logging` capability: ffmpeg warnings (dropped frames, a full audio buffer, a warning from an edit job that still succeeded) and a recording that ends on its own (cap reached, window closed, recorder crash) are sent as `notifications/message`, filtered by the level the client sets with `logging/setLevel`.
 
 ## Usage
 
@@ -278,7 +300,7 @@ It also offers **resources**, so a client can list and attach recordings without
 > [!WARNING]
 > Screen capture can record **anything** on screen at the moment of capture — passwords, tokens, private messages, and other secrets. `window:` captures the screen rectangle a window occupies, so overlays, notifications, or another window drawn over it are captured too. Treat recordings, screenshots, and sampled frames as sensitive by default.
 
-- **Capture is always explicit.** Nothing auto-fires; capture is gated behind an explicit tool call.
+- **Capture is always explicit.** Nothing auto-fires; capture is gated behind an explicit tool call. Set `SCREENCAST_CONFIRM_CAPTURE=1` to also require the user's confirmation, through the client, before each live capture (see [Configuration](#configuration)).
 - **The server makes no network requests.** Files are written to the local filesystem only. What a tool returns to your agent (frames, OCR text, event summaries) is sent to your model provider like any other tool result; see [Privacy](#privacy).
 - **Public repo, private captures.** The `.gitignore` blocks recordings, frames, screenshots, and common video/image output so test media cannot be committed by accident.
 - **Review before sharing.** Sample frames or inspect a recording before handing a file to another tool or person, so you know what it contains. In clients that support MCP Apps, `review_recording` opens an inline player where a person can scrub the whole recording and draw redaction boxes before anything leaves the machine. The player gets frames through the MCP connection; no local web server is started.

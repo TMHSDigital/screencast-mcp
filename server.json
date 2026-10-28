@@ -8,12 +8,12 @@
     "source": "github"
   },
   "websiteUrl": "https://tmhsdigital.github.io/screencast-mcp/",
-  "version": "0.43.0",
+  "version": "0.44.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@tmhs/screencast-mcp",
-      "version": "0.43.0",
+      "version": "0.44.0",
       "transport": {
         "type": "stdio"
       },
@@ -21,6 +21,12 @@
         {
           "name": "SCREENCAST_HOME",
           "description": "Where recordings, frames, screenshots, and edits are written (default <homedir>/.screencast-mcp)",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "SCREENCAST_ALLOWED_DIRS",
+          "description": "Semicolon-separated folders outputs may be written to besides SCREENCAST_HOME; when set (or when the client sends roots), outputs elsewhere are refused",
           "isRequired": false,
           "isSecret": false
         },
@@ -71,6 +77,19 @@
           "isRequired": false,
           "isSecret": false,
           "format": "number"
+        },
+        {
+          "name": "SCREENCAST_CONFIRM_CAPTURE",
+          "description": "Set to 1 to ask the user to confirm every live capture through MCP elicitation; clients without elicitation are refused (off by default)",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "boolean"
+        },
+        {
+          "name": "SCREENCAST_TOOLSETS",
+          "description": "Comma-separated toolsets to load: capture, watch, edit, produce, audio (doctor and get_media_info are always on; default all)",
+          "isRequired": false,
+          "isSecret": false
         }
       ]
     }

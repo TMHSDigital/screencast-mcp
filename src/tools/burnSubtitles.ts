@@ -18,8 +18,8 @@ const inputSchema = {
     .enum(["clean", "social"])
     .optional()
     .describe(
-      "'clean' (default for .srt): a modest outlined line. 'social': large bold text on a dark box, for muted " +
-        "autoplay. An .ass/.ssa file keeps its own styling unless a style is given.",
+      "clean (default for .srt): outlined line. social: big bold text on a dark box. .ass keeps its own " +
+        "styling unless set.",
     ),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
@@ -31,8 +31,7 @@ export function register(server: McpServer): void {
     {
       title: "Burn In Subtitles",
       description:
-        "Burn subtitles (an SRT from transcribe, or any SRT/ASS) permanently into a video, in " +
-        "the bundled font, in a clean or social-media style. Returns the output path.",
+        "Burn SRT/ASS subtitles (e.g. from transcribe) into a video in the bundled font.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

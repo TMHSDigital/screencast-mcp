@@ -29,15 +29,12 @@ const inputSchema = {
     .number()
     .min(0)
     .optional()
-    .describe(`Keep this much of each stretch at both edges so cuts are not abrupt (default ${DEFAULT_KEEP_SEC}).`),
+    .describe(`Seconds kept at each edge of a cut (default ${DEFAULT_KEEP_SEC}).`),
   useAudio: z
     .boolean()
     .optional()
-    .describe(
-      "Count a stretch as idle only if the audio is also silent (default true when the video " +
-        "has audio). Set false to cut frozen video even while sound plays.",
-    ),
-  dryRun: z.boolean().optional().describe("Only report the stretches that would be cut; write nothing."),
+    .describe("Require silent audio too (default true when there is audio)."),
+  dryRun: z.boolean().optional().describe("Only report what would be cut."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -48,9 +45,8 @@ export function register(server: McpServer): void {
     {
       title: "Cut Idle Stretches",
       description:
-        "Remove dead air: cut stretches where the screen is frozen (and, if there is audio, " +
-        "silent), keeping a short pad at each edge. Agent recordings are full of these pauses. " +
-        "dryRun reports what would be cut first. Returns the output path and the time saved.",
+        "Remove dead air: cut stretches where the screen is frozen (and silent), keeping a short pad. " +
+        "Returns the time saved.",
       inputSchema,
       annotations: WRITES_FILE,
     },

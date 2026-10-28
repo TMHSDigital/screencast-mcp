@@ -13,12 +13,12 @@ const inputSchema = {
   segments: z
     .array(
       z.object({
-        start: z.number().nonnegative().describe("Segment start in seconds."),
-        end: z.number().positive().describe("Segment end in seconds."),
+        start: z.number().nonnegative(),
+        end: z.number().positive(),
       }),
     )
     .min(1)
-    .describe("One or more {start, end} segments. Each becomes its own output file."),
+    .describe("{start, end} segments in seconds; each becomes its own file."),
   output: z
     .string()
     .optional()
@@ -32,9 +32,7 @@ export function register(server: McpServer): void {
     {
       title: "Extract Clips",
       description:
-        "Extract one or more frame-accurate sub-segments to separate files. Unlike " +
-        "trim (fast stream copy that snaps to a keyframe), clip re-encodes so cuts " +
-        "land exactly on the given times.",
+        "Extract several frame-exact segments, each to its own file. For one segment, trim does the same.",
       inputSchema,
       outputSchema: looseOutput({ outputs: z.array(z.string()), count: z.number().int() }),
       annotations: WRITES_FILE,

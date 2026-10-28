@@ -20,7 +20,7 @@ const inputSchema = {
   inputs: z
     .array(z.string().min(1))
     .min(2)
-    .describe("Two or more video paths to join, in order. Matching inputs are stream-copied; others are re-encoded."),
+    .describe("Video paths to join, in order."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -31,11 +31,8 @@ export function register(server: McpServer): void {
     {
       title: "Concatenate Videos",
       description:
-        "Concatenate two or more videos into a single file. Matching inputs are " +
-        "joined by stream copy (fast, lossless). Inputs that differ in codec, size, " +
-        "pixel format, frame rate or audio layout, or that hold frames hidden behind " +
-        "an edit list (a trim with exact: false), are re-encoded with hard cuts " +
-        "instead, so the result is always a valid file; `mode` in the result says which.",
+        "Join videos end to end with hard cuts: stream copy when they match, else a re-encode (`mode` " +
+        "says which). For transitions use xfade_transition or assemble_highlights.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

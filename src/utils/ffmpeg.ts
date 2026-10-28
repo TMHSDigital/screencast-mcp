@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ScreencastError } from "./errors.js";
 import { buildProbeArgs, parseMediaInfo, type MediaInfo } from "./media.js";
+import { logFfmpegWarnings } from "./logging.js";
 
 const INSTALL_HINT =
   "ffmpeg and ffprobe must be installed and on PATH (or set FFMPEG_PATH / " +
@@ -315,6 +316,9 @@ export async function runFfmpeg(
       const tail = res.stderr.trim().split("\n").slice(-6).join("\n");
       throw new ScreencastError(`ffmpeg failed (exit ${res.code}):\n${tail}`);
     }
+    // A job that succeeds can still warn (a dropped frame, a guessed layout);
+    // the client sees that as a log message rather than nothing (#222).
+    logFfmpegWarnings(res.stderr);
   } finally {
     scripted.cleanup();
   }

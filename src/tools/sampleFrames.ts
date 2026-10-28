@@ -18,7 +18,7 @@ import {
   DEFAULT_MAX_FRAMES,
   MAX_FRAMES_CEILING,
 } from "../utils/media.js";
-import { subdir, stamp, rand, sequencePattern } from "../utils/paths.js";
+import { subdir, stamp, rand, sequencePattern, resolveOutputDir } from "../utils/paths.js";
 import {
   encodeInlineImages,
   clampInlineCount,
@@ -33,37 +33,34 @@ const inputSchema = {
     .enum(["fps", "timestamps", "scenes"])
     .optional()
     .describe(
-      "How to pick frames. 'scenes' returns only frames where the screen changed " +
-        "(plus the first frame), strongest changes first up to maxFrames, which is " +
-        "usually the cheapest way to review a recording. Defaults to 'fps' or " +
-        "'timestamps' depending on which of those is given.",
+      "scenes: only frames where the screen changed (strongest first), usually the cheapest review. " +
+        "Default: fps or timestamps, whichever is given.",
     ),
   fps: z
     .number()
     .positive()
     .optional()
-    .describe("Sample this many frames per second (mode 'fps')."),
+    .describe("Frames per second (mode fps)."),
   timestamps: z
     .array(z.number().nonnegative())
     .optional()
-    .describe("Explicit second offsets to grab one frame at each (mode 'timestamps')."),
+    .describe("Seconds to grab a frame at (mode timestamps)."),
   sceneThreshold: z
     .number()
     .gt(0)
     .lt(1)
     .optional()
     .describe(
-      `Mode 'scenes': how much the frame must change to count, 0-1 (default ${DEFAULT_SCENE_THRESHOLD}; ` +
-        "raise it to keep only big changes).",
+      `Mode scenes: change needed to count, 0-1 (default ${DEFAULT_SCENE_THRESHOLD}).`,
     ),
   dedupe: z
     .boolean()
     .optional()
-    .describe("Mode 'fps': drop frames that are nearly identical to the previous one (default false)."),
+    .describe("Mode fps: drop near-duplicate frames (default false)."),
   outputDir: z
     .string()
     .optional()
-    .describe("Optional folder for the frames. Defaults to SCREENCAST_HOME/frames/<id>."),
+    .describe("Optional folder for the frames (a relative path resolves under SCREENCAST_HOME/frames). Defaults to SCREENCAST_HOME/frames/<id>."),
   maxFrames: z
     .number()
     .int()
@@ -71,15 +68,13 @@ const inputSchema = {
     .max(MAX_FRAMES_CEILING)
     .optional()
     .describe(
-      `Most frames this call may write (default ${DEFAULT_MAX_FRAMES}, max ${MAX_FRAMES_CEILING}). ` +
-        "In fps mode a rate that would exceed it is lowered so the frames still span the whole video.",
+      `Frame cap (default ${DEFAULT_MAX_FRAMES}); fps is lowered to fit while still spanning the video.`,
     ),
   returnImages: z
     .boolean()
     .optional()
     .describe(
-      "Also return the frames inline as images the model can view directly " +
-        "(default true). Only the first maxInlineImages frames are embedded.",
+      "Return the first maxInlineImages frames inline (default true).",
     ),
   maxInlineImages: z
     .number()
@@ -88,15 +83,14 @@ const inputSchema = {
     .max(MAX_INLINE_IMAGES)
     .optional()
     .describe(
-      `How many frames to embed inline (default ${DEFAULT_MAX_INLINE_IMAGES}, max ${MAX_INLINE_IMAGES}). ` +
-        "Every frame is still written to disk and listed by path.",
+      `Frames to embed inline (default ${DEFAULT_MAX_INLINE_IMAGES}); all are listed by path.`,
     ),
   maxImageWidth: z
     .number()
     .int()
     .min(16)
     .optional()
-    .describe(`Downscale inline images to at most this width (default ${DEFAULT_MAX_IMAGE_WIDTH}).`),
+    .describe(`Max inline image width (default ${DEFAULT_MAX_IMAGE_WIDTH}).`),
 };
 
 export function register(server: McpServer): void {
@@ -105,10 +99,8 @@ export function register(server: McpServer): void {
     {
       title: "Sample Frames",
       description:
-        "Sample frames from a video so the agent can actually view what happened: " +
-        "either at a fixed rate (fps) or at explicit timestamps. Writes PNG frames " +
-        "to a folder and returns their paths, plus the first few frames inline so " +
-        "the model can view them directly (disable with returnImages: false).",
+        "Sample PNG frames from a video (by fps, timestamps, or scene changes) and return the first " +
+        "few inline so the model can see what happened.",
       inputSchema,
       outputSchema: looseOutput({
         frameDir: z.string(),
@@ -169,7 +161,7 @@ export function register(server: McpServer): void {
           sceneTimes = pickSceneFrames(scenes, maxFrames);
         }
 
-        const dir = args.outputDir ?? join(subdir("frames"), `sample-${stamp()}-${rand()}`);
+        const dir = resolveOutputDir(args.outputDir, subdir("frames")) ?? join(subdir("frames"), `sample-${stamp()}-${rand()}`);
         mkdirSync(dir, { recursive: true });
 
         let frames: string[] = [];

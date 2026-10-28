@@ -37,12 +37,12 @@ import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 /** One zoom keyframe; shared with pipeline. */
 export const zoomKeyframeSchema = z.object({
-  t: z.number().nonnegative().describe("Seconds: the view is fully reached at this time."),
+  t: z.number().nonnegative(),
   x: z.number().optional(),
   y: z.number().optional(),
   width: z.number().positive().optional(),
   height: z.number().positive().optional(),
-  full: z.boolean().optional().describe("Zoom back out to the whole frame."),
+  full: z.boolean().optional(),
 });
 
 const inputSchema = {
@@ -52,29 +52,28 @@ const inputSchema = {
     .max(100)
     .optional()
     .describe(
-      "Views to animate between: each fills the frame with a source rectangle (x, y, width, height) " +
-        "by time t, or { t, full: true } to zoom out. Omit to plan them automatically (see follow).",
+      "Views reached by time t: a source rectangle (x, y, width, height), or { t, full: true } to " +
+        "zoom out. Omit to plan them (see follow).",
     ),
   follow: z
     .enum(["auto", "clicks", "changes"])
     .optional()
     .describe(
-      "Without keyframes: clicks zooms toward each click in the recording's input event log " +
-        "(start_recording events: true), panning between clicks close together; changes zooms toward " +
-        "where the screen changed. auto (default) uses clicks when the log has any, else changes.",
+      "Without keyframes: clicks (from the events log of start_recording events: true) or changes " +
+        "(where the screen changed). auto (default): clicks if logged, else changes.",
     ),
   events: z
     .string()
     .optional()
     .describe(
-      "Event log to read clicks from (default: the input's sibling .events.jsonl). Its times and " +
-        "pixels must match the input, so use the original recording, not a trimmed or scaled copy.",
+      "Events log (default: the input's .events.jsonl); must match the input's timing and size, so " +
+        "use the original recording.",
     ),
   highlightClicks: z
     .boolean()
     .optional()
-    .describe("Draw an expanding ring at each click from the event log (default false). Rings move with the zoom."),
-  highlightColor: z.string().optional().describe("Ring color: name, #RRGGBB, or name@alpha (default #FF4545)."),
+    .describe("Ring each logged click (default false)."),
+  highlightColor: z.string().optional().describe("Ring color (default #FF4545)."),
   transitionSec: z
     .number()
     .positive()
@@ -87,8 +86,8 @@ const inputSchema = {
     .max(MAX_ZOOM)
     .optional()
     .describe(`Auto mode: the furthest it zooms in (default ${DEFAULT_AUTO_MAX_ZOOM}).`),
-  holdSec: z.number().positive().max(30).optional().describe("Auto mode: stay zoomed this long after activity stops (default 2)."),
-  dryRun: z.boolean().optional().describe("Only return the planned keyframes (edit them and pass them back); write nothing."),
+  holdSec: z.number().positive().max(30).optional().describe("Auto mode: stay zoomed this long after activity (default 2)."),
+  dryRun: z.boolean().optional().describe("Return the planned keyframes only (editable, pass back)."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -99,10 +98,8 @@ export function register(server: McpServer): void {
     {
       title: "Zoom and Pan",
       description:
-        "Smooth animated zoom-and-pan, Screen Studio style: zoom into where the action is and back " +
-        "out. Give keyframes (rectangles by time), or let it plan them from the clicks in the " +
-        "recording's input event log or from where the screen changes. highlightClicks rings each " +
-        "click. dryRun returns the plan so it can be adjusted. Returns the output path.",
+        "Smooth animated zoom-and-pan into the action and back out, from keyframes or planned from " +
+        "logged clicks or screen changes.",
       inputSchema,
       outputSchema: looseOutput({ keyframes: z.array(z.unknown()) }),
       annotations: WRITES_FILE,

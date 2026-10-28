@@ -13,9 +13,9 @@ import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const timing = {
-  from: z.number().nonnegative().optional().describe("Show from this second (default: start)."),
-  to: z.number().positive().optional().describe("Hide after this second (default: end)."),
-  color: z.string().optional().describe("Color name, #RRGGBB, or name@alpha."),
+  from: z.number().nonnegative().optional(),
+  to: z.number().positive().optional(),
+  color: z.string().optional(),
 };
 
 /** Explicit font for drawn text (#231); shared with pipeline and title_card. */
@@ -24,9 +24,8 @@ export const fontFileSchema = z
   .min(1)
   .optional()
   .describe(
-    "Font for the text: a .ttf/.otf/.ttc path, or a file name in C:\\Windows\\Fonts (e.g. msyh.ttc). " +
-      "Default: the bundled Inter, or a Windows system font that covers characters Inter lacks " +
-      "(CJK, emoji, Arabic, Hebrew, Indic, Thai, ...).",
+    "Font: a .ttf/.otf/.ttc path or a C:\\Windows\\Fonts file name. Default: bundled Inter, with a " +
+      "covering system font for scripts it lacks (CJK, emoji, Arabic, ...).",
   );
 
 /** One callout; shared with pipeline. */
@@ -52,10 +51,10 @@ export const calloutItemSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("arrow"),
-    x1: z.number().describe("Tail x."),
-    y1: z.number().describe("Tail y."),
-    x2: z.number().describe("Head x: the point the arrow points at."),
-    y2: z.number().describe("Head y."),
+    x1: z.number(),
+    y1: z.number(),
+    x2: z.number().describe("Head (x2,y2) is the point the arrow points at."),
+    y2: z.number(),
     thickness: z.number().positive().optional().describe("Shaft px (default 8)."),
     ...timing,
   }),
@@ -68,8 +67,8 @@ const inputSchema = {
     .min(1)
     .max(50)
     .describe(
-      "Annotations, drawn in order (later on top). Each is a box, a text label, or an arrow, " +
-        "shown between from and to (seconds). Coordinates are video pixels.",
+      "Boxes, text labels, and arrows, drawn in order (later on top), in video pixels. Each shows " +
+        "from..to seconds (default: whole video); color is a name, #RRGGBB, or name@alpha.",
     ),
   fontFile: fontFileSchema,
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
@@ -82,11 +81,8 @@ export function register(server: McpServer): void {
     {
       title: "Add Callouts",
       description:
-        "Annotate a video with timed boxes, text labels, and arrows (e.g. 'click here', a box " +
-        "around the bug), each shown between two timestamps. Returns the output path. Text uses " +
-        "the bundled Inter font; text Inter cannot draw (CJK, emoji, Arabic, Indic, ...) " +
-        "automatically uses a Windows system font that covers it (listed in fallbackFonts), " +
-        "and characters no font covers are reported in warnings instead of silently drawn as boxes.",
+        "Annotate a video with timed boxes, text labels, and arrows. Fallback fonts used are listed in " +
+        "fallbackFonts; characters no font covers are reported in warnings.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

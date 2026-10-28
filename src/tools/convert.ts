@@ -12,9 +12,9 @@ const inputSchema = {
   input: z.string().min(1).describe("Path to the source media."),
   format: z
     .enum(["mp4", "gif", "webm"])
-    .describe("Target format. Converts mp4 <-> gif/webm (H.264 / VP9 / palette gif)."),
-  fps: z.number().positive().optional().describe("Output fps (gif only; default 12)."),
-  width: z.number().positive().optional().describe("Output width in px, height auto (gif only; default 720)."),
+    .describe("mp4 (H.264), webm (VP9), or gif (palette)."),
+  fps: z.number().positive().optional().describe("gif only: fps (default 12)."),
+  width: z.number().positive().optional().describe("gif only: width in px (default 720)."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -25,8 +25,8 @@ export function register(server: McpServer): void {
     {
       title: "Convert Format",
       description:
-        "Convert a video between mp4, gif, and webm. mp4 uses H.264, webm uses VP9, " +
-        "and gif uses a palette filter for quality. Returns the output path.",
+        "Convert media to mp4, webm, or gif. For a size-bounded GIF/WebP prefer export_gif; for a " +
+        "smaller mp4, compress or export_preset.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

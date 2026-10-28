@@ -19,21 +19,20 @@ import { join } from "node:path";
 import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js";
 
 const inputSchema = {
-  a: z.string().min(1).describe("The 'before' image (or video: its first frame is used)."),
-  b: z.string().min(1).describe("The 'after' image (or video). Scaled to a's size if it differs."),
+  a: z.string().min(1).describe("Before image (or video: first frame)."),
+  b: z.string().min(1).describe("After image (or video); scaled to a's size."),
   pixelThreshold: z
     .number()
     .min(0)
     .max(255)
     .optional()
     .describe(
-      `How different (0-255 mean) a cell of about 32x32 image pixels must be to count as changed ` +
-        `(default ${DEFAULT_PIXEL_THRESHOLD}: catches a changed label or a toast).`,
+      `Mean 0-255 difference for a ~32x32 cell to count as changed (default ${DEFAULT_PIXEL_THRESHOLD}).`,
     ),
   returnImage: z
     .boolean()
     .optional()
-    .describe("Also return 'b' inline with the changed regions outlined in red (default true)."),
+    .describe("Return b inline with changes outlined (default true)."),
 };
 
 export function register(server: McpServer): void {
@@ -42,10 +41,8 @@ export function register(server: McpServer): void {
     {
       title: "Screen Diff",
       description:
-        "Compare two screenshots or frames: returns an SSIM similarity score, the share of the " +
-        "image that changed, and bounding boxes of the changed areas in b's pixel coordinates, " +
-        "plus b inline with those areas outlined. Use it to check that a UI change happened " +
-        "(and only where expected).",
+        "Compare two screenshots or frames: SSIM score, changed share, and changed boxes in b's " +
+        "pixels, to check a UI change happened only where expected.",
       inputSchema,
       outputSchema: looseOutput({
         identical: z.boolean(),

@@ -12,16 +12,16 @@ const inputSchema = {
   clips: z
     .array(z.string().min(1))
     .min(2)
-    .describe("Two or more clip paths, in order. Clips are auto-normalized, so they need not match."),
+    .describe("Clip paths, in order."),
   transition: z
     .string()
     .optional()
-    .describe("'cut' (default, hard cuts) or an xfade transition name (fade, wipeleft, slideup, ...)."),
+    .describe("cut (default) or an xfade name (fade, wipeleft, slideup, ...)."),
   duration: z
     .number()
     .positive()
     .optional()
-    .describe(`Transition length in seconds when not a cut (default ${DEFAULT_TRANSITION_DUR}).`),
+    .describe(`Transition seconds (default ${DEFAULT_TRANSITION_DUR}).`),
   width: z.number().int().positive().optional().describe("Common output width (default 1920)."),
   height: z.number().int().positive().optional().describe("Common output height (default 1080)."),
   fps: z.number().int().positive().optional().describe("Common output fps (default 30)."),
@@ -35,9 +35,8 @@ export function register(server: McpServer): void {
     {
       title: "Assemble Highlights",
       description:
-        "Stitch two or more clips into a single video, with hard cuts or an xfade " +
-        "transition between each. Clips are auto-normalized to a common " +
-        "resolution, fps, and audio rate, so they need not match.",
+        "Stitch clips (including title cards) into one video with cuts or xfade transitions; they " +
+        "need not match in size, fps, or audio.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

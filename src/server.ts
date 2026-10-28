@@ -4,7 +4,14 @@
  * connect it in memory (#192).
  */
 import { createRequire } from "node:module";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  parseToolsets,
+  serverInstructions,
+  SELECTABLE_TOOLSETS,
+  toolsetOf,
+  type ToolsetSelection,
+} from "./utils/toolsets.js";
 
 import { register as registerStartRecording } from "./tools/startRecording.js";
 import { register as registerStopRecording } from "./tools/stopRecording.js";
@@ -50,6 +57,8 @@ import { register as registerPipeline } from "./tools/pipeline.js";
 import { register as registerExportPreset } from "./tools/exportPreset.js";
 import { registerResources } from "./resources.js";
 import { registerPrompts } from "./prompts.js";
+import { attachLogging } from "./utils/logging.js";
+import { trackClientRoots } from "./utils/roots.js";
 
 // Resolves from src/ in dev and dist/ in the published package alike; keeps
 // the advertised version from drifting from package.json (the hardcoded
@@ -58,11 +67,25 @@ const { version } = createRequire(import.meta.url)("../package.json") as {
   version: string;
 };
 
-export function createServer(): McpServer {
-  const server = new McpServer({
-    name: "screencast-mcp",
-    version,
-  });
+export function createServer(options: { toolsets?: string } = {}): McpServer {
+  const selection = parseToolsets(options.toolsets ?? process.env.SCREENCAST_TOOLSETS);
+  if (selection.unknown.length > 0) {
+    console.error(
+      `screencast-mcp: ignoring unknown SCREENCAST_TOOLSETS entries: ${selection.unknown.join(", ")} ` +
+        `(known: all, ${SELECTABLE_TOOLSETS.join(", ")})`,
+    );
+  }
+  const server = new McpServer(
+    {
+      name: "screencast-mcp",
+      version,
+    },
+    // ffmpeg warnings and capture events are sent as log messages (#222).
+    // The instructions carry the workflow map so tool descriptions stay short (#214).
+    { capabilities: { logging: {} }, instructions: serverInstructions(selection) },
+  );
+  attachLogging(server);
+  const tools = captureRegisteredTools(server);
 
   registerStartRecording(server);
   registerStopRecording(server);
@@ -106,8 +129,34 @@ export function createServer(): McpServer {
   registerZoom(server);
   registerPipeline(server);
   registerExportPreset(server);
+  applyToolsets(tools, selection);
   registerResources(server);
   registerPrompts(server);
+  // Confine caller-chosen output paths to the client's roots (#221).
+  trackClientRoots(server);
 
   return server;
+}
+
+/** Records every tool registered from here on, by name, so toolsets can
+ * remove the ones not selected (#214). */
+function captureRegisteredTools(server: McpServer): Map<string, RegisteredTool> {
+  const tools = new Map<string, RegisteredTool>();
+  const register = server.registerTool.bind(server) as (...args: unknown[]) => RegisteredTool;
+  server.registerTool = ((...args: unknown[]) => {
+    const tool = register(...args);
+    tools.set(args[0] as string, tool);
+    return tool;
+  }) as typeof server.registerTool;
+  return tools;
+}
+
+/** Removes the tools outside the selected toolsets: they are not listed and
+ * cannot be called. Every tool must belong to a toolset. */
+function applyToolsets(tools: Map<string, RegisteredTool>, selection: ToolsetSelection): void {
+  for (const [name, tool] of tools) {
+    const set = toolsetOf(name);
+    if (!set) throw new Error(`Tool "${name}" belongs to no toolset; add it to TOOLSETS in src/utils/toolsets.ts.`);
+    if (!selection.enabled.includes(set)) tool.remove();
+  }
 }

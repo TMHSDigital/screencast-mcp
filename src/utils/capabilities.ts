@@ -108,6 +108,7 @@ export async function ocrStatus(): Promise<OcrStatus> {
 /** Environment variables the server reads. */
 export const ENV_SETTINGS = [
   "SCREENCAST_HOME",
+  "SCREENCAST_ALLOWED_DIRS",
   "FFMPEG_PATH",
   "FFPROBE_PATH",
   "SCREENCAST_WHISPER_MODEL",
@@ -115,6 +116,8 @@ export const ENV_SETTINGS = [
   "SCREENCAST_JOB_TIMEOUT_MS",
   "SCREENCAST_PS_TIMEOUT_MS",
   "SCREENCAST_RETENTION_DAYS",
+  "SCREENCAST_CONFIRM_CAPTURE",
+  "SCREENCAST_TOOLSETS",
 ] as const;
 
 /** The set ones, with their values; unset ones as null. Pure. */

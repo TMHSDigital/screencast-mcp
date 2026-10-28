@@ -9,12 +9,12 @@ import { buildXfadeArgs, clipLength, DEFAULT_TRANSITION_DUR } from "../utils/pro
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
-  inputA: z.string().min(1).describe("Path to the first (outgoing) video."),
-  inputB: z.string().min(1).describe("Path to the second (incoming) video."),
+  inputA: z.string().min(1).describe("Outgoing video."),
+  inputB: z.string().min(1).describe("Incoming video."),
   transition: z
     .string()
     .optional()
-    .describe("xfade transition name (default fade): fade, wipeleft, slideup, circleopen, dissolve, ..."),
+    .describe("xfade name (default fade): fade, wipeleft, slideup, circleopen, dissolve, ..."),
   duration: z
     .number()
     .positive()
@@ -30,10 +30,8 @@ export function register(server: McpServer): void {
     {
       title: "Crossfade Transition",
       description:
-        "Crossfade two videos into one with an xfade transition. Both clips are " +
-        "auto-normalized to a common resolution, fps, and audio rate first, so " +
-        "they need not match. Offsets follow each clip's video length; audio is " +
-        "crossfaded, with silence standing in for a clip that has no track.",
+        "Join two videos with an xfade transition (audio crossfaded); they need not match in size, " +
+        "fps, or audio. For more clips use assemble_highlights.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

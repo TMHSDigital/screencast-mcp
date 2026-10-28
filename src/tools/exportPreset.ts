@@ -19,14 +19,13 @@ const inputSchema = {
   platform: z
     .enum(PLATFORMS)
     .describe(
-      "Target platform. Sets aspect, resolution, fps, and bitrate. steam_trailer: 1920x1080, " +
-        "H.264 High, padded 5.5 Mbps CBR, AAC 48 kHz at -14 LUFS. vertical_reel: 1080x1920 with the " +
-        "footage centred over a blurred copy of itself, audio at -14 LUFS (fit is ignored).",
+      "Sets aspect, size, fps, bitrate. steam_trailer: 1080p 5.5 Mbps CBR, -14 LUFS. vertical_reel: " +
+        "1080x1920 over a blurred copy of itself, -14 LUFS (ignores fit).",
     ),
   fit: z
     .enum(["pad", "crop"])
     .optional()
-    .describe("How to fit the source into the platform aspect: pad (default) or crop."),
+    .describe("Fit to the platform aspect: pad (default) or crop."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -37,9 +36,7 @@ export function register(server: McpServer): void {
     {
       title: "Export for Platform",
       description:
-        "Encode a platform-ready file for youtube, instagram_reel, tiktok, x, square, " +
-        "steam_trailer, or vertical_reel. Reframes to the platform aspect, caps fps, and " +
-        "encodes H.264 at the platform bitrate with faststart. Returns the output path.",
+        "Encode a platform-ready H.264 file (aspect, fps, bitrate, faststart) for a named platform.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

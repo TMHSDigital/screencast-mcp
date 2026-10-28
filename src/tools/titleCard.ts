@@ -31,13 +31,8 @@ export function register(server: McpServer): void {
     {
       title: "Title Card",
       description:
-        "Generate a standalone title card: centered text on a solid background, with " +
-        "a silent audio track so it composes with audio-bearing clips (use " +
-        "assemble_highlights to stitch it in). Text is rendered with the bundled " +
-        "Inter font, so no system font is required for Latin, Greek or Cyrillic; other " +
-        "scripts and emoji automatically use a Windows system font that covers them " +
-        "(returned as fontFile), and characters no font covers are reported in " +
-        "warnings instead of silently drawn as boxes.",
+        "Generate a title card clip (centered text on a solid background, silent audio track) to stitch " +
+        "in with assemble_highlights. Uncoverable characters are reported in warnings.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

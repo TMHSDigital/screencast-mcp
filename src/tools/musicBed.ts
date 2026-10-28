@@ -11,11 +11,11 @@ import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
   video: z.string().min(1).describe("Path to the video."),
-  music: z.string().min(1).describe("Path to the music audio file (looped/trimmed to the video length)."),
-  musicVolume: z.number().nonnegative().optional().describe("Music level 0..1 (default 0.25 over existing audio, 0.8 alone)."),
-  fadeIn: z.number().nonnegative().optional().describe("Music fade-in seconds (default 1)."),
-  fadeOut: z.number().nonnegative().optional().describe("Music fade-out seconds (default 2)."),
-  duck: z.boolean().optional().describe("Duck the music under the original audio via a sidechain (default false)."),
+  music: z.string().min(1).describe("Music audio file."),
+  musicVolume: z.number().nonnegative().optional().describe("0..1 (default 0.25 over existing audio, 0.8 alone)."),
+  fadeIn: z.number().nonnegative().optional().describe("Fade-in seconds (default 1)."),
+  fadeOut: z.number().nonnegative().optional().describe("Fade-out seconds (default 2)."),
+  duck: z.boolean().optional().describe("Duck the music under the original audio (default false)."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -26,10 +26,8 @@ export function register(server: McpServer): void {
     {
       title: "Add Music Bed",
       description:
-        "Lay a music track under a video: the music is looped/trimmed to the video " +
-        "length, faded in and out, and leveled. When the video already has audio " +
-        "the two are mixed, optionally ducking the music under the original. The " +
-        "video stream is copied; only audio is re-encoded.",
+        "Lay music under a video: looped or trimmed to length, faded, leveled, and mixed with any " +
+        "existing audio. Video is stream-copied.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

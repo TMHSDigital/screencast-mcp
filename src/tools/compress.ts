@@ -13,13 +13,13 @@ const inputSchema = {
   level: z
     .enum(["light", "medium", "heavy"])
     .optional()
-    .describe("How hard to compress (CRF 23 / 28 / 32). Default medium."),
+    .describe("CRF 23 / 28 / 32 (default medium)."),
   maxWidth: z
     .number()
     .int()
     .positive()
     .optional()
-    .describe("Optional width cap in px; only ever downscales. Height follows aspect."),
+    .describe("Width cap in px (only downscales)."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -30,8 +30,7 @@ export function register(server: McpServer): void {
     {
       title: "Compress Video",
       description:
-        "Re-encode a video to a smaller file with a CRF quality ladder and an " +
-        "optional width cap. Returns the output path.",
+        "Re-encode a video smaller (H.264 CRF ladder, optional width cap). For a platform target use export_preset.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

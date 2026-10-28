@@ -7,6 +7,25 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.44.0]
+
+### Security
+
+- Output paths are confined (#221). A relative `output` (or `sample_frames` `outputDir`) resolves under the tool's `SCREENCAST_HOME` subfolder instead of the server's working directory. When the client sends workspace roots, or the new `SCREENCAST_ALLOWED_DIRS` (`;`-separated) is set, an explicit output outside `SCREENCAST_HOME`, those roots, and those folders is refused with an error naming the allowed folders; roots are re-read on `roots/list_changed`, and junctions or `..` cannot step outside. With neither, any writable path is still accepted. `doctor` reports the folders in effect as `storage.allowedOutputDirs`.
+
+### Added
+
+- Opt-in capture consent (#222). With `SCREENCAST_CONFIRM_CAPTURE=1`, `start_recording`, `screenshot`, `find_text` on a live target, and `wait_for_change` first ask the user through MCP elicitation, showing the matched window, duration, audio source, and output path. Declining, cancelling, or no answer within 5 minutes captures nothing, and a client without elicitation is refused rather than captured silently.
+- ffmpeg warnings as MCP log messages (#222). The server declares the `logging` capability: a recording's ffmpeg warnings (each distinct line once), dropped-frame counts (at most every 10 s), warnings from edit jobs that still succeeded, and a recording that ends on its own arrive as `notifications/message`, filtered by the client's `logging/setLevel`.
+- Server `instructions` with the record, look, edit workflow and a redact-before-sharing note, sent once at initialize so tool descriptions can stay short (#214).
+- `SCREENCAST_TOOLSETS` loads only the tool groups an agent needs (`capture`, `watch`, `edit`, `produce`, `audio`; `doctor` and `get_media_info` are always on). Unset or `all` keeps every tool; unknown names are ignored and reported by `doctor`, which also lists the enabled toolsets (#214).
+
+### Changed
+
+- Tool and parameter descriptions are trimmed: the default `tools/list` drops from about 83 KB to about 71 KB, and `capture` alone is about 16 KB. A test fails if the default list grows past 74 KB (#214).
+- Overlapping tools point to each other (`trim`/`clip`/`pipeline`, `convert`/`export_gif`/`compress`/`export_preset`, `concat`/`xfade_transition`/`assemble_highlights`); `clip` no longer claims `trim` stream-copies by default. `mcp-tools.json` lists each tool's toolset, and its descriptions match the server again (#214).
+- The new settings are exposed in the Claude Desktop bundle and `server.json`, and listed by `doctor` (#214, #221, #222).
+
 ## [0.43.0]
 
 ### Added

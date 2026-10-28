@@ -16,6 +16,7 @@ import {
   type Rect,
 } from "../utils/diff.js";
 import { windowMatchReport } from "../utils/windows.js";
+import { confirmCapture, describeTarget } from "../utils/consent.js";
 import { subdir, stamp, rand } from "../utils/paths.js";
 import { join } from "node:path";
 import { rmSync } from "node:fs";
@@ -25,52 +26,49 @@ import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js"
 const inputSchema = {
   target: z
     .string()
-    .describe("What to watch: 'full' | 'monitor:<index>' | 'window:<title>' (or window:exe=<app.exe> / window:hwnd=<handle>) | 'region:<x>,<y>,<w>,<h>'."),
-  exactTitle: z.boolean().optional().describe("For window: targets, match the title exactly (default false)."),
+    .describe("What to watch: full | monitor:<i> | window:<title> (or exe=/hwnd=) | region:<x>,<y>,<w>,<h>."),
+  exactTitle: z.boolean().optional().describe("window: targets match the whole title only (default false)."),
   mode: z
     .enum(["change", "settle"])
     .optional()
     .describe(
-      "'change' (default) returns as soon as the target differs from when the call started " +
-        "(a dialog opened, a page responded). 'settle' returns once the target has stopped " +
-        "changing for settleSec (a build finished, a page finished loading).",
+      "change (default): return once it differs from the start. settle: once it has been still for settleSec.",
     ),
   timeoutSec: z
     .number()
     .positive()
     .max(600)
     .optional()
-    .describe("Give up after this many seconds (default 30). A timeout is a normal result, not an error."),
+    .describe("Give up after this many seconds (default 30; a timeout is a result, not an error)."),
   settleSec: z
     .number()
     .positive()
     .max(60)
     .optional()
-    .describe("Mode 'settle': how long the screen must stay still (default 1)."),
+    .describe("Mode settle: seconds of stillness (default 1)."),
   intervalMs: z
     .number()
     .int()
     .min(100)
     .max(5000)
     .optional()
-    .describe("Pause between checks in ms (default 250); each check itself takes ~0.2 s."),
+    .describe("Pause between checks in ms (default 250)."),
   pixelThreshold: z
     .number()
     .min(0)
     .max(255)
     .optional()
     .describe(
-      `How different (0-255 mean) a cell of about 32x32 screen pixels must be to count as changed ` +
-        `(default ${DEFAULT_PIXEL_THRESHOLD}: catches a changed label or a toast).`,
+      `Mean 0-255 difference for a ~32x32 cell to count as changed (default ${DEFAULT_PIXEL_THRESHOLD}).`,
     ),
   returnImage: z
     .boolean()
     .optional()
-    .describe("Also return a screenshot of the final state inline (default true)."),
+    .describe("Return the final state inline (default true)."),
   keep: z
     .boolean()
     .optional()
-    .describe("Keep the final screenshot on disk and return its path (default false: it is only returned inline)."),
+    .describe("Keep the final screenshot on disk and return its path (default false)."),
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -81,10 +79,8 @@ export function register(server: McpServer): void {
     {
       title: "Wait for Screen Change",
       description:
-        "Watch part of the screen and return when it changes (mode 'change') or when it has " +
-        "stopped changing (mode 'settle'), instead of guessing a sleep. Reports how long it " +
-        "took, where the screen changed, and the final state as an inline screenshot. `regions` " +
-        "are in the screenshot's pixels (like find_text and screen_diff); add `origin` for desktop coordinates.",
+        "Wait until part of the screen changes or settles, instead of guessing a sleep. Returns the " +
+        "elapsed time, changed regions (screenshot pixels; add `origin` for desktop), and the final state.",
       inputSchema,
       outputSchema: looseOutput({
         outcome: z.string(),
@@ -104,6 +100,11 @@ export function register(server: McpServer): void {
         const interval = args.intervalMs ?? 250;
         // The target (and a window's rectangle) is resolved once, up front.
         const { target, monitors, window } = await resolveCaptureTarget(args.target, { exactTitle: args.exactTitle });
+        await confirmCapture(
+          server,
+          `Watch ${describeTarget(args.target, window)} for up to ${timeoutMs / 1000} s, until it ${mode === "settle" ? "stops changing" : "changes"}?`,
+          extra.signal,
+        );
         const area = targetSize(target, monitors);
         const size = detectionSize(area.width, area.height);
         const grab = () => runFfmpegBuffer(buildRawGrabArgs(target, monitors, size), 15_000, { signal: extra.signal });

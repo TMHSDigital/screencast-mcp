@@ -21,8 +21,7 @@ const inputSchema = {
     .union([z.enum(["youtube", "podcast", "broadcast"]), z.number()])
     .optional()
     .describe(
-      "Loudness target: 'youtube' (-14 LUFS, default), 'podcast' (-16 LUFS), 'broadcast' " +
-        "(EBU R128, -23 LUFS), or a LUFS number such as -18.",
+      "youtube (-14 LUFS, default), podcast (-16), broadcast (-23), or a LUFS number.",
     ),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
@@ -34,9 +33,8 @@ export function register(server: McpServer): void {
     {
       title: "Normalize Loudness",
       description:
-        "Normalize a recording's loudness to a delivery target (EBU R128, two-pass loudnorm) so " +
-        "narration and system audio are neither too quiet nor clipping. Video is copied " +
-        "untouched. Reports the loudness before and after.",
+        "Normalize loudness to a delivery target (two-pass EBU R128 loudnorm); video is copied. " +
+        "Reports loudness before and after.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

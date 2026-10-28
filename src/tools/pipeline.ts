@@ -63,13 +63,11 @@ const inputSchema = {
     .min(1)
     .max(MAX_PIPELINE_STEPS)
     .describe(
-      "Edits in order, each { op, ...the same options as its tool }: trim, crop, scale, speed, redact " +
-        "(redact_region), callout, reframe, zoom (keyframes), and as the last step only export_preset " +
-        "or export_gif. Times in a step are on the timeline as it is at that step, after any earlier " +
-        "trim or speed change; pixel positions are in the frame as it is at that step.",
+      "Edits in order, each { op, ...its tool's options }; export_preset/export_gif only last. Times " +
+        "and pixels are relative to the video as it is at that step (after earlier trims, speed, crops).",
     ),
   quality: z.enum(["draft", "standard", "high"]).optional().describe("Encoder preset for an mp4 result (default standard)."),
-  dryRun: z.boolean().optional().describe("Return the planned ffmpeg command and output size without running it."),
+  dryRun: z.boolean().optional().describe("Return the plan (ffmpeg command, output size) without running it."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -80,10 +78,9 @@ export function register(server: McpServer): void {
     {
       title: "Edit Pipeline",
       description:
-        "Run several edits as one ffmpeg process: one re-encode and no intermediate files, instead of a " +
-        "tool call and a re-encode per edit. Steps use the same options as the standalone tools " +
-        "(trim, crop, scale, speed, redact, callout, reframe, zoom) and may end with export_preset or " +
-        "export_gif. The same steps can be saved and re-run on another recording. dryRun returns the plan.",
+        "Run several edits (trim, crop, scale, speed, redact, callout, reframe, zoom, then optionally " +
+        "export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it " +
+        "over chaining edit tools.",
       inputSchema,
       outputSchema: looseOutput({ processes: z.number().int(), steps: z.array(z.string()) }),
       annotations: WRITES_FILE,

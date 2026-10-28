@@ -17,7 +17,7 @@ const inputSchema = {
   fit: z
     .enum(["pad", "crop"])
     .optional()
-    .describe("pad (default): scale to fit and letterbox, no content lost. crop: scale to fill and center-crop."),
+    .describe("pad (default): letterbox, nothing lost. crop: fill and center-crop."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -28,9 +28,7 @@ export function register(server: McpServer): void {
     {
       title: "Reframe Aspect Ratio",
       description:
-        "Re-aspect a video to a target ratio (16:9, 9:16, 1:1, 4:5). 'pad' " +
-        "letterboxes so nothing is lost; 'crop' fills the frame and trims the " +
-        "overflow. Returns the output path.",
+        "Re-aspect a video to 16:9, 9:16, 1:1, or 4:5 by padding or cropping.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
       annotations: WRITES_FILE,

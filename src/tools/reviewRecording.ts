@@ -66,10 +66,8 @@ export function register(server: McpServer): void {
     {
       title: "Review Recording",
       description:
-        "Open a recording for a person to review. In clients that support MCP Apps it shows an " +
-        "inline player: scrub the timeline, drag trim handles, and draw redaction boxes, then export " +
-        "a trimmed, redacted copy (their choices run as a pipeline call). Elsewhere it returns the " +
-        "video's details; use contact_sheet or sample_frames to look at it.",
+        "Open a recording for a person to review: in MCP Apps clients an inline player to scrub, trim, " +
+        "and redact, then export; elsewhere just the video's details.",
       inputSchema: {
         input: z.string().optional().describe("Path to the video."),
         sessionId: z.string().optional().describe("Or the session id of a stopped recording."),

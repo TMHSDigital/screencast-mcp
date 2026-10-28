@@ -20,6 +20,8 @@ import {
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
 import { windowMatchReport } from "../utils/windows.js";
 import { resolveLoopbackDevice } from "../utils/audioDevices.js";
+import { confirmCapture, describeTarget } from "../utils/consent.js";
+import { logMessage, StderrWatch } from "../utils/logging.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { getStore } from "../context.js";
 import { classifyUnrequestedExit, killPid, serverIdentity, type SessionRecord } from "../utils/sessions.js";
@@ -42,18 +44,15 @@ const inputSchema = {
   target: z
     .string()
     .describe(
-      "Capture target: 'full' | 'monitor:<index>' (0 = primary) | " +
-        "'window:<title>' (or window:exe=<app.exe> / window:hwnd=<handle>, without relying on the title) | 'region:<x>,<y>,<w>,<h>' (absolute pixels). " +
-        "window: records the on-screen rectangle the window occupies, resolved " +
-        "ONCE at start (it must be visible, on top, not minimized); it does not " +
-        "follow a window moved or resized mid-recording.",
+      "full | monitor:<i> (0 = primary) | window:<title> (or window:exe=<app.exe> / window:hwnd=<n>) | " +
+        "region:<x>,<y>,<w>,<h>. With gdigrab a window's rectangle is resolved once at start (visible, " +
+        "on top); it does not follow the window.",
     ),
   exactTitle: z
     .boolean()
     .optional()
     .describe(
-      "For window: targets, match only a window whose title equals the given " +
-        "title (case-insensitive); never fall back to a substring match. Default false.",
+      "window: targets match the whole title only, never a substring (default false).",
     ),
   fps: z
     .number()
@@ -70,26 +69,18 @@ const inputSchema = {
     .object({
       source: z
         .enum(["system", "none"])
-        .describe("system captures what is playing on the machine; none is video-only."),
+        .describe("system = what the machine plays (needs a loopback device); none = video only."),
       device: z
         .string()
         .optional()
-        .describe(
-          "Optional dshow loopback device name (from list_audio_devices). When " +
-            "omitted, a loopback device is auto-detected.",
-        ),
+        .describe("dshow loopback device (from list_audio_devices); auto-detected if omitted."),
     })
     .optional()
-    .describe(
-      "Audio capture (default none, video-only). source 'system' needs a " +
-        "loopback device; microphone capture is not supported.",
-    ),
+    .describe("Audio (default none). No microphone capture."),
   output: z
     .string()
     .optional()
-    .describe(
-      "Optional output .mp4 path. Defaults to a file under SCREENCAST_HOME/recordings.",
-    ),
+    .describe("Output .mp4 path (default under SCREENCAST_HOME/recordings)."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
   maxDurationSec: z
     .number()
@@ -98,33 +89,29 @@ const inputSchema = {
     .max(MAX_RECORDING_CAP_SEC)
     .optional()
     .describe(
-      `Stop automatically after this many seconds, finalizing the file (default ` +
-        `${DEFAULT_MAX_RECORDING_SEC}, or SCREENCAST_MAX_RECORDING_SEC; at most ${MAX_RECORDING_CAP_SEC}, 7 days). 0 = no cap. ` +
-        "A safety net against a recording that is never stopped.",
+      `Auto-stop after this many seconds (default ${DEFAULT_MAX_RECORDING_SEC} or ` +
+        "SCREENCAST_MAX_RECORDING_SEC; max 7 days; 0 = no cap).",
     ),
   events: z
     .boolean()
     .optional()
     .describe(
-      "Also log mouse clicks, scroll, cursor positions, and typing to " +
-        "<recording>.events.jsonl, timed to the video and in video pixels (default " +
-        "false). Read it with read_events. Adds about a second to start.",
+      "Also log clicks, scroll, cursor, and typing (video-timed, video pixels) for read_events " +
+        "(default false; ~1 s slower start).",
     ),
   keys: z
     .enum(["masked", "shortcuts"])
     .optional()
     .describe(
-      "With events: masked (default) logs typing only as bursts (start and length on a 0.5 s grid), " +
-        "never which keys or when each one was pressed. shortcuts also names chords made with Ctrl, Alt, " +
-        "or Win (e.g. Ctrl+S), with their times; typed text is never logged.",
+      "With events: masked (default) logs typing only as 0.5 s-grid bursts, never keys; shortcuts " +
+        "also names Ctrl/Alt/Win chords. Typed text is never logged.",
     ),
   backend: z
     .enum(["gdigrab", "wgc"])
     .optional()
     .describe(
-      "gdigrab (default) records the screen rectangle. wgc (window: targets, FFmpeg 8+) records the " +
-        "window's own surface through Windows Graphics Capture: it keeps recording the window when " +
-        "it is covered, moved, or in the background, and frames only its client area. No audio with wgc.",
+      "gdigrab (default): the screen rectangle. wgc (window: targets, FFmpeg 8+): the window's own " +
+        "surface, even when covered or moved; client area only, no audio.",
     ),
 };
 
@@ -134,11 +121,8 @@ export function register(server: McpServer): void {
     {
       title: "Start Recording",
       description:
-        "Start a screen recording (Windows gdigrab) as a background ffmpeg process. " +
-        "Returns a session id and output path. Recording is explicit and never " +
-        "auto-starts. Use stop_recording with the id to finalize the file. " +
-        "Audio is video-only by default; set audio.source = 'system' to also " +
-        "capture system (loopback) audio. Microphone capture is not supported.",
+        "Start a background screen recording. Returns a session id; finalize it with stop_recording. " +
+        "Never auto-starts.",
       inputSchema,
       outputSchema: looseOutput({
         sessionId: z.string(),
@@ -148,7 +132,7 @@ export function register(server: McpServer): void {
       }),
       annotations: WRITES_FILE,
     },
-    async (args) => {
+    async (args, extra) => {
       try {
         const { ffmpeg } = requireFfmpeg();
         const { target, monitors, window } = await resolveCaptureTarget(args.target, {
@@ -179,6 +163,15 @@ export function register(server: McpServer): void {
           args.audio?.source === "system"
             ? { device: await resolveLoopbackDevice(args.audio.device) }
             : undefined;
+        await confirmCapture(
+          server,
+          `Record ${describeTarget(args.target, window)} ` +
+            (maxDurationSec > 0 ? `for up to ${maxDurationSec} s` : "with no time limit") +
+            (audio ? `, with system audio (${audio.device})` : ", without audio") +
+            (args.events ? ", logging mouse clicks and typing" : "") +
+            `, saved to ${output}?`,
+          extra.signal,
+        );
 
         const ffArgs = buildCaptureArgs(target, {
           fps,
@@ -216,12 +209,16 @@ export function register(server: McpServer): void {
 
         // Detect an immediate failure (bad window title, busy device, etc.).
         // The head keeps the input banner, whose start: time aligns events.
+        // Warnings and dropped frames go to the client as log messages (#222).
         let stderrTail = "";
         let stderrHead = "";
+        const id = `rec-${stamp()}-${rand(6)}`;
+        const watch = new StderrWatch(() => ({ sessionId: id }));
         child.stderr?.on("data", (d) => {
           const text = d.toString();
           stderrTail = (stderrTail + text).slice(-2000);
           if (stderrHead.length < 8000) stderrHead += text;
+          watch.feed(text);
         });
         // gdigrab is running once it survives a moment; the wgc recorder says
         // so when its first frame is written (a repaint can take a second).
@@ -246,7 +243,6 @@ export function register(server: McpServer): void {
           });
         });
 
-        const id = `rec-${stamp()}-${rand(6)}`;
         if (settled === "exited") {
           if (logger) await stopEventLogger(logger);
           if (evPaths) rmSync(evPaths.raw, { force: true });
@@ -325,6 +321,13 @@ export function register(server: McpServer): void {
           // state; only an exit nobody asked for is classified here.
           if (!cur || cur.status !== "recording" || store.isStopping(id)) return;
           const verdict = classifyUnrequestedExit({ code, backend, maxDurationSec, elapsedMs: Date.now() - spawnedAt });
+          logMessage(
+            verdict.status === "failed" ? "error" : "notice",
+            verdict.status === "failed"
+              ? `Recording ${id} failed: the recorder exited with code ${code}.`
+              : `Recording ${id} ended on its own (${verdict.endReason}).`,
+            { sessionId: id, ...verdict },
+          );
           store.tryUpdate(id, {
             ...verdict,
             stoppedAt: new Date().toISOString(),
