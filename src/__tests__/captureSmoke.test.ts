@@ -71,6 +71,7 @@ describe.skipIf(!RUN)("capture smoke (RUN_CAPTURE_SMOKE)", () => {
 
   it("leaves a paused stretch out of the file and the markers (#200)", async () => {
     const { probeMedia } = await import("../utils/ffmpeg.js");
+    const t0 = Date.now();
     const start = await call("start_recording", { target: "region:0,0,640,480", quality: "draft", fps: 15 });
     expect(start.isError, start.text).toBe(false);
     const id = start.json.sessionId;
@@ -86,14 +87,15 @@ describe.skipIf(!RUN)("capture smoke (RUN_CAPTURE_SMOKE)", () => {
     expect(resume.isError, resume.text).toBe(false);
     await sleep(2000);
     const stop = await call("stop_recording", { sessionId: id });
+    const wallSec = (Date.now() - t0) / 1000;
     expect(stop.isError, stop.text).toBe(false);
     expect(stop.json.segmentsJoined).toBe(2);
     const info = await probeMedia(start.json.outputPath as string);
-    // About 4 s recorded over about 7 s of wall time. The second segment runs
-    // ~2 s plus resume/stop latency (up to ~1.6 s on a hosted runner); keeping
-    // the 3 s pause would put it past recorded + 5.
+    // About 4 s recorded over about 7 s of wall time. A loaded runner stretches
+    // each segment by its start/stop latency, so rather than an absolute bound,
+    // check that the 3 s pause is missing from the wall-clock span.
     expect(info.durationSec!).toBeGreaterThan(recorded + 1);
-    expect(info.durationSec!).toBeLessThan(recorded + 4.5);
+    expect(info.durationSec!, `file ${info.durationSec}s, wall ${wallSec}s`).toBeLessThan(wallSec - 2.5);
     expect(existsSync(`${start.json.outputPath as string}.parts`)).toBe(false);
   }, 90_000);
 
