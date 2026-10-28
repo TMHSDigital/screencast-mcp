@@ -18,7 +18,17 @@ export const PROMPT_TEXT = {
 3. find_text { input: <recording>, scanEverySec: 1, query: "sk-|ghp_|api.?key|token|password", regex: true, redact: true } to check the whole clip, not one frame. If anything sensitive shows up, redact_region its redactRegions (each has its own start/end) with style "box" before sharing. OCR can miss text, so also look at the frames yourself.
 4. trim (or clip) to the few seconds around the bug, and callout to box or point at it.
 5. export_gif { input: <clip>, maxBytes: 10000000 } so it can be pasted into an issue or PR.
-Report the final file path, what the clip shows, and anything you redacted.`,
+Report the final file path, what the clip shows, and anything you redacted. (To file it as an issue, bug_report does steps 3-5 in one call and writes report.md.)`,
+
+  fileBugReport: (target: string, notes: string, expected: string) =>
+    `File a bug report for ${target}, with a redacted repro package.${notes ? ` The bug: ${notes}.` : ""}${expected ? ` Expected: ${expected}.` : ""}
+
+1. start_recording { target: "${target}", events: true } so clicks and shortcuts are logged as repro steps, then reproduce the bug (or ask me to), and stop_recording right after it shows.
+2. contact_sheet { input: <recording> } and find the moment it goes wrong; note its time.
+3. bug_report { sessionId: <session id>, title: <one-line summary>, actual: <what happened>, expected: <what should happen>, clipSec: 30 } (or start/end around that moment). It scans the clip for secrets with OCR and boxes them out before writing the clip, GIF, contact sheet, steps, error text, and report.md.
+4. Read report.md and look at the contact sheet it returns: check the steps make sense and that nothing sensitive is left (OCR can miss text; add regions and rerun with overwrite: true if so).
+5. Only if I confirm, run gh issue create --title <title> --body-file <reportPath>, then attach the GIF to the issue.
+Report the folder path, the steps, the error text found, and what was redacted.`,
 
   demoGif: (target: string, maxMB: string) =>
     `Make a demo GIF of ${target} for a README or PR, under ${maxMB} MB.
@@ -61,6 +71,20 @@ export function registerPrompts(server: McpServer): void {
       },
     },
     ({ target, notes }) => message(PROMPT_TEXT.bugReproClip(target || "full", notes ?? "")),
+  );
+
+  server.registerPrompt(
+    "file-bug-report",
+    {
+      title: "File a bug report",
+      description: "Record a repro with input events, then package it with bug_report: redacted clip, GIF, steps, error text, and report.md.",
+      argsSchema: {
+        target: z.string().optional().describe("What to record, e.g. window:My App (default: full)."),
+        notes: z.string().optional().describe("What the bug is."),
+        expected: z.string().optional().describe("What should happen instead."),
+      },
+    },
+    ({ target, notes, expected }) => message(PROMPT_TEXT.fileBugReport(target || "full", notes ?? "", expected ?? "")),
   );
 
   server.registerPrompt(

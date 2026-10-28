@@ -26,7 +26,8 @@
         "maxDurationSec": { "type": "integer", "minimum": 0, "maximum": 604800, "description": "Stop automatically after this many seconds, finalizing the file (default 3600, or SCREENCAST_MAX_RECORDING_SEC; at most 604800, 7 days). 0 = no cap" },
         "backend": { "type": "string", "enum": ["gdigrab", "wgc"], "description": "gdigrab (default) records the screen rectangle. wgc (window: targets, FFmpeg 8+) records the window's own surface through Windows Graphics Capture: covered, moved, or background windows keep recording; frames only its client area. No audio with wgc" },
         "events": { "type": "boolean", "description": "Also log mouse clicks, scroll, cursor positions, and typing to <recording>.events.jsonl, timed to the video and in video pixels (default false). Read it with read_events" },
-        "keys": { "type": "string", "enum": ["masked", "shortcuts"], "description": "With events: masked (default) logs typing only as bursts (start and length on a 0.5 s grid), never which keys or per-key times; shortcuts also names Ctrl/Alt/Win chords (e.g. Ctrl+S) with their times. Typed text is never logged" }
+        "keys": { "type": "string", "enum": ["masked", "shortcuts"], "description": "With events: masked (default) logs typing only as bursts (start and length on a 0.5 s grid), never which keys or per-key times; shortcuts also names Ctrl/Alt/Win chords (e.g. Ctrl+S) with their times. Typed text is never logged" },
+        "replayBufferSec": { "type": "integer", "minimum": 4, "maximum": 3600, "description": "Instant replay: keep only the last N seconds in a rolling ring of 2 s segments under SCREENCAST_HOME/replay (disk bounded to about N s); save_replay writes the last seconds to an mp4 without stopping it, and stop_recording discards the buffer unless save: true. gdigrab only" }
       },
       "required": ["target"]
     }
@@ -40,7 +41,26 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "sessionId": { "type": "string", "description": "Session id returned by start_recording" }
+        "sessionId": { "type": "string", "description": "Session id returned by start_recording" },
+        "save": { "type": "boolean", "description": "Replay-buffer sessions: write the whole buffer to outputPath before discarding it (default false: the buffer is discarded)" }
+      },
+      "required": ["sessionId"]
+    }
+  },
+  {
+    "name": "save_replay",
+    "toolset": "capture",
+    "title": "Save Replay",
+    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "description": "Save the last N seconds of a replay buffer (start_recording replayBufferSec) to an mp4; the buffer keeps running.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string", "description": "Session id of a recording started with replayBufferSec" },
+        "lastSec": { "type": "number", "exclusiveMinimum": 0, "maximum": 3600, "description": "Seconds to keep, back from now (default: the whole buffer; capped at replayBufferSec)" },
+        "output": { "type": "string", "description": "Output .mp4 path (default under SCREENCAST_HOME/recordings). With an events buffer, the sliced <output>.events.jsonl is written beside it" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
+        "reencode": { "type": "boolean", "description": "Frame-exact re-encode (slower). Default: a near-instant stream copy that keeps up to one segment (2 s) of earlier frames hidden behind an edit list; never rely on it to remove secrets" }
       },
       "required": ["sessionId"]
     }
@@ -84,6 +104,23 @@
         "inFrameOnly": { "type": "boolean", "description": "Drop events whose cursor was outside the recorded area" },
         "limit": { "type": "integer", "minimum": 1, "maximum": 5000, "description": "Most events to return (default 200)" }
       }
+    }
+  },
+  {
+    "name": "add_marker",
+    "toolset": "capture",
+    "title": "Add Marker",
+    "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": false, "openWorldHint": false },
+    "description": "Mark a labelled moment on a recording, live or at a second. Kept in the session and a sidecar; chapters and pipeline turn markers into chapters.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "label": { "type": "string", "description": "What happens here, e.g. \"bug appears\" or \"step 3: save\" (at most 200 characters)" },
+        "sessionId": { "type": "string", "description": "The recording to mark (running, or stopped with at)" },
+        "input": { "type": "string", "description": "Or a video path (needs at); the marker goes in its .markers.json sidecar" },
+        "at": { "type": "number", "minimum": 0, "description": "Video second to mark. Default: now, on the running recording's clock" }
+      },
+      "required": ["label"]
     }
   },
   {
@@ -436,6 +473,56 @@
     }
   },
   {
+    "name": "keystroke_overlay",
+    "toolset": "produce",
+    "title": "Keystroke Overlay",
+    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "description": "Burn keycast-style badges for shortcuts, clicks, and typing from the recording's input event log (start_recording events: true). Never shows typed text: the log has none.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the recording" },
+        "events": { "type": "string", "description": "Event log (default: the input's .events.jsonl from start_recording events: true)" },
+        "clicks": { "type": "boolean", "description": "Show clicks, double clicks, and right clicks (default true)" },
+        "typing": { "type": "boolean", "description": "Show typing bursts as \"Typing…\" (default true); typed text is never logged" },
+        "keys": { "type": "string", "enum": ["shortcuts", "masked"], "description": "shortcuts (default): the logged chord (Ctrl + S, repeats as ×N); masked: its modifiers only (Ctrl + …). Shortcuts are only logged with start_recording keys: \"shortcuts\"" },
+        "lingerSec": { "type": "number", "description": "Seconds a badge stays up after its input (default 1.2); the next badge replaces it" },
+        "position": { "type": "string", "enum": ["bottom", "bottom-left", "bottom-right", "top", "top-left", "top-right"], "description": "Where the badge sits (default bottom, centred)" },
+        "size": { "type": "number", "description": "Font size px (default 4.5% of the frame height)" },
+        "color": { "type": "string", "description": "Text color (default white), on the same dark panel as a callout" },
+        "fontFile": { "type": "string", "description": "Font for the badges: a .ttf/.otf/.ttc path or a C:\\Windows\\Fonts file name. Default: the bundled Inter, with a covering system font as fallback" },
+        "dryRun": { "type": "boolean", "description": "Return the planned badges; write nothing" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+      },
+      "required": ["input"]
+    }
+  },
+  {
+    "name": "backdrop",
+    "toolset": "produce",
+    "title": "Add Backdrop",
+    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "description": "Frame a video or screenshot on a gradient, color, or wallpaper with padding, rounded corners, and a drop shadow, optionally on a 16:9/1:1/9:16/4:5 canvas.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video, or an image (png/jpg) for a framed still" },
+        "preset": { "type": "string", "enum": ["desktop", "rec", "amber", "light"], "description": "Gradient look in the project's palette: desktop (default, dark slate), rec (record red), amber (amber to red), light (pale, for light UIs)" },
+        "colors": { "type": "array", "description": "Instead of a preset: 1 color = solid, 2-4 = a diagonal gradient (name or #RRGGBB)", "items": { "type": "string" } },
+        "image": { "type": "string", "description": "A wallpaper image instead, scaled to cover the canvas" },
+        "padding": { "type": "integer", "description": "Space around the content in px (default 6% of the longer side)" },
+        "radius": { "type": "integer", "description": "Corner radius px (default about 1.2% of the longer side; 0 = square)" },
+        "shadow": { "type": "integer", "description": "Drop shadow blur px (default about 2.5% of the longer side; 0 = none)" },
+        "shadowOpacity": { "type": "number", "description": "Shadow opacity 0-1 (default 0.5)" },
+        "aspect": { "type": "string", "enum": ["16:9", "9:16", "1:1", "4:5"], "description": "Put the result on this aspect's canvas (1920x1080, 1080x1920, 1080x1080, 1080x1350), content scaled to fit inside the padding" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits, or screenshots for an image)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+      },
+      "required": ["input"]
+    }
+  },
+  {
     "name": "compress",
     "toolset": "edit",
     "title": "Compress Video",
@@ -538,6 +625,29 @@
         "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input", "subtitles"]
+    }
+  },
+  {
+    "name": "chapters",
+    "toolset": "produce",
+    "title": "Chapters",
+    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "description": "Write chapters (markers, scene changes, transcript, or a list) into an mp4/mkv/mov copy without re-encoding; returns YouTube chapter text. Can mux an SRT as soft subtitles.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the video" },
+        "sessionId": { "type": "string", "description": "Or a stopped recording's session id (uses its markers)" },
+        "from": { "type": "string", "enum": ["markers", "scenes", "transcript"], "description": "Where chapters come from (ignored with chapters): markers (default; add_marker, else the file's own chapters), scenes (strongest screen changes), or transcript (an SRT, split at pauses)" },
+        "chapters": { "type": "array", "items": { "type": "object", "properties": { "start": { "type": "number", "minimum": 0 }, "title": { "type": "string" } }, "required": ["start", "title"] }, "description": "Explicit chapters, { start (s), title }, instead of from" },
+        "transcript": { "type": "string", "description": "from: transcript: the .srt (e.g. from transcribe)" },
+        "minChapterSec": { "type": "number", "minimum": 0, "description": "Shortest chapter; closer points merge (default 1, or 10 for scenes and 30 for transcript). Scenes picks at most 12 chapters, the strongest screen changes" },
+        "subtitles": { "type": "string", "description": "Also mux this .srt/.vtt/.ass as a soft (toggleable) subtitle track (mov_text in mp4/mov), instead of burning it in" },
+        "subtitleLanguage": { "type": "string", "description": "ISO 639-2 language of subtitles, e.g. eng" },
+        "textOnly": { "type": "boolean", "description": "Only return the chapters and YouTube text; write no file" },
+        "output": { "type": "string", "description": "Optional .mp4/.mkv/.mov output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+      }
     }
   },
   {
@@ -791,16 +901,17 @@
     "toolset": "edit",
     "title": "Edit Pipeline",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Run several edits (trim, crop, scale, speed, redact, callout, reframe, zoom, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools.",
+    "description": "Run several edits (trim, crop, scale, speed, redact, callout, keystroke_overlay, reframe, zoom, backdrop, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "input": { "type": "string", "description": "Path to the source video" },
-        "steps": { "type": "array", "description": "Edits in order, each { op, ...the same options as its tool }: trim, crop, scale, speed, redact, callout, reframe, zoom (keyframes), and as the last step only export_preset or export_gif. Times and pixels in a step are on the timeline and frame as they are at that step", "items": { "type": "object" } },
+        "steps": { "type": "array", "description": "Edits in order, each { op, ...the same options as its tool }: trim, crop, scale, speed, redact, callout, keystroke_overlay (badges re-timed through earlier trims and speed changes), reframe, zoom (keyframes), backdrop, and as the last step only export_preset or export_gif. Times and pixels in a step are on the timeline and frame as they are at that step", "items": { "type": "object" } },
         "quality": { "type": "string", "enum": ["draft", "standard", "high"], "description": "Encoder preset for an mp4 result (default standard)" },
         "dryRun": { "type": "boolean", "description": "Return the planned ffmpeg command and output size without running it" },
         "output": { "type": "string", "description": "Optional output path. Defaults under SCREENCAST_HOME/edits" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
+        "chapters": { "type": "boolean", "description": "Write the input's markers (add_marker; else its own chapters) into the output as chapters, re-timed through trims and speed changes. Not for a GIF/WebP result" }
       },
       "required": ["input", "steps"]
     }
@@ -821,6 +932,36 @@
         "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input", "platform"]
+    }
+  },
+  {
+    "name": "bug_report",
+    "toolset": "produce",
+    "title": "Bug Report Package",
+    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "description": "Package a recording as a paste-ready repro folder: secret-scanned, redacted clip and GIF, contact sheet, steps from the event log, OCR'd errors, environment, report.md for gh issue create --body-file.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Recording path (uses its .events.jsonl)" },
+        "sessionId": { "type": "string", "description": "Or a stopped session's id" },
+        "title": { "type": "string", "description": "Issue title" },
+        "actual": { "type": "string", "description": "What happened" },
+        "expected": { "type": "string", "description": "What should happen" },
+        "start": { "type": "number", "description": "Clip start s (default: end - clipSec)" },
+        "end": { "type": "number", "description": "Clip end s (default: recording end)" },
+        "clipSec": { "type": "number", "description": "Clip length without start (default 30)" },
+        "redact": { "type": "boolean", "description": "Box out OCR-found secrets in every output (default true; needs Windows OCR)" },
+        "secretPattern": { "type": "string", "description": "Secret regex (default: API keys, tokens, password: values)" },
+        "regions": { "type": "array", "description": "Extra boxes (video px; start/end on the clip clock)", "items": { "type": "object" } },
+        "errorPattern": { "type": "string", "description": "Error-line regex" },
+        "scanEverySec": { "type": "number", "description": "OCR every N s (default 1)" },
+        "maxFrames": { "type": "integer", "description": "Scan frame cap (default 30)" },
+        "gif": { "type": "boolean", "description": "Also export a GIF (default true)" },
+        "maxBytes": { "type": "integer", "description": "GIF size budget (default 10000000)" },
+        "outputDir": { "type": "string", "description": "Package folder (default: a new one in SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Replace a report already in outputDir" }
+      }
     }
   }
 ]

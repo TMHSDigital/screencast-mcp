@@ -170,13 +170,19 @@ export function buildSampleByFpsArgs(
   outputPattern: string,
   maxFrames: number = DEFAULT_MAX_FRAMES,
   dedupe = false,
+  range?: { start: number; duration?: number },
 ): string[] {
   validatePositive(fps, "fps");
   // dedupe (#114): mpdecimate drops frames nearly identical to the previous
   // kept one, and -fps_mode vfr stops the muxer re-inserting them.
   const vf = dedupe ? `fps=${fps},mpdecimate` : `fps=${fps}`;
+  // range (#198): an input seek, so frame i is at range.start + i / fps, the
+  // same clock as a clip cut with a leading pipeline trim.
+  const seek = range
+    ? ["-ss", String(range.start), ...(range.duration !== undefined ? ["-t", String(range.duration)] : [])]
+    : [];
   return [
-    "-y", "-i", input, "-vf", vf,
+    "-y", ...seek, "-i", input, "-vf", vf,
     ...(dedupe ? ["-fps_mode", "vfr"] : []),
     "-frames:v", String(maxFrames), outputPattern,
   ];

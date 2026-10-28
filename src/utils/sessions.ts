@@ -28,6 +28,8 @@ import { basename } from "node:path";
 import { ScreencastError } from "./errors.js";
 import type { Quality } from "./targets.js";
 import { WGC_WINDOW_CLOSED_EXIT } from "./wgc.js";
+import type { ReplayBuffer } from "./replay.js";
+import type { Marker } from "./chapters.js";
 
 /** Cap on retained finished records, so the registry does not grow without
  * bound. Active ("recording") records are always kept. */
@@ -80,6 +82,16 @@ export interface SessionRecord {
     summary?: Record<string, number>;
     error?: string;
   };
+  /** Epoch ms of the first captured frame (ffmpeg's input start), the zero of
+   * the video clock that add_marker stamps markers on (#174). */
+  videoStartMs?: number;
+  /** Labelled moments from add_marker, in video seconds, in time order (#174). */
+  markers?: Marker[];
+  /** Rolling replay buffer (#197), when started with replayBufferSec. The
+   * recording writes a segment ring here instead of outputPath; save_replay
+   * keeps the last N seconds, and stop_recording { save: true } writes the
+   * whole buffer to outputPath. */
+  replay?: ReplayBuffer;
 }
 
 /** Decide what an in-progress session becomes at boot, given liveness.

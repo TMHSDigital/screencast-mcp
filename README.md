@@ -4,7 +4,7 @@
 
 **An MCP server that lets an agent record the screen, _watch_ the footage, and make minimal ffmpeg edits — over stdio, on Windows.**
 
-Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, redact, annotate, zoom toward clicks, and export for GitHub or social. No cloud service, no telemetry: ffmpeg and ffprobe behind 43 typed tools.
+Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, redact, annotate, zoom toward clicks, and export for GitHub or social. No cloud service, no telemetry: ffmpeg and ffprobe behind 49 typed tools.
 
 **For developers who want their coding agent to see and prove UI changes on Windows**: bug repros, UI verification, and demo clips the agent records, checks, and edits itself. Capture is Windows-only; the watch and edit tools work on any OS with ffmpeg. Free for non-commercial use ([CC BY-NC-ND 4.0](#license)); [why not OBS, Playwright, or a screenshot MCP?](#why-not-just)
 
@@ -92,19 +92,21 @@ What it can do beyond record-and-look:
 
 ## Tools
 
-43 tools in six groups. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface; tests keep it, this README, and the docs site in sync with `src/tools/`.
+49 tools in six groups. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface; tests keep it, this README, and the docs site in sync with `src/tools/`.
 
 ### Capture
 
 | Tool | Purpose |
 | --- | --- |
-| `start_recording` | Start a background recording. `target` = `full` \| `monitor:<index>` \| `window:<title>` \| `region:<x>,<y>,<w>,<h>`; optional `fps`, `quality`, `audio` (set `audio.source` = `system` to also capture loopback audio), `maxDurationSec` (auto-stop cap, default 3600; `0` = none), and `events` (log clicks, scroll, cursor, and key presses to `<recording>.events.jsonl`; `keys` = `masked` by default or `shortcuts`). Returns a session id and output path. |
-| `stop_recording` | Stop a session by id. Sends ffmpeg a graceful quit so the file is **finalized, not truncated**. Returns the final path and duration. |
+| `start_recording` | Start a background recording. `target` = `full` \| `monitor:<index>` \| `window:<title>` \| `region:<x>,<y>,<w>,<h>`; optional `fps`, `quality`, `audio` (set `audio.source` = `system` to also capture loopback audio), `maxDurationSec` (auto-stop cap, default 3600; `0` = none), and `events` (log clicks, scroll, cursor, and key presses to `<recording>.events.jsonl`; `keys` = `masked` by default or `shortcuts`), and `replayBufferSec` (instant replay: keep only the last N seconds, see `save_replay`). Returns a session id and output path. |
+| `stop_recording` | Stop a session by id. Sends ffmpeg a graceful quit so the file is **finalized, not truncated**. Returns the final path and duration. On a replay buffer, `save: true` writes the whole buffer to the output path; otherwise the buffer is discarded. |
+| `save_replay` | Instant replay: write the last `lastSec` seconds of a buffer started with `start_recording { "replayBufferSec": 60 }` to an mp4, without stopping it. A stream copy, so it returns in about a second; `reencode: true` for a frame-exact file. With `events: true` the event log is sliced to match. |
 | `list_sessions` | List active and finished sessions. |
 | `get_session` | Inspect a single session by id. |
 | `review_recording` | **Review player** in clients that support MCP Apps: an inline player where a person scrubs the recording, drags trim handles, and draws redaction boxes, then exports a trimmed, redacted copy (one `pipeline` call). Pass it a stopped recording's `sessionId`. Elsewhere it returns the video's details. |
 | `player_frames` | Preview JPEG frames for the review player (an even grid plus scene changes, labelled with their real times); called by the player (app-only), not by agents. |
 | `read_events` | Read a recording's input event log (clicks, scroll, cursor, shortcuts, typing bursts) on the video's clock. Opt in with `start_recording` `events: true`. |
+| `add_marker` | Stamp a labelled moment ("bug appears", "step 3") on a running recording's video clock, or at a given second of a stopped one or any file. Markers are kept in the session (survive `stop_recording`, shown by `get_session`) and in a `<video>.markers.json` sidecar; the review player shows them as ticks, and `chapters` / `pipeline` turn them into chapters. |
 | `screenshot` | Capture a single PNG of a `target`, and return it inline as an image the model can view. |
 | `list_audio_devices` | List the DirectShow audio devices ffmpeg can see and flag a likely system-audio loopback device for `start_recording`. |
 | `list_targets` | List what can be captured: the desktop, each monitor (bounds, DPI scale), and each window (title, exe, pid, hwnd, bounds, minimized, cloaked, and whether gdigrab and `wgc` can capture it). Every entry carries a `target` string (`window:hwnd=<handle>` for windows) to pass as-is to `screenshot` or `start_recording`; filter with `exe` / `titleContains`. |
@@ -147,6 +149,7 @@ These tools re-encode (a filter rewrites pixels, so stream copy does not apply).
 | `denoise` | Reduce **steady** background noise (fan, hum, hiss) with `afftdn`, tuned to the file's measured noise floor. Video is copied. |
 | `transcribe` | **Speech to an SRT file, locally**, with FFmpeg 8's `whisper` filter (needs a whisper.cpp model: pass `model` or set `SCREENCAST_WHISPER_MODEL`). Cues are renumbered and de-overlapped. |
 | `burn_subtitles` | Burn an SRT/ASS into the video in the bundled font: `clean` (outlined line) or `social` (big bold text on a dark box, for muted autoplay). |
+| `chapters` | **Chapters without a re-encode**: from markers (the default), the strongest scene changes, transcript sections (an SRT split at pauses), or an explicit list, written into an mp4/mkv/mov copy as real chapters (FFMETADATA, stream copy; they show in VLC and MPC) and returned as YouTube chapter text, with any YouTube rule it breaks (first at 0:00, three or more, 10 s each). `subtitles` muxes an SRT as a soft, toggleable track (`mov_text` in mp4) instead of burning it in; `textOnly` writes nothing. |
 | `clip` | Extract one or more frame-accurate sub-segments, each to its own file. For a single segment, `trim` (default `exact: true`) does the same. |
 | `cut_idle` | **Remove dead air**: cut stretches where the screen is frozen and (when there is audio) silent, keeping a short pad at each edge. `dryRun` reports first; speech over a still screen is kept unless `useAudio: false`. |
 
@@ -171,8 +174,11 @@ The production layer turns raw clips into a finished piece. Tools that combine c
 | `music_bed` | Lay a music track under a video: looped/trimmed to length, faded in and out, leveled, and mixed with any existing audio (optionally ducked). |
 | `reframe` | Re-aspect to `16:9`, `9:16`, `1:1`, or `4:5` with `pad` (letterbox, no content lost) or `crop` (fill, trims overflow). |
 | `zoom` | **Smooth zoom-and-pan** (Screen Studio style) into where the action is and back out. Give keyframes (rectangles by time), or let it plan them from the clicks in the input event log (`start_recording` `events: true`; `highlightClicks` rings each click) or from where the screen changes; `dryRun` returns the plan to adjust. |
+| `keystroke_overlay` | **Keycast-style badges** ("Ctrl + Shift + P", "Double click", "Typing…") burned in from the input event log, one at a time, each lingering `lingerSec` (default 1.2). Repeats merge (`Ctrl + Z ×3`); `position`, `size`, `clicks`, `typing`. It can only show what the log holds: never typed text, and shortcuts only from `keys: "shortcuts"` recordings; `keys: "masked"` here shows a chord's modifiers only. |
+| `backdrop` | **Frame a clip or screenshot** (Screen Studio / CleanShot style): padding, a gradient, solid, or wallpaper `image` background, rounded corners, and a soft drop shadow, optionally on a `16:9`/`9:16`/`1:1`/`4:5` canvas. Presets in the project palette: `desktop` (default, dark slate), `rec` (record red), `amber` (amber to red), `light`. A PNG/JPG input writes a framed still. |
 | `export_preset` | Encode a platform-ready file (`youtube`, `instagram_reel`, `tiktok`, `x`, `square`, `steam_trailer`, `vertical_reel`): reframes, caps fps, and encodes H.264 at the platform bitrate with faststart. `steam_trailer` is 1080p H.264 High at a padded 5.5 Mbps CBR (above Steam's 5 Mbps floor) with 48 kHz audio at -14 LUFS; `vertical_reel` centres the footage over a blurred copy of itself with audio at -14 LUFS. |
-| `pipeline` | **Several edits in one ffmpeg process**: `steps` of `trim`, `crop`, `scale`, `speed`, `redact`, `callout`, `reframe`, `zoom` (keyframes), ending optionally in `export_preset` or `export_gif`, each with its tool's options. One re-encode, no intermediate files, and a recipe you can save and re-run on the next recording; `dryRun` returns the planned command. |
+| `pipeline` | **Several edits in one ffmpeg process**: `steps` of `trim`, `crop`, `scale`, `speed`, `redact`, `callout`, `keystroke_overlay`, `reframe`, `zoom` (keyframes), `backdrop`, ending optionally in `export_preset` or `export_gif`, each with its tool's options. One re-encode, no intermediate files, and a recipe you can save and re-run on the next recording; `dryRun` returns the planned command; `chapters: true` keeps the input's markers as chapters, re-timed through trims and speed changes. |
+| `bug_report` | **A paste-ready repro package in one call**: from a recording path or `sessionId`, writes a folder with a trimmed clip (the last 30 s by default) and a GIF under 10 MB, a timecoded contact sheet, numbered steps rebuilt from the input event log, OCR'd error and dialog text, environment details (OS, displays and DPI, window, ffmpeg), and a `report.md` for `gh issue create --body-file` (plus `report.json`). Before anything is encoded, a whole-clip OCR secret scan boxes out API keys, tokens, and `password:` values in every output and masks them in the quoted text; it needs Windows OCR (`redact: false` skips it). |
 
 ### Targets
 
@@ -216,10 +222,10 @@ Edit and produce tools write to a `<name>.partial.<ext>` file next to the output
 
 | Toolset | Tools |
 | --- | --- |
-| `capture` | `start_recording`, `stop_recording`, `list_sessions`, `get_session`, `read_events`, `screenshot`, `list_targets`, `list_audio_devices` |
+| `capture` | `start_recording`, `stop_recording`, `save_replay`, `list_sessions`, `get_session`, `read_events`, `add_marker`, `screenshot`, `list_targets`, `list_audio_devices` |
 | `watch` | `sample_frames`, `contact_sheet`, `screen_diff`, `wait_for_change`, `find_text`, `review_recording`, `player_frames` |
 | `edit` | `pipeline`, `trim`, `clip`, `concat`, `convert`, `export_gif`, `crop`, `scale`, `speed`, `compress`, `redact_region`, `cut_idle` |
-| `produce` | `callout`, `overlay`, `zoom`, `reframe`, `title_card`, `xfade_transition`, `assemble_highlights`, `export_preset`, `burn_subtitles` |
+| `produce` | `callout`, `keystroke_overlay`, `backdrop`, `overlay`, `zoom`, `reframe`, `title_card`, `xfade_transition`, `assemble_highlights`, `export_preset`, `burn_subtitles`, `chapters`, `bug_report` |
 | `audio` | `extract_audio`, `normalize_audio`, `denoise`, `transcribe`, `music_bed` |
 | `core` (always) | `doctor`, `get_media_info` |
 
@@ -254,6 +260,33 @@ Don't know where to look? `sample_frames { "input": "…", "mode": "scenes" }` r
 
 `screenshot { "target": "window:My App" }` is the one-shot equivalent for a still, and also returns the image inline.
 
+Catching a flaky failure: the useful footage is the half minute before the test failed, and by then it is too late to start recording. Run an instant-replay buffer instead and save it when something goes wrong:
+
+```jsonc
+// 1. keep a rolling 60 s buffer for the whole test loop (maxDurationSec 0 = no cap)
+start_recording { "target": "window:My App", "replayBufferSec": 60, "maxDurationSec": 0, "events": true }
+//    -> { "sessionId": "rec-…", "replay": { "bufferSec": 60, "segmentSec": 2 } }
+
+// 2. a run fails: keep the last 30 s; the buffer keeps running for the next failure
+save_replay { "sessionId": "rec-…", "lastSec": 30 }
+//    -> { "outputPath": "…/recordings/replay-….mp4", "durationSec": 30, "eventsPath": "…/replay-….events.jsonl" }
+
+// 3. done: stop and discard the buffer (save: true would write the whole buffer)
+stop_recording { "sessionId": "rec-…" }
+```
+
+The buffer is a ring of 2 s MPEG-TS segments under `SCREENCAST_HOME/replay`, so disk use stays at about the buffer length plus 6 s however long it runs (the same bitrate as an ordinary recording of that target). Encoding costs the same CPU as an ordinary recording. A save snapshots the segments it needs, joins them and cuts with a stream copy, so it returns in about a second; the clip can hold up to 2 s of earlier frames behind an edit list (pass `reencode: true` for a frame-exact file). Buffers no live recording owns are deleted when the server starts.
+
+Filing the bug an agent just reproduced (record with `events: true` so the clicks become steps):
+
+```jsonc
+bug_report { "sessionId": "rec-…", "title": "Save fails on a read-only folder", "expected": "The file saves or a clear error" }
+//    -> { "outputDir": "…/edits/bug-report-…", "reportPath": "…/report.md", "steps": 6,
+//         "errors": ["Error: Access to the path is denied."], "redaction": { "found": 1, … } }
+// review report.md and the returned contact sheet, then:
+gh issue create --title "Save fails on a read-only folder" --body-file …/report.md
+```
+
 Inline images are downscaled JPEGs (`maxImageWidth`, default 1280) and capped per call (`maxInlineImages`, default 8, max 20); the full-resolution PNGs stay on disk. Pass `returnImage: false` / `returnImages: false` to get paths only.
 
 `sample_frames` writes at most `maxFrames` frames per call (default 100, max 1000). In `fps` mode it probes the video first; if the rate would exceed the cap, it samples at a lower rate so the frames still span the whole video, and the result's `capNote` says what it did.
@@ -265,6 +298,7 @@ Beyond tools, the server offers **prompts**: ready-made workflows that clients s
 | Prompt | What it does |
 | --- | --- |
 | `bug-repro-clip` | Record, find the bug moment, check for secrets, trim, annotate, and export a GIF for an issue. |
+| `file-bug-report` | Record a repro with input events, package it with `bug_report` (redacted clip, GIF, steps, error text, `report.md`), review it, and file it with `gh issue create` once you confirm. |
 | `demo-gif` | Record a feature walkthrough and export a GIF small enough for a README or PR. |
 | `verify-ui-change` | Screenshot before, make the change, wait for the screen to settle, diff, and confirm the text. |
 | `review-recording` | Summarize what happens in a recording, with timestamps. |

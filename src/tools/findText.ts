@@ -1,17 +1,16 @@
 import { z } from "zod";
 import { extname, join } from "node:path";
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
-import { requireFfmpeg, runFfmpeg, probeMedia } from "../utils/ffmpeg.js";
-import { jobTimeoutMs } from "../utils/jobs.js";
+import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
 import { captureStill } from "../utils/still.js";
 import { buildHighlightArgs, targetSize } from "../utils/diff.js";
-import { recognize, mergePasses, findMatches, redactionRects, passScales, type OcrLine, type TextMatch } from "../utils/ocr.js";
-import { buildSampleByFpsArgs, planFpsSampling } from "../utils/media.js";
+import { findMatches, redactionRects } from "../utils/ocr.js";
+import { readFrames, scanVideoFrames, scanMatches } from "../utils/ocrScan.js";
 import { windowMatchReport } from "../utils/windows.js";
 import { confirmCapture, describeTarget } from "../utils/consent.js";
 import { subdir, stamp, rand, stillOutput } from "../utils/paths.js";
@@ -76,42 +75,6 @@ const inputSchema = {
     .optional()
     .describe("Return the image with matches outlined (default: true with a query)."),
 };
-
-/** OCR several frames in one PowerShell run: each frame is upscaled for every
- * pass (passScales), and the passes are merged back per frame. */
-async function readFrames(
-  sources: string[],
-  work: string,
-  signal: AbortSignal,
-): Promise<Array<{ lines: OcrLine[]; width: number; height: number }>> {
-  const sized = await Promise.all(
-    sources.map(async (source) => {
-      const { width, height } = await probeMedia(source);
-      if (!width || !height) throw new ScreencastError("Could not read the image size.");
-      return { source, width, height };
-    }),
-  );
-  const passes: string[] = [];
-  const passScaleList: number[] = [];
-  const owner: number[] = [];
-  for (const [f, { source, width, height }] of sized.entries()) {
-    for (const [i, scale] of passScales(width, height).entries()) {
-      const out = join(work, `pass${f}-${i}.png`);
-      await runFfmpeg(["-y", "-v", "error", "-i", source, "-vf", `scale=iw*${scale}:ih*${scale}:flags=lanczos`, out], 60_000, {
-        signal,
-      });
-      passes.push(out);
-      passScaleList.push(scale);
-      owner.push(f);
-    }
-  }
-  const results = await recognize(passes, passScaleList);
-  return sized.map(({ width, height }, f) => ({
-    lines: mergePasses(results.filter((_r, i) => owner[i] === f)),
-    width,
-    height,
-  }));
-}
 
 export function register(server: McpServer): void {
   server.registerTool(
@@ -231,46 +194,21 @@ async function scanClip(args: Args, work: string, signal: AbortSignal) {
   if (IMAGE_EXTENSIONS.has(extname(args.input).toLowerCase())) {
     throw new ScreencastError("scanEverySec is for a video input; an image has one frame, so drop scanEverySec.");
   }
-  const info = await probeMedia(args.input);
   const maxFrames = args.maxFrames ?? DEFAULT_SCAN_FRAMES;
-  const plan = planFpsSampling(info.videoDurationSec ?? info.durationSec, 1 / args.scanEverySec!, maxFrames);
-  await runFfmpeg(
-    buildSampleByFpsArgs(args.input, plan.fps, join(work, "scan_%05d.png"), maxFrames),
-    jobTimeoutMs(info.durationSec),
-    { signal },
-  );
-  const frames = readdirSync(work).filter((f) => f.startsWith("scan_")).sort().map((f) => join(work, f));
-  if (frames.length === 0) throw new ScreencastError("Could not read any frames from the video.");
-  const step = 1 / plan.fps;
-  const timeAt = (i: number) => Math.round(i * step * 1000) / 1000;
-  const end = info.videoDurationSec ?? info.durationSec ?? timeAt(frames.length - 1) + step;
-  const read = await readFrames(frames, work, signal);
+  const scan = await scanVideoFrames(args.input, { everySec: args.scanEverySec!, maxFrames }, work, signal);
+  const { step } = scan;
   // Every sampled frame has the same size.
-  const [size] = read;
+  const [size] = scan.frames;
   if (!size) throw new ScreencastError("Could not read any frames from the video.");
-
-  const matches: Array<TextMatch & { t: number }> = [];
-  const redactRegions: Array<ReturnType<typeof redactionRects>[number] & { start: number; end: number }> = [];
   const seenLines = new Set<string>();
-  read.forEach((frame, i) => {
-    for (const l of frame.lines) seenLines.add(l.text);
-    if (!args.query) return;
-    const hits = findMatches(frame.lines, args.query, args.regex === true);
-    const t = timeAt(i);
-    const start = Math.max(0, Math.round((t - step) * 1000) / 1000);
-    const stop = Math.min(end, Math.round((t + step) * 1000) / 1000);
-    // redactionRects maps hits one to one.
-    const rects = redactionRects(hits, frame);
-    for (const [k, hit] of hits.entries()) {
-      matches.push({ t, ...hit });
-      const rect = rects[k];
-      if (rect) redactRegions.push({ ...rect, start, end: stop });
-    }
-  });
+  for (const frame of scan.frames) for (const l of frame.lines) seenLines.add(l.text);
+  const { matches, redactRegions } = args.query
+    ? scanMatches(scan, args.query, args.regex === true)
+    : { matches: [], redactRegions: [] };
 
   const images = [];
   const first = matches[0];
-  const firstFrame = first && frames.find((_, i) => timeAt(i) === first.t);
+  const firstFrame = first && scan.frames.find((f) => f.t === first.t)?.path;
   if ((args.returnImage ?? Boolean(args.query)) && first && firstFrame) {
     const shown = join(work, "shown.png");
     await runFfmpeg(buildHighlightArgs(firstFrame, matches.filter((m) => m.t === first.t), shown), 30_000, { signal });
@@ -283,8 +221,8 @@ async function scanClip(args: Args, work: string, signal: AbortSignal) {
       imageSize: { width: size.width, height: size.height },
       scan: {
         everySec: Math.round(step * 1000) / 1000,
-        framesScanned: frames.length,
-        ...(plan.clamped ? { note: `Widened from ${args.scanEverySec} s to fit maxFrames ${maxFrames}.` } : {}),
+        framesScanned: scan.frames.length,
+        ...(scan.clamped ? { note: `Widened from ${args.scanEverySec} s to fit maxFrames ${maxFrames}.` } : {}),
       },
       ...(args.query
         ? {

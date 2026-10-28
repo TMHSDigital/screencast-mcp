@@ -15,10 +15,12 @@ afterAll(() => rmSync(home, { recursive: true, force: true }));
 
 /**
  * Budget for the default tools/list, in bytes of compact JSON (~4 bytes per
- * token). It was 83.4 KB before #214 and about 71 KB after; raise it only
- * deliberately, after trying to say the new thing in fewer words.
+ * token). It was 83.4 KB before #214 and about 71 KB after; 0.45.0's six new
+ * tools (save_replay, bug_report, backdrop, keystroke_overlay, add_marker,
+ * chapters) took it to about 84.4 KB. Raise it only deliberately, after trying
+ * to say the new thing in fewer words; SCREENCAST_TOOLSETS trims it per client.
  */
-const TOOLS_LIST_BUDGET_BYTES = 74_000;
+const TOOLS_LIST_BUDGET_BYTES = 86_000;
 
 const manifest = JSON.parse(readFileSync(join(process.cwd(), "mcp-tools.json"), "utf8")) as Array<{
   name: string;

@@ -16,6 +16,7 @@ import { abortEditJobs } from "./utils/jobs.js";
 import { probeDuration, stopAll } from "./utils/lifecycle.js";
 import { createServer } from "./server.js";
 import { pruneCaptures, retentionDays, RETENTION_ENV } from "./utils/retention.js";
+import { cleanupReplayDirs } from "./utils/replay.js";
 
 const server = createServer();
 
@@ -31,6 +32,17 @@ async function main(): Promise<void> {
     process.stderr.write(
       `Orphan reaping skipped: ${err instanceof Error ? err.message : String(err)}\n`,
     );
+  }
+  // Replay buffers (#197) no live recording owns are scratch: a crash, a
+  // failed save, or a session that ended on its own left them.
+  try {
+    const live = getStore()
+      .list()
+      .flatMap((r) => (r.status === "recording" && r.replay ? [r.replay.dir] : []));
+    const removed = cleanupReplayDirs(live);
+    if (removed > 0) process.stderr.write(`Removed ${removed} leftover replay buffer(s).\n`);
+  } catch (err) {
+    process.stderr.write(`Replay buffer cleanup skipped: ${err instanceof Error ? err.message : String(err)}\n`);
   }
   const days = retentionDays();
   if (days !== null) {

@@ -8,7 +8,8 @@
  */
 import { existsSync, rmSync, writeFileSync } from "node:fs";
 import type { ChildProcess } from "node:child_process";
-import { runCapture } from "./ffmpeg.js";
+import { requireFfmpeg, runCapture } from "./ffmpeg.js";
+import { finishReplay, type ReplayStopResult } from "./replay.js";
 import { whenFinalized } from "./events.js";
 import { buildProbeArgs, parseMediaInfo } from "./media.js";
 import { ScreencastError } from "./errors.js";
@@ -62,12 +63,17 @@ export interface StopOptions {
   probe: (path: string) => Promise<number | null>;
   /** How long to wait for a graceful 'q' before killing (default 8s). */
   gracefulMs?: number;
+  /** Replay-buffer sessions (#197): write the whole buffer to outputPath
+   * before discarding it (default false: discard). */
+  saveReplay?: boolean;
 }
 
 export interface StopResult {
   record: SessionRecord | undefined;
   graceful: boolean;
   durationSec: number | null;
+  /** What happened to a replay session's buffer (#197). */
+  replay?: ReplayStopResult;
 }
 
 /**
@@ -166,6 +172,15 @@ async function runStop(
     store.detachChild(record.id);
     // The input event log converts once ffmpeg has exited (#118).
     await whenFinalized(record.id);
+    // A replay buffer is saved to outputPath on request, else discarded (#197).
+    const replay = record.replay
+      ? await finishReplay(record.replay, {
+          save: opts.saveReplay ?? false,
+          output: record.outputPath,
+          quality: record.quality,
+          tools: requireFfmpeg,
+        })
+      : undefined;
 
     const durationSec = await opts.probe(record.outputPath);
     const updated = store.update(record.id, {
@@ -177,7 +192,7 @@ async function runStop(
       // detector in start_recording; a deliberate stop is not a failure.
       error: undefined,
     });
-    return { record: updated, graceful, durationSec };
+    return { record: updated, graceful, durationSec, ...(replay ? { replay } : {}) };
   } finally {
     if (stopFile) rmSync(stopFile, { force: true });
     store.clearStopping(record.id);

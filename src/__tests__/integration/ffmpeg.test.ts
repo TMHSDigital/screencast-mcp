@@ -52,6 +52,8 @@ import { prepareCalloutAssets } from "../../utils/calloutAssets.js";
 import { encodeInlineImages } from "../../utils/images.js";
 import { animLadder, buildAnimArgs } from "../../utils/anim.js";
 import { buildArrowImageArgs, buildCalloutArgs } from "../../utils/callout.js";
+import { buildBackdropArgs } from "../../utils/backdrop.js";
+import { planBadges, groupBadges, buildKeystrokeArgs } from "../../utils/keystrokes.js";
 import { buildBurnSubtitlesArgs, buildTranscribeArgs, parseSrt, normalizeCues } from "../../utils/captions.js";
 import { buildIdleScanArgs, parseFreezes, parseSilences, intersect, cutsFor, buildCutIdleArgs, MAX_CUTS } from "../../utils/idle.js";
 import { keyframesToViews, buildZoomArgs, planClickZoom } from "../../utils/zoom.js";
@@ -679,6 +681,81 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     // ... and the source shows through before it starts.
     expect(regionLuma(out, 0.3, 20, 20, 40, 20)).toBeLessThan(220);
     expect((await probeMedia(out)).durationSec!).toBeCloseTo(4, 0);
+  });
+
+  it("backdrop pads onto the background with rounded corners and a drop shadow (#171)", async () => {
+    const white = p("white.mp4");
+    await runFfmpeg(["-y", "-f", "lavfi", "-i", "color=c=white:s=320x240:r=30:d=2", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", white]);
+    const out = p("backdrop.mp4");
+    const { args, layout } = buildBackdropArgs(white, out, { colors: ["black"], padding: 40, radius: 24, shadow: 0 }, { width: 320, height: 240 });
+    await runFfmpeg(args);
+    const info = await probeMedia(out);
+    expect([info.width, info.height]).toEqual([400, 320]);
+    expect([layout.x, layout.y]).toEqual([40, 40]);
+    expect(info.durationSec!).toBeCloseTo(2, 0);
+    expect(regionLuma(out, 1, 150, 130, 100, 60)).toBeGreaterThan(230); // the content
+    expect(regionLuma(out, 1, 4, 4, 30, 30)).toBeLessThan(25); // the background in the padding
+    expect(regionLuma(out, 1, 40, 40, 4, 4)).toBeLessThan(60); // the rounded-off corner shows the background
+    expect(regionLuma(out, 1, 40, 150, 4, 4)).toBeGreaterThan(200); // a straight edge is not cut
+
+    // A shadow darkens the background just below the content, not far from it.
+    const shadowed = p("backdrop-shadow.mp4");
+    await runFfmpeg(buildBackdropArgs(vOnly, shadowed, { colors: ["white"], padding: 40, radius: 0, shadow: 16, shadowOpacity: 0.8 }, { width: 320, height: 240 }).args);
+    expect(regionLuma(shadowed, 1, 100, 283, 120, 6)).toBeLessThan(200);
+    expect(regionLuma(shadowed, 1, 0, 0, 20, 20)).toBeGreaterThan(240);
+  });
+
+  it("backdrop frames a PNG still on an aspect canvas with a gradient preset (#171)", async () => {
+    const shot = p("shot.png");
+    await runFfmpeg(["-y", "-f", "lavfi", "-i", "color=c=white:s=301x201", "-frames:v", "1", shot]);
+    const out = p("framed.png");
+    await runFfmpeg(buildBackdropArgs(shot, out, { preset: "rec", aspect: "1:1", padding: 60 }, { width: 301, height: 201 }, true).args);
+    const info = await probeMedia(out);
+    expect([info.width, info.height]).toEqual([1080, 1080]);
+    expect(regionLuma(out, 0, 440, 500, 200, 80)).toBeGreaterThan(230); // the scaled-up shot
+    const top = regionLuma(out, 0, 0, 0, 40, 40);
+    const bottom = regionLuma(out, 0, 1040, 1040, 40, 40);
+    expect(top).toBeGreaterThan(bottom + 20); // red #FF4545 fading to dark oxblood
+  });
+
+  it("keystroke_overlay burns a badge from the event log only while it lingers (#169)", async () => {
+    const black = p("keys-black.mp4");
+    await runFfmpeg(["-y", "-f", "lavfi", "-i", "color=c=black:s=640x360:r=30:d=3", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", black]);
+    const badges = planBadges([{ t: 0.5, type: "key", x: 0, y: 0, inFrame: true, keys: "Ctrl+Shift+P" }]);
+    const groups = groupBadges(badges);
+    const label = p("badge.txt");
+    writeFileSync(label, groups[0]!.label);
+    const out = p("keys.mp4");
+    await runFfmpeg(buildKeystrokeArgs(black, out, groups, { fontFile: bundledFontPath("bold"), textFiles: { [groups[0]!.label]: label } }, {}, { height: 360 }, "draft"));
+    // The badge sits bottom-centre: white text on the dark panel at 1 s, gone at 2.5 s.
+    expect(regionMaxLuma(out, 1, 200, 280, 240, 70)).toBeGreaterThan(200);
+    expect(regionMaxLuma(out, 2.5, 200, 280, 240, 70)).toBeLessThan(40);
+    expect(regionMaxLuma(out, 1, 160, 40, 320, 120)).toBeLessThan(40); // nothing elsewhere
+  });
+
+  it("pipeline re-times keystroke badges through a trim and frames the result with backdrop (#169, #171)", async () => {
+    const black = p("keys-black2.mp4");
+    await runFfmpeg(["-y", "-f", "lavfi", "-i", "color=c=black:s=320x240:r=30:d=6", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", black]);
+    // A click at 4.5 s of the source is at 1.5 s after trimming the first 3 s.
+    const badges = planBadges([{ t: 4.5, type: "down", x: 10, y: 10, inFrame: true, button: "left" }]);
+    const label = p("click.txt");
+    writeFileSync(label, "Click");
+    const out = p("keys-pipeline.mp4");
+    const steps: PipelineStep[] = [
+      { op: "trim", start: 3, end: 6 },
+      { op: "keystroke_overlay", size: 24 },
+      { op: "backdrop", colors: ["#202020"], padding: 20, shadow: 0 },
+    ];
+    const plan = planPipeline(black, out, steps, { width: 320, height: 240, fps: 30, durationSec: 6, hasAudio: false }, {}, "draft", {
+      keystrokes: { 1: { badges, fontFile: bundledFontPath("bold"), textFiles: { Click: label } } },
+    });
+    await runFfmpeg(plan.args);
+    const info = await probeMedia(out);
+    expect([info.width, info.height]).toEqual([360, 280]);
+    expect(info.durationSec!).toBeCloseTo(3, 0);
+    // The badge, inside the framed content's bottom half, at 2 s but not at 0.5 s.
+    expect(regionMaxLuma(out, 2, 100, 190, 160, 60)).toBeGreaterThan(200);
+    expect(regionMaxLuma(out, 0.5, 100, 190, 160, 60)).toBeLessThan(60);
   });
 
   it.runIf(FALLBACK_FAMILIES.japanese.bold.some((f) => existsSync(join(systemFontsDir(), f))))(

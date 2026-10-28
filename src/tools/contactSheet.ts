@@ -73,6 +73,34 @@ const inputSchema = {
     .describe(`Max inline image width (default ${DEFAULT_MAX_IMAGE_WIDTH}).`),
 };
 
+/** Tile timecode-labelled frames of `input` at `times` into one PNG at
+ * `output`; shared with bug_report (#198). Returns the grid used. */
+export async function renderContactSheet(
+  input: string,
+  times: number[],
+  output: string,
+  opts: { tileWidth: number; columns?: number },
+  signal?: AbortSignal,
+): Promise<{ columns: number; rows: number }> {
+  const grid = sheetGrid(times.length, opts.columns);
+  // Tiles and their label files live in a private temp dir, removed
+  // whatever happens.
+  const work = mkdtempSync(join(tmpdir(), "screencast-sheet-"));
+  try {
+    const font = bundledFontPath("bold");
+    for (const [i, t] of times.entries()) {
+      const labelFile = join(work, `label_${i}.txt`);
+      writeFileSync(labelFile, formatTimecode(t));
+      const tile = join(work, `tile_${String(i).padStart(3, "0")}.png`);
+      await runFfmpeg(buildTileArgs(input, t, tile, opts.tileWidth, font, labelFile), 60_000, { signal });
+    }
+    await runFfmpeg(buildSheetArgs(sequencePattern(work, "tile_%03d.png"), grid, output), 60_000, { signal });
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+  return grid;
+}
+
 export function register(server: McpServer): void {
   server.registerTool(
     "contact_sheet",
@@ -125,24 +153,7 @@ export function register(server: McpServer): void {
           } else {
             times = evenTimes(durationSec, count);
           }
-          const grid = sheetGrid(times.length, args.columns);
-          // Tiles and their label files live in a private temp dir, removed
-          // whatever happens.
-          const work = mkdtempSync(join(tmpdir(), "screencast-sheet-"));
-          try {
-            const font = bundledFontPath("bold");
-            for (const [i, t] of times.entries()) {
-              const labelFile = join(work, `label_${i}.txt`);
-              writeFileSync(labelFile, formatTimecode(t));
-              const tile = join(work, `tile_${String(i).padStart(3, "0")}.png`);
-              await runFfmpeg(buildTileArgs(args.input, t, tile, tileWidth, font, labelFile), 60_000, {
-                signal: extra.signal,
-              });
-            }
-            await runFfmpeg(buildSheetArgs(sequencePattern(work, "tile_%03d.png"), grid, output), 60_000, { signal: extra.signal });
-          } finally {
-            rmSync(work, { recursive: true, force: true });
-          }
+          const grid = await renderContactSheet(args.input, times, output, { tileWidth, columns: args.columns }, extra.signal);
           result = {
             outputPath: output,
             mode: args.mode ?? "even",

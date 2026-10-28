@@ -26,7 +26,15 @@ import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { getStore } from "../context.js";
 import { classifyUnrequestedExit, killPid, serverIdentity, type SessionRecord } from "../utils/sessions.js";
 import { rmSync } from "node:fs";
-import { basename } from "node:path";
+import { basename, join } from "node:path";
+import {
+  MAX_REPLAY_SEC,
+  MIN_REPLAY_SEC,
+  discardReplay,
+  planReplayBuffer,
+  prepareReplayDir,
+  segmentOutputArgs,
+} from "../utils/replay.js";
 import {
   DEFAULT_KEY_MODE,
   eventPaths,
@@ -113,6 +121,13 @@ const inputSchema = {
       "gdigrab (default): the screen rectangle. wgc (window: targets, FFmpeg 8+): the window's own " +
         "surface, even when covered or moved; client area only, no audio.",
     ),
+  replayBufferSec: z
+    .number()
+    .int()
+    .min(MIN_REPLAY_SEC)
+    .max(MAX_REPLAY_SEC)
+    .optional()
+    .describe("Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab only."),
 };
 
 export function register(server: McpServer): void {
@@ -147,6 +162,11 @@ export function register(server: McpServer): void {
             throw new ScreencastError('backend "wgc" needs FFmpeg 8 or newer (the gfxcapture filter). Use gdigrab, or update ffmpeg.');
           }
         }
+        // Instant replay (#197): a segment ring instead of one mp4.
+        if (args.replayBufferSec !== undefined && backend === "wgc") {
+          throw new ScreencastError('replayBufferSec is not supported with backend "wgc" yet; use gdigrab.');
+        }
+        const replay = args.replayBufferSec !== undefined ? planReplayBuffer(args.replayBufferSec) : null;
         const fps = args.fps ?? DEFAULT_FPS;
         const quality: Quality = (args.quality as Quality) ?? DEFAULT_QUALITY;
         const maxDurationSec = resolveMaxDuration(args.maxDurationSec);
@@ -165,15 +185,16 @@ export function register(server: McpServer): void {
             : undefined;
         await confirmCapture(
           server,
-          `Record ${describeTarget(args.target, window)} ` +
+          (replay ? `Keep a rolling ${replay.bufferSec} s replay buffer of ` : "Record ") +
+            `${describeTarget(args.target, window)} ` +
             (maxDurationSec > 0 ? `for up to ${maxDurationSec} s` : "with no time limit") +
             (audio ? `, with system audio (${audio.device})` : ", without audio") +
             (args.events ? ", logging mouse clicks and typing" : "") +
-            `, saved to ${output}?`,
+            (replay ? ", kept only until save_replay or stop_recording { save: true } writes it out?" : `, saved to ${output}?`),
           extra.signal,
         );
 
-        const ffArgs = buildCaptureArgs(target, {
+        const captureArgs = buildCaptureArgs(target, {
           fps,
           quality,
           output,
@@ -181,10 +202,13 @@ export function register(server: McpServer): void {
           audio,
           maxDurationSec,
         });
+        const ffArgs = replay ? segmentOutputArgs(captureArgs, replay) : captureArgs;
+        if (replay) prepareReplayDir(replay);
         // The event logger starts first so the first frames have events (#118).
+        // A replay session's raw log lives in its buffer; save_replay slices it.
         const keyMode: KeyMode = args.keys ?? DEFAULT_KEY_MODE;
-        const evPaths = args.events ? eventPaths(output) : null;
-        if (evPaths) prepareEventPaths(evPaths, args.overwrite);
+        const evPaths = args.events ? (replay ? { raw: join(replay.dir, "events.raw"), jsonl: "" } : eventPaths(output)) : null;
+        if (evPaths && !replay) prepareEventPaths(evPaths, args.overwrite);
         // wgc frames the client area; its size is known once the recorder starts.
         let frame = args.events
           ? captureFrame(target, monitors)
@@ -246,6 +270,7 @@ export function register(server: McpServer): void {
         if (settled === "exited") {
           if (logger) await stopEventLogger(logger);
           if (evPaths) rmSync(evPaths.raw, { force: true });
+          if (replay) discardReplay(replay);
           const tail = stderrTail.trim().split("\n").slice(-6).join("\n");
           throw new ScreencastError(
             `Recording failed to start (${backend === "wgc" ? "window capture" : "ffmpeg"} exited immediately):\n${tail}`,
@@ -266,9 +291,21 @@ export function register(server: McpServer): void {
           ...serverIdentity(),
           status: "recording",
           startedAt: new Date().toISOString(),
+          // The video clock's zero, for add_marker (#174).
+          videoStartMs: parseCaptureStart(stderrHead) ?? spawnedAt,
           ...(maxDurationSec > 0 ? { maxDurationSec } : {}),
           ...(window ? { matchedWindow: window.matchedTitle } : {}),
-          ...(evPaths ? { events: { path: evPaths.jsonl, keys: keyMode } } : {}),
+          ...(evPaths && !replay ? { events: { path: evPaths.jsonl, keys: keyMode } } : {}),
+          ...(replay
+            ? {
+                replay: {
+                  ...replay,
+                  ...(evPaths && frame
+                    ? { events: { raw: evPaths.raw, keys: keyMode, startMs: parseCaptureStart(stderrHead) ?? spawnedAt, frame } }
+                    : {}),
+                },
+              }
+            : {}),
           backend,
           processImage: backend === "wgc" ? basename(process.execPath).toLowerCase() : "ffmpeg.exe",
         };
@@ -283,11 +320,16 @@ export function register(server: McpServer): void {
           if (child.pid !== undefined) killPid(child.pid);
           if (logger) await stopEventLogger(logger);
           if (evPaths) rmSync(evPaths.raw, { force: true });
+          if (replay) discardReplay(replay);
           throw new ScreencastError(
             `Recording stopped: the session registry could not be written (${(err as Error).message}).`,
           );
         }
-        if (logger && evPaths && frame) {
+        if (logger && replay) {
+          // The raw log stays in the buffer for save_replay to slice (#197).
+          const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+          trackFinalizer(id, exited.then(() => stopEventLogger(logger)));
+        } else if (logger && evPaths && frame) {
           const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
           trackFinalizer(
             id,
@@ -348,9 +390,15 @@ export function register(server: McpServer): void {
           audioDevice: audio?.device ?? null,
           maxDurationSec: maxDurationSec > 0 ? maxDurationSec : null,
           ...(window ? windowMatchReport(window) : {}),
-          ...(evPaths ? { eventsPath: evPaths.jsonl, keys: keyMode } : {}),
+          ...(evPaths && !replay ? { eventsPath: evPaths.jsonl, keys: keyMode } : {}),
+          ...(replay
+            ? { replay: { bufferSec: replay.bufferSec, segmentSec: replay.segmentSec, dir: replay.dir, events: !!evPaths } }
+            : {}),
           note:
-            "Call stop_recording with this sessionId to finalize the file." +
+            (replay
+              ? `Replay buffer running: save_replay keeps the last seconds (up to ${replay.bufferSec}s) without stopping it; ` +
+                "stop_recording discards the buffer unless save: true (then it writes outputPath)."
+              : "Call stop_recording with this sessionId to finalize the file.") +
             (maxDurationSec > 0
               ? ` It stops on its own after ${maxDurationSec}s (maxDurationSec).`
               : ""),

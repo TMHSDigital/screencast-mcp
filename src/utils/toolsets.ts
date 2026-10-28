@@ -12,9 +12,11 @@ export const TOOLSETS = {
   capture: [
     "start_recording",
     "stop_recording",
+    "save_replay",
     "list_sessions",
     "get_session",
     "read_events",
+    "add_marker",
     "screenshot",
     "list_targets",
     "list_audio_devices",
@@ -44,6 +46,8 @@ export const TOOLSETS = {
   ],
   produce: [
     "callout",
+    "keystroke_overlay",
+    "backdrop",
     "overlay",
     "zoom",
     "reframe",
@@ -52,6 +56,8 @@ export const TOOLSETS = {
     "assemble_highlights",
     "export_preset",
     "burn_subtitles",
+    "chapters",
+    "bug_report",
   ],
   audio: ["extract_audio", "normalize_audio", "denoise", "transcribe", "music_bed"],
 } as const satisfies Record<string, readonly string[]>;
@@ -110,7 +116,9 @@ export function serverInstructions(selection: ToolsetSelection): string {
   if (on.has("capture")) {
     lines.push(
       "Capture: screenshot for a still; start_recording -> (do the task) -> stop_recording for video " +
-        "(events: true also logs clicks for read_events and zoom). Never start a recording the user did not ask for.",
+        "(events: true also logs clicks for read_events and zoom). For flaky failures, start_recording " +
+        "{ replayBufferSec } keeps a rolling buffer and save_replay writes the last seconds after the fact. " +
+        "Never start a recording the user did not ask for.",
     );
   }
   if (on.has("watch")) {
@@ -121,15 +129,29 @@ export function serverInstructions(selection: ToolsetSelection): string {
   }
   if (on.has("edit")) {
     lines.push(
-      "Edit: prefer one pipeline call (trim, crop, scale, speed, redact, callout, reframe, zoom, then " +
+      "Edit: prefer one pipeline call (trim, crop, scale, speed, redact, callout, keystroke_overlay, reframe, zoom, backdrop, then " +
         "export_preset or export_gif) over chaining single-edit tools; each tool call re-encodes. trim = one " +
         "segment, clip = several files; export_gif for size-bounded GIF/WebP, compress for a smaller mp4.",
     );
   }
   if (on.has("produce")) {
     lines.push(
-      "Produce: callout, zoom, overlay, title_card, xfade_transition, assemble_highlights, burn_subtitles, export_preset.",
+      "Produce: callout, zoom, keystroke_overlay, backdrop, overlay, title_card, xfade_transition, assemble_highlights, burn_subtitles, export_preset.",
     );
+  }
+  if (on.has("produce")) {
+    lines.push(
+      "Bug reports: bug_report turns a recording (path or sessionId) into one redacted folder: clip, GIF, " +
+        "contact sheet, steps from the event log, OCR'd error text, environment, and report.md.",
+    );
+  }
+  if (on.has("capture") || on.has("produce")) {
+    const marks = [
+      on.has("capture") && "add_marker stamps a labelled moment during a recording (or at a second of a file).",
+      on.has("produce") && "chapters writes markers, scene changes, or a transcript as mp4/mkv chapters plus YouTube text.",
+      on.has("edit") && "pipeline chapters: true keeps markers as chapters through trims and speed.",
+    ];
+    lines.push(`Markers: ${marks.filter(Boolean).join(" ")}`);
   }
   if (on.has("audio")) {
     lines.push("Audio: extract_audio, normalize_audio, denoise, music_bed; transcribe makes an SRT for burn_subtitles.");

@@ -121,6 +121,26 @@
       t.style.left = `${pct(S.times[i])}%`;
       return t;
     }));
+    // Markers (#174): a tick on the timeline and a button that seeks to it.
+    const marks = Array.isArray(meta.markers) ? meta.markers.filter((m) => m && typeof m.t === "number" && m.t <= S.duration) : [];
+    $("marks").replaceChildren(...marks.map((m) => {
+      const b = document.createElement("b");
+      b.style.left = `${pct(m.t)}%`;
+      return b;
+    }));
+    $("markList").replaceChildren(...marks.map((m) => {
+      const li = document.createElement("li");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      const tc = document.createElement("span");
+      tc.textContent = fmt(m.t);
+      btn.append(tc, String(m.label || "Marker"));
+      btn.setAttribute("aria-label", `Go to marker ${m.label || ""} at ${fmt(m.t)}`);
+      btn.addEventListener("click", () => { stop(); show(frameAt(m.t)); render(); });
+      li.appendChild(btn);
+      return li;
+    }));
+    $("markList").hidden = marks.length === 0;
     const every = meta.intervalSec ?? S.duration / S.frames.length;
     $("sampling").textContent = `1 frame / ${every.toFixed(1)}s` + (S.scene.size ? `, +${S.scene.size} at scene changes` : "");
     ["play", "draw"].forEach((id) => ($(id).disabled = false));

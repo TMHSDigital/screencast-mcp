@@ -21,6 +21,16 @@ import { ASPECT_DIMS, exportPresetParts, reframeFilter, type Aspect, type Platfo
 import { keyframesToViews, zoomFilter, DEFAULT_TRANSITION_SEC, type ZoomKeyframe } from "./zoom.js";
 import { resolveQuality, type Quality } from "./targets.js";
 import type { AnimExportOptions } from "./animExport.js";
+import type { TimeOp } from "./chapters.js";
+import { backdropSteps, type BackdropOptions } from "./backdrop.js";
+import { groupBadges, keystrokeSteps, retimeBadges, type Badge, type BadgePlanOptions, type BadgeStyle, type KeystrokeAssets } from "./keystrokes.js";
+
+/** What a keystroke_overlay step needs: the badges planned from the event log
+ * on the source's clock (retimed here through earlier trims and speed
+ * changes), the font, and a text file per label. */
+export interface KeystrokeStepAssets extends KeystrokeAssets {
+  badges: Badge[];
+}
 
 export const MAX_PIPELINE_STEPS = 30;
 
@@ -33,6 +43,8 @@ export type PipelineStep =
   | { op: "callout"; items: Callout[]; fontFile?: string }
   | { op: "reframe"; aspect: Aspect; fit?: ReframeFit }
   | { op: "zoom"; keyframes: ZoomKeyframe[]; transitionSec?: number }
+  | ({ op: "backdrop" } & BackdropOptions)
+  | ({ op: "keystroke_overlay"; events?: string; fontFile?: string } & BadgePlanOptions & BadgeStyle)
   | { op: "export_preset"; platform: Platform; fit?: ReframeFit }
   | ({ op: "export_gif" } & AnimExportOptions);
 
@@ -56,6 +68,8 @@ export interface PipelinePlan {
   gif?: AnimExportOptions;
   /** One line per step: what it became. */
   summary: string[];
+  /** The trims and speed changes, in order, to re-time markers (#174). */
+  timeOps: TimeOp[];
 }
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -68,6 +82,8 @@ export function planPipeline(
   src: SourceInfo,
   assets: Record<number, CalloutAssets> = {},
   quality: Quality = "standard",
+  /** chaptersFile: an FFMETADATA file whose chapters the output gets (#174). */
+  opts: { chaptersFile?: string; keystrokes?: Record<number, KeystrokeStepAssets> } = {},
 ): PipelinePlan {
   if (steps.length === 0) throw new ScreencastError("Give at least one step.");
   if (steps.length > MAX_PIPELINE_STEPS) throw new ScreencastError(`At most ${MAX_PIPELINE_STEPS} steps.`);
@@ -102,6 +118,7 @@ export function planPipeline(
   let encode: string[] | null = null;
   let gif: AnimExportOptions | undefined;
   const summary: string[] = [];
+  const timeOps: TimeOp[] = [];
 
   const trimRange = (s: { start: number; end?: number; duration?: number }, at: number) => {
     if (!Number.isFinite(s.start) || s.start < 0) throw new ScreencastError(`step ${at}: trim start must be a non-negative number.`);
@@ -137,6 +154,7 @@ export function planPipeline(
         }
         audioReencode = true;
         dur = end - start;
+        timeOps.push({ op: "trim", start, end });
         break;
       }
       case "crop":
@@ -158,6 +176,7 @@ export function planPipeline(
         audio.push(atempoChain(s.factor));
         audioReencode = true;
         if (dur !== null) dur /= s.factor;
+        timeOps.push({ op: "speed", factor: s.factor });
         summary.push(`speed x${s.factor}`);
         break;
       case "redact": {
@@ -193,6 +212,33 @@ export function planPipeline(
         summary.push(`zoom ${s.keyframes.length} keyframe(s)`);
         break;
       }
+      case "backdrop": {
+        const { op: _op, ...bo } = s;
+        const { steps: st, out: o, extraInputs: ex, layout } = backdropSteps(bo, { width: W, height: H }, cur, nextInput, tag);
+        graph.push(...st);
+        extraInputs.push(...ex);
+        nextInput += ex.length / 2;
+        cur = o;
+        W = layout.canvasW;
+        H = layout.canvasH;
+        summary.push(`backdrop to ${W}x${H}`);
+        break;
+      }
+      case "keystroke_overlay": {
+        const k = opts.keystrokes?.[i];
+        if (!k) throw new ScreencastError(`Internal: missing keystroke badges for step ${at}.`);
+        // Badges are on the source's clock; move them past earlier trims and speed changes.
+        const badges = retimeBadges(k.badges, timeOps);
+        if (badges.length === 0) {
+          summary.push("keystroke_overlay: no badges in this part of the video");
+          break;
+        }
+        const { steps: st, out: o } = keystrokeSteps(groupBadges(badges), k, s, { height: H }, cur, tag);
+        graph.push(...st);
+        cur = o;
+        summary.push(`keystroke_overlay ${badges.length} badge(s)`);
+        break;
+      }
       case "export_preset": {
         const p = exportPresetParts(s.platform, s.fit ?? "pad", tag);
         chain(p.vf);
@@ -215,6 +261,9 @@ export function planPipeline(
   });
 
   const args = ["-y", ...inputArgs, "-i", input, ...extraInputs];
+  // Chapters come from their own input, after every other one (#174).
+  const chaptersInput = opts.chaptersFile ? args.filter((a) => a === "-i").length : -1;
+  if (opts.chaptersFile) args.push("-f", "ffmetadata", "-i", opts.chaptersFile);
   if (graph.length > 0) {
     if (src.hasAudio && audio.length > 0) graph.push(`[0:a]${audio.join(",")}[aout]`);
     args.push("-filter_complex", graph.join(";"), "-map", cur);
@@ -233,6 +282,7 @@ export function planPipeline(
     if (src.hasAudio) args.push(...(audioReencode ? ["-c:a", "aac", "-b:a", "160k"] : ["-c:a", "copy"]));
     args.push("-movflags", "+faststart");
   }
+  if (chaptersInput !== -1) args.push("-map_chapters", String(chaptersInput));
   args.push(output);
-  return { args, width: W, height: H, fps, durationSec: dur === null ? null : r3(dur), gif, summary };
+  return { args, width: W, height: H, fps, durationSec: dur === null ? null : r3(dur), gif, summary, timeOps };
 }

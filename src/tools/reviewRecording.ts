@@ -23,6 +23,7 @@ import {
   PLAYER_URI,
 } from "../utils/player.js";
 import { getStore } from "../context.js";
+import { markersOrChapters, readMarkers } from "../utils/chapters.js";
 
 const uiAsset = (name: string) => readFileSync(fileURLToPath(new URL(`../../assets/ui/${name}`, import.meta.url)), "utf8");
 
@@ -44,6 +45,11 @@ function resolveInput(args: { input?: string; sessionId?: string }): string {
   }
   if (args.input) return args.input;
   throw new ScreencastError("Pass input or sessionId.");
+}
+
+/** The markers to report, as { t, label }, or nothing when there are none. */
+function markersField(markers: Array<{ t: number; label: string }> | undefined) {
+  return markers && markers.length > 0 ? { markers: markers.map(({ t, label }) => ({ t, label })) } : {};
 }
 
 export function register(server: McpServer): void {
@@ -96,6 +102,7 @@ export function register(server: McpServer): void {
           height: info.height,
           fps: info.fps,
           hasAudio: info.audioCodec !== null,
+          ...markersField(args.sessionId ? getStore().get(args.sessionId)?.markers ?? readMarkers(input) : readMarkers(input)),
           note:
             "Clients with MCP Apps show an inline review player for this result. Without it, " +
             "look with contact_sheet or sample_frames, then trim and redact with pipeline.",
@@ -157,6 +164,13 @@ export function register(server: McpServer): void {
           return frame && jpeg ? [{ frame, jpeg }] : [];
         });
         const t0 = firstFrame.timeSec;
+        // Marker ticks (#174): the sidecar's markers, else the file's chapters.
+        let markers: Array<{ t: number; label: string }> = [];
+        try {
+          markers = (await markersOrChapters(args.input, extra.signal)).markers.map(({ t, label }) => ({ t, label }));
+        } catch {
+          /* ticks are optional */
+        }
         const frameTimes = keep.map(({ frame }) => Math.round((frame.timeSec - t0) * 1000) / 1000);
         const sceneFrames = keep.flatMap(({ frame }, k) => (frame.scene ? [k] : []));
         return {
@@ -172,6 +186,7 @@ export function register(server: McpServer): void {
                 frameTimes,
                 intervalSec: plan.intervalSec,
                 sceneFrames,
+                markers,
               }),
             },
             ...keep.map(({ jpeg }) => ({ type: "image" as const, data: jpeg.toString("base64"), mimeType: "image/jpeg" })),

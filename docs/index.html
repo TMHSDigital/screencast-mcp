@@ -134,14 +134,16 @@
         <table>
           <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td><code>start_recording</code></td><td>Start a background recording. Target = full, a monitor, a window by title, or a region. Optional fps, quality preset, system audio, and an input event log.</td></tr>
+            <tr><td><code>start_recording</code></td><td>Start a background recording. Target = full, a monitor, a window by title, or a region. Optional fps, quality preset, system audio, an input event log, and an instant-replay buffer.</td></tr>
             <tr><td><code>stop_recording</code></td><td>Stop a session by id with a graceful quit so the file is finalized, not truncated.</td></tr>
+            <tr><td><code>save_replay</code></td><td>Instant replay: write the last N seconds of a rolling buffer (start_recording replayBufferSec) to an mp4 after something fails, without stopping it.</td></tr>
             <tr><td><code>screenshot</code></td><td>Capture a single PNG of a target, returned inline for the model to view.</td></tr>
             <tr><td><code>list_sessions</code></td><td>List active and finished recording sessions.</td></tr>
             <tr><td><code>get_session</code></td><td>Inspect a single session by id.</td></tr>
             <tr><td><code>review_recording</code></td><td>Open a recording in an inline player (in clients with MCP Apps): scrub, trim, draw redaction boxes, export a redacted copy.</td></tr>
             <tr><td><code>player_frames</code></td><td>Preview frames for the review player (called by the player, not the agent).</td></tr>
             <tr><td><code>read_events</code></td><td>Read a recording&rsquo;s input event log: clicks, scroll, cursor, and key presses on the video&rsquo;s clock. Opt in with <code>start_recording</code> <code>events: true</code>.</td></tr>
+            <tr><td><code>add_marker</code></td><td>Stamp a labelled moment on a recording as it runs, or at a second of a file; markers become ticks in the review player and chapters on export.</td></tr>
             <tr><td><code>list_audio_devices</code></td><td>List DirectShow audio devices and flag a likely system-audio loopback device for start_recording.</td></tr>
             <tr><td><code>list_targets</code></td><td>List what can be captured &mdash; the desktop, each monitor, each window &mdash; with a ready-to-use <code>target</code> string and whether it can be captured.</td></tr>
             <tr><td><code>doctor</code></td><td>Check the setup: ffmpeg version (FFmpeg 8+), the filters that gate tools, Windows OCR, folders and settings, with a fix for each problem.</td></tr>
@@ -197,6 +199,7 @@
             <tr><td><code>denoise</code></td><td>Reduce steady background noise, tuned to the measured noise floor.</td></tr>
             <tr><td><code>transcribe</code></td><td>Speech to SRT locally, with FFmpeg 8's whisper filter.</td></tr>
             <tr><td><code>burn_subtitles</code></td><td>Burn captions into the video, clean or social style.</td></tr>
+            <tr><td><code>chapters</code></td><td>Write markers, scene changes, or transcript sections as mp4/mkv chapters without a re-encode, return YouTube chapter text, and mux an SRT as a soft subtitle track.</td></tr>
             <tr><td><code>redact_region</code></td><td>Cover declared rectangles (solid box, blur, or pixelate) to hide on-screen secrets. Declared regions only, not automatic detection.</td></tr>
           </tbody>
         </table>
@@ -217,8 +220,11 @@
             <tr><td><code>music_bed</code></td><td>Lay a music track under a video: looped/trimmed, faded, leveled, and mixed with any existing audio.</td></tr>
             <tr><td><code>reframe</code></td><td>Re-aspect to 16:9, 9:16, 1:1, or 4:5 with pad (letterbox) or crop (fill).</td></tr>
             <tr><td><code>zoom</code></td><td>Smooth zoom-and-pan into the action: from keyframes, toward each click in the input event log (with optional click rings), or toward where the screen changed.</td></tr>
-            <tr><td><code>pipeline</code></td><td>Run several edits (trim, crop, scale, speed, redact, callout, reframe, zoom, then an export) as one ffmpeg process: one re-encode, no intermediate files.</td></tr>
+            <tr><td><code>keystroke_overlay</code></td><td>Keycast-style badges (Ctrl + Shift + P, Double click, Typing&hellip;) burned in from the input event log. Never typed text: the log has none.</td></tr>
+            <tr><td><code>backdrop</code></td><td>Frame a clip or screenshot on a gradient, color, or wallpaper with padding, rounded corners, and a drop shadow, optionally on a 16:9, 9:16, 1:1, or 4:5 canvas. Presets: desktop, rec, amber, light.</td></tr>
+            <tr><td><code>pipeline</code></td><td>Run several edits (trim, crop, scale, speed, redact, callout, keystroke_overlay, reframe, zoom, backdrop, then an export) as one ffmpeg process: one re-encode, no intermediate files.</td></tr>
             <tr><td><code>export_preset</code></td><td>Encode a platform-ready file (youtube, instagram_reel, tiktok, x, square, steam_trailer, vertical_reel) at the right aspect, fps, and bitrate.</td></tr>
+            <tr><td><code>bug_report</code></td><td>Turn a recording into a paste-ready repro folder: a secret-scanned, redacted clip and GIF, contact sheet, steps from the event log, OCR&rsquo;d error text, environment, and a report.md for <code>gh issue create</code>.</td></tr>
           </tbody>
         </table>
       </section>

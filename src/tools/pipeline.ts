@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { join } from "node:path";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
@@ -16,6 +16,10 @@ import { zoomKeyframeSchema } from "./zoom.js";
 import { redactRegionSchema } from "./redactRegion.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { PLATFORMS } from "../utils/produce.js";
+import { buildChapters, ffmetadata, markerPoints, markersOrChapters, retimeMarkers, writeMarkers, type Chapter, type Marker } from "../utils/chapters.js";
+import type { KeystrokeStepAssets } from "../utils/pipeline.js";
+import { backdropOptionsSchema } from "./backdrop.js";
+import { keystrokeOptionsSchema, loadBadges, prepareKeystrokeAssets } from "./keystrokeOverlay.js";
 
 const aspect = z.enum(["16:9", "9:16", "1:1", "4:5"]);
 const fit = z.enum(["pad", "crop"]).optional();
@@ -46,6 +50,8 @@ const step = z.discriminatedUnion("op", [
   z.object({ op: z.literal("callout"), items: z.array(calloutItemSchema).min(1).max(50), fontFile: fontFileSchema }),
   z.object({ op: z.literal("reframe"), aspect, fit }),
   z.object({ op: z.literal("zoom"), keyframes: z.array(zoomKeyframeSchema).min(1).max(100), transitionSec: z.number().positive().max(5).optional() }),
+  z.object({ op: z.literal("backdrop"), ...backdropOptionsSchema }),
+  z.object({ op: z.literal("keystroke_overlay"), ...keystrokeOptionsSchema }),
   z.object({ op: z.literal("export_preset"), platform: z.enum(PLATFORMS), fit }),
   z.object({
     op: z.literal("export_gif"),
@@ -70,6 +76,10 @@ const inputSchema = {
   dryRun: z.boolean().optional().describe("Return the plan (ffmpeg command, output size) without running it."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  chapters: z
+    .boolean()
+    .optional()
+    .describe("Keep the input's markers as chapters, re-timed through trims and speed."),
 };
 
 export function register(server: McpServer): void {
@@ -78,7 +88,7 @@ export function register(server: McpServer): void {
     {
       title: "Edit Pipeline",
       description:
-        "Run several edits (trim, crop, scale, speed, redact, callout, reframe, zoom, then optionally " +
+        "Run several edits (trim, crop, scale, speed, redact, callout, keystroke_overlay, reframe, zoom, backdrop, then optionally " +
         "export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it " +
         "over chaining edit tools.",
       inputSchema,
@@ -120,9 +130,42 @@ export function register(server: McpServer): void {
             fallbackFonts.push(...a.fallbackFonts.map((f) => ({ step: i, ...f })));
             warnings.push(...a.warnings.map((w) => `Step ${i}, ${w.charAt(0).toLowerCase()}${w.slice(1)}`));
           }
+          // Keystroke badges come from the input's event log, on its clock;
+          // planPipeline moves them through earlier trims and speed changes.
+          const keystrokes: Record<number, KeystrokeStepAssets> = {};
+          for (const [i, s] of steps.entries()) {
+            if (s.op === "backdrop" && s.image && !existsSync(s.image)) {
+              throw new ScreencastError(`step ${i + 1}: background image not found: ${s.image}`);
+            }
+            if (s.op !== "keystroke_overlay") continue;
+            const { badges } = loadBadges(args.input, s.events, s);
+            const labels = [...new Set(badges.map((b) => b.label))];
+            const k = prepareKeystrokeAssets(labels, args.dryRun ? null : work, `s${i}_`, s.fontFile);
+            keystrokes[i] = { badges, fontFile: k.fontFile, textFiles: k.textFiles };
+            warnings.push(...k.warnings.map((w) => `Step ${i}, ${w.charAt(0).toLowerCase()}${w.slice(1)}`));
+          }
           // An export_gif tail renders to a temporary mp4 first; a dry run names it plainly.
           const target = last.op === "export_gif" ? (args.dryRun ? "<temporary stage1.mp4>" : join(work, "stage1.mp4")) : output;
-          const plan = planPipeline(args.input, target, steps, src, assets, args.quality ?? "standard");
+          let plan = planPipeline(args.input, target, steps, src, assets, args.quality ?? "standard", { keystrokes });
+          // Chapters (#174): the input's markers, re-timed through the plan's
+          // trims and speed changes, muxed from an FFMETADATA input.
+          let chapterList: Chapter[] = [];
+          let retimed: Marker[] = [];
+          if (args.chapters) {
+            const found = plan.gif ? null : await markersOrChapters(args.input, extra.signal);
+            if (!found) warnings.push("chapters: a GIF/WebP cannot hold chapters; none written.");
+            else if (found.markers.length === 0) warnings.push("chapters: the input has no markers (add_marker) or chapters; none written.");
+            else {
+              retimed = retimeMarkers(found.markers, plan.timeOps);
+              chapterList = plan.durationSec ? buildChapters(markerPoints(retimed), plan.durationSec) : [];
+              if (chapterList.length === 0) warnings.push("chapters: no marker falls inside the result; none written.");
+              else {
+                const file = args.dryRun ? "<chapters.txt>" : join(work, "chapters.txt");
+                if (!args.dryRun) writeFileSync(file, ffmetadata(chapterList));
+                plan = planPipeline(args.input, target, steps, src, assets, args.quality ?? "standard", { chaptersFile: file, keystrokes });
+              }
+            }
+          }
           const result = {
             steps: plan.summary,
             processes: plan.gif ? 2 : 1,
@@ -131,6 +174,7 @@ export function register(server: McpServer): void {
             durationSec: plan.durationSec,
             ...(fallbackFonts.length > 0 && { fallbackFonts }),
             ...(warnings.length > 0 && { warnings }),
+            ...(chapterList.length > 0 && { chapters: chapterList }),
           };
           if (args.dryRun) return okResponse({ dryRun: true, ...result, ffmpegArgs: plan.args });
 
@@ -140,7 +184,16 @@ export function register(server: McpServer): void {
             const anim = await exportAnimation(target, output, plan.gif, extra);
             return okResponse({ outputPath: output, ...result, animation: anim });
           }
-          return okResponse({ outputPath: output, ...result });
+          // The re-timed markers go with the result, for the player and chapters.
+          let markersPath: string | undefined;
+          if (chapterList.length > 0) {
+            try {
+              markersPath = writeMarkers(output, retimed.filter((m) => m.t < (plan.durationSec ?? Infinity)));
+            } catch {
+              /* best effort: the chapters are in the file */
+            }
+          }
+          return okResponse({ outputPath: output, ...result, ...(markersPath && { markersPath }) });
         } finally {
           rmSync(work, { recursive: true, force: true });
         }

@@ -7,6 +7,20 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.45.0]
+
+### Added
+
+- Instant replay (#197). `start_recording { "replayBufferSec": 60 }` keeps a rolling buffer of the last N seconds as a ring of 2 s segments under `SCREENCAST_HOME/replay`, so disk use stays at about the buffer length however long it runs. `save_replay` writes the last `lastSec` seconds to an mp4 without stopping the buffer, so an agent can keep the half minute before a flaky failure after it happens; it is a stream copy that returns in about a second, and `reencode: true` gives a frame-exact file. With `events: true` the event log is sliced to match. `stop_recording` discards the buffer unless `save: true`. Buffers left by a crash are deleted at startup.
+- `bug_report` (#198): one call turns a recording (path or `sessionId`) into a paste-ready repro folder: a trimmed clip and a GIF under 10 MB, a timecoded contact sheet, numbered steps rebuilt from the input event log, OCR'd error and dialog text, environment details, and a `report.md` (plus `report.json`) ready for `gh issue create --body-file`. Before anything is encoded, a whole-clip OCR secret scan boxes API keys, tokens, and `password:` values out of every output and masks them in the quoted text; without Windows OCR it refuses unless `redact: false`. A new `file-bug-report` prompt drives the flow.
+- `backdrop` (#171): frame a recording or screenshot on a gradient, solid color, or wallpaper with padding, rounded corners, and a soft drop shadow, optionally on a 16:9, 9:16, 1:1, or 4:5 canvas, with presets in the project's palette. The clip keeps its own timing. Also a `pipeline` step.
+- `keystroke_overlay` (#169): keycast-style badges ("Ctrl + Shift + P", "Double click", "Typing…") burned in from the input event log, one at a time, with repeats merged. It only shows what the log holds: never typed text. As a `pipeline` step, badges are re-timed through earlier trims and speed changes.
+- Markers and chapters (#174). `add_marker` stamps a labelled moment on a running recording's video clock (timed from its first captured frame), or on any file with `at`. Markers live in the session record and a `<video>.markers.json` sidecar, and the review player shows them as timeline ticks. `chapters` writes chapters into an mp4/mkv/mov copy without re-encoding, from markers, scene changes, transcript sections, or an explicit list, returns YouTube chapter text with any rule it breaks, and can mux an SRT as a soft subtitle track. `pipeline` `chapters: true` carries markers into the result, re-timed through trims and speed changes.
+
+### Changed
+
+- The tools/list size budget test is raised from 74 KB to 86 KB for the six new tools (about 84.4 KB by default); `SCREENCAST_TOOLSETS` still trims it per client.
+
 ## [0.44.2]
 
 ### Fixed

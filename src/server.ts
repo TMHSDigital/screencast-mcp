@@ -15,9 +15,12 @@ import {
 
 import { register as registerStartRecording } from "./tools/startRecording.js";
 import { register as registerStopRecording } from "./tools/stopRecording.js";
+import { register as registerSaveReplay } from "./tools/saveReplay.js";
 import { register as registerListSessions } from "./tools/listSessions.js";
 import { register as registerGetSession } from "./tools/getSession.js";
 import { register as registerReadEvents } from "./tools/readEvents.js";
+import { register as registerAddMarker } from "./tools/addMarker.js";
+import { register as registerChapters } from "./tools/chapters.js";
 import { register as registerReviewRecording } from "./tools/reviewRecording.js";
 import { register as registerScreenshot } from "./tools/screenshot.js";
 import { register as registerSampleFrames } from "./tools/sampleFrames.js";
@@ -35,6 +38,8 @@ import { register as registerScale } from "./tools/scale.js";
 import { register as registerSpeed } from "./tools/speed.js";
 import { register as registerOverlay } from "./tools/overlay.js";
 import { register as registerCallout } from "./tools/callout.js";
+import { register as registerKeystrokeOverlay } from "./tools/keystrokeOverlay.js";
+import { register as registerBackdrop } from "./tools/backdrop.js";
 import { register as registerCompress } from "./tools/compress.js";
 import { register as registerExtractAudio } from "./tools/extractAudio.js";
 import { register as registerNormalizeAudio } from "./tools/normalizeAudio.js";
@@ -55,6 +60,7 @@ import { register as registerReframe } from "./tools/reframe.js";
 import { register as registerZoom } from "./tools/zoom.js";
 import { register as registerPipeline } from "./tools/pipeline.js";
 import { register as registerExportPreset } from "./tools/exportPreset.js";
+import { register as registerBugReport } from "./tools/bugReport.js";
 import { registerResources } from "./resources.js";
 import { registerPrompts } from "./prompts.js";
 import { attachLogging } from "./utils/logging.js";
@@ -89,9 +95,11 @@ export function createServer(options: { toolsets?: string } = {}): McpServer {
 
   registerStartRecording(server);
   registerStopRecording(server);
+  registerSaveReplay(server);
   registerListSessions(server);
   registerGetSession(server);
   registerReadEvents(server);
+  registerAddMarker(server);
   registerReviewRecording(server);
   registerScreenshot(server);
   registerSampleFrames(server);
@@ -109,12 +117,15 @@ export function createServer(options: { toolsets?: string } = {}): McpServer {
   registerSpeed(server);
   registerOverlay(server);
   registerCallout(server);
+  registerKeystrokeOverlay(server);
+  registerBackdrop(server);
   registerCompress(server);
   registerExtractAudio(server);
   registerNormalizeAudio(server);
   registerDenoise(server);
   registerTranscribe(server);
   registerBurnSubtitles(server);
+  registerChapters(server);
   registerClip(server);
   registerCutIdle(server);
   registerRedactRegion(server);
@@ -129,6 +140,7 @@ export function createServer(options: { toolsets?: string } = {}): McpServer {
   registerZoom(server);
   registerPipeline(server);
   registerExportPreset(server);
+  registerBugReport(server);
   applyToolsets(tools, selection);
   registerResources(server);
   registerPrompts(server);
