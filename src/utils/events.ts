@@ -430,6 +430,23 @@ export function eventPaths(recording: string): { raw: string; jsonl: string } {
   return { raw: `${base}.events.raw`, jsonl: `${base}.events.jsonl` };
 }
 
+/** Apply the output's existing-file protection to its event log siblings
+ * (#185): without `overwrite`, an existing .events.jsonl or .events.raw is an
+ * error rather than replaced (or appended to). With it, a leftover raw log is
+ * cleared so the helper's appends do not mix two recordings. */
+export function prepareEventPaths(paths: { raw: string; jsonl: string }, overwrite = false): void {
+  if (!overwrite) {
+    const existing = [paths.jsonl, paths.raw].find((p) => existsSync(p));
+    if (existing) {
+      throw new ScreencastError(
+        `Event log already exists: ${existing}. Pass overwrite: true to replace it, or choose a different output path.`,
+      );
+    }
+    return;
+  }
+  rmSync(paths.raw, { force: true });
+}
+
 /** Convert the raw helper output to the recording's events.jsonl and remove
  * the raw file. Returns how many events were kept. */
 export function writeEventsFile(

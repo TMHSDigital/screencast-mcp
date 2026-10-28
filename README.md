@@ -93,7 +93,7 @@ What it can do beyond record-and-look:
 | `list_sessions` | List active and finished sessions. |
 | `get_session` | Inspect a single session by id. |
 | `review_recording` | **Review player** in clients that support MCP Apps: an inline player where a person scrubs the recording, drags trim handles, and draws redaction boxes, then exports a trimmed, redacted copy (one `pipeline` call). Pass it a stopped recording's `sessionId`. Elsewhere it returns the video's details. |
-| `player_frames` | Preview JPEG frames for the review player; called by the player (app-only), not by agents. |
+| `player_frames` | Preview JPEG frames for the review player (an even grid plus scene changes, labelled with their real times); called by the player (app-only), not by agents. |
 | `read_events` | Read a recording's input event log (clicks, scroll, cursor, shortcuts, typing bursts) on the video's clock. Opt in with `start_recording` `events: true`. |
 | `screenshot` | Capture a single PNG of a `target`, and return it inline as an image the model can view. |
 | `list_audio_devices` | List the DirectShow audio devices ffmpeg can see and flag a likely system-audio loopback device for `start_recording`. |
@@ -128,7 +128,7 @@ These tools re-encode (a filter rewrites pixels, so stream copy does not apply).
 | `scale` | Resize to a `width` and/or `height`. One side keeps the aspect ratio; both set an exact size. |
 | `speed` | Change playback speed by a `factor` (>1 faster, <1 slower). Audio is retempo'd when present. |
 | `overlay` | Composite a logo, watermark, or picture-in-picture onto a base video at a position, optionally scaled and time-limited. |
-| `callout` | **Timed annotations**: boxes, text labels, and arrows at any angle, each shown between two timestamps. Mark the bug, point at the button, caption a step. |
+| `callout` | **Timed annotations**: boxes, text labels, and arrows at any angle, each shown between two timestamps. Mark the bug, point at the button, caption a step. Text Inter can't draw (CJK, emoji, Arabic, Indic, ...) falls back to a Windows system font that covers it; `fontFile` picks one explicitly, and anything no font covers comes back in `warnings` instead of as silent boxes. |
 | `compress` | Re-encode smaller with a `light`/`medium`/`heavy` CRF ladder and an optional `maxWidth` that only downscales. |
 | `extract_audio` | Write the audio track to its own file (`mp3`, `aac`, `wav`, or `copy`). |
 | `normalize_audio` | **Loudness to a delivery target** (two-pass EBU R128 `loudnorm`): `youtube` −14 LUFS, `podcast` −16, `broadcast` −23, or any LUFS value. Video is copied; reports loudness before and after. |
@@ -155,7 +155,7 @@ The production layer turns raw clips into a finished piece. Tools that combine c
 | --- | --- |
 | `xfade_transition` | Crossfade two videos into one with an `xfade` transition (`fade`, `wipeleft`, `slideup`, ...). Audio is crossfaded when both clips have a track. |
 | `assemble_highlights` | Stitch two or more clips into one, with hard cuts (`transition: "cut"`) or an xfade transition between each. |
-| `title_card` | Generate a standalone title card (centered text on a solid background, with a silent track so it composes). Text uses a bundled font, so no system font is needed. |
+| `title_card` | Generate a standalone title card (centered text on a solid background, with a silent track so it composes). Text uses the bundled Inter, so Latin, Greek and Cyrillic need no system font; other scripts and emoji fall back to a Windows system font (or pass `fontFile`), with `warnings` for anything no font covers. |
 | `music_bed` | Lay a music track under a video: looped/trimmed to length, faded in and out, leveled, and mixed with any existing audio (optionally ducked). |
 | `reframe` | Re-aspect to `16:9`, `9:16`, `1:1`, or `4:5` with `pad` (letterbox, no content lost) or `crop` (fill, trims overflow). |
 | `zoom` | **Smooth zoom-and-pan** (Screen Studio style) into where the action is and back out. Give keyframes (rectangles by time), or let it plan them from the clicks in the input event log (`start_recording` `events: true`; `highlightClicks` rings each click) or from where the screen changes; `dryRun` returns the plan to adjust. |

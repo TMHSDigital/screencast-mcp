@@ -17,6 +17,17 @@ const timing = {
   color: z.string().optional().describe("Color name, #RRGGBB, or name@alpha."),
 };
 
+/** Explicit font for drawn text (#231); shared with pipeline and title_card. */
+export const fontFileSchema = z
+  .string()
+  .min(1)
+  .optional()
+  .describe(
+    "Font for the text: a .ttf/.otf/.ttc path, or a file name in C:\\Windows\\Fonts (e.g. msyh.ttc). " +
+      "Default: the bundled Inter, or a Windows system font that covers characters Inter lacks " +
+      "(CJK, emoji, Arabic, Hebrew, Indic, Thai, ...).",
+  );
+
 /** One callout; shared with pipeline. */
 export const calloutItemSchema = z.discriminatedUnion("type", [
   z.object({
@@ -59,6 +70,7 @@ const inputSchema = {
       "Annotations, drawn in order (later on top). Each is a box, a text label, or an arrow, " +
         "shown between from and to (seconds). Coordinates are video pixels.",
     ),
+  fontFile: fontFileSchema,
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -67,7 +79,10 @@ export function register(server: McpServer): void {
   server.tool(
     "callout",
     "Annotate a video with timed boxes, text labels, and arrows (e.g. 'click here', a box " +
-      "around the bug), each shown between two timestamps. Returns the output path.",
+      "around the bug), each shown between two timestamps. Returns the output path. Text uses " +
+      "the bundled Inter font; text Inter cannot draw (CJK, emoji, Arabic, Indic, ...) " +
+      "automatically uses a Windows system font that covers it (listed in fallbackFonts), " +
+      "and characters no font covers are reported in warnings instead of silently drawn as boxes.",
     inputSchema,
     async (args, extra) => {
       try {
@@ -82,13 +97,18 @@ export function register(server: McpServer): void {
         // Text files and rendered arrows live in a private temp dir.
         const work = mkdtempSync(join(tmpdir(), "screencast-callout-"));
         try {
-          const assets = await prepareCalloutAssets(items, work);
+          const assets = await prepareCalloutAssets(items, work, "", args.fontFile);
           const ffArgs = buildCalloutArgs(args.input, output, items, assets);
           await runEditJob(ffArgs, { output, durationSec: await probeDuration(args.input), extra });
+          return okResponse({
+            outputPath: output,
+            callouts: items.length,
+            ...(assets.fallbackFonts.length > 0 && { fallbackFonts: assets.fallbackFonts }),
+            ...(assets.warnings.length > 0 && { warnings: assets.warnings }),
+          });
         } finally {
           rmSync(work, { recursive: true, force: true });
         }
-        return okResponse({ outputPath: output, callouts: items.length });
       } catch (error) {
         return errorResponse(error);
       }

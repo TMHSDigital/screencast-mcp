@@ -21,13 +21,14 @@ import { windowMatchReport } from "../utils/windows.js";
 import { resolveLoopbackDevice } from "../utils/audioDevices.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { getStore } from "../context.js";
-import { classifyUnrequestedExit, killPid, type SessionRecord } from "../utils/sessions.js";
+import { classifyUnrequestedExit, killPid, serverIdentity, type SessionRecord } from "../utils/sessions.js";
 import { rmSync } from "node:fs";
 import { basename } from "node:path";
 import {
   DEFAULT_KEY_MODE,
   eventPaths,
   parseCaptureStart,
+  prepareEventPaths,
   startEventLogger,
   stopEventLogger,
   summarizeEvents,
@@ -178,6 +179,7 @@ export function register(server: McpServer): void {
         // The event logger starts first so the first frames have events (#118).
         const keyMode: KeyMode = args.keys ?? DEFAULT_KEY_MODE;
         const evPaths = args.events ? eventPaths(output) : null;
+        if (evPaths) prepareEventPaths(evPaths, args.overwrite);
         // wgc frames the client area; its size is known once the recorder starts.
         let frame = args.events
           ? captureFrame(target, monitors)
@@ -253,7 +255,7 @@ export function register(server: McpServer): void {
           fps,
           quality,
           pid: child.pid ?? null,
-          serverPid: process.pid,
+          ...serverIdentity(),
           status: "recording",
           startedAt: new Date().toISOString(),
           ...(maxDurationSec > 0 ? { maxDurationSec } : {}),

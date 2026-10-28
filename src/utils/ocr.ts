@@ -11,6 +11,7 @@
  *
  * The PowerShell/WinRT call is impure; parsing, merging, and matching are pure.
  */
+import { runInNewContext } from "node:vm";
 import { ScreencastError } from "./errors.js";
 import { runPowerShell, psTimeoutMs } from "./monitors.js";
 import type { Rect } from "./diff.js";
@@ -124,13 +125,62 @@ export interface TextMatch extends Rect {
   line: string;
 }
 
+/** Longest query findMatches accepts (#185). */
+export const MAX_QUERY_LENGTH = 500;
+/** Time budget for running a regex query over every line (#185). */
+export const REGEX_BUDGET_MS = 1_000;
+
+/** Match ranges for `re` in each text, also trying `_` and `-` swapped either
+ * way: the engine often reads one as the other, and a secret pattern like
+ * `ghp_` must still match `ghp-` (#236). Same length, so offsets map to words
+ * as is. Runs inside a vm context so the caller can bound it with a timeout. */
+const REGEX_SCAN = `JSON.stringify(texts.map((text) => {
+  const re = new RegExp(query, "gi");
+  const seen = new Set();
+  const ranges = [];
+  for (const variant of [text, text.replace(/-/g, "_"), text.replace(/_/g, "-")]) {
+    for (const m of variant.matchAll(re)) {
+      const key = m.index + ":" + m[0].length;
+      if (m[0].length > 0 && !seen.has(key)) {
+        seen.add(key);
+        ranges.push([m.index, m.index + m[0].length]);
+      }
+    }
+  }
+  return ranges;
+}))`;
+
+/** Run a user regex over the texts within REGEX_BUDGET_MS, so a pattern that
+ * backtracks catastrophically, like `(a+)+$`, fails the call instead of
+ * freezing the server (#185). */
+export function regexRanges(texts: string[], query: string, budgetMs = REGEX_BUDGET_MS): Array<Array<[number, number]>> {
+  try {
+    new RegExp(query, "gi");
+  } catch (err) {
+    throw new ScreencastError(`Invalid regex: ${(err as Error).message}`);
+  }
+  try {
+    return JSON.parse(runInNewContext(REGEX_SCAN, { texts, query }, { timeout: budgetMs }) as string);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ERR_SCRIPT_EXECUTION_TIMEOUT") {
+      throw new ScreencastError(
+        `The regex took longer than ${budgetMs / 1000} s to run and was stopped.`,
+        "Simplify it: nested quantifiers such as (a+)+ backtrack catastrophically.",
+      );
+    }
+    throw err;
+  }
+}
+
 /** Find `query` (plain text, or a regular expression when `regex`) in the
  * lines. Plain queries also match through normalizeForMatch. Each hit is
  * boxed around the words it spans. Pure. */
 export function findMatches(lines: OcrLine[], query: string, regex = false): TextMatch[] {
-  const out: TextMatch[] = [];
-  for (const line of lines) {
-    // Rebuild the line from its words so character offsets map to words.
+  if (query.length > MAX_QUERY_LENGTH) {
+    throw new ScreencastError(`The query is ${query.length} characters; at most ${MAX_QUERY_LENGTH} are allowed.`);
+  }
+  // Rebuild each line from its words so character offsets map to words.
+  const rebuilt = lines.map((line) => {
     const spans: Array<{ start: number; end: number; word: OcrWord }> = [];
     let text = "";
     for (const w of line.words) {
@@ -138,32 +188,19 @@ export function findMatches(lines: OcrLine[], query: string, regex = false): Tex
       spans.push({ start: text.length, end: text.length + w.text.length, word: w });
       text += w.text;
     }
-    const ranges: Array<[number, number]> = [];
-    if (regex) {
-      let re: RegExp;
-      try {
-        re = new RegExp(query, "gi");
-      } catch (err) {
-        throw new ScreencastError(`Invalid regex: ${(err as Error).message}`);
-      }
-      // Also try the text with `_` and `-` swapped either way: the engine
-      // often reads one as the other, and a secret pattern like `ghp_` must
-      // still match `ghp-` (#236). Same length, so offsets map to words as is.
-      const seen = new Set<string>();
-      for (const variant of [text, text.replace(/-/g, "_"), text.replace(/_/g, "-")]) {
-        for (const m of variant.matchAll(re)) {
-          const key = `${m.index}:${m[0].length}`;
-          if (m[0].length > 0 && !seen.has(key)) {
-            seen.add(key);
-            ranges.push([m.index!, m.index! + m[0].length]);
-          }
-        }
-      }
+    return { line, spans, text };
+  });
+  const regexHits = regex ? regexRanges(rebuilt.map((r) => r.text), query) : null;
+  const out: TextMatch[] = [];
+  rebuilt.forEach(({ line, spans }, i) => {
+    let ranges: Array<[number, number]> = [];
+    if (regexHits) {
+      ranges = regexHits[i];
     } else {
       // normalizeForMatch keeps string length except for collapsing runs of
       // separators, so search the normalized text and map back word by word.
       const needle = normalizeForMatch(query);
-      if (!needle) continue;
+      if (!needle) return;
       const hay = spans.map((s) => normalizeForMatch(s.word.text)).join("_");
       let from = 0;
       for (let at = hay.indexOf(needle, from); at !== -1; at = hay.indexOf(needle, from)) {
@@ -178,7 +215,7 @@ export function findMatches(lines: OcrLine[], query: string, regex = false): Tex
       words.forEach((w) => boxed.add(w));
       out.push({ text: words.map((w) => w.text).join(" "), line: line.text, ...unionRect(words) });
     }
-  }
+  });
   return out;
 }
 

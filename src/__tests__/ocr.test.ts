@@ -4,6 +4,8 @@ import {
   mergePasses,
   normalizeForMatch,
   findMatches,
+  regexRanges,
+  MAX_QUERY_LENGTH,
   redactionRects,
   passScales,
   type OcrLine,
@@ -73,6 +75,14 @@ describe("OCR helpers (#117)", () => {
     expect(hits.map((m) => m.text)).toEqual(["ghp-AbC123xyz", "sk_live"]);
     // A match found in several variants is reported once.
     expect(findMatches([line([word("sk-abc", 0)])], "sk-", true)).toHaveLength(1);
+  });
+
+  it("stops a catastrophic regex within its time budget and caps the query length (#185)", () => {
+    const started = Date.now();
+    expect(() => regexRanges(["a".repeat(40) + "!"], "(a+)+$", 200)).toThrow(/took longer than 0\.2 s/);
+    expect(Date.now() - started).toBeLessThan(3000);
+    expect(() => findMatches([line([word("x", 0)])], "x".repeat(MAX_QUERY_LENGTH + 1))).toThrow(/at most 500/);
+    expect(regexRanges(["ghp-1 x", "none"], "ghp_")).toEqual([[[0, 4]], []]);
   });
 
   it("pads redaction rectangles and clamps them to the frame", () => {

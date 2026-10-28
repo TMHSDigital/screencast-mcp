@@ -30,7 +30,7 @@ export type PipelineStep =
   | { op: "scale"; width?: number; height?: number }
   | { op: "speed"; factor: number }
   | ({ op: "redact"; regions: RedactRegion[] } & RedactOptions)
-  | { op: "callout"; items: Callout[] }
+  | { op: "callout"; items: Callout[]; fontFile?: string }
   | { op: "reframe"; aspect: Aspect; fit?: ReframeFit }
   | { op: "zoom"; keyframes: ZoomKeyframe[]; transitionSec?: number }
   | { op: "export_preset"; platform: Platform; fit?: ReframeFit }

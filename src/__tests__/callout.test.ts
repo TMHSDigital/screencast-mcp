@@ -48,4 +48,19 @@ describe("callout (#121)", () => {
     expect(() => buildCalloutArgs("in.mp4", "o.mp4", [{ type: "box", x: -1, y: 0, width: 5, height: 5 }], assets)).toThrow(/non-negative/);
     expect(() => buildCalloutArgs("in.mp4", "o.mp4", [{ type: "box", x: 0, y: 0, width: 5, height: 5, from: 3, to: 2 }], assets)).toThrow(/greater/);
   });
+
+  it("draws each text item with its own fallback font when one is given (#231)", () => {
+    const args = buildCalloutArgs(
+      "in.mp4",
+      "out.mp4",
+      [
+        { type: "text", x: 0, y: 0, text: "hi" },
+        { type: "text", x: 0, y: 50, text: "日本語" },
+      ],
+      { ...assets, textFiles: ["C:\\t\\a.txt", "C:\\t\\b.txt"], fontFiles: [null, "C:\\Windows\\Fonts\\YuGothB.ttc"] },
+    );
+    const fc = args[args.indexOf("-filter_complex") + 1].split(";");
+    expect(fc[0]).toContain("drawtext=fontfile=C\\\\:/f/Inter.ttf:");
+    expect(fc[1]).toContain("drawtext=fontfile=C\\\\:/Windows/Fonts/YuGothB.ttc:");
+  });
 });

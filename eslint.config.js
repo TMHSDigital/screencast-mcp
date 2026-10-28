@@ -6,7 +6,8 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "node_modules/**", "assets/**", "coverage/**"],
+    // assets/ holds fonts and the player page; its one script is linted below.
+    ignores: ["dist/**", "node_modules/**", "assets/**/*", "!assets/ui/", "!assets/ui/player.js", "coverage/**"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -36,6 +37,17 @@ export default tseslint.config(
         window: "readonly", document: "readonly", navigator: "readonly", location: "readonly",
         history: "readonly", performance: "readonly", requestAnimationFrame: "readonly", setTimeout: "readonly",
         IntersectionObserver: "readonly", scrollY: "readonly", innerHeight: "readonly", addEventListener: "readonly",
+      },
+    },
+  },
+  {
+    // The review player's script runs in the host's sandboxed iframe (#243).
+    files: ["assets/ui/**/*.js"],
+    languageOptions: {
+      sourceType: "script",
+      globals: {
+        window: "readonly", document: "readonly", ResizeObserver: "readonly",
+        setTimeout: "readonly", clearTimeout: "readonly",
       },
     },
   },

@@ -5,9 +5,10 @@
  *
  * The page gets the video as JPEG frames (data: images work under the strict
  * CSP hosts apply to apps, unlike a local file or HTTP server, and keep
- * "output stays local"). These helpers plan and split those frames. Pure.
+ * "output stays local"). These helpers plan, label, and split those frames. Pure.
  */
 import { ScreencastError } from "./errors.js";
+import { escapeFilterPath } from "./fonts.js";
 
 /** The MCP Apps resource the player is served as, and its MIME type. */
 export const PLAYER_URI = "ui://screencast/player";
@@ -36,28 +37,92 @@ export const DEFAULT_PLAYER_FRAMES = 120;
 export const MAX_PLAYER_FRAMES = 300;
 export const PLAYER_FPS = 4;
 export const DEFAULT_PLAYER_WIDTH = 640;
+/** Scene score that adds a frame between grid frames (#232). Far below the
+ * sampler's 0.1: a dialog or a pasted token covers a small share of the screen,
+ * and a static screen scores ~0, so this mostly catches real changes. */
+export const PLAYER_SCENE_THRESHOLD = 0.01;
 
-/** How many preview frames, and at what rate, to cover `durationSec`: up to
- * PLAYER_FPS per second, at most `maxFrames`, spread evenly. */
-export function playerFramePlan(durationSec: number, maxFrames = DEFAULT_PLAYER_FRAMES): { count: number; fps: number } {
+export interface PlayerFramePlan {
+  /** Frames on the even grid, one per interval. */
+  count: number;
+  intervalSec: number;
+  /** Least time between two scene-change frames, so continuous motion (a
+   * scroll, a video playing) cannot flood the set. */
+  sceneGapSec: number;
+}
+
+/** The even grid that covers `durationSec`: up to PLAYER_FPS frames per
+ * second, at most `maxFrames`. Scene-change frames come on top (#232). */
+export function playerFramePlan(durationSec: number, maxFrames = DEFAULT_PLAYER_FRAMES): PlayerFramePlan {
   if (!(durationSec > 0)) throw new ScreencastError("The video has no duration to review.");
   const count = Math.max(1, Math.min(maxFrames, Math.ceil(durationSec * PLAYER_FPS)));
-  return { count, fps: count / durationSec };
+  const intervalSec = Number((durationSec / count).toFixed(6));
+  return { count, intervalSec, sceneGapSec: Number(Math.max(0.25, intervalSec / 4).toFixed(6)) };
 }
 
-/** Each frame's time: the middle of its slice of the video. */
-export function playerFrameTimes(durationSec: number, count: number): number[] {
-  return Array.from({ length: count }, (_, i) => Math.round(((i + 0.5) * durationSec * 1000) / count) / 1000);
-}
-
-/** Decode `input` to JPEG frames on stdout at `fps`, `width` wide. */
-export function buildPlayerFramesArgs(input: string, fps: number, width: number, count: number): string[] {
+/** Decode `input` to JPEG frames on stdout, `width` wide: the first frame of
+ * each grid interval, plus (in a second branch, so the grid never delays one)
+ * frames whose scene score passes `threshold`, at least sceneGapSec apart.
+ * Each frame's real pts and kind go to `logFile` via metadata=print (#232):
+ * labels come from the frames themselves, not from arithmetic. */
+export function buildPlayerFramesArgs(
+  input: string,
+  plan: PlayerFramePlan,
+  width: number,
+  logFile: string,
+  threshold = PLAYER_SCENE_THRESHOLD,
+): string[] {
+  const i = plan.intervalSec;
+  const grid = `isnan(prev_t)+gt(floor((t-start_t)/${i})\\,floor((prev_t-start_t)/${i}))`;
+  const scene = `gt(scene\\,${threshold})*not(${grid})*(isnan(prev_selected_t)+gte(t-prev_selected_t\\,${plan.sceneGapSec}))`;
   return [
     "-v", "error", "-i", input, "-an",
-    "-vf", `fps=${Number(fps.toFixed(6))},scale='min(${width},iw)':-2`,
-    "-frames:v", String(count),
+    "-vf",
+    `scale='min(${width},iw)':-2,split[g][s];` +
+      `[g]select='${grid}',metadata=add:key=kind:value=grid[g1];` +
+      `[s]select='${scene}',metadata=add:key=kind:value=scene[s1];` +
+      `[g1][s1]interleave,metadata=print:file=${escapeFilterPath(logFile)}`,
+    "-fps_mode", "passthrough",
     "-q:v", "6", "-f", "image2pipe", "-c:v", "mjpeg", "-",
   ];
+}
+
+export interface PlayerFrame {
+  timeSec: number;
+  scene: boolean;
+  /** The scene score of a scene-change frame (0 for grid frames). */
+  score: number;
+}
+
+/** Parse the metadata=print log of buildPlayerFramesArgs, one entry per
+ * frame written, in output order. Pure. */
+export function parsePlayerFrameLog(text: string): PlayerFrame[] {
+  const out: PlayerFrame[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const t = line.match(/pts_time:\s*(-?[\d.]+)/);
+    if (t) {
+      out.push({ timeSec: Number(t[1]), scene: false, score: 0 });
+      continue;
+    }
+    const last = out.at(-1);
+    if (!last) continue;
+    if (line === "kind=scene") last.scene = true;
+    const s = line.match(/^lavfi\.scene_score=([\d.]+)/);
+    if (s) last.score = Number(s[1]);
+  }
+  return out;
+}
+
+/** Which frames to keep: every grid frame, plus the `maxScene` strongest
+ * scene-change frames. Returns indexes in time order. Pure. */
+export function pickPlayerFrames(frames: PlayerFrame[], maxScene: number): number[] {
+  const scene = frames
+    .map((f, i) => ({ f, i }))
+    .filter((x) => x.f.scene)
+    .sort((a, b) => b.f.score - a.f.score)
+    .slice(0, Math.max(0, maxScene));
+  const keep = new Set(scene.map((x) => x.i));
+  return frames.map((_, i) => i).filter((i) => !frames[i].scene || keep.has(i));
 }
 
 /** Split concatenated JPEGs (ffmpeg's mjpeg image2pipe) at their start/end

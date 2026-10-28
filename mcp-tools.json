@@ -84,12 +84,12 @@
   },
   {
     "name": "player_frames",
-    "description": "Preview frames for the review player: JPEGs spread evenly over the video, with their times. Used by the inline player (MCP Apps visibility: app), and listed only to clients that advertise MCP Apps; agents should use sample_frames or contact_sheet instead.",
+    "description": "Preview frames for the review player: JPEGs on an even grid over the video plus frames at scene changes, with their real times. Used by the inline player (MCP Apps visibility: app), and listed only to clients that advertise MCP Apps; agents should use sample_frames or contact_sheet instead.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "input": { "type": "string", "description": "Path to the video" },
-        "maxFrames": { "type": "integer", "minimum": 1, "maximum": 300, "description": "Most frames (default 120)" },
+        "maxFrames": { "type": "integer", "minimum": 1, "maximum": 300, "description": "Frames on the even grid (default 120); scene-change frames come on top, up to as many again" },
         "width": { "type": "integer", "minimum": 64, "maximum": 1280, "description": "Frame width (default 640)" }
       },
       "required": ["input"]
@@ -353,12 +353,13 @@
   },
   {
     "name": "callout",
-    "description": "Annotate a video with timed boxes, text labels, and arrows (e.g. a box around the bug, 'click here'), each shown between two timestamps. Returns the output path.",
+    "description": "Annotate a video with timed boxes, text labels, and arrows (e.g. a box around the bug, 'click here'), each shown between two timestamps. Returns the output path. Text uses the bundled Inter font; text Inter cannot draw (CJK, emoji, Arabic, Indic, ...) automatically uses a Windows system font that covers it (listed in fallbackFonts), and characters no font covers are reported in warnings instead of silently drawn as boxes.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "input": { "type": "string", "description": "Path to the source video" },
         "items": { "type": "array", "description": "Annotations drawn in order (later on top). box: {type, x, y, width, height, thickness?, fill?}; text: {type, x, y, text, size?, background?}; arrow: {type, x1, y1, x2, y2 (head), thickness?}. All take from?, to? (seconds) and color?", "items": {"type": "object"} },
+        "fontFile": { "type": "string", "description": "Font for the text: a .ttf/.otf/.ttc path, or a file name in C:\\Windows\\Fonts (e.g. msyh.ttc). Default: the bundled Inter, or a Windows system font that covers characters Inter lacks (CJK, emoji, Arabic, Hebrew, Indic, Thai, ...)" },
         "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
         "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
@@ -569,7 +570,7 @@
   },
   {
     "name": "title_card",
-    "description": "Generate a standalone title card: centered text on a solid background, with a silent audio track so it composes with audio-bearing clips (stitch it in with assemble_highlights). Text is rendered with a bundled font, so no system font is required.",
+    "description": "Generate a standalone title card: centered text on a solid background, with a silent audio track so it composes with audio-bearing clips (stitch it in with assemble_highlights). Text is rendered with the bundled Inter font, so no system font is required for Latin, Greek or Cyrillic; other scripts and emoji automatically use a Windows system font that covers them (returned as fontFile), and characters no font covers are reported in warnings instead of silently drawn as boxes.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -582,6 +583,7 @@
         "fontColor": { "type": "string", "description": "Text color (default white)" },
         "fontSize": { "type": "integer", "minimum": 1, "description": "Text size in px (default 96)" },
         "bold": { "type": "boolean", "description": "Use the bold weight (default true)" },
+        "fontFile": { "type": "string", "description": "Font for the text: a .ttf/.otf/.ttc path, or a file name in C:\\Windows\\Fonts (e.g. msyh.ttc). Default: the bundled Inter, or a Windows system font that covers characters Inter lacks (CJK, emoji, Arabic, Hebrew, Indic, Thai, ...)" },
         "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
         "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },

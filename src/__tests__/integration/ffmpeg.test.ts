@@ -46,7 +46,8 @@ import {
   buildReframeArgs,
   buildExportPresetArgs,
 } from "../../utils/produce.js";
-import { bundledFontPath } from "../../utils/fonts.js";
+import { bundledFontPath, systemFontsDir, FALLBACK_FAMILIES } from "../../utils/fonts.js";
+import { prepareCalloutAssets } from "../../utils/calloutAssets.js";
 import { encodeInlineImages } from "../../utils/images.js";
 import { animLadder, buildAnimArgs } from "../../utils/anim.js";
 import { buildArrowImageArgs, buildCalloutArgs } from "../../utils/callout.js";
@@ -672,6 +673,43 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     expect(regionLuma(out, 0.3, 20, 20, 40, 20)).toBeLessThan(220);
     expect((await probeMedia(out)).durationSec!).toBeCloseTo(4, 0);
   });
+
+  it.runIf(FALLBACK_FAMILIES.japanese.bold.some((f) => existsSync(join(systemFontsDir(), f))))(
+    "callout draws Japanese text with a system fallback font, not tofu (#231)",
+    async () => {
+      const black = p("black.mp4");
+      await runFfmpeg(["-y", "-f", "lavfi", "-i", "color=c=black:s=320x240:r=30:d=1", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", black]);
+      // Two different characters at block-aligned spots. Missing glyphs all
+      // draw the same box, so with Inter the two crops match; real glyphs differ.
+      const items = [
+        { type: "text" as const, x: 16, y: 16, text: "日", size: 64, background: false },
+        { type: "text" as const, x: 16, y: 128, text: "本", size: 64, background: false },
+      ];
+      const render = async (name: string, fontFile?: string) => {
+        const work = mkdtempSync(join(dir, `${name}-`));
+        const assets = await prepareCalloutAssets(items, work, "", fontFile);
+        const out = p(`${name}.mp4`);
+        await runFfmpeg(buildCalloutArgs(black, out, items, assets, "high"));
+        return { out, assets };
+      };
+      const meanDiff = (a: Buffer, b: Buffer) => a.reduce((s, v, i) => s + Math.abs(v - b[i]), 0) / a.length;
+      const glyphs = (out: string) => [regionPixels(out, 0.5, 16, 16, 96, 96), regionPixels(out, 0.5, 16, 128, 96, 96)];
+
+      const tofu = await render("ja-tofu", bundledFontPath("bold"));
+      expect(tofu.assets.warnings.join(" ")).toMatch(/no glyph for 日/);
+      const [t1, t2] = glyphs(tofu.out);
+      expect(meanDiff(t1, t2)).toBeLessThan(1);
+
+      const real = await render("ja-fallback");
+      expect(real.assets.warnings).toEqual([]);
+      expect(real.assets.fallbackFonts.map((f) => f.item)).toEqual([0, 1]);
+      const [g1, g2] = glyphs(real.out);
+      // Ink is present, the two characters differ, and neither is the box.
+      expect(Math.max(...g1)).toBeGreaterThan(200);
+      expect(meanDiff(g1, g2)).toBeGreaterThan(5);
+      expect(meanDiff(g1, t1)).toBeGreaterThan(5);
+    },
+  );
 
   it("redact_region box fills the region solid", async () => {
     const out = p("redact.mp4");

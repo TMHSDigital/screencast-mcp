@@ -1,6 +1,6 @@
 {
   "name": "@tmhs/screencast-mcp",
-  "version": "0.41.0",
+  "version": "0.42.0",
   "description": "Let AI agents record the Windows screen, watch it as frames, and edit it with ffmpeg",
   "mcpName": "io.github.TMHSDigital/screencast-mcp",
   "type": "module",
@@ -64,8 +64,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/jsdom": "^30.0.0",
     "@types/node": "^22.15.3",
     "eslint": "^10.5.0",
+    "jsdom": "^30.1.3",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.61.1",

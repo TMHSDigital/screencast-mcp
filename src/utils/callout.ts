@@ -94,6 +94,9 @@ export function buildArrowImageArgs(a: ArrowCallout, output: string): string[] {
 
 export interface CalloutAssets {
   fontFile: string;
+  /** Per item: a font replacing fontFile for that text callout (a system
+   * fallback for characters Inter lacks, #231), else null. */
+  fontFiles?: Array<string | null>;
   /** Per item: the text file for a text callout, else null. */
   textFiles: Array<string | null>;
   /** Per item: the rendered arrow PNG for an arrow callout, else null. */
@@ -131,7 +134,7 @@ export function calloutSteps(
       const size = Math.max(8, Math.round(c.size ?? 32));
       const panel = c.background === false ? "" : `:box=1:boxcolor=black@0.6:boxborderw=${Math.round(size / 3)}`;
       steps.push(
-        `${cur}drawtext=fontfile=${escapeFilterPath(assets.fontFile)}:textfile=${escapeFilterPath(file)}:expansion=none` +
+        `${cur}drawtext=fontfile=${escapeFilterPath(assets.fontFiles?.[i] ?? assets.fontFile)}:textfile=${escapeFilterPath(file)}:expansion=none` +
           `:x=${nonNeg(c.x, "x")}:y=${nonNeg(c.y, "y")}:fontsize=${size}:fontcolor=${color}${panel}${enable(c)}${out}`,
       );
     } else {

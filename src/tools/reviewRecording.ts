@@ -1,16 +1,19 @@
 import { z } from "zod";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg, probeMedia, runFfmpegBuffer } from "../utils/ffmpeg.js";
 import { jobTimeoutMs } from "../utils/jobs.js";
+import { tempPath } from "../utils/paths.js";
 import {
   buildPlayerFramesArgs,
   clientSupportsApps,
+  parsePlayerFrameLog,
+  pickPlayerFrames,
   playerFramePlan,
-  playerFrameTimes,
   splitJpegs,
+  type PlayerFrame,
   DEFAULT_PLAYER_FRAMES,
   DEFAULT_PLAYER_WIDTH,
   MAX_PLAYER_FRAMES,
@@ -20,9 +23,15 @@ import {
 } from "../utils/player.js";
 import { getStore } from "../context.js";
 
-/** The player page, shipped in assets/ui (dist/tools -> ../../assets). */
+const uiAsset = (name: string) => readFileSync(fileURLToPath(new URL(`../../assets/ui/${name}`, import.meta.url)), "utf8");
+
+/** The player page, shipped in assets/ui (dist/tools -> ../../assets), with
+ * player.js inlined in place of its script tag: the host loads the resource
+ * as one document and its CSP allows no other fetch (#243). */
 export function playerHtml(): string {
-  return readFileSync(fileURLToPath(new URL("../../assets/ui/player.html", import.meta.url)), "utf8");
+  const js = uiAsset("player.js");
+  if (/<\/script/i.test(js)) throw new ScreencastError("player.js must not contain a closing script tag.");
+  return uiAsset("player.html").replace('<script src="player.js"></script>', () => `<script>\n${js}</script>`);
 }
 
 function resolveInput(args: { input?: string; sessionId?: string }): string {
@@ -95,11 +104,12 @@ export function register(server: McpServer): void {
     "player_frames",
     {
       description:
-        "Preview frames for the review player: JPEGs spread evenly over the video, with their times. " +
-        "Used by the inline player; agents should use sample_frames or contact_sheet instead.",
+        "Preview frames for the review player: JPEGs on an even grid over the video plus frames at " +
+        "scene changes, with their real times. Used by the inline player; agents should use " +
+        "sample_frames or contact_sheet instead.",
       inputSchema: {
         input: z.string().min(1).describe("Path to the video."),
-        maxFrames: z.number().int().min(1).max(MAX_PLAYER_FRAMES).optional().describe(`Most frames (default ${DEFAULT_PLAYER_FRAMES}).`),
+        maxFrames: z.number().int().min(1).max(MAX_PLAYER_FRAMES).optional().describe(`Frames on the even grid (default ${DEFAULT_PLAYER_FRAMES}); scene-change frames come on top, up to as many again.`),
         width: z.number().int().min(64).max(1280).optional().describe(`Frame width (default ${DEFAULT_PLAYER_WIDTH}).`),
       },
       _meta: { ui: { visibility: ["app"] } },
@@ -110,14 +120,28 @@ export function register(server: McpServer): void {
         if (!existsSync(args.input)) throw new ScreencastError(`Input file not found: ${args.input}`);
         const info = await probeMedia(args.input);
         const durationSec = info.durationSec ?? 0;
-        const { count, fps } = playerFramePlan(durationSec, args.maxFrames ?? DEFAULT_PLAYER_FRAMES);
-        const raw = await runFfmpegBuffer(
-          buildPlayerFramesArgs(args.input, fps, args.width ?? DEFAULT_PLAYER_WIDTH, count),
-          jobTimeoutMs(durationSec),
-          { signal: extra.signal },
-        );
-        const jpegs = splitJpegs(raw);
-        const times = playerFrameTimes(durationSec, jpegs.length);
+        const plan = playerFramePlan(durationSec, args.maxFrames ?? DEFAULT_PLAYER_FRAMES);
+        // Each frame's real time and kind come back through a log file (#232).
+        const log = tempPath(".txt");
+        let jpegs: Buffer[];
+        let frames: PlayerFrame[];
+        try {
+          const raw = await runFfmpegBuffer(
+            buildPlayerFramesArgs(args.input, plan, args.width ?? DEFAULT_PLAYER_WIDTH, log),
+            jobTimeoutMs(durationSec),
+            { signal: extra.signal },
+          );
+          jpegs = splitJpegs(raw);
+          frames = parsePlayerFrameLog(existsSync(log) ? readFileSync(log, "utf8") : "").slice(0, jpegs.length);
+        } finally {
+          rmSync(log, { force: true });
+        }
+        if (frames.length === 0) throw new ScreencastError("ffmpeg returned no preview frames.");
+        // Scene-change frames on top of the grid: at most as many again.
+        const keep = pickPlayerFrames(frames, plan.count);
+        const t0 = frames[0].timeSec;
+        const frameTimes = keep.map((i) => Math.round((frames[i].timeSec - t0) * 1000) / 1000);
+        const sceneFrames = keep.flatMap((i, k) => (frames[i].scene ? [k] : []));
         return {
           content: [
             {
@@ -128,10 +152,12 @@ export function register(server: McpServer): void {
                 width: info.width,
                 height: info.height,
                 hasAudio: info.audioCodec !== null,
-                frameTimes: times,
+                frameTimes,
+                intervalSec: plan.intervalSec,
+                sceneFrames,
               }),
             },
-            ...jpegs.map((j) => ({ type: "image" as const, data: j.toString("base64"), mimeType: "image/jpeg" })),
+            ...keep.map((i) => ({ type: "image" as const, data: jpegs[i].toString("base64"), mimeType: "image/jpeg" })),
           ],
         };
       } catch (error) {

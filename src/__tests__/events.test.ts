@@ -1,5 +1,8 @@
 /** #118: input event log - alignment, coordinate mapping, and selection. */
 import { describe, it, expect } from "vitest";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   buildHookScript,
   cleanPsError,
@@ -7,6 +10,7 @@ import {
   eventPaths,
   formatEventsJsonl,
   parseCaptureStart,
+  prepareEventPaths,
   parseEventsJsonl,
   selectEvents,
   summarizeEvents,
@@ -75,6 +79,25 @@ describe("eventPaths", () => {
   it("sits next to the recording", () => {
     expect(eventPaths("C:/rec/rec-1.mp4")).toEqual({ raw: "C:/rec/rec-1.events.raw", jsonl: "C:/rec/rec-1.events.jsonl" });
     expect(eventPaths("C:/a.b/clip").jsonl).toBe("C:/a.b/clip.events.jsonl");
+  });
+});
+
+describe("prepareEventPaths (#185)", () => {
+  it("refuses an existing event log without overwrite, and clears a stale raw log with it", () => {
+    const dir = mkdtempSync(join(tmpdir(), "sc-evpaths-"));
+    try {
+      const paths = eventPaths(join(dir, "clip.mp4"));
+      expect(() => prepareEventPaths(paths)).not.toThrow();
+      writeFileSync(paths.jsonl, "{}\n");
+      expect(() => prepareEventPaths(paths)).toThrow(/Event log already exists: .*clip\.events\.jsonl.*overwrite: true/);
+      rmSync(paths.jsonl);
+      writeFileSync(paths.raw, "1.0,click,0,0,left\n");
+      expect(() => prepareEventPaths(paths, false)).toThrow(/clip\.events\.raw/);
+      prepareEventPaths(paths, true);
+      expect(existsSync(paths.raw)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

@@ -24,6 +24,7 @@ import {
   linkSync,
 } from "node:fs";
 import type { ChildProcess } from "node:child_process";
+import { basename } from "node:path";
 import { ScreencastError } from "./errors.js";
 import type { Quality } from "./targets.js";
 import { WGC_WINDOW_CLOSED_EXIT } from "./wgc.js";
@@ -49,6 +50,11 @@ export interface SessionRecord {
   /** The node process (server instance) that created this record. Used so a
    * second server instance does not reap a recording owned by a still-live one. */
   serverPid?: number;
+  /** When that server process started, and its image name (node.exe), so a
+   * crashed server's pid recycled by another process is not mistaken for a
+   * live owner (#185). Absent on older records. */
+  serverStartedAt?: string;
+  serverImage?: string;
   status: SessionStatus;
   startedAt: string;
   stoppedAt?: string;
@@ -110,6 +116,56 @@ export function isForeignLiveRecording(
     record.serverPid !== currentServerPid &&
     ownerAlive
   );
+}
+
+/** This server process's identity, stamped on the records it creates. */
+export function serverIdentity(): Pick<SessionRecord, "serverPid" | "serverStartedAt" | "serverImage"> {
+  return {
+    serverPid: process.pid,
+    serverStartedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
+    serverImage: basename(process.execPath).toLowerCase(),
+  };
+}
+
+/** Slack between a process's OS creation time and the start time the process
+ * computed for itself (they differ by its startup, well under a second). */
+export const OWNER_START_SLACK_MS = 5_000;
+
+/** True unless what is now running under a record's `serverPid` is provably
+ * another process: a different image, or one that started after the owner
+ * did (after the record itself, for records with no serverStartedAt). A pid
+ * whose details cannot be read is trusted, so a live owner is never reaped
+ * on a guess. Pure (#185). */
+export function isSameServer(
+  record: Pick<SessionRecord, "serverStartedAt" | "serverImage" | "startedAt">,
+  running: { image: string; startMs: number } | null,
+): boolean {
+  if (!running) return true;
+  if (record.serverImage && running.image.toLowerCase() !== record.serverImage.toLowerCase()) return false;
+  const ref = Date.parse(record.serverStartedAt ?? record.startedAt);
+  return !(Number.isFinite(ref) && running.startMs > ref + OWNER_START_SLACK_MS);
+}
+
+/** Parse `<image>|<start ms>` from processInfo's PowerShell. Pure. */
+export function parseProcessInfo(stdout: string): { image: string; startMs: number } | null {
+  const m = /^(.+)\|(\d+)\s*$/m.exec(stdout.trim());
+  return m ? { image: m[1].trim(), startMs: Number(m[2]) } : null;
+}
+
+/** Image name and start time of a running pid (Windows), or null when it is
+ * gone or cannot be read. Used only at boot, for records another server owns. */
+export function processInfo(pid: number): { image: string; startMs: number } | null {
+  if (process.platform !== "win32" || !Number.isInteger(pid) || pid <= 0) return null;
+  const script =
+    `$p = Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; ` +
+    `if ($p) { "{0}|{1}" -f $p.Name, ([DateTimeOffset]$p.CreationDate).ToUnixTimeMilliseconds() }`;
+  const res = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], {
+    encoding: "utf8",
+    windowsHide: true,
+    timeout: 10_000,
+    killSignal: "SIGKILL",
+  });
+  return res.status === 0 && res.stdout ? parseProcessInfo(res.stdout) : null;
 }
 
 /** True if a pid exists. `process.kill(pid, 0)` throws ESRCH when it does not. */
@@ -244,16 +300,22 @@ function renameWithRetry(from: string, to: string): void {
 /** Take over a stale lock by renaming it aside rather than deleting it, then
  * confirm the file moved is the one judged stale (`raw`). Two waiters can judge
  * the same lock stale; a plain unlink by the slower one would delete the lock
- * the faster one just created. If that happened, put the live lock back. */
-function breakStaleLock(lock: string, raw: string): void {
+ * the faster one just created. If that happened, put the live lock back.
+ * Returns true only when the stale lock is gone, so a lock that cannot be
+ * moved (held open elsewhere) is waited on, not retried in a tight loop. */
+export function breakStaleLock(lock: string, raw: string): boolean {
   const aside = `${lock}.${process.pid}.${Date.now()}.stale`;
   try {
     renameSync(lock, aside);
   } catch {
-    return; // released or taken over meanwhile; the caller retries
+    return false; // released, taken over, or held open meanwhile; the caller waits
   }
+  let removed = true;
   try {
-    if (readFileSync(aside, "utf8") !== raw) linkSync(aside, lock);
+    if (readFileSync(aside, "utf8") !== raw) {
+      removed = false;
+      linkSync(aside, lock);
+    }
   } catch {
     /* best effort: a new holder may already have recreated it */
   }
@@ -262,22 +324,25 @@ function breakStaleLock(lock: string, raw: string): void {
   } catch {
     /* best effort */
   }
+  return removed;
 }
 
 /** Run `fn` holding an exclusive lockfile next to the registry (#55), so two
  * server instances cannot interleave a read-merge-write. The lock is an
- * O_EXCL-created file holding the owner's pid and a timestamp; a stale lock
- * (dead owner, or older than LOCK_STALE_MS) is taken over. A busy lock is
- * waited on with backoff for up to `waitMs`, then the call fails: it never runs
- * `fn` unlocked (#235). */
-function withRegistryLock<T>(registry: string, fn: () => T, waitMs = LOCK_WAIT_MS): T {
+ * O_EXCL-created file holding the owner's pid, a timestamp, and a nonce; a
+ * stale lock (dead owner, or older than LOCK_STALE_MS) is taken over. A busy
+ * lock is waited on with backoff for up to `waitMs`, then the call fails: it
+ * never runs `fn` unlocked (#235). */
+export function withRegistryLock<T>(registry: string, fn: () => T, waitMs = LOCK_WAIT_MS): T {
   const lock = `${registry}.lock`;
   const deadline = Date.now() + waitMs;
   let holderPid: number | undefined;
+  let mine: string;
   for (let attempt = 0; ; attempt++) {
     try {
       const fd = openSync(lock, "wx");
-      writeFileSync(fd, JSON.stringify({ pid: process.pid, at: Date.now() }));
+      mine = JSON.stringify({ pid: process.pid, at: Date.now(), nonce: Math.random().toString(36).slice(2) });
+      writeFileSync(fd, mine);
       closeSync(fd);
       break;
     } catch (err) {
@@ -306,8 +371,10 @@ function withRegistryLock<T>(registry: string, fn: () => T, waitMs = LOCK_WAIT_M
         }
         if (seen) {
           holderPid = seen.holder?.pid;
-          if (isLockStale(seen.holder, Date.now(), isAlive(seen.holder?.pid ?? null))) {
-            breakStaleLock(lock, seen.raw);
+          if (
+            isLockStale(seen.holder, Date.now(), isAlive(seen.holder?.pid ?? null)) &&
+            breakStaleLock(lock, seen.raw)
+          ) {
             continue;
           }
         }
@@ -320,15 +387,18 @@ function withRegistryLock<T>(registry: string, fn: () => T, waitMs = LOCK_WAIT_M
         );
       }
       // Exponential backoff with jitter, capped so a waiter still notices the
-      // release promptly when several instances queue up.
+      // release promptly when several instances queue up. Each wait blocks the
+      // event loop (persist() is synchronous), so it stays well under 0.1 s.
       sleepSync(Math.min(50, 2 ** Math.min(attempt, 6)) * (0.5 + Math.random()));
     }
   }
   try {
     return fn();
   } finally {
+    // Release only our own lock: if this holder stalled past LOCK_STALE_MS and
+    // was taken over, the file is now someone else's (#185).
     try {
-      unlinkSync(lock);
+      if (readFileSync(lock, "utf8") === mine) unlinkSync(lock);
     } catch {
       /* already removed */
     }
@@ -570,11 +640,20 @@ export class SessionStore {
   reapOrphans(): string[] {
     this.refresh();
     const reaped: string[] = [];
+    const owners = new Map<number, ReturnType<typeof processInfo>>();
+    const ownerAlive = (record: SessionRecord): boolean => {
+      const pid = record.serverPid;
+      if (pid === undefined || pid === process.pid || !isAlive(pid)) return false;
+      // A live pid may be a crashed server's, recycled by another process
+      // (#185): check it is still the same program, started before the record.
+      if (!owners.has(pid)) owners.set(pid, processInfo(pid));
+      return isSameServer(record, owners.get(pid) ?? null);
+    };
     for (const record of this.records.values()) {
       if (record.status !== "recording") continue;
       // Never reap a recording owned by another still-live server instance:
       // that would kill its active capture. Leave the record untouched.
-      if (isForeignLiveRecording(record, process.pid, isAlive(record.serverPid ?? null))) {
+      if (isForeignLiveRecording(record, process.pid, ownerAlive(record))) {
         continue;
       }
       const alive = isAlive(record.pid);

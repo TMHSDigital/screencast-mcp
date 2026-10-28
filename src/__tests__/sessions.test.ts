@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { rmSync, existsSync, writeFileSync, readFileSync, mkdtempSync } from "node:fs";
+import { rmSync, existsSync, writeFileSync, readFileSync, mkdtempSync, readdirSync } from "node:fs";
 import {
   classifyOrphan,
   isAlive,
@@ -16,6 +16,12 @@ import {
   classifyUnrequestedExit,
   expectedImage,
   tasklistHasImage,
+  isSameServer,
+  parseProcessInfo,
+  processInfo,
+  serverIdentity,
+  breakStaleLock,
+  withRegistryLock,
   type SessionRecord,
 } from "../utils/sessions.js";
 import { ScreencastError } from "../utils/errors.js";
@@ -382,5 +388,90 @@ describe("tryUpdate (#207)", () => {
     expect(() => store.update("r", { status: "stopped" })).toThrow(/ENOSPC/);
     expect(() => store.tryUpdate("r", { status: "stopped" })).not.toThrow();
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("recycled server pid (#185)", () => {
+  const start = Date.parse("2026-01-01T00:00:00Z");
+  const rec = { startedAt: new Date(start + 60_000).toISOString(), serverStartedAt: new Date(start).toISOString(), serverImage: "node.exe" };
+
+  it("accepts the owner itself and trusts a pid whose details cannot be read", () => {
+    expect(isSameServer(rec, { image: "NODE.EXE", startMs: start - 200 })).toBe(true);
+    expect(isSameServer(rec, null)).toBe(true);
+  });
+  it("rejects a process that started after the owner, or runs another image", () => {
+    expect(isSameServer(rec, { image: "node.exe", startMs: start + 120_000 })).toBe(false);
+    expect(isSameServer(rec, { image: "chrome.exe", startMs: start })).toBe(false);
+    // Older records: judged against the record's own start.
+    expect(isSameServer({ startedAt: rec.startedAt }, { image: "x.exe", startMs: start + 120_000 })).toBe(false);
+    expect(isSameServer({ startedAt: rec.startedAt }, { image: "x.exe", startMs: start })).toBe(true);
+  });
+  it("parses the process query output", () => {
+    expect(parseProcessInfo("node.exe|1793154113389\r\n")).toEqual({ image: "node.exe", startMs: 1793154113389 });
+    expect(parseProcessInfo("")).toBeNull();
+  });
+  it("stamps this server's identity", () => {
+    const id = serverIdentity();
+    expect(id.serverPid).toBe(process.pid);
+    expect(Date.parse(id.serverStartedAt!)).toBeLessThanOrEqual(Date.now());
+  });
+
+  it.skipIf(process.platform !== "win32")("reaps a record whose server pid now belongs to a newer process", async () => {
+    const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"], { stdio: "ignore" });
+    const p = join(tmpdir(), `sc-recycled-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+    try {
+      await new Promise((r) => child.once("spawn", r));
+      const info = processInfo(child.pid!);
+      expect(info?.image.toLowerCase()).toBe("node.exe");
+      expect(Math.abs(info!.startMs - Date.now())).toBeLessThan(30_000);
+      const old = new Date(Date.now() - 600_000).toISOString();
+      const live = new Date(info!.startMs).toISOString();
+      writeFileSync(p, JSON.stringify([
+        record({ id: "phantom", pid: null, serverPid: child.pid, serverStartedAt: old, serverImage: "node.exe", startedAt: old }),
+        record({ id: "owned", pid: null, serverPid: child.pid, serverStartedAt: live, serverImage: "node.exe" }),
+      ]));
+      const store = new SessionStore(p);
+      store.load();
+      store.reapOrphans();
+      expect(store.get("phantom")?.status).toBe("stopped");
+      expect(store.get("owned")?.status).toBe("recording");
+    } finally {
+      child.kill();
+      rmSync(p, { force: true });
+    }
+  }, 30_000);
+});
+
+describe("stale-lock takeover (#185)", () => {
+  let dir = "";
+  afterEach(() => {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+    dir = "";
+  });
+
+  it("removes the lock it judged stale, but puts back one that replaced it", () => {
+    dir = mkdtempSync(join(tmpdir(), "sc-stale-"));
+    const lock = join(dir, "sessions.json.lock");
+    const stale = JSON.stringify({ pid: 0, at: 1 });
+    writeFileSync(lock, stale);
+    expect(breakStaleLock(lock, stale)).toBe(true);
+    expect(existsSync(lock)).toBe(false);
+    // Another waiter already took over: the lock now holds a fresh owner.
+    const fresh = JSON.stringify({ pid: process.pid, at: Date.now() });
+    writeFileSync(lock, fresh);
+    expect(breakStaleLock(lock, stale)).toBe(false);
+    expect(readFileSync(lock, "utf8")).toBe(fresh);
+    expect(readdirSync(dir)).toEqual(["sessions.json.lock"]);
+    expect(breakStaleLock(join(dir, "missing.lock"), stale)).toBe(false);
+  });
+
+  it("does not delete a lock another holder took over while it ran", () => {
+    dir = mkdtempSync(join(tmpdir(), "sc-stale-"));
+    const registry = join(dir, "sessions.json");
+    const other = JSON.stringify({ pid: process.pid + 1, at: Date.now() });
+    withRegistryLock(registry, () => writeFileSync(`${registry}.lock`, other));
+    expect(readFileSync(`${registry}.lock`, "utf8")).toBe(other);
+    withRegistryLock(join(dir, "b.json"), () => undefined);
+    expect(existsSync(join(dir, "b.json.lock"))).toBe(false);
   });
 });

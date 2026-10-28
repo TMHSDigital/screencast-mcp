@@ -5,7 +5,8 @@ import { errorResponse, okResponse } from "../utils/errors.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildTitleCardArgs, DEFAULT_TITLE_DURATION } from "../utils/produce.js";
-import { bundledFontPath } from "../utils/fonts.js";
+import { resolveTextFont } from "../utils/fonts.js";
+import { fontFileSchema } from "./callout.js";
 import { resolveOutput, subdir, stamp, rand, tempPath } from "../utils/paths.js";
 
 const inputSchema = {
@@ -18,6 +19,7 @@ const inputSchema = {
   fontColor: z.string().optional().describe("Text color (default white)."),
   fontSize: z.number().int().positive().optional().describe("Text size in px (default 96)."),
   bold: z.boolean().optional().describe("Use the bold weight (default true)."),
+  fontFile: fontFileSchema,
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -27,20 +29,23 @@ export function register(server: McpServer): void {
     "title_card",
     "Generate a standalone title card: centered text on a solid background, with " +
       "a silent audio track so it composes with audio-bearing clips (use " +
-      "assemble_highlights to stitch it in). Text is rendered with a bundled " +
-      "font, so no system font is required.",
+      "assemble_highlights to stitch it in). Text is rendered with the bundled " +
+      "Inter font, so no system font is required for Latin, Greek or Cyrillic; other " +
+      "scripts and emoji automatically use a Windows system font that covers them " +
+      "(returned as fontFile), and characters no font covers are reported in " +
+      "warnings instead of silently drawn as boxes.",
     inputSchema,
     async (args, extra) => {
       try {
         requireFfmpeg();
         const output = resolveOutput(args.output, subdir("edits"), `title-${stamp()}-${rand()}.mp4`, args.overwrite);
-        const fontFile = bundledFontPath(args.bold === false ? "regular" : "bold");
+        const font = resolveTextFont(args.text, { weight: args.bold === false ? "regular" : "bold", fontFile: args.fontFile });
         // Write the text to a temp file so arbitrary content (quotes, colons,
         // percent signs) needs no inline filtergraph escaping.
         const textFile = tempPath(".txt");
         writeFileSync(textFile, args.text);
         try {
-          const ffArgs = buildTitleCardArgs(textFile, fontFile, output, {
+          const ffArgs = buildTitleCardArgs(textFile, font.fontFile, output, {
             duration: args.duration,
             width: args.width,
             height: args.height,
@@ -53,7 +58,11 @@ export function register(server: McpServer): void {
         } finally {
           rmSync(textFile, { force: true });
         }
-        return okResponse({ outputPath: output });
+        return okResponse({
+          outputPath: output,
+          ...((font.fallback || args.fontFile) && { fontFile: font.fontFile }),
+          ...(font.warning && { warnings: [font.warning] }),
+        });
       } catch (error) {
         return errorResponse(error);
       }

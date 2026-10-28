@@ -7,10 +7,10 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { planPipeline, MAX_PIPELINE_STEPS, type PipelineStep } from "../utils/pipeline.js";
-import { prepareCalloutAssets } from "../utils/calloutAssets.js";
+import { calloutFonts, prepareCalloutAssets } from "../utils/calloutAssets.js";
 import { exportAnimation } from "../utils/animExport.js";
 import type { CalloutAssets } from "../utils/callout.js";
-import { calloutItemSchema } from "./callout.js";
+import { calloutItemSchema, fontFileSchema } from "./callout.js";
 import { zoomKeyframeSchema } from "./zoom.js";
 import { redactRegionSchema } from "./redactRegion.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
@@ -42,7 +42,7 @@ const step = z.discriminatedUnion("op", [
     pad: z.number().int().nonnegative().optional(),
     color: z.string().optional(),
   }),
-  z.object({ op: z.literal("callout"), items: z.array(calloutItemSchema).min(1).max(50) }),
+  z.object({ op: z.literal("callout"), items: z.array(calloutItemSchema).min(1).max(50), fontFile: fontFileSchema }),
   z.object({ op: z.literal("reframe"), aspect, fit }),
   z.object({ op: z.literal("zoom"), keyframes: z.array(zoomKeyframeSchema).min(1).max(100), transitionSec: z.number().positive().max(5).optional() }),
   z.object({ op: z.literal("export_preset"), platform: z.enum(PLATFORMS), fit }),
@@ -102,13 +102,19 @@ export function register(server: McpServer): void {
         const work = mkdtempSync(join(tmpdir(), "screencast-pipeline-"));
         try {
           // Callout text and arrow files; a dry run plans with placeholder paths.
+          // Fonts are chosen either way, so a dry run reports missing glyphs too (#231).
           const assets: Record<number, CalloutAssets> = {};
+          const fallbackFonts: Array<{ step: number; item: number; fontFile: string }> = [];
+          const warnings: string[] = [];
           for (let i = 0; i < steps.length; i++) {
             const s = steps[i];
             if (s.op !== "callout") continue;
-            assets[i] = args.dryRun
-              ? { fontFile: "<font>", textFiles: s.items.map((c) => (c.type === "text" ? "<text>" : null)), arrowFiles: s.items.map((c) => (c.type === "arrow" ? "<arrow.png>" : null)) }
-              : await prepareCalloutAssets(s.items, work, `s${i}_`);
+            const a = args.dryRun
+              ? { fontFile: "<font>", textFiles: s.items.map((c) => (c.type === "text" ? "<text>" : null)), arrowFiles: s.items.map((c) => (c.type === "arrow" ? "<arrow.png>" : null)), ...calloutFonts(s.items, s.fontFile) }
+              : await prepareCalloutAssets(s.items, work, `s${i}_`, s.fontFile);
+            assets[i] = a;
+            fallbackFonts.push(...a.fallbackFonts.map((f) => ({ step: i, ...f })));
+            warnings.push(...a.warnings.map((w) => `Step ${i}, ${w.charAt(0).toLowerCase()}${w.slice(1)}`));
           }
           // An export_gif tail renders to a temporary mp4 first; a dry run names it plainly.
           const target = last.op === "export_gif" ? (args.dryRun ? "<temporary stage1.mp4>" : join(work, "stage1.mp4")) : output;
@@ -119,6 +125,8 @@ export function register(server: McpServer): void {
             width: plan.width,
             height: plan.height,
             durationSec: plan.durationSec,
+            ...(fallbackFonts.length > 0 && { fallbackFonts }),
+            ...(warnings.length > 0 && { warnings }),
           };
           if (args.dryRun) return okResponse({ dryRun: true, ...result, ffmpegArgs: plan.args });
 

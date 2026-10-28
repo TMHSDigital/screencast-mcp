@@ -7,6 +7,27 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.42.0]
+
+### Added
+
+- `callout`, `title_card` and the pipeline `callout` step take an optional `fontFile` (a path, or a file name in `C:\Windows\Fonts`). Results list `fallbackFonts` and `warnings` (#231).
+- `player_frames` returns `intervalSec` and `sceneFrames`; the player shows the sampling interval and marks scene-change frames on the timeline (#232).
+
+### Changed
+
+- The review player script moved to `assets/ui/player.js` (inlined when served) and is now linted and tested in jsdom, alongside ffmpeg-backed `player_frames` tests (#243).
+
+### Fixed
+
+- `callout`, `title_card` and pipeline callouts no longer draw CJK, emoji, Arabic, Indic and other non-Latin text as blank boxes while reporting success. Text is checked against the font's character map, and characters the bundled Inter lacks fall back to a Windows system font that covers them (Yu Gothic, Microsoft YaHei, Malgun Gothic, Nirmala UI, Segoe UI, Segoe UI Emoji, ...); any character no font can draw comes back in `warnings` (#231).
+- Review player frames are labelled with their real timestamps instead of half an interval late, and scene-change frames are sampled on top of the even grid, so a brief dialog or pasted token in a long recording shows up (#232).
+- The review player works by keyboard and screen reader: the timeline and trim handles are sliders (arrows, Page Up/Down, Home/End, announced timecodes), redaction boxes can be typed as x/y/w/h, focus is visible, and a cancelled pointer drag no longer leaves a draft box (#243).
+- `start_recording` with `events: true` honours `overwrite` for the `.events.jsonl` and `.events.raw` siblings instead of replacing or appending to an existing log (#185).
+- A crashed server whose pid was reused by another process no longer leaves its recording "recording" forever: records store the server's start time and image name, and boot-time reaping checks both (#185).
+- Session registry lock: a stale lock that cannot be moved is waited on instead of retried in a tight loop, and a holder only ever deletes its own lock (#185).
+- `find_text` caps the query at 500 characters and runs regex queries with a 1 s budget, so a catastrophic pattern such as `(a+)+$` fails the call instead of freezing the server (#185).
+
 ## [0.41.0]
 
 ### Changed
