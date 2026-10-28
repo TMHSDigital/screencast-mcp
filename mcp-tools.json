@@ -286,6 +286,44 @@
     }
   },
   {
+    "name": "index_recording",
+    "toolset": "watch",
+    "title": "Index Recording",
+    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "description": "Build a recording's text timeline (<video>.index.json: OCR per scene, events, markers, transcript) for search_recording.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Recording path (one of input / sessionId)" },
+        "sessionId": { "type": "string", "description": "Or a stopped session's id" },
+        "sceneThreshold": { "type": "number", "description": "Scene change (0-1, exclusive) that starts a new segment (default 0.03)" },
+        "maxFrames": { "type": "integer", "minimum": 1, "maximum": 600, "description": "Most keyframes to OCR (default 120); gaps over 10 s get fill keyframes while the cap allows" },
+        "transcript": { "type": "string", "description": "An .srt file to include, or 'whisper' to transcribe now (FFmpeg 8 whisper + SCREENCAST_WHISPER_MODEL). Default: <video>.srt when it exists" },
+        "force": { "type": "boolean", "description": "Re-run scene detection and OCR even when a cached index matches the file and options" }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "search_recording",
+    "toolset": "watch",
+    "title": "Search Recording",
+    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "description": "Search an index_recording timeline (screen text, events, markers, transcript): timecoded hits, best first, secrets masked. No frames unless asked.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Recording path (one of input / sessionId)" },
+        "sessionId": { "type": "string", "description": "Or a stopped session's id" },
+        "query": { "type": "string", "description": "Text to find; case-insensitive and tolerant of OCR misreads. Several words also match a segment holding all of them" },
+        "regex": { "type": "boolean", "description": "Treat query as a regular expression" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 50, "description": "Most hits to return (default 10)" },
+        "images": { "type": "integer", "minimum": 0, "maximum": 20, "description": "Inline thumbnails (480 px) for the top N hits (default 0: text only)" }
+      },
+      "required": ["query"]
+    }
+  },
+  {
     "name": "get_media_info",
     "toolset": "core",
     "title": "Get Media Info",
@@ -603,6 +641,7 @@
         "input": { "type": "string", "description": "Path to the video or audio to transcribe" },
         "model": { "type": "string", "description": "Path to a whisper.cpp model file (ggml-*.bin); defaults to SCREENCAST_WHISPER_MODEL" },
         "language": { "type": "string", "description": "Spoken language code, e.g. en, or auto (default)" },
+        "words": { "type": "boolean", "description": "One word per cue, for word timing (cut_by_transcript)" },
         "output": { "type": "string", "description": "Optional output .srt path (defaults under SCREENCAST_HOME/edits)" },
         "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
@@ -697,6 +736,30 @@
         "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },
       "required": ["input"]
+    }
+  },
+  {
+    "name": "cut_by_transcript",
+    "toolset": "edit",
+    "title": "Cut By Transcript",
+    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "description": "Edit a video by its transcript: cut quoted text, cue numbers, or fillers. Also writes the re-timed .srt.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Path to the source video" },
+        "srt": { "type": "string", "description": "Its .srt (transcribe; words: true for word timing)" },
+        "remove": {
+          "type": "array",
+          "items": { "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "string" }] },
+          "description": "Cue numbers, or transcript text quoted exactly (must occur once)"
+        },
+        "fillers": { "type": "boolean", "description": "Also cut fillers (um, uh...) that have their own cue" },
+        "dryRun": { "type": "boolean", "description": "Only report the cuts" },
+        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+      },
+      "required": ["input", "srt"]
     }
   },
   {
@@ -901,7 +964,7 @@
     "toolset": "edit",
     "title": "Edit Pipeline",
     "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Run several edits (trim, crop, scale, speed, redact, callout, keystroke_overlay, reframe, zoom, backdrop, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools.",
+    "description": "Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -961,6 +1024,25 @@
         "maxBytes": { "type": "integer", "description": "GIF size budget (default 10000000)" },
         "outputDir": { "type": "string", "description": "Package folder (default: a new one in SCREENCAST_HOME/edits)" },
         "overwrite": { "type": "boolean", "description": "Replace a report already in outputDir" }
+      }
+    }
+  },
+  {
+    "name": "step_guide",
+    "toolset": "produce",
+    "title": "Step-by-Step Guide",
+    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "description": "Turn a recording's event log into a numbered how-to: a ringed screenshot and caption per step, marker headings; Markdown and/or one HTML file. Never includes typed text.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "string", "description": "Recording path (uses its .events.jsonl)" },
+        "sessionId": { "type": "string", "description": "Or a stopped session's id" },
+        "title": { "type": "string", "description": "Guide title" },
+        "format": { "type": "string", "enum": ["md", "html", "both"], "description": "md + images/, self-contained html, or both (default)" },
+        "ocr": { "type": "boolean", "description": "OCR shots for captions and secret boxes (default true; needs Windows OCR)" },
+        "outputDir": { "type": "string", "description": "Guide folder (default: new in SCREENCAST_HOME/edits)" },
+        "overwrite": { "type": "boolean", "description": "Replace a guide already in outputDir" }
       }
     }
   }

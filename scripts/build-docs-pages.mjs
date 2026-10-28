@@ -190,6 +190,21 @@ const RECIPES = [
     output: { src: "../media/pipeline.gif", w: 480, h: 281, alt: "The same bug-repro GIF as REC 01: the API key covered by a black box, a red box and label on the Save button, then the Saved banner.", cap: `<span class="tc">pipeline.gif</span> · 480 × 281 · 46 KB · one pipeline call` },
     after: `<p>Steps run in order, and each sees the frame and timeline left by the steps before it: crop then redact means redact coordinates are in the cropped frame. <code>export_preset</code> or <code>export_gif</code> can only come last. Without one, the result is an mp4 at <code>quality</code> (default standard).</p>`,
   },
+  {
+    slug: "edit-by-transcript", n: "08", name: "Edit by the transcript",
+    chain: "transcribe (words) → cut_by_transcript (dryRun) → cut_by_transcript → burn_subtitles",
+    description: "Cut a narrated recording by editing its transcript: quote the lines to drop, remove um and uh, and get a re-timed SRT that still lines up.",
+    lede: "Narration is where most of the editing time goes: the false start, the \"um\", the closing line you'd rather not keep. Transcribe with word timing, then cut by quoting the words. Audio and video are cut in the same pass, so they stay in sync, and the transcript comes back re-timed to the new video.",
+    prompt: "Transcribe my narrated demo, take out the ums and uhs and the last sentence, and keep the captions lined up.",
+    takes: [
+      take(`${b("transcribe")} { "input": "demo.mp4", "words": true }`, "<code>words: true</code> asks whisper for one word per cue (<code>max_len=1</code>), so every word has its own timestamps. Without it, cues are sentences, and a cut inside one is an estimate.", `{ "srtPath": "captions-….srt", "cues": 24, "text": "Hello and welcome to this demo. Um. Today we will open the Settings page. uh, then we click save. That is all for now." }`),
+      take(`${b("cut_by_transcript")} { "input": "demo.mp4", "srt": "captions-….srt", "fillers": true, "remove": ["that is all for now"], "dryRun": true }`, "A quote is matched ignoring case and punctuation, and must occur exactly once (otherwise quote more words, or pass cue numbers). Fillers take the pause around them, up to 0.5 s a side. <code>dryRun</code> returns the edited text to check first.", `{ "cuts": [{ "start": 2, "end": 3.271, "text": "Um.", "exact": true }, { "start": 5.583, "end": 6.653, "text": "uh,", "exact": true }, { "start": 8.573, "end": 9.615, "text": "That is all for now.", "exact": true }], "removedSec": 3.38, "newDurationSec": 7, "text": "Hello and welcome to this demo. Today we will open the Settings page. then we click save." }`),
+      take(`${b("cut_by_transcript")} { …the same, without dryRun }`, "One select/aselect pass: each kept frame moves back by the time cut before it, so audio and video stay the same length.", `{ "outputPath": "cut-transcript-….mp4", "srtPath": "cut-transcript-….srt", "removedSec": 3.38 }`),
+      take(`${b("burn_subtitles")} { "input": "cut-transcript-….mp4", "subtitles": "cut-transcript-….srt" }`, "The re-timed SRT matches the cut video, so captions land on the right words.", ""),
+    ],
+    outputs: [],
+    after: `<p>Transcribing the cut video again gives back <em>"Hello and welcome to this demo. Today we will open the settings page, then we click Save."</em>: the fillers and the last line are gone and nothing else was clipped.</p><p>Whisper often leaves fillers out of its transcript, and only what the transcript contains can be cut. With sentence-level cues, <code>fillers: true</code> skips a filler inside a sentence rather than guess its time, and says how many it kept.</p>`,
+  },
 ];
 
 // Under reduced motion, an animated output shows a still frame instead (#224).

@@ -33,10 +33,9 @@ Report the folder path, the steps, the error text found, and what was redacted.`
   demoGif: (target: string, maxMB: string) =>
     `Make a demo GIF of ${target} for a README or PR, under ${maxMB} MB.
 
-1. start_recording { target: "${target}" }, walk through the feature (or ask me to), then stop_recording.
+1. start_recording { target: "${target}", events: true }, walk through the feature (or ask me to), then stop_recording.
 2. contact_sheet { input: <recording>, mode: "scenes" } to see the whole run at a glance and pick the best stretch.
-3. trim to that stretch (skip any audio steps: a GIF has no sound).
-4. export_gif { input: <clip>, maxBytes: ${Math.round(Number(maxMB) * 1_000_000) || 10_000_000} }. If it does not fit, try format: "webp" or a shorter clip.
+3. pipeline { input: <recording>, recipe: "pr_demo", steps: [{ op: "trim", ... that stretch }, { op: "export_gif", maxBytes: ${Math.round(Number(maxMB) * 1_000_000) || 10_000_000} }] }: one pass that cuts idle time, zooms toward the clicks, and writes the GIF (dryRun first to see the steps). If it does not fit, try format: "webp" or a shorter stretch.
 Report the file path, its size, and the settings export_gif chose.`,
 
   verifyUiChange: (target: string, expectation: string) =>
@@ -57,6 +56,14 @@ Say whether the change happened, whether anything changed that should not have, 
 3. sample_frames { input: "${path}", mode: "scenes" } to look closely at each change.
 4. If there is on-screen text worth quoting, find_text on the relevant frame.
 Give a timestamped summary of the main steps and anything that looks wrong.`,
+
+  documentSteps: (target: string, task: string) =>
+    `Document ${task ? `how to ${task}` : "what I do next"} as a step-by-step guide.
+
+1. start_recording { target: "${target}", events: true } so every click and shortcut is logged, then do the task (or ask me to). Between phases, add_marker { sessionId: <id>, label: <phase name> } so the guide gets section headings. Then stop_recording.
+2. step_guide { sessionId: <session id>, title: <what the guide teaches> }. It writes guide.md (with an images folder) and a self-contained guide.html: one screenshot per step, the click ringed, captioned from the text under it, secrets boxed out. Typed text is never logged; say what to type in the captions yourself.
+3. Read the returned steps and rewrite any vague caption ("Click the marked spot") in guide.md, using the screenshot to name the control.
+Report the guide paths, the steps, and anything you would check before sharing it.`,
 };
 
 export function registerPrompts(server: McpServer): void {
@@ -121,5 +128,18 @@ export function registerPrompts(server: McpServer): void {
       argsSchema: { path: z.string().describe("Path to the recording.") },
     },
     ({ path }) => message(PROMPT_TEXT.reviewRecording(path)),
+  );
+
+  server.registerPrompt(
+    "document-steps",
+    {
+      title: "Document what I just did",
+      description: "Record a task with input events and markers, then turn it into a step-by-step guide with step_guide.",
+      argsSchema: {
+        target: z.string().optional().describe("What to record (default: full)."),
+        task: z.string().optional().describe("The task the guide teaches."),
+      },
+    },
+    ({ target, task }) => message(PROMPT_TEXT.documentSteps(target || "full", task ?? "")),
   );
 }

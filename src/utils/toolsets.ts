@@ -27,6 +27,8 @@ export const TOOLSETS = {
     "screen_diff",
     "wait_for_change",
     "find_text",
+    "index_recording",
+    "search_recording",
     "review_recording",
     "player_frames",
   ],
@@ -43,6 +45,7 @@ export const TOOLSETS = {
     "compress",
     "redact_region",
     "cut_idle",
+    "cut_by_transcript",
   ],
   produce: [
     "callout",
@@ -58,6 +61,7 @@ export const TOOLSETS = {
     "burn_subtitles",
     "chapters",
     "bug_report",
+    "step_guide",
   ],
   audio: ["extract_audio", "normalize_audio", "denoise", "transcribe", "music_bed"],
 } as const satisfies Record<string, readonly string[]>;
@@ -124,13 +128,15 @@ export function serverInstructions(selection: ToolsetSelection): string {
   if (on.has("watch")) {
     lines.push(
       "Look: contact_sheet is the cheapest overview, sample_frames (mode scenes) for detail, find_text for OCR " +
-        "and secret finding, wait_for_change instead of sleeping, screen_diff to compare two states.",
+        "and secret finding, wait_for_change instead of sleeping, screen_diff to compare two states. " +
+        "Long recording: index_recording once, then search_recording finds moments as text.",
     );
   }
   if (on.has("edit")) {
     lines.push(
-      "Edit: prefer one pipeline call (trim, crop, scale, speed, redact, callout, keystroke_overlay, reframe, zoom, backdrop, then " +
-        "export_preset or export_gif) over chaining single-edit tools; each tool call re-encodes. trim = one " +
+      "Edit: prefer one pipeline call (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, reframe, zoom, backdrop, " +
+        "audio, burn_subtitles, then export_preset or export_gif) over chaining single-edit tools; each tool call re-encodes. " +
+        "To polish a raw recording, start from pipeline recipe pr_demo, tutorial or social_reel (dryRun shows its steps). trim = one " +
         "segment, clip = several files; export_gif for size-bounded GIF/WebP, compress for a smaller mp4.",
     );
   }
@@ -154,7 +160,7 @@ export function serverInstructions(selection: ToolsetSelection): string {
     lines.push(`Markers: ${marks.filter(Boolean).join(" ")}`);
   }
   if (on.has("audio")) {
-    lines.push("Audio: extract_audio, normalize_audio, denoise, music_bed; transcribe makes an SRT for burn_subtitles.");
+    lines.push("Audio: extract_audio, normalize_audio, denoise, music_bed; transcribe makes an SRT for burn_subtitles (words: true for word timing, then cut_by_transcript cuts by quoting it).");
   }
   lines.push(
     "Outputs go under SCREENCAST_HOME unless a call names a path; times are seconds and positions video pixels. " +

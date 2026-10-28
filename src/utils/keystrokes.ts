@@ -18,6 +18,8 @@ import { sumExpr } from "./expr.js";
 import type { InputEvent } from "./events.js";
 import { resolveQuality, type Quality } from "./targets.js";
 import { validateColor } from "./validate.js";
+import type { TimeOp } from "./chapters.js";
+import { mapWindow } from "./timeline.js";
 
 export type BadgeKind = "shortcut" | "click" | "typing";
 export type KeyDisplay = "shortcuts" | "masked";
@@ -181,27 +183,13 @@ export function mapBadges(badges: Badge[], map: (from: number, to: number) => [n
   });
 }
 
-/** A trim or speed change, in pipeline order (the shape of chapters' TimeOp). */
-export type BadgeTimeOp = { op: "trim"; start: number; end: number } | { op: "speed"; factor: number };
+/** A trim, speed change or cut, in pipeline order (chapters' TimeOp). */
+export type BadgeTimeOp = TimeOp;
 
 /** Badges on the source clock moved onto the timeline after `ops`: a trim
- * cuts and shifts them, a speed change rescales them. Pure. */
+ * cuts and shifts them, a speed change rescales them, a cut closes up. Pure. */
 export function retimeBadges(badges: Badge[], ops: readonly BadgeTimeOp[]): Badge[] {
-  return mapBadges(badges, (from, to) => {
-    let a = from;
-    let b = to;
-    for (const op of ops) {
-      if (op.op === "trim") {
-        a = Math.max(a, op.start) - op.start;
-        b = Math.min(b, op.end) - op.start;
-        if (b <= a) return null;
-      } else {
-        a /= op.factor;
-        b /= op.factor;
-      }
-    }
-    return [a, b];
-  });
+  return mapBadges(badges, (from, to) => mapWindow(from, to, ops));
 }
 
 export interface BadgeStyle {

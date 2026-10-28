@@ -100,16 +100,23 @@ export function audioCodecFor(output: string): string[] {
   }
 }
 
-/** Pass 2: apply a linear correction from the measurement. loudnorm works at
- * 192 kHz internally, so the output rate is set back to 48 kHz. */
-export function buildLoudnessApplyArgs(input: string, output: string, t: LoudnessTarget, m: LoudnessMeasurement): string[] {
+/** loudnorm for a target: linear, from a pass-1 measurement, or single-pass
+ * (dynamic) without one. Shared with pipeline (#244). Pure. */
+export function loudnormFilter(t: LoudnessTarget, m?: LoudnessMeasurement): string {
+  if (!m) return `loudnorm=${filterTarget(t)}`;
   const measured =
     `measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:` +
     `measured_thresh=${m.input_thresh}:offset=${m.target_offset}`;
+  return `loudnorm=${filterTarget(t)}:${measured}:linear=true`;
+}
+
+/** Pass 2: apply a linear correction from the measurement. loudnorm works at
+ * 192 kHz internally, so the output rate is set back to 48 kHz. */
+export function buildLoudnessApplyArgs(input: string, output: string, t: LoudnessTarget, m: LoudnessMeasurement): string[] {
   return [
     "-y", "-hide_banner", "-i", input,
     ...keepVideoArgs(output),
-    "-af", `loudnorm=${filterTarget(t)}:${measured}:linear=true:print_format=json`,
+    "-af", `${loudnormFilter(t, m)}:print_format=json`,
     "-ar", "48000",
     ...audioCodecFor(output),
     output,
@@ -149,6 +156,13 @@ export function noiseFloorSetting(floorDb: number | null): number {
   return Math.max(-80, Math.min(-20, Math.round(floorDb + 5)));
 }
 
+/** The afftdn filter for a strength and measured floor; shared with pipeline. Pure. */
+export function denoiseFilter(strength: DenoiseStrength, noiseFloorDb: number | null): string {
+  const nr = DENOISE_NR[strength];
+  if (nr === undefined) throw new ScreencastError(`Unknown denoise strength "${strength}".`);
+  return `afftdn=nr=${nr}:nf=${noiseFloorSetting(noiseFloorDb)}`;
+}
+
 /** Reduce steady background noise (fans, hum, hiss) with afftdn, using the
  * floor measured by buildNoiseFloorArgs. Pure. */
 export function buildDenoiseArgs(
@@ -157,12 +171,10 @@ export function buildDenoiseArgs(
   strength: DenoiseStrength = "medium",
   noiseFloorDb: number | null = null,
 ): string[] {
-  const nr = DENOISE_NR[strength];
-  if (nr === undefined) throw new ScreencastError(`Unknown denoise strength "${strength}".`);
   return [
     "-y", "-i", input,
     ...keepVideoArgs(output),
-    "-af", `afftdn=nr=${nr}:nf=${noiseFloorSetting(noiseFloorDb)}`,
+    "-af", denoiseFilter(strength, noiseFloorDb),
     ...audioCodecFor(output),
     output,
   ];

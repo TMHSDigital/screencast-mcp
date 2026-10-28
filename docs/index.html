@@ -165,6 +165,8 @@
             <tr><td><code>screen_diff</code></td><td>Compare two screenshots: SSIM score and boxes around what changed.</td></tr>
             <tr><td><code>wait_for_change</code></td><td>Return when the screen changes or settles, instead of guessing a sleep.</td></tr>
             <tr><td><code>find_text</code></td><td>Read on-screen text with Windows' built-in OCR, with bounding boxes; find secrets and get redaction rectangles.</td></tr>
+            <tr><td><code>index_recording</code></td><td>Build a recording's text timeline: OCR per scene, input events, markers, and transcript, saved next to the video.</td></tr>
+            <tr><td><code>search_recording</code></td><td>Find a moment in a long recording as text: timecoded hits with secrets masked, and thumbnails only when asked.</td></tr>
             <tr><td><code>get_media_info</code></td><td>ffprobe wrapper: duration, resolution, fps, codecs, format, size.</td></tr>
           </tbody>
         </table>
@@ -185,6 +187,7 @@
             <tr><td><code>trim</code></td><td>Cut a sub-clip by start + end or duration. Stream copy, snaps to keyframes.</td></tr>
             <tr><td><code>clip</code></td><td>Extract one or more frame-accurate sub-segments to separate files.</td></tr>
             <tr><td><code>cut_idle</code></td><td>Cut dead air: frozen, silent stretches, with a short pad kept.</td></tr>
+            <tr><td><code>cut_by_transcript</code></td><td>Edit by the transcript: cut quoted lines, cue numbers, or um/uh fillers, with a re-timed SRT.</td></tr>
             <tr><td><code>concat</code></td><td>Join two or more videos into one.</td></tr>
             <tr><td><code>convert</code></td><td>Convert between mp4, gif, and webm.</td></tr>
             <tr><td><code>export_gif</code></td><td>Animated GIF or WebP that fits a size budget (default: GitHub's 10 MB limit), for PRs and READMEs.</td></tr>
@@ -222,9 +225,10 @@
             <tr><td><code>zoom</code></td><td>Smooth zoom-and-pan into the action: from keyframes, toward each click in the input event log (with optional click rings), or toward where the screen changed.</td></tr>
             <tr><td><code>keystroke_overlay</code></td><td>Keycast-style badges (Ctrl + Shift + P, Double click, Typing&hellip;) burned in from the input event log. Never typed text: the log has none.</td></tr>
             <tr><td><code>backdrop</code></td><td>Frame a clip or screenshot on a gradient, color, or wallpaper with padding, rounded corners, and a drop shadow, optionally on a 16:9, 9:16, 1:1, or 4:5 canvas. Presets: desktop, rec, amber, light.</td></tr>
-            <tr><td><code>pipeline</code></td><td>Run several edits (trim, crop, scale, speed, redact, callout, keystroke_overlay, reframe, zoom, backdrop, then an export) as one ffmpeg process: one re-encode, no intermediate files.</td></tr>
+            <tr><td><code>pipeline</code></td><td>Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, reframe, zoom, backdrop, audio, burn_subtitles, then an export) as one ffmpeg process: one re-encode, no intermediate files. Recipes (pr_demo, tutorial, social_reel) do the usual polish in one call.</td></tr>
             <tr><td><code>export_preset</code></td><td>Encode a platform-ready file (youtube, instagram_reel, tiktok, x, square, steam_trailer, vertical_reel) at the right aspect, fps, and bitrate.</td></tr>
             <tr><td><code>bug_report</code></td><td>Turn a recording into a paste-ready repro folder: a secret-scanned, redacted clip and GIF, contact sheet, steps from the event log, OCR&rsquo;d error text, environment, and a report.md for <code>gh issue create</code>.</td></tr>
+            <tr><td><code>step_guide</code></td><td>Turn a recording and its event log into a step-by-step how-to: a ringed screenshot and OCR caption per step, markers as headings, secrets boxed out, as Markdown or one self-contained HTML page.</td></tr>
           </tbody>
         </table>
       </section>

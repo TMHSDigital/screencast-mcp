@@ -29,8 +29,10 @@ export function resolveWhisperModel(arg: string | undefined, env: NodeJS.Process
   return model;
 }
 
-/** Transcribe the input's audio to an SRT file (whisper wants 16 kHz). */
-export function buildTranscribeArgs(input: string, model: string, srtOut: string, language = "auto"): string[] {
+/** Transcribe the input's audio to an SRT file (whisper wants 16 kHz).
+ * `words` asks for one word per cue: max_len=1 makes whisper.cpp compute
+ * token timestamps and split segments at every token (#173). */
+export function buildTranscribeArgs(input: string, model: string, srtOut: string, language = "auto", words = false): string[] {
   if (!/^[a-z]{2,3}$|^auto$/.test(language)) {
     throw new ScreencastError(`language must be a code like "en" or "auto", got "${language}".`);
   }
@@ -38,9 +40,22 @@ export function buildTranscribeArgs(input: string, model: string, srtOut: string
     "-y", "-v", "error", "-i", input, "-vn",
     "-af",
     `aresample=16000,whisper=model=${escapeFilterPath(model)}:language=${language}:format=srt:` +
-      `destination=${escapeFilterPath(srtOut)}:use_gpu=false`,
+      `destination=${escapeFilterPath(srtOut)}:use_gpu=false` + (words ? ":max_len=1" : ""),
     "-f", "null", "-",
   ];
+}
+
+/** Word-level whisper output gives punctuation its own cue ("demo", "."),
+ * often zero-length. Fold each punctuation-only cue into the cue before it
+ * (keeping that cue's timing), so every cue is a spoken word. Pure. */
+export function mergePunctuation(cues: Cue[]): Cue[] {
+  const out: Cue[] = [];
+  for (const c of cues) {
+    const prev = out[out.length - 1];
+    if (prev && !/[\p{L}\p{N}]/u.test(c.text)) prev.text += c.text.trim();
+    else out.push({ ...c });
+  }
+  return out;
 }
 
 export interface Cue {
@@ -105,6 +120,16 @@ export const CAPTION_STYLES: Record<CaptionStyle, string> = {
   social: "FontName=Inter,Bold=1,FontSize=22,PrimaryColour=&H00FFFFFF,BackColour=&H99000000,BorderStyle=3,Outline=6,Shadow=0,MarginV=40",
 };
 
+/** The subtitles filter; shared by burn_subtitles and pipeline (#244). Pure. */
+export function subtitlesFilter(subtitles: string, fontsDir: string, style: CaptionStyle | null = "clean"): string {
+  const force = style === null ? null : CAPTION_STYLES[style];
+  if (force === undefined) throw new ScreencastError(`Unknown caption style "${style}".`);
+  return (
+    `subtitles=filename=${escapeFilterPath(subtitles)}:fontsdir=${escapeFilterPath(fontsDir)}` +
+    (force ? `:force_style='${force}'` : "")
+  );
+}
+
 /** Burn an SRT/ASS file into the video with the bundled font. A null style
  * keeps an .ass file's own styling instead of forcing one (#189). */
 export function buildBurnSubtitlesArgs(
@@ -115,13 +140,9 @@ export function buildBurnSubtitlesArgs(
   style: CaptionStyle | null = "clean",
   quality: Quality = "standard",
 ): string[] {
-  const force = style === null ? null : CAPTION_STYLES[style];
-  if (force === undefined) throw new ScreencastError(`Unknown caption style "${style}".`);
   return [
     "-y", "-i", input,
-    "-vf",
-    `subtitles=filename=${escapeFilterPath(subtitles)}:fontsdir=${escapeFilterPath(fontsDir)}` +
-      (force ? `:force_style='${force}'` : ""),
+    "-vf", subtitlesFilter(subtitles, fontsDir, style),
     ...resolveQuality(quality),
     "-c:a", "copy",
     output,

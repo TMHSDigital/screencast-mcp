@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Edit by the transcript — Screencast MCP</title>
+  <meta name="description" content="Cut a narrated recording by editing its transcript: quote the lines to drop, remove um and uh, and get a re-timed SRT that still lines up.">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/workflows/edit-by-transcript.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="Edit by the transcript — Screencast MCP">
+  <meta property="og:description" content="Cut a narrated recording by editing its transcript: quote the lines to drop, remove um and uh, and get a re-timed SRT that still lines up.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/workflows/edit-by-transcript.html">
+  <meta property="og:site_name" content="Screencast MCP">
+  <meta property="og:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Screencast MCP: give your agent eyes on the screen. A recorded window zooms in on a clicked Save button.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <link rel="preload" href="../fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../workflows/" class="here">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">WORKFLOWS</a> / REC 08</p>
+      <h1>Edit by the transcript</h1>
+      <p class="lede">Narration is where most of the editing time goes: the false start, the "um", the closing line you'd rather not keep. Transcribe with word timing, then cut by quoting the words. Audio and video are cut in the same pass, so they stay in sync, and the transcript comes back re-timed to the new video.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>THE PROMPT</span></div>
+      <p class="prompt">Transcribe my narrated demo, take out the ums and uhs and the last sentence, and keep the captions lined up.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>THE CALLS IT MAKES</span></div>
+      <p>transcribe (words) &rarr; cut_by_transcript (dryRun) &rarr; cut_by_transcript &rarr; burn_subtitles. Paths are shortened; every value is from a real run.</p>
+      <ol class="takes">
+        <li><span class="call"><b>transcribe</b> { "input": "demo.mp4", "words": true }</span><span class="why"><code>words: true</code> asks whisper for one word per cue (<code>max_len=1</code>), so every word has its own timestamps. Without it, cues are sentences, and a cut inside one is an estimate.</span><span class="ret">{ "srtPath": "captions-….srt", "cues": 24, "text": "Hello and welcome to this demo. Um. Today we will open the Settings page. uh, then we click save. That is all for now." }</span></li>
+        <li><span class="call"><b>cut_by_transcript</b> { "input": "demo.mp4", "srt": "captions-….srt", "fillers": true, "remove": ["that is all for now"], "dryRun": true }</span><span class="why">A quote is matched ignoring case and punctuation, and must occur exactly once (otherwise quote more words, or pass cue numbers). Fillers take the pause around them, up to 0.5 s a side. <code>dryRun</code> returns the edited text to check first.</span><span class="ret">{ "cuts": [{ "start": 2, "end": 3.271, "text": "Um.", "exact": true }, { "start": 5.583, "end": 6.653, "text": "uh,", "exact": true }, { "start": 8.573, "end": 9.615, "text": "That is all for now.", "exact": true }], "removedSec": 3.38, "newDurationSec": 7, "text": "Hello and welcome to this demo. Today we will open the Settings page. then we click save." }</span></li>
+        <li><span class="call"><b>cut_by_transcript</b> { …the same, without dryRun }</span><span class="why">One select/aselect pass: each kept frame moves back by the time cut before it, so audio and video stay the same length.</span><span class="ret">{ "outputPath": "cut-transcript-….mp4", "srtPath": "cut-transcript-….srt", "removedSec": 3.38 }</span></li>
+        <li><span class="call"><b>burn_subtitles</b> { "input": "cut-transcript-….mp4", "subtitles": "cut-transcript-….srt" }</span><span class="why">The re-timed SRT matches the cut video, so captions land on the right words.</span></li>
+      </ol>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:30</span><span>THE OUTPUT</span></div>
+
+      <p>Transcribing the cut video again gives back <em>"Hello and welcome to this demo. Today we will open the settings page, then we click Save."</em>: the fillers and the last line are gone and nothing else was clipped.</p><p>Whisper often leaves fillers out of its transcript, and only what the transcript contains can be cut. With sentence-level cues, <code>fillers: true</code> skips a filler inside a sentence rather than guess its time, and says how many it kept.</p>
+      <nav class="pager" aria-label="More recipes">
+        <span><a href="pipeline.html">&larr; REC 07 The whole edit in one call</a></span>
+        <span><a href="../connect.html">Connect your client &rarr;</a></span>
+      </nav>
+    </section>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>License: <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/LICENSE">CC BY-NC-ND 4.0</a> &middot; free for non-commercial use</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>

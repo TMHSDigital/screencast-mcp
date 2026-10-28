@@ -10,6 +10,7 @@ import {
   buildTranscribeArgs,
   parseSrt,
   normalizeCues,
+  mergePunctuation,
   formatSrt,
   WHISPER_MODEL_ENV,
 } from "../utils/captions.js";
@@ -22,6 +23,7 @@ const inputSchema = {
     .optional()
     .describe(`Path to a whisper.cpp model file (ggml-*.bin). Defaults to ${WHISPER_MODEL_ENV}.`),
   language: z.string().optional().describe("Spoken language code, e.g. 'en', or 'auto' (default)."),
+  words: z.boolean().optional().describe("One word per cue, for word timing (cut_by_transcript)."),
   output: z.string().optional().describe("Optional output .srt path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -59,10 +61,10 @@ export function register(server: McpServer): void {
         // then tidy it into the output.
         const raw = tempPath(".srt");
         try {
-          await runFfmpeg(buildTranscribeArgs(args.input, model, raw, args.language ?? "auto"), jobTimeoutMs(info.durationSec), {
+          await runFfmpeg(buildTranscribeArgs(args.input, model, raw, args.language ?? "auto", args.words), jobTimeoutMs(info.durationSec), {
             signal: extra.signal,
           });
-          const cues = existsSync(raw) ? normalizeCues(parseSrt(readFileSync(raw, "utf8"))) : [];
+          const cues = existsSync(raw) ? normalizeCues(mergePunctuation(parseSrt(readFileSync(raw, "utf8")))) : [];
           writeFileSync(output, formatSrt(cues));
           const text = cues.map((c) => c.text.replace(/\n/g, " ")).join(" ");
           return okResponse({

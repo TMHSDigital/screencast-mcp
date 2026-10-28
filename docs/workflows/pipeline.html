@@ -62,6 +62,20 @@
     </section>
 
     <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:20</span><span>OR NAME A RECIPE</span></div>
+      <p>For the usual polish, name a <code>recipe</code> instead of writing steps. It expands to ordinary steps, so <code>dryRun</code> shows exactly what will run, and any step you pass replaces the recipe's step with the same op (an export replaces its export); a <code>trim</code> you add runs first, on the source's timeline, and other steps go just before the export.</p>
+      <ul>
+        <li><code>pr_demo</code>: <code>cut_idle</code> &rarr; <code>zoom</code> toward logged clicks &rarr; GIF under 10 MB.</li>
+        <li><code>tutorial</code>: <code>cut_idle</code> &rarr; click zoom &rarr; <code>audio</code> (light denoise, normalize to -14 LUFS) &rarr; captions transcribed with whisper &rarr; 1080p YouTube mp4.</li>
+        <li><code>social_reel</code>: <code>cut_idle</code> &rarr; click zoom &rarr; normalize &rarr; 9:16 &rarr; big captions &rarr; Reels/TikTok mp4.</li>
+      </ul>
+      <ol class="takes">
+        <li><span class="call"><b>pipeline</b> { "input": "rec-….mp4", "recipe": "tutorial", "chapters": true, "dryRun": true }</span><span class="why">A 10 s recording with a 4 s pause and one logged click. No whisper model is set, so captions are left out with a note instead of failing; the loudness is measured when it runs.</span><span class="ret">{ "expandedSteps": [{ "op": "cut_idle" }, { "op": "zoom", "follow": "clicks" }, { "op": "audio", "denoise": "light", "normalize": "youtube" }, { "op": "export_preset", "platform": "youtube" }], "steps": ["cut_idle 1 stretch(es), 3.2s removed", "zoom 2 keyframe(s) from 1 click(s)", "audio: denoise light, normalize to -14 LUFS", "export_preset youtube"], "measuredOnRun": ["step 3: noisefloor", "step 3: loudness"], "warnings": ["captions left out: no whisper model (set SCREENCAST_WHISPER_MODEL)."] }</span></li>
+      </ol>
+      <p>Everything recorded on the source's clock (clicks, markers, keystroke badges, a subtitle file) is moved through the cut, so chapters and captions still land on the right moment. Idle stretches are found on the source, so put <code>cut_idle</code> before steps that animate the picture.</p>
+    </section>
+
+    <section class="chapter">
       <div class="tc-mark"><span class="tc">00:30</span><span>THE OUTPUT</span></div>
       <figure class="output">
         <div class="frame"><picture><source srcset="../media/pipeline-still.webp" media="(prefers-reduced-motion: reduce)"><img src="../media/pipeline.gif" width="480" height="281" alt="The same bug-repro GIF as REC 01: the API key covered by a black box, a red box and label on the Save button, then the Saved banner." loading="lazy"></picture></div>
@@ -70,7 +84,7 @@
       <p>Steps run in order, and each sees the frame and timeline left by the steps before it: crop then redact means redact coordinates are in the cropped frame. <code>export_preset</code> or <code>export_gif</code> can only come last. Without one, the result is an mp4 at <code>quality</code> (default standard).</p>
       <nav class="pager" aria-label="More recipes">
         <span><a href="zoom-clicks.html">&larr; REC 06 Zoom toward every click</a></span>
-        <span><a href="../connect.html">Connect your client &rarr;</a></span>
+        <span><a href="edit-by-transcript.html">REC 08 Edit by the transcript &rarr;</a></span>
       </nav>
     </section>
 

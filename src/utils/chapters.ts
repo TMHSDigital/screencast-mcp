@@ -16,6 +16,7 @@ import { ScreencastError } from "./errors.js";
 import { requireFfmpeg, runCapture } from "./ffmpeg.js";
 import type { SceneChange } from "./media.js";
 import type { Cue } from "./captions.js";
+import { cutShift } from "./timeline.js";
 
 export interface Marker {
   /** Video seconds. */
@@ -37,8 +38,12 @@ export interface Chapter {
 }
 
 /** A timing change a pipeline step makes: a trim keeps [start, end) and
- * shifts it to 0; a speed change divides every time by the factor. */
-export type TimeOp = { op: "trim"; start: number; end: number } | { op: "speed"; factor: number };
+ * shifts it to 0; a speed change divides every time by the factor; a cut
+ * removes sorted spans (cut_idle, #244). See timeline.ts. */
+export type TimeOp =
+  | { op: "trim"; start: number; end: number }
+  | { op: "speed"; factor: number }
+  | { op: "cut"; spans: Array<{ start: number; end: number }> };
 
 export const MAX_MARKERS = 500;
 export const MAX_LABEL = 200;
@@ -116,7 +121,7 @@ export function writeMarkers(video: string, markers: readonly Marker[], sessionI
 }
 
 /**
- * Re-time markers through trims and speed changes, in order. A trim drops the
+ * Re-time markers through trims, speed changes and cuts, in order. A trim drops the
  * markers outside what it keeps, except that the last marker before the kept
  * range moves to its start (unless one is already there): the chapter it opens
  * is still running when the kept range begins. Pure.
@@ -126,6 +131,11 @@ export function retimeMarkers(markers: readonly Marker[], ops: readonly TimeOp[]
   for (const op of ops) {
     if (op.op === "speed") {
       cur = cur.map((m) => ({ ...m, t: r3(m.t / op.factor) }));
+      continue;
+    }
+    if (op.op === "cut") {
+      // A marker inside a removed span lands where the span was.
+      cur = cur.map((m) => ({ ...m, t: r3(m.t - cutShift(m.t, op.spans)) }));
       continue;
     }
     const inside = cur.filter((m) => m.t >= op.start && m.t < op.end).map((m) => ({ ...m, t: r3(m.t - op.start) }));

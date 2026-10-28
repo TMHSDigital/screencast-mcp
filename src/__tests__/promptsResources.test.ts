@@ -12,6 +12,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ResourceListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
+import { RECIPES } from "../utils/recipes.js";
 
 const home = mkdtempSync(join(tmpdir(), "screencast-pr-"));
 process.env.SCREENCAST_HOME = home;
@@ -44,7 +45,7 @@ describe("MCP prompts and resources (#126)", () => {
 
   it("lists the workflow prompts", async () => {
     const names = (await client.listPrompts()).prompts.map((p) => p.name).sort();
-    expect(names).toEqual(["bug-repro-clip", "demo-gif", "file-bug-report", "review-recording", "verify-ui-change"]);
+    expect(names).toEqual(["bug-repro-clip", "demo-gif", "document-steps", "file-bug-report", "review-recording", "verify-ui-change"]);
   });
 
   it("fills a prompt's arguments into its workflow", async () => {
@@ -61,11 +62,12 @@ describe("MCP prompts and resources (#126)", () => {
       PROMPT_TEXT.demoGif("full", "10"),
       PROMPT_TEXT.verifyUiChange("full", ""),
       PROMPT_TEXT.reviewRecording("x.mp4"),
+      PROMPT_TEXT.documentSteps("full", ""),
     ].join("\n");
     const named = [...texts.matchAll(/\b([a-z]+(?:_[a-z]+)+)\b(?= \{|\b)/g)].map((m) => defined(m[1])).filter((n) => /^[a-z]+_[a-z_]+$/.test(n));
-    const unknown = [...new Set(named)].filter((n) => !toolNames.has(n) && !["fileExists"].includes(n));
+    const unknown = [...new Set(named)].filter((n) => !toolNames.has(n) && !["fileExists", ...RECIPES].includes(n));
     expect(unknown).toEqual([]);
-    for (const t of ["start_recording", "export_gif", "find_text", "contact_sheet", "screen_diff", "bug_report"]) expect(named).toContain(t);
+    for (const t of ["start_recording", "export_gif", "find_text", "contact_sheet", "screen_diff", "bug_report", "step_guide"]) expect(named).toContain(t);
   });
 
   it("exposes sessions as resources and announces changes", async () => {

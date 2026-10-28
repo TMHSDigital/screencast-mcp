@@ -26,7 +26,7 @@ import { validateColor } from "../utils/validate.js";
 export const MAX_RINGS = 200;
 
 /** In-frame clicks (mouse down) from an event log, or null if there is none. */
-function readClicks(path: string): ClickPoint[] | null {
+export function readClicks(path: string): ClickPoint[] | null {
   if (!existsSync(path)) return null;
   return parseEventsJsonl(readFileSync(path, "utf8"))
     .filter((e) => e.type === "down" && e.inFrame)

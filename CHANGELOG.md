@@ -7,6 +7,23 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.46.0]
+
+### Added
+
+- `pipeline` polish steps (#244): `cut_idle` (finds frozen, silent stretches and cuts them in the same pass, re-timing chapters, keystroke badges, clicks, and subtitles after it), `audio` (two-pass `normalize` and measured `denoise`, applied to the audio as it reaches the step), `burn_subtitles` (an .srt/.ass re-timed onto the edited timeline, or `transcribe: true`), and `zoom` with `follow: "clicks"` planned from the event log.
+- `pipeline` recipes (#244): `recipe: "pr_demo"` (cut idle, click zoom, GIF under 10 MB), `"tutorial"` (plus denoise/normalize and captions, 1080p mp4) and `"social_reel"` (9:16 with big captions). A recipe expands to ordinary steps that `dryRun` shows; your own `steps` replace its step of the same op, and steps the input can't support are left out with a note.
+- `index_recording` and `search_recording` (#245): a searchable text timeline per recording, so an agent can find "when did the error dialog appear?" as text instead of sampling frames. `index_recording` cuts the video at scene changes (no stretch over 10 s goes unread), OCRs one keyframe per segment, and attaches input events, markers, and transcript cues, writing `<video>.index.json` (or under `SCREENCAST_HOME/edits/indexes` when that folder is outside the allowed output dirs); a re-run on an unchanged file reuses the OCR. `search_recording` returns timecoded hits, tolerant of OCR misreads or with `regex: true`, with secrets masked in snippets and thumbnails only when asked. The index keeps the raw screen text, so treat it like the video.
+- `step_guide` (#172): turn a recording and its event log into a step-by-step how-to. Each click, shortcut, typing burst, and scroll becomes a numbered step with the frame just before it, the click ringed, and a caption from OCR of the text under the click ("Click **Save**"); markers become section headings. Writes `guide.md` with images and/or one self-contained `guide.html`. Secrets are boxed out of screenshots and masked in captions; typed text is never logged, so it never appears. A new `document-steps` prompt drives it.
+- `cut_by_transcript` (#173): edit a narrated recording by its transcript. Quote the lines to drop (or cue numbers) and/or pass `fillers: true` to remove um/uh/erm; the cuts run in one pass that keeps audio and video in sync, and a re-timed `.srt` is written beside the video. `dryRun` returns the edited text first. Timing is as fine as the transcript; a quote inside a sentence cue is estimated and flagged `exact: false`.
+- `transcribe` `words: true`: one word per cue with whisper's word timestamps, for word-accurate transcript edits (#173).
+
+### Changed
+
+- `cut_idle` cuts audio in 256-sample chunks instead of whole AAC frames, so long edits keep audio within a few milliseconds of the video (#244).
+- The event-log step builder behind `bug_report` is a shared helper, also used by `step_guide`; `bug_report` output is unchanged (#172).
+- The tools/list size budget test is raised to 92 KB for the five new tools and the recipes (about 91 KB by default).
+
 ## [0.45.0]
 
 ### Added

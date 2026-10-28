@@ -15,7 +15,7 @@ const SPAWN = /\b(runFfmpeg|runCapture|runFfmpegBuffer|runFfmpegFrames|runEditJo
 /** Calls whose work is bounded however long the input is (one frame, a still
  * image, a live grab, or a probe), so a fixed timeout is fine. */
 const FIXED_OK = [
-  /\bbuild(RawFrame|Ssim|Highlight|RawGrab|Screenshot|Tile|Sheet|SampleAtTimestamp|Probe)Args\(/,
+  /\bbuild(RawFrame|Ssim|Highlight|RawGrab|Screenshot|Tile|Sheet|SampleAtTimestamp|Probe|StepFrame|StepShot)Args\(/,
   /"-frames:v", "1"/,
   /scale=iw\*\$\{scale\}/, // OCR upscale of one still
 ];

@@ -88,6 +88,25 @@ export function cutsFor(idle: Interval[], minIdleSec: number, keep: number): Int
     .map((r) => ({ start: Number(r.start.toFixed(3)), end: Number(r.end.toFixed(3)) }));
 }
 
+/** The video and audio filters that remove `cuts`; shared by cut_idle and
+ * pipeline (#244). Pure. */
+export function cutFilters(cuts: Interval[]): { video: string; audio: string } {
+  if (cuts.length === 0) throw new ScreencastError("Nothing to cut.");
+  if (cuts.length > MAX_CUTS) throw new ScreencastError(`Too many idle stretches (${cuts.length}); raise minIdleSec.`);
+  // Grouped, since ffmpeg rejects a flat sum of 100+ terms (#225).
+  const drop = sumExpr(cuts.map((c) => `between(t,${c.start},${c.end})`));
+  // Each kept frame moves back by the cut time before it, rather than being
+  // renumbered at a constant rate, so variable-frame-rate video stays as long
+  // as its audio (#186).
+  const removed = sumExpr(cuts.map((c) => `clip(T-${c.start},0,${Number((c.end - c.start).toFixed(3))})`));
+  return {
+    video: `select='not(${drop})',setpts='(T-(${removed}))/TB'`,
+    // aselect keeps or drops whole frames (1024 samples, ~21 ms, for AAC), so
+    // small frames keep each cut within a few ms of the video's (#244).
+    audio: `asetnsamples=n=256:p=0,aselect='not(${drop})',asetpts=N/SR/TB`,
+  };
+}
+
 /** Remove the cut spans from video (and audio) in one pass. Timestamps are
  * regenerated so the result plays continuously. Pure. */
 export function buildCutIdleArgs(
@@ -97,18 +116,11 @@ export function buildCutIdleArgs(
   withAudio: boolean,
   quality: Quality = "standard",
 ): string[] {
-  if (cuts.length === 0) throw new ScreencastError("Nothing to cut.");
-  if (cuts.length > MAX_CUTS) throw new ScreencastError(`Too many idle stretches (${cuts.length}); raise minIdleSec.`);
-  // Grouped, since ffmpeg rejects a flat sum of 100+ terms (#225).
-  const drop = sumExpr(cuts.map((c) => `between(t,${c.start},${c.end})`));
-  // Each kept frame moves back by the cut time before it, rather than being
-  // renumbered at a constant rate, so variable-frame-rate video stays as long
-  // as its audio (#186).
-  const removed = sumExpr(cuts.map((c) => `clip(T-${c.start},0,${Number((c.end - c.start).toFixed(3))})`));
+  const f = cutFilters(cuts);
   return [
     "-y", "-i", input,
-    "-vf", `select='not(${drop})',setpts='(T-(${removed}))/TB'`,
-    ...(withAudio ? ["-af", `aselect='not(${drop})',asetpts=N/SR/TB`] : ["-an"]),
+    "-vf", f.video,
+    ...(withAudio ? ["-af", f.audio] : ["-an"]),
     ...resolveQuality(quality),
     ...(withAudio ? ["-c:a", "aac", "-b:a", "160k"] : []),
     output,

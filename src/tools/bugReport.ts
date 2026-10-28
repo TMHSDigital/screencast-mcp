@@ -65,13 +65,13 @@ const inputSchema = {
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
-interface Source {
+export interface Source {
   path: string;
   eventsPath: string | null;
   record?: SessionRecord;
 }
 
-async function resolveSource(args: { input?: string; sessionId?: string }): Promise<Source> {
+export async function resolveSource(args: { input?: string; sessionId?: string }): Promise<Source> {
   if (args.sessionId !== undefined) {
     const record = getStore().get(args.sessionId);
     if (!record) throw new ScreencastError(`No session with id "${args.sessionId}".`);

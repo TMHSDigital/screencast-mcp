@@ -4,7 +4,7 @@
 
 **An MCP server that lets an agent record the screen, _watch_ the footage, and make minimal ffmpeg edits — over stdio, on Windows.**
 
-Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, redact, annotate, zoom toward clicks, and export for GitHub or social. No cloud service, no telemetry: ffmpeg and ffprobe behind 49 typed tools.
+Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, redact, annotate, zoom toward clicks, and export for GitHub or social. No cloud service, no telemetry: ffmpeg and ffprobe behind 53 typed tools.
 
 **For developers who want their coding agent to see and prove UI changes on Windows**: bug repros, UI verification, and demo clips the agent records, checks, and edits itself. Capture is Windows-only; the watch and edit tools work on any OS with ffmpeg. Free for non-commercial use ([CC BY-NC-ND 4.0](#license)); [why not OBS, Playwright, or a screenshot MCP?](#why-not-just)
 
@@ -79,7 +79,7 @@ What it can do beyond record-and-look:
 - **Zoom toward clicks.** Record with `events: true` and `zoom` glides in on each click and rings it, Screen Studio style.
 - **Review before sharing.** In clients with MCP Apps, `review_recording` opens an inline player where a person trims and draws redaction boxes.
 - **Find and cover secrets.** `find_text` reads the screen with Windows OCR and returns rectangles for `redact_region`.
-- **One call, one encode.** `pipeline` runs trim, crop, redact, callouts, and an export as a single ffmpeg pass.
+- **One call, one encode.** `pipeline` runs trim, crop, redact, callouts, and an export as a single ffmpeg pass; `recipe: "tutorial"` turns a raw recording into a cut, zoomed, normalized, captioned mp4.
 - **Record a covered window.** `backend: "wgc"` records a window's own surface through Windows Graphics Capture.
 
 ### Why not just...
@@ -92,7 +92,7 @@ What it can do beyond record-and-look:
 
 ## Tools
 
-49 tools in six groups. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface; tests keep it, this README, and the docs site in sync with `src/tools/`.
+53 tools in six groups. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface; tests keep it, this README, and the docs site in sync with `src/tools/`.
 
 ### Capture
 
@@ -121,6 +121,8 @@ What it can do beyond record-and-look:
 | `screen_diff` | Compare two screenshots/frames: SSIM score, share changed, and **bounding boxes of what changed**, with the changes outlined in an inline image. Verify a UI change happened, and only where expected. |
 | `wait_for_change` | Watch a target and return when it **changes** (a dialog opened) or **settles** (a build or page finished), instead of guessing a sleep. Reports elapsed time, changed regions, and the final state inline. |
 | `find_text` | **Read text** on screen or in a frame with the OCR engine built into Windows (no install): every line and match with its bounding box. Locate a button by its label, check what the screen says, or find secrets (`regex: "sk-|ghp_"`) and get `redact_region` rectangles with `redact: true`; `scanEverySec` checks a whole video, with a time window per match. Best-effort; review before relying on it. |
+| `index_recording` | **Text timeline** of a recording (path or `sessionId`): cuts it at scene changes (with fill keyframes so no stretch over 10 s goes unread), OCRs one keyframe per segment, and attaches input events, markers, and transcript cues (an `.srt`, the `<video>.srt` sidecar, or `transcript: "whisper"`). Writes `<video>.index.json` next to the video (or under `SCREENCAST_HOME/edits/indexes` when that folder is outside the allowed output dirs); a re-run on an unchanged file reuses the OCR. The index holds the raw screen text, so treat it like the video. |
+| `search_recording` | **Find a moment as text** in an indexed recording: "when did Save failed appear?" returns timecoded hits (segment `start`/`end` plus the exact time of a matching cue, marker, or event), best first, with secrets masked in the snippets. Plain queries tolerate OCR misreads; `regex: true` for patterns. No images unless `images: N` asks for small thumbnails of the top hits. |
 | `get_media_info` | ffprobe wrapper: duration, resolution, fps, codecs, container format, and size. |
 
 ### Minimal edit
@@ -147,11 +149,12 @@ These tools re-encode (a filter rewrites pixels, so stream copy does not apply).
 | `extract_audio` | Write the audio track to its own file (`mp3`, `aac`, `wav`, or `copy`). |
 | `normalize_audio` | **Loudness to a delivery target** (two-pass EBU R128 `loudnorm`): `youtube` −14 LUFS, `podcast` −16, `broadcast` −23, or any LUFS value. Video is copied; reports loudness before and after. |
 | `denoise` | Reduce **steady** background noise (fan, hum, hiss) with `afftdn`, tuned to the file's measured noise floor. Video is copied. |
-| `transcribe` | **Speech to an SRT file, locally**, with FFmpeg 8's `whisper` filter (needs a whisper.cpp model: pass `model` or set `SCREENCAST_WHISPER_MODEL`). Cues are renumbered and de-overlapped. |
+| `transcribe` | **Speech to an SRT file, locally**, with FFmpeg 8's `whisper` filter (needs a whisper.cpp model: pass `model` or set `SCREENCAST_WHISPER_MODEL`). Cues are renumbered and de-overlapped; `words: true` gives one word per cue (whisper `max_len=1`) for `cut_by_transcript`. |
 | `burn_subtitles` | Burn an SRT/ASS into the video in the bundled font: `clean` (outlined line) or `social` (big bold text on a dark box, for muted autoplay). |
 | `chapters` | **Chapters without a re-encode**: from markers (the default), the strongest scene changes, transcript sections (an SRT split at pauses), or an explicit list, written into an mp4/mkv/mov copy as real chapters (FFMETADATA, stream copy; they show in VLC and MPC) and returned as YouTube chapter text, with any YouTube rule it breaks (first at 0:00, three or more, 10 s each). `subtitles` muxes an SRT as a soft, toggleable track (`mov_text` in mp4) instead of burning it in; `textOnly` writes nothing. |
 | `clip` | Extract one or more frame-accurate sub-segments, each to its own file. For a single segment, `trim` (default `exact: true`) does the same. |
 | `cut_idle` | **Remove dead air**: cut stretches where the screen is frozen and (when there is audio) silent, keeping a short pad at each edge. `dryRun` reports first; speech over a still screen is kept unless `useAudio: false`. |
+| `cut_by_transcript` | **Edit by the transcript**: cut the lines you quote (`remove: ["exact words"]`, or cue numbers) and, with `fillers: true`, um/uh/erm, in one select/aselect pass that keeps audio and video in sync. Writes a re-timed `.srt` next to the video so `burn_subtitles` still lines up. Timing is as fine as the SRT: `transcribe { words: true }` gives one word per cue; with sentence cues a partial quote is placed by estimate (`exact: false`) and fillers inside a sentence are left in. `dryRun` returns the edited text first. |
 
 ### Redact
 
@@ -177,8 +180,9 @@ The production layer turns raw clips into a finished piece. Tools that combine c
 | `keystroke_overlay` | **Keycast-style badges** ("Ctrl + Shift + P", "Double click", "Typing…") burned in from the input event log, one at a time, each lingering `lingerSec` (default 1.2). Repeats merge (`Ctrl + Z ×3`); `position`, `size`, `clicks`, `typing`. It can only show what the log holds: never typed text, and shortcuts only from `keys: "shortcuts"` recordings; `keys: "masked"` here shows a chord's modifiers only. |
 | `backdrop` | **Frame a clip or screenshot** (Screen Studio / CleanShot style): padding, a gradient, solid, or wallpaper `image` background, rounded corners, and a soft drop shadow, optionally on a `16:9`/`9:16`/`1:1`/`4:5` canvas. Presets in the project palette: `desktop` (default, dark slate), `rec` (record red), `amber` (amber to red), `light`. A PNG/JPG input writes a framed still. |
 | `export_preset` | Encode a platform-ready file (`youtube`, `instagram_reel`, `tiktok`, `x`, `square`, `steam_trailer`, `vertical_reel`): reframes, caps fps, and encodes H.264 at the platform bitrate with faststart. `steam_trailer` is 1080p H.264 High at a padded 5.5 Mbps CBR (above Steam's 5 Mbps floor) with 48 kHz audio at -14 LUFS; `vertical_reel` centres the footage over a blurred copy of itself with audio at -14 LUFS. |
-| `pipeline` | **Several edits in one ffmpeg process**: `steps` of `trim`, `crop`, `scale`, `speed`, `redact`, `callout`, `keystroke_overlay`, `reframe`, `zoom` (keyframes), `backdrop`, ending optionally in `export_preset` or `export_gif`, each with its tool's options. One re-encode, no intermediate files, and a recipe you can save and re-run on the next recording; `dryRun` returns the planned command; `chapters: true` keeps the input's markers as chapters, re-timed through trims and speed changes. |
+| `pipeline` | **Several edits in one ffmpeg process**: `steps` of `trim`, `crop`, `scale`, `speed`, `cut_idle`, `redact`, `callout`, `keystroke_overlay`, `reframe`, `zoom` (keyframes, or `follow: "clicks"` from the event log), `backdrop`, `audio` (`normalize`, `denoise`), `burn_subtitles` (a file, or `transcribe: true`), ending optionally in `export_preset` or `export_gif`, each with its tool's options. Or name a `recipe`: `pr_demo` (cut idle, click zoom, GIF under 10 MB), `tutorial` (plus denoise/normalize and captions, 1080p mp4) or `social_reel` (9:16, big captions); it expands to steps that `dryRun` shows and your own `steps` override. One re-encode, no intermediate files, and a recipe you can save and re-run on the next recording; `dryRun` returns the planned command; `chapters: true` keeps the input's markers as chapters, re-timed through trims and speed changes. |
 | `bug_report` | **A paste-ready repro package in one call**: from a recording path or `sessionId`, writes a folder with a trimmed clip (the last 30 s by default) and a GIF under 10 MB, a timecoded contact sheet, numbered steps rebuilt from the input event log, OCR'd error and dialog text, environment details (OS, displays and DPI, window, ffmpeg), and a `report.md` for `gh issue create --body-file` (plus `report.json`). Before anything is encoded, a whole-clip OCR secret scan boxes out API keys, tokens, and `password:` values in every output and masks them in the quoted text; it needs Windows OCR (`redact: false` skips it). |
+| `step_guide` | **A step-by-step how-to from a recording** (Steps Recorder for the agent era): from a path or `sessionId` with an input event log, writes `guide.md` with an `images/` folder and/or one self-contained `guide.html`. Each click, shortcut, typing burst, and scroll becomes a numbered step with the frame just before it, the click ringed, and a caption ("Click **Save**") from OCR of the text under the click; markers become section headings. OCR also boxes secrets out of the screenshots and masks them in captions (`ocr: false` skips both; it needs Windows OCR). Typed text is never logged, so it never appears. Returns the steps so the agent can rewrite captions. |
 
 ### Targets
 
@@ -223,9 +227,9 @@ Edit and produce tools write to a `<name>.partial.<ext>` file next to the output
 | Toolset | Tools |
 | --- | --- |
 | `capture` | `start_recording`, `stop_recording`, `save_replay`, `list_sessions`, `get_session`, `read_events`, `add_marker`, `screenshot`, `list_targets`, `list_audio_devices` |
-| `watch` | `sample_frames`, `contact_sheet`, `screen_diff`, `wait_for_change`, `find_text`, `review_recording`, `player_frames` |
-| `edit` | `pipeline`, `trim`, `clip`, `concat`, `convert`, `export_gif`, `crop`, `scale`, `speed`, `compress`, `redact_region`, `cut_idle` |
-| `produce` | `callout`, `keystroke_overlay`, `backdrop`, `overlay`, `zoom`, `reframe`, `title_card`, `xfade_transition`, `assemble_highlights`, `export_preset`, `burn_subtitles`, `chapters`, `bug_report` |
+| `watch` | `sample_frames`, `contact_sheet`, `screen_diff`, `wait_for_change`, `find_text`, `index_recording`, `search_recording`, `review_recording`, `player_frames` |
+| `edit` | `pipeline`, `trim`, `clip`, `concat`, `convert`, `export_gif`, `crop`, `scale`, `speed`, `compress`, `redact_region`, `cut_idle`, `cut_by_transcript` |
+| `produce` | `callout`, `keystroke_overlay`, `backdrop`, `overlay`, `zoom`, `reframe`, `title_card`, `xfade_transition`, `assemble_highlights`, `export_preset`, `burn_subtitles`, `chapters`, `bug_report`, `step_guide` |
 | `audio` | `extract_audio`, `normalize_audio`, `denoise`, `transcribe`, `music_bed` |
 | `core` (always) | `doctor`, `get_media_info` |
 
@@ -287,6 +291,14 @@ bug_report { "sessionId": "rec-…", "title": "Save fails on a read-only folder"
 gh issue create --title "Save fails on a read-only folder" --body-file …/report.md
 ```
 
+Documenting a task as a how-to (record with `events: true`; `add_marker` between phases gives section headings):
+
+```jsonc
+step_guide { "sessionId": "rec-…", "title": "Export a report as PDF" }
+//    -> { "outputDir": "…/edits/step-guide-…", "markdownPath": "…/guide.md", "htmlPath": "…/guide.html",
+//         "steps": [{ "n": 1, "caption": "Click File", "section": "Open the report", "image": "step-01.png" }, …] }
+```
+
 Inline images are downscaled JPEGs (`maxImageWidth`, default 1280) and capped per call (`maxInlineImages`, default 8, max 20); the full-resolution PNGs stay on disk. Pass `returnImage: false` / `returnImages: false` to get paths only.
 
 `sample_frames` writes at most `maxFrames` frames per call (default 100, max 1000). In `fps` mode it probes the video first; if the rate would exceed the cap, it samples at a lower rate so the frames still span the whole video, and the result's `capNote` says what it did.
@@ -299,6 +311,7 @@ Beyond tools, the server offers **prompts**: ready-made workflows that clients s
 | --- | --- |
 | `bug-repro-clip` | Record, find the bug moment, check for secrets, trim, annotate, and export a GIF for an issue. |
 | `file-bug-report` | Record a repro with input events, package it with `bug_report` (redacted clip, GIF, steps, error text, `report.md`), review it, and file it with `gh issue create` once you confirm. |
+| `document-steps` | Record a task with input events and markers, turn it into a step-by-step guide with `step_guide`, and tidy the captions. |
 | `demo-gif` | Record a feature walkthrough and export a GIF small enough for a README or PR. |
 | `verify-ui-change` | Screenshot before, make the change, wait for the screen to settle, diff, and confirm the text. |
 | `review-recording` | Summarize what happens in a recording, with timestamps. |
