@@ -16,7 +16,10 @@ const inputSchema = {
   style: z
     .enum(["clean", "social"])
     .optional()
-    .describe("'clean' (default): a modest outlined line. 'social': large bold text on a dark box, for muted autoplay."),
+    .describe(
+      "'clean' (default for .srt): a modest outlined line. 'social': large bold text on a dark box, for muted " +
+        "autoplay. An .ass/.ssa file keeps its own styling unless a style is given.",
+    ),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
 };
@@ -40,13 +43,13 @@ export function register(server: McpServer): void {
         const ext = editOutputExt(args.input);
         const output = resolveOutput(args.output, subdir("edits"), `subtitled-${stamp()}-${rand()}${ext}`, args.overwrite);
         const fontsDir = dirname(bundledFontPath("regular"));
-        const style = (args.style as CaptionStyle | undefined) ?? "clean";
+        const style = (args.style as CaptionStyle | undefined) ?? (/\.(ass|ssa)$/i.test(args.subtitles) ? null : "clean");
         await runEditJob(buildBurnSubtitlesArgs(args.input, args.subtitles, output, fontsDir, style), {
           output,
           durationSec: (await probeMedia(args.input)).durationSec,
           extra,
         });
-        return okResponse({ outputPath: output, style });
+        return okResponse({ outputPath: output, style: style ?? "file" });
       } catch (error) {
         return errorResponse(error);
       }

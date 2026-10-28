@@ -38,7 +38,9 @@ export function register(server: McpServer): void {
         const output = resolveOutput(args.output, subdir("edits"), `denoise-${stamp()}-${rand()}${ext}`, args.overwrite);
         // Measure the noise floor first: afftdn only works when told roughly how
         // loud the noise is.
-        const scan = await runCapture(requireFfmpeg().ffmpeg, buildNoiseFloorArgs(args.input), jobTimeoutMs(info.durationSec));
+        const scan = await runCapture(requireFfmpeg().ffmpeg, buildNoiseFloorArgs(args.input), jobTimeoutMs(info.durationSec), {
+          signal: extra.signal,
+        });
         const floor = parseNoiseFloor(scan.stdout);
         await runEditJob(buildDenoiseArgs(args.input, output, strength, floor), {
           output,

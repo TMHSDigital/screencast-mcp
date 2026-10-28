@@ -36,7 +36,13 @@ export function register(server: McpServer): void {
           args.overwrite,
         );
         const ffArgs = buildSpeedArgs(args.input, output, args.factor, audioCodec !== null);
-        await runEditJob(ffArgs, { output, durationSec: durationSec !== null ? durationSec / args.factor : null, extra });
+        // Progress follows the output; the timeout follows the input ffmpeg decodes (#237).
+        await runEditJob(ffArgs, {
+          output,
+          durationSec: durationSec !== null ? durationSec / args.factor : null,
+          inputDurationSec: durationSec,
+          extra,
+        });
         return okResponse({ outputPath: output, factor: args.factor, audio: audioCodec !== null });
       } catch (error) {
         return errorResponse(error);

@@ -86,8 +86,11 @@ export function zoomFilter(views: View[], size: { width: number; height: number;
   const z = viewExpr(views, "z", transition);
   const cx = viewExpr(views, "cx", transition);
   const cy = viewExpr(views, "cy", transition);
+  // zoompan writes one frame per input frame at `fps`, so the input is first
+  // made constant-rate at that fps: variable-rate video, or a sped-up stream
+  // in a pipeline, would otherwise come out the wrong length (#186).
   return (
-    `scale=${W * up}:${H * up},` +
+    `fps=${n(fps)},scale=${W * up}:${H * up},` +
     `zoompan=z='${z}':x='clip((${cx})*${up}-iw/zoom/2,0,iw-iw/zoom)':y='clip((${cy})*${up}-ih/zoom/2,0,ih-ih/zoom)'` +
     `:d=1:s=${W}x${H}:fps=${n(fps)}`
   );

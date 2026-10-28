@@ -21,8 +21,10 @@ import {
   closeSync,
   unlinkSync,
   statSync,
+  linkSync,
 } from "node:fs";
 import type { ChildProcess } from "node:child_process";
+import { ScreencastError } from "./errors.js";
 import type { Quality } from "./targets.js";
 import { WGC_WINDOW_CLOSED_EXIT } from "./wgc.js";
 
@@ -195,12 +197,13 @@ export function pruneRecords(records: SessionRecord[]): SessionRecord[] {
   return [...active, ...finished];
 }
 
-/** A lock older than this is assumed abandoned even if its pid looks alive
- * (pids are recycled). A read-merge-write takes milliseconds. */
-export const LOCK_STALE_MS = 10_000;
-/** Give up waiting for the lock after this long and write anyway: a stuck
- * lock must not stop a recording from being registered. */
-export const LOCK_WAIT_MS = 2_000;
+/** A lock whose holder pid is dead is taken over at once. One whose pid still
+ * looks alive is taken over only past this age, since pids are recycled; a
+ * read-merge-write takes milliseconds, so no live holder gets near it. */
+export const LOCK_STALE_MS = 30_000;
+/** How long a write waits for the lock before failing with an error. It never
+ * writes without the lock: that is how records were lost (#235). */
+export const LOCK_WAIT_MS = 15_000;
 
 /** True when a registry lock can be taken over: it is older than
  * LOCK_STALE_MS, or it names a holder pid that is no longer alive. A lock with
@@ -238,75 +241,110 @@ function renameWithRetry(from: string, to: string): void {
   }
 }
 
+/** Take over a stale lock by renaming it aside rather than deleting it, then
+ * confirm the file moved is the one judged stale (`raw`). Two waiters can judge
+ * the same lock stale; a plain unlink by the slower one would delete the lock
+ * the faster one just created. If that happened, put the live lock back. */
+function breakStaleLock(lock: string, raw: string): void {
+  const aside = `${lock}.${process.pid}.${Date.now()}.stale`;
+  try {
+    renameSync(lock, aside);
+  } catch {
+    return; // released or taken over meanwhile; the caller retries
+  }
+  try {
+    if (readFileSync(aside, "utf8") !== raw) linkSync(aside, lock);
+  } catch {
+    /* best effort: a new holder may already have recreated it */
+  }
+  try {
+    unlinkSync(aside);
+  } catch {
+    /* best effort */
+  }
+}
+
 /** Run `fn` holding an exclusive lockfile next to the registry (#55), so two
  * server instances cannot interleave a read-merge-write. The lock is an
  * O_EXCL-created file holding the owner's pid and a timestamp; a stale lock
- * (dead owner or older than LOCK_STALE_MS) is taken over. */
-function withRegistryLock<T>(registry: string, fn: () => T): T {
+ * (dead owner, or older than LOCK_STALE_MS) is taken over. A busy lock is
+ * waited on with backoff for up to `waitMs`, then the call fails: it never runs
+ * `fn` unlocked (#235). */
+function withRegistryLock<T>(registry: string, fn: () => T, waitMs = LOCK_WAIT_MS): T {
   const lock = `${registry}.lock`;
-  const deadline = Date.now() + LOCK_WAIT_MS;
-  let held = false;
-  while (!held) {
+  const deadline = Date.now() + waitMs;
+  let holderPid: number | undefined;
+  for (let attempt = 0; ; attempt++) {
     try {
       const fd = openSync(lock, "wx");
       writeFileSync(fd, JSON.stringify({ pid: process.pid, at: Date.now() }));
       closeSync(fd);
-      held = true;
+      break;
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
-      if (Date.now() >= deadline) {
-        process.stderr.write(`Session registry lock ${lock} is busy; writing without it.\n`);
-        break;
-      }
       // On Windows a lock that its holder just deleted, while another process
       // still had it open, lingers as "delete pending": creating it again fails
       // with EPERM/EACCES/EBUSY, not EEXIST. That means busy, so wait.
-      if (code === "EPERM" || code === "EACCES" || code === "EBUSY") {
-        sleepSync(5 + Math.random() * 10);
-        continue;
+      const busy = code === "EEXIST" || code === "EPERM" || code === "EACCES" || code === "EBUSY";
+      if (!busy) {
+        throw new ScreencastError(`Could not lock the session registry (${lock}): ${(err as Error).message}`);
       }
-      if (code !== "EEXIST") break; // e.g. a missing or read-only dir: write unlocked
-      let holder: { pid?: number; at?: number } | null;
-      try {
-        holder = JSON.parse(readFileSync(lock, "utf8"));
-      } catch {
-        // Unreadable or half-written: judge it by the file's age instead.
+      if (code === "EEXIST") {
+        let seen: { raw: string; holder: { pid?: number; at?: number } | null } | null;
         try {
-          holder = { at: statSync(lock).mtimeMs };
+          const raw = readFileSync(lock, "utf8");
+          let holder: { pid?: number; at?: number } | null;
+          try {
+            holder = JSON.parse(raw);
+          } catch {
+            // Half-written: judge it by the file's age instead.
+            holder = { at: statSync(lock).mtimeMs };
+          }
+          seen = { raw, holder };
         } catch {
-          continue; // the holder just released it; retry at once
+          seen = null; // the holder just released it (or is mid-release): wait
+        }
+        if (seen) {
+          holderPid = seen.holder?.pid;
+          if (isLockStale(seen.holder, Date.now(), isAlive(seen.holder?.pid ?? null))) {
+            breakStaleLock(lock, seen.raw);
+            continue;
+          }
         }
       }
-      if (isLockStale(holder, Date.now(), isAlive(holder?.pid ?? null))) {
-        try {
-          unlinkSync(lock);
-        } catch {
-          /* another instance took it over first */
-        }
-        continue;
+      if (Date.now() >= deadline) {
+        throw new ScreencastError(
+          `The session registry is busy: could not take ${lock} within ${waitMs / 1000} s` +
+            `${holderPid !== undefined ? ` (held by process ${holderPid})` : ""}. Nothing was written.`,
+          "Another screencast-mcp server is writing to the same registry. Retry; if no other server is running, delete the .lock file.",
+        );
       }
-      sleepSync(10 + Math.random() * 15);
+      // Exponential backoff with jitter, capped so a waiter still notices the
+      // release promptly when several instances queue up.
+      sleepSync(Math.min(50, 2 ** Math.min(attempt, 6)) * (0.5 + Math.random()));
     }
   }
   try {
     return fn();
   } finally {
-    if (held) {
-      try {
-        unlinkSync(lock);
-      } catch {
-        /* already removed */
-      }
+    try {
+      unlinkSync(lock);
+    } catch {
+      /* already removed */
     }
   }
 }
 
 export class SessionStore {
   private records = new Map<string, SessionRecord>();
-  /** Ids this instance created or changed since its last write. Only these
-   * override the on-disk copy; every other record is taken from disk, so a
-   * stale copy loaded at boot never undoes another instance's update (#55). */
-  private dirty = new Set<string>();
+  /** Fields this instance created or changed since its last write, by id. Only
+   * these override the on-disk copy, field by field: every other record and
+   * field is taken from disk, so a stale copy never undoes another instance's
+   * update (#55, #235). */
+  private pending = new Map<string, Partial<SessionRecord>>();
+  /** Identity of the registry file as last read or written, so get()/list()
+   * re-read it only when another instance has replaced it (#235). */
+  private seen: string | null = null;
   private children = new Map<string, ChildProcess>();
   /** Ids with a deliberate stop in flight, so the child's exit handler does not
    * misread the clean exit as the maxDurationSec cap firing. */
@@ -315,7 +353,10 @@ export class SessionStore {
    * resources changed (#126). */
   private listeners: Array<() => void> = [];
 
-  constructor(private readonly path: string) {}
+  constructor(
+    private readonly path: string,
+    private readonly lockWaitMs = LOCK_WAIT_MS,
+  ) {}
 
   /** Run `cb` after each registry write. A throwing listener is ignored. */
   onChange(cb: () => void): void {
@@ -329,8 +370,7 @@ export class SessionStore {
   private readDisk(): Map<string, SessionRecord> {
     if (!existsSync(this.path)) return new Map();
     try {
-      const data = JSON.parse(readFileSync(this.path, "utf8")) as SessionRecord[];
-      return new Map(data.map((r) => [r.id, r]));
+      return this.parseDisk();
     } catch {
       try {
         copyFileSync(this.path, `${this.path}.bak`);
@@ -344,31 +384,89 @@ export class SessionStore {
     }
   }
 
+  /** Parse the registry file; throws if it is missing or unreadable. */
+  private parseDisk(): Map<string, SessionRecord> {
+    const data = JSON.parse(readFileSync(this.path, "utf8")) as SessionRecord[];
+    return new Map(data.map((r) => [r.id, r]));
+  }
+
+  /** The registry file's identity: every write replaces it by rename, so a
+   * new file id (or size/mtime) means another instance wrote it. */
+  private signature(): string | null {
+    try {
+      const s = statSync(this.path, { bigint: true });
+      return `${s.ino}:${s.size}:${s.mtimeNs}`;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Lay this instance's unwritten changes over the on-disk records, field by
+   * field, falling back to our own copy for a record the disk no longer has. */
+  private overlay(disk: Map<string, SessionRecord>): Map<string, SessionRecord> {
+    for (const [id, patch] of this.pending) {
+      const base = disk.get(id) ?? this.records.get(id);
+      if (base) disk.set(id, { ...base, ...patch });
+    }
+    return disk;
+  }
+
+  /** Pick up records another server instance started, stopped, or updated
+   * since we last looked (#235). Cheap when nothing changed (one stat). A read
+   * that fails (the file mid-replace, or corrupt) keeps the current view;
+   * load() and persist() deal with a corrupt file. */
+  private refresh(): void {
+    const sig = this.signature();
+    if (sig === this.seen) return;
+    let disk: Map<string, SessionRecord>;
+    try {
+      disk = sig === null ? new Map() : this.parseDisk();
+    } catch {
+      return;
+    }
+    this.seen = sig;
+    this.records = new Map(pruneRecords([...this.overlay(disk).values()]).map((r) => [r.id, r]));
+  }
+
   load(): void {
     // Read under the lock too: on Windows a writer's rename over the file
-    // fails while any other process has it open for reading.
-    const disk = withRegistryLock(this.path, () => this.readDisk());
-    this.records = new Map(pruneRecords([...disk.values()]).map((r) => [r.id, r]));
+    // fails while any other process has it open for reading. If the lock
+    // stays busy, read anyway: a read cannot lose a record, and the writer's
+    // rename is retried.
+    const read = () => {
+      const disk = this.readDisk();
+      this.seen = this.signature();
+      return disk;
+    };
+    let disk: Map<string, SessionRecord>;
+    try {
+      disk = withRegistryLock(this.path, read, this.lockWaitMs);
+    } catch (err) {
+      process.stderr.write(`${(err as Error).message} Reading the session registry without the lock.\n`);
+      disk = read();
+    }
+    this.records = new Map(pruneRecords([...this.overlay(disk).values()]).map((r) => [r.id, r]));
   }
 
   persist(): void {
-    // Under the registry lock: re-read the file, overlay only the records this
+    // Under the registry lock: re-read the file, overlay only the fields this
     // instance changed (anything else on disk is newer than our copy), prune,
     // and write atomically (temp + rename) so a kill mid-write cannot corrupt
-    // the file. Our view is then refreshed from what was written.
-    withRegistryLock(this.path, () => {
-      const merged = this.readDisk();
-      for (const id of this.dirty) {
-        const rec = this.records.get(id);
-        if (rec) merged.set(id, rec);
-      }
-      const pruned = pruneRecords([...merged.values()]);
-      const tmp = `${this.path}.${process.pid}.tmp`;
-      writeFileSync(tmp, JSON.stringify(pruned, null, 2));
-      renameWithRetry(tmp, this.path);
-      this.records = new Map(pruned.map((r) => [r.id, r]));
-      this.dirty.clear();
-    });
+    // the file. Our view is then refreshed from what was written. A lock that
+    // stays busy throws and leaves the changes pending for the next write.
+    withRegistryLock(
+      this.path,
+      () => {
+        const pruned = pruneRecords([...this.overlay(this.readDisk()).values()]);
+        const tmp = `${this.path}.${process.pid}.tmp`;
+        writeFileSync(tmp, JSON.stringify(pruned, null, 2));
+        renameWithRetry(tmp, this.path);
+        this.seen = this.signature();
+        this.records = new Map(pruned.map((r) => [r.id, r]));
+        this.pending.clear();
+      },
+      this.lockWaitMs,
+    );
     for (const cb of this.listeners) {
       try {
         cb();
@@ -378,28 +476,45 @@ export class SessionStore {
     }
   }
 
+  /** Register a new session. If the write fails the session is dropped again,
+   * so a recording the caller then abandons does not linger in our view. */
   create(record: SessionRecord): void {
     this.records.set(record.id, record);
-    this.dirty.add(record.id);
-    this.persist();
+    this.pending.set(record.id, record);
+    try {
+      this.persist();
+    } catch (err) {
+      this.records.delete(record.id);
+      this.pending.delete(record.id);
+      throw err;
+    }
   }
 
   get(id: string): SessionRecord | undefined {
+    this.refresh();
     return this.records.get(id);
   }
 
   list(): SessionRecord[] {
+    this.refresh();
     return [...this.records.values()].sort((a, b) =>
       a.startedAt < b.startedAt ? 1 : -1,
     );
   }
 
+  /** Apply `patch` to a session. Only the patched fields are written over the
+   * current on-disk record, so fields another instance changed meanwhile
+   * survive (#235). */
   update(id: string, patch: Partial<SessionRecord>): SessionRecord | undefined {
-    const cur = this.records.get(id);
+    let cur = this.records.get(id);
+    if (!cur) {
+      this.refresh(); // started by another instance since we last looked
+      cur = this.records.get(id);
+    }
     if (!cur) return undefined;
     const next = { ...cur, ...patch };
     this.records.set(id, next);
-    this.dirty.add(id);
+    this.pending.set(id, { ...this.pending.get(id), ...patch });
     this.persist();
     return this.records.get(id) ?? next;
   }
@@ -453,6 +568,7 @@ export class SessionStore {
    * the ids that were reaped.
    */
   reapOrphans(): string[] {
+    this.refresh();
     const reaped: string[] = [];
     for (const record of this.records.values()) {
       if (record.status !== "recording") continue;
@@ -467,16 +583,15 @@ export class SessionStore {
         if (isRecorderProcess(record.pid, expectedImage(record))) killPid(record.pid);
         reaped.push(record.id);
       }
-      this.dirty.add(record.id);
-      this.records.set(record.id, {
-        ...record,
+      const patch: Partial<SessionRecord> = {
         status: verdict.status,
-        stoppedAt: record.stoppedAt ?? new Date().toISOString(),
-        error:
-          verdict.status === "orphaned"
-            ? "Reaped on server restart (recording was interrupted)."
-            : record.error,
-      });
+        ...(record.stoppedAt ? {} : { stoppedAt: new Date().toISOString() }),
+        ...(verdict.status === "orphaned"
+          ? { error: "Reaped on server restart (recording was interrupted)." }
+          : {}),
+      };
+      this.records.set(record.id, { ...record, ...patch });
+      this.pending.set(record.id, { ...this.pending.get(record.id), ...patch });
     }
     if (this.records.size > 0) this.persist();
     return reaped;

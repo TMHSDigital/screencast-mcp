@@ -68,11 +68,11 @@ describe("zoom (#119)", () => {
   it("renders with zoompan on a 2x upscale at the source size and frame rate", () => {
     const a = buildZoomArgs("in.mp4", "o.mp4", keyframesToViews([{ t: 1, full: true }], W, H), { width: W, height: H, fps: 30 });
     const vf = a[a.indexOf("-vf") + 1];
-    expect(vf.startsWith("scale=2560:1440,zoompan=z='")).toBe(true);
+    expect(vf.startsWith("fps=30,scale=2560:1440,zoompan=z='")).toBe(true);
     expect(vf).toContain(":d=1:s=1280x720:fps=30");
     expect(vf).toContain("x='clip((");
     const big = buildZoomArgs("in.mp4", "o.mp4", keyframesToViews([{ t: 1, full: true }], 3840, 2160), { width: 3840, height: 2160, fps: 60 });
-    expect(big[big.indexOf("-vf") + 1].startsWith("scale=3840:2160,")).toBe(true);
+    expect(big[big.indexOf("-vf") + 1].includes(",scale=3840:2160,")).toBe(true);
   });
 
   it("fits a view around a change: padded, frame-shaped, at least min size, inside the frame", () => {
@@ -139,7 +139,7 @@ describe("zoom (#119)", () => {
     });
     const graph = args[args.indexOf("-filter_complex") + 1];
     expect(graph.startsWith("[0:v]null[in];color=c=red")).toBe(true);
-    expect(graph).toContain("[out]scale=2560:1440,zoompan=");
+    expect(graph).toContain("[out]fps=30,scale=2560:1440,zoompan=");
     expect(args).toContain("0:a?");
     expect(args).not.toContain("-vf");
   });

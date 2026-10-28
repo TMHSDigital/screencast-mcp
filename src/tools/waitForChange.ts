@@ -93,7 +93,7 @@ export function register(server: McpServer): void {
         const { target, monitors, window } = await resolveCaptureTarget(args.target, { exactTitle: args.exactTitle });
         const area = targetSize(target, monitors);
         const size = detectionSize(area.width, area.height);
-        const grab = () => runFfmpegBuffer(buildRawGrabArgs(target, monitors, size), 15_000);
+        const grab = () => runFfmpegBuffer(buildRawGrabArgs(target, monitors, size), 15_000, { signal: extra.signal });
         const opts = targetDiffOptions(area, size, args.pixelThreshold);
 
         const started = Date.now();
@@ -110,7 +110,15 @@ export function register(server: McpServer): void {
             break;
           }
           await sleep(interval);
-          const current = await grab();
+          // A grab killed by the cancel is the cancel, not a failure.
+          const current = await grab().catch((error: unknown) => {
+            if (extra.signal.aborted) return null;
+            throw error;
+          });
+          if (!current) {
+            outcome = "cancelled";
+            break;
+          }
           if (mode === "change") {
             const d = diffFrames(baseline, current, size.width, size.height, opts);
             if (d.regions.length > 0) {
@@ -147,7 +155,7 @@ export function register(server: McpServer): void {
             ? join(subdir("screenshots"), `wait-${stamp()}-${rand()}.png`)
             : join(tmpdir(), `screencast-wait-${stamp()}-${rand()}.png`);
           try {
-            await runFfmpeg(buildScreenshotArgs(target, shot, monitors), 60_000);
+            await runFfmpeg(buildScreenshotArgs(target, shot, monitors), 60_000, { signal: extra.signal });
             if (args.keep) result.screenshotPath = shot;
             images.push(...(await encodeInlineImages([shot], DEFAULT_MAX_IMAGE_WIDTH, 1)).images);
           } finally {

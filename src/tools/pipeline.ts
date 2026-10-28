@@ -122,7 +122,8 @@ export function register(server: McpServer): void {
           };
           if (args.dryRun) return okResponse({ dryRun: true, ...result, ffmpegArgs: plan.args });
 
-          await runEditJob(plan.args, { output: target, durationSec: plan.durationSec, extra });
+          // The timeout follows the input ffmpeg decodes, not the (maybe sped-up) output (#237).
+          await runEditJob(plan.args, { output: target, durationSec: plan.durationSec, inputDurationSec: info.durationSec, extra });
           if (plan.gif) {
             const anim = await exportAnimation(target, output, plan.gif, extra);
             return okResponse({ outputPath: output, ...result, animation: anim });

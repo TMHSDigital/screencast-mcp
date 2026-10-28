@@ -18,6 +18,7 @@ import {
   tasklistHasImage,
   type SessionRecord,
 } from "../utils/sessions.js";
+import { ScreencastError } from "../utils/errors.js";
 import { WGC_WINDOW_CLOSED_EXIT } from "../utils/wgc.js";
 
 function record(over: Partial<SessionRecord> = {}): SessionRecord {
@@ -207,6 +208,54 @@ describe("SessionStore", () => {
     expect((JSON.parse(readFileSync(p, "utf8")) as SessionRecord[]).map((r) => r.id)).toEqual(["x"]);
   });
 
+  it("sees a session another instance started, without writing first (#235)", () => {
+    const p = newPath();
+    const a = new SessionStore(p);
+    a.load();
+    const b = new SessionStore(p);
+    b.load();
+    b.create(record({ id: "b-rec" }));
+    expect(a.get("b-rec")?.status).toBe("recording");
+    expect(a.list().map((s) => s.id)).toEqual(["b-rec"]);
+    b.update("b-rec", { status: "stopped", endReason: "stopped" });
+    expect(a.get("b-rec")?.status).toBe("stopped");
+    expect(a.list()[0]?.endReason).toBe("stopped");
+  });
+
+  it("does not let a stale update clobber fields another instance changed (#235)", () => {
+    const p = newPath();
+    const a = new SessionStore(p);
+    a.load();
+    a.create(record({ id: "r" }));
+    // B loads the live recording, then A stops it.
+    const b = new SessionStore(p);
+    b.load();
+    a.update("r", { status: "stopped", endReason: "stopped", durationSec: 9 });
+    // B, still holding its "recording" copy, records only the event log.
+    const out = b.update("r", { events: { path: "e.jsonl", keys: "masked", count: 3 } });
+    const onDisk = (JSON.parse(readFileSync(p, "utf8")) as SessionRecord[])[0];
+    for (const rec of [onDisk, out, a.get("r")]) {
+      expect(rec?.status).toBe("stopped");
+      expect(rec?.endReason).toBe("stopped");
+      expect(rec?.durationSec).toBe(9);
+      expect(rec?.events?.count).toBe(3);
+    }
+  });
+
+  it("fails a write instead of writing unlocked while the lock is busy (#235)", () => {
+    const p = newPath();
+    paths.push(`${p}.lock`);
+    // A fresh lock held by a live process (this one).
+    writeFileSync(`${p}.lock`, JSON.stringify({ pid: process.pid, at: Date.now() }));
+    const store = new SessionStore(p, 200);
+    store.load();
+    expect(() => store.create(record({ id: "x" }))).toThrow(ScreencastError);
+    expect(() => store.create(record({ id: "x" }))).toThrow(/registry is busy/);
+    expect(existsSync(p)).toBe(false);
+    expect(existsSync(`${p}.lock`)).toBe(true);
+    expect(store.get("x")).toBeUndefined();
+  });
+
   it("backs up a corrupt registry to .bak instead of silently discarding it", () => {
     const p = newPath();
     writeFileSync(p, "{ not json");
@@ -285,7 +334,8 @@ describe("SessionStore across processes (#55)", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  }, 60_000);
+    // Six cold tsx starts plus 150 locked writes; a loaded CI runner needs room.
+  }, 120_000);
 });
 
 describe("recorder process image (#182)", () => {

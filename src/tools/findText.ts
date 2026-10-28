@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { requireFfmpeg, runFfmpeg, probeMedia } from "../utils/ffmpeg.js";
+import { jobTimeoutMs } from "../utils/jobs.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
 import { captureStill } from "../utils/still.js";
 import { buildHighlightArgs, targetSize } from "../utils/diff.js";
@@ -81,7 +82,11 @@ const inputSchema = {
 
 /** OCR several frames in one PowerShell run: each frame is upscaled for every
  * pass (passScales), and the passes are merged back per frame. */
-async function readFrames(sources: string[], work: string): Promise<Array<{ lines: OcrLine[]; width: number; height: number }>> {
+async function readFrames(
+  sources: string[],
+  work: string,
+  signal: AbortSignal,
+): Promise<Array<{ lines: OcrLine[]; width: number; height: number }>> {
   const sized = await Promise.all(sources.map((s) => probeMedia(s)));
   const passes: string[] = [];
   const passScaleList: number[] = [];
@@ -91,7 +96,9 @@ async function readFrames(sources: string[], work: string): Promise<Array<{ line
     if (!width || !height) throw new ScreencastError("Could not read the image size.");
     for (const [i, scale] of passScales(width, height).entries()) {
       const out = join(work, `pass${f}-${i}.png`);
-      await runFfmpeg(["-y", "-v", "error", "-i", sources[f], "-vf", `scale=iw*${scale}:ih*${scale}:flags=lanczos`, out], 60_000);
+      await runFfmpeg(["-y", "-v", "error", "-i", sources[f], "-vf", `scale=iw*${scale}:ih*${scale}:flags=lanczos`, out], 60_000, {
+        signal,
+      });
       passes.push(out);
       passScaleList.push(scale);
       owner.push(f);
@@ -115,7 +122,7 @@ export function register(server: McpServer): void {
       "in the image's pixels; for a live target, add `origin` for desktop coordinates. Best-effort " +
       "detection: always review.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         if ((args.target === undefined) === (args.input === undefined)) {
@@ -123,7 +130,7 @@ export function register(server: McpServer): void {
         }
         const work = mkdtempSync(join(tmpdir(), "screencast-ocr-"));
         try {
-          if (args.scanEverySec !== undefined) return await scanClip(args, work);
+          if (args.scanEverySec !== undefined) return await scanClip(args, work, extra.signal);
 
           // 1. Get the source as one PNG frame.
           let source: string;
@@ -147,11 +154,12 @@ export function register(server: McpServer): void {
             await runFfmpeg(
               ["-y", "-v", "error", ...(isImage ? [] : ["-ss", String(args.timestamp ?? 0)]), "-i", args.input!, "-frames:v", "1", ...stillOutput(source)],
               60_000,
+              { signal: extra.signal },
             );
           }
 
           // 2. Upscaled copies for each recognition pass, then OCR them in one run.
-          const [{ lines, width, height }] = await readFrames([source], work);
+          const [{ lines, width, height }] = await readFrames([source], work, extra.signal);
 
           // 3. Match, and optionally outline / suggest redactions.
           const matches = args.query ? findMatches(lines, args.query, args.regex === true) : [];
@@ -159,7 +167,7 @@ export function register(server: McpServer): void {
           const wantImage = args.returnImage ?? Boolean(args.query);
           if (wantImage) {
             const shown = join(work, "shown.png");
-            await runFfmpeg(buildHighlightArgs(source, matches, shown), 30_000);
+            await runFfmpeg(buildHighlightArgs(source, matches, shown), 30_000, { signal: extra.signal });
             images.push(...(await encodeInlineImages([shown], DEFAULT_MAX_IMAGE_WIDTH, 1)).images);
           }
           return okResponse(
@@ -208,7 +216,7 @@ type Args = {
  * fit maxFrames) and report each match with its time. A redaction window runs
  * from the previous sample to the next, since the text may be on screen for
  * any part of the time between two samples. */
-async function scanClip(args: Args, work: string) {
+async function scanClip(args: Args, work: string, signal: AbortSignal) {
   if (args.input === undefined) throw new ScreencastError("scanEverySec reads a video file: pass input, not target.");
   if (!existsSync(args.input)) throw new ScreencastError(`Input file not found: ${args.input}`);
   if (IMAGE_EXTENSIONS.has(extname(args.input).toLowerCase())) {
@@ -217,13 +225,17 @@ async function scanClip(args: Args, work: string) {
   const info = await probeMedia(args.input);
   const maxFrames = args.maxFrames ?? DEFAULT_SCAN_FRAMES;
   const plan = planFpsSampling(info.videoDurationSec ?? info.durationSec, 1 / args.scanEverySec!, maxFrames);
-  await runFfmpeg(buildSampleByFpsArgs(args.input, plan.fps, join(work, "scan_%05d.png"), maxFrames), 10 * 60_000);
+  await runFfmpeg(
+    buildSampleByFpsArgs(args.input, plan.fps, join(work, "scan_%05d.png"), maxFrames),
+    jobTimeoutMs(info.durationSec),
+    { signal },
+  );
   const frames = readdirSync(work).filter((f) => f.startsWith("scan_")).sort().map((f) => join(work, f));
   if (frames.length === 0) throw new ScreencastError("Could not read any frames from the video.");
   const step = 1 / plan.fps;
   const times = frames.map((_, i) => Math.round(i * step * 1000) / 1000);
   const end = info.videoDurationSec ?? info.durationSec ?? times[times.length - 1] + step;
-  const read = await readFrames(frames, work);
+  const read = await readFrames(frames, work, signal);
 
   const matches: Array<TextMatch & { t: number }> = [];
   const redactRegions: Array<ReturnType<typeof redactionRects>[number] & { start: number; end: number }> = [];
@@ -245,7 +257,7 @@ async function scanClip(args: Args, work: string) {
   if ((args.returnImage ?? Boolean(args.query)) && first) {
     const i = times.indexOf(first.t);
     const shown = join(work, "shown.png");
-    await runFfmpeg(buildHighlightArgs(frames[i], matches.filter((m) => m.t === first.t), shown), 30_000);
+    await runFfmpeg(buildHighlightArgs(frames[i], matches.filter((m) => m.t === first.t), shown), 30_000, { signal });
     images.push(...(await encodeInlineImages([shown], DEFAULT_MAX_IMAGE_WIDTH, 1)).images);
   }
   const text = [...seenLines].join("\n");

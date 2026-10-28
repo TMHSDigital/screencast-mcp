@@ -86,7 +86,7 @@ export function register(server: McpServer): void {
       "image path and the sheet inline. poster: true writes a single representative " +
       "frame instead.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         const { ffmpeg } = requireFfmpeg();
         if (!existsSync(args.input)) {
@@ -105,7 +105,9 @@ export function register(server: McpServer): void {
 
         let result: Record<string, unknown>;
         if (args.poster) {
-          await runFfmpeg(buildPosterArgs(args.input, durationSec, output, Math.max(tileWidth, 1280)), jobTimeoutMs(durationSec));
+          await runFfmpeg(buildPosterArgs(args.input, durationSec, output, Math.max(tileWidth, 1280)), jobTimeoutMs(durationSec), {
+            signal: extra.signal,
+          });
           result = { outputPath: output, poster: true };
         } else {
           const count = args.count ?? DEFAULT_SHEET_COUNT;
@@ -115,6 +117,7 @@ export function register(server: McpServer): void {
               ffmpeg,
               buildSceneScanArgs(args.input, args.sceneThreshold ?? DEFAULT_SCENE_THRESHOLD),
               jobTimeoutMs(durationSec),
+              { signal: extra.signal },
             );
             if (scan.code !== 0) {
               throw new ScreencastError(`Scene scan failed (exit ${scan.code}): ${scan.stderr.trim().slice(-400)}`);
@@ -133,9 +136,11 @@ export function register(server: McpServer): void {
               const labelFile = join(work, `label_${i}.txt`);
               writeFileSync(labelFile, formatTimecode(times[i]));
               const tile = join(work, `tile_${String(i).padStart(3, "0")}.png`);
-              await runFfmpeg(buildTileArgs(args.input, times[i], tile, tileWidth, font, labelFile), 60_000);
+              await runFfmpeg(buildTileArgs(args.input, times[i], tile, tileWidth, font, labelFile), 60_000, {
+                signal: extra.signal,
+              });
             }
-            await runFfmpeg(buildSheetArgs(sequencePattern(work, "tile_%03d.png"), grid, output), 60_000);
+            await runFfmpeg(buildSheetArgs(sequencePattern(work, "tile_%03d.png"), grid, output), 60_000, { signal: extra.signal });
           } finally {
             rmSync(work, { recursive: true, force: true });
           }

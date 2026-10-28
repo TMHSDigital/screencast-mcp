@@ -32,7 +32,7 @@ export function register(server: McpServer): void {
       "whisper filter (needs a whisper.cpp model file). Returns the SRT path and the text. " +
       "Pair with burn_subtitles to caption the video.",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         if (!existsSync(args.input)) throw new ScreencastError(`Input file not found: ${args.input}`);
@@ -52,7 +52,9 @@ export function register(server: McpServer): void {
         // then tidy it into the output.
         const raw = tempPath(".srt");
         try {
-          await runFfmpeg(buildTranscribeArgs(args.input, model, raw, args.language ?? "auto"), jobTimeoutMs(info.durationSec));
+          await runFfmpeg(buildTranscribeArgs(args.input, model, raw, args.language ?? "auto"), jobTimeoutMs(info.durationSec), {
+            signal: extra.signal,
+          });
           const cues = existsSync(raw) ? normalizeCues(parseSrt(readFileSync(raw, "utf8"))) : [];
           writeFileSync(output, formatSrt(cues));
           const text = cues.map((c) => c.text.replace(/\n/g, " ")).join(" ");

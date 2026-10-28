@@ -82,7 +82,8 @@ export function buildAnimArgs(
     ...(clip.start ? ["-ss", String(clip.start)] : []),
     ...(clip.duration ? ["-t", String(clip.duration)] : []),
   ];
-  const base = `fps=${s.fps},scale=${s.width}:-1:flags=lanczos`;
+  // Never upscale: a bigger GIF of a small clip only costs bytes (#189).
+  const base = `fps=${s.fps},scale='min(${s.width},iw)':-1:flags=lanczos`;
   if (format === "gif") {
     const colors = s.colors ?? 256;
     return [

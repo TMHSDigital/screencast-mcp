@@ -104,20 +104,23 @@ export const CAPTION_STYLES: Record<CaptionStyle, string> = {
   social: "FontName=Inter,Bold=1,FontSize=22,PrimaryColour=&H00FFFFFF,BackColour=&H99000000,BorderStyle=3,Outline=6,Shadow=0,MarginV=40",
 };
 
-/** Burn an SRT/ASS file into the video with the bundled font. */
+/** Burn an SRT/ASS file into the video with the bundled font. A null style
+ * keeps an .ass file's own styling instead of forcing one (#189). */
 export function buildBurnSubtitlesArgs(
   input: string,
   subtitles: string,
   output: string,
   fontsDir: string,
-  style: CaptionStyle = "clean",
+  style: CaptionStyle | null = "clean",
   quality: Quality = "standard",
 ): string[] {
-  const force = CAPTION_STYLES[style];
-  if (!force) throw new ScreencastError(`Unknown caption style "${style}".`);
+  const force = style === null ? null : CAPTION_STYLES[style];
+  if (force === undefined) throw new ScreencastError(`Unknown caption style "${style}".`);
   return [
     "-y", "-i", input,
-    "-vf", `subtitles=filename=${escapeFilterPath(subtitles)}:fontsdir=${escapeFilterPath(fontsDir)}:force_style='${force}'`,
+    "-vf",
+    `subtitles=filename=${escapeFilterPath(subtitles)}:fontsdir=${escapeFilterPath(fontsDir)}` +
+      (force ? `:force_style='${force}'` : ""),
     ...resolveQuality(quality),
     "-c:a", "copy",
     output,

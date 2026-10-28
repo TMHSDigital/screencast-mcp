@@ -12,6 +12,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 import { getStore, isShuttingDown, markShuttingDown } from "./context.js";
 import { requireFfmpeg } from "./utils/ffmpeg.js";
+import { abortEditJobs } from "./utils/jobs.js";
 import { probeDuration, stopAll } from "./utils/lifecycle.js";
 import { createServer } from "./server.js";
 import { pruneCaptures, retentionDays, RETENTION_ENV } from "./utils/retention.js";
@@ -72,10 +73,14 @@ process.on("unhandledRejection", (reason) => {
   );
 });
 
-/** Finalize every active recording, then exit. Idempotent and never throws. */
+/** Cancel in-flight edits, finalize every active recording, then exit.
+ * Idempotent and never throws. */
 async function shutdown(reason: string, exitCode = 0): Promise<void> {
   if (isShuttingDown()) return;
   markShuttingDown();
+  // process.exit would skip runEditJob's cleanup and leave .partial files
+  // (#237); cancel edits alongside stopping recordings, then await both.
+  const edits = abortEditJobs();
   try {
     const store = getStore();
     if (store.activeIds().length > 0) {
@@ -95,6 +100,8 @@ async function shutdown(reason: string, exitCode = 0): Promise<void> {
       `Shutdown cleanup failed: ${err instanceof Error ? err.message : String(err)}\n`,
     );
   }
+  const cancelled = await edits;
+  if (cancelled > 0) process.stderr.write(`Shutdown (${reason}): cancelled ${cancelled} edit job(s).\n`);
   process.exit(exitCode);
 }
 

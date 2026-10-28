@@ -98,9 +98,13 @@ export function buildCutIdleArgs(
   if (cuts.length > MAX_CUTS) throw new ScreencastError(`Too many idle stretches (${cuts.length}); raise minIdleSec.`);
   // Grouped, since ffmpeg rejects a flat sum of 100+ terms (#225).
   const drop = sumExpr(cuts.map((c) => `between(t,${c.start},${c.end})`));
+  // Each kept frame moves back by the cut time before it, rather than being
+  // renumbered at a constant rate, so variable-frame-rate video stays as long
+  // as its audio (#186).
+  const removed = sumExpr(cuts.map((c) => `clip(T-${c.start},0,${Number((c.end - c.start).toFixed(3))})`));
   return [
     "-y", "-i", input,
-    "-vf", `select='not(${drop})',setpts=N/FRAME_RATE/TB`,
+    "-vf", `select='not(${drop})',setpts='(T-(${removed}))/TB'`,
     ...(withAudio ? ["-af", `aselect='not(${drop})',asetpts=N/SR/TB`] : ["-an"]),
     ...resolveQuality(quality),
     ...(withAudio ? ["-c:a", "aac", "-b:a", "160k"] : []),

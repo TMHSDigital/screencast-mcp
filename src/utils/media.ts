@@ -380,15 +380,17 @@ export function buildConvertArgs(
       const fps = opts.fps ?? 12;
       const width = opts.width ?? 720;
       const filter =
-        `fps=${fps},scale=${width}:-1:flags=lanczos,split[s0][s1];` +
+        `fps=${fps},scale='min(${width},iw)':-1:flags=lanczos,split[s0][s1];` +
         `[s0]palettegen[p];[s1][p]paletteuse`;
       return ["-y", "-i", input, "-vf", filter, output];
     }
     case "webm":
       return [
         "-y", "-i", input,
+        // libvpx's default deadline is its slowest; "good" at cpu-used 4 is
+        // several times faster for little size cost (#189).
         "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "30",
-        "-row-mt", "1",
+        "-deadline", "good", "-cpu-used", "4", "-row-mt", "1",
         output,
       ];
     case "mp4":
@@ -530,7 +532,8 @@ export function atempoChain(factor: number): string {
     parts.push("atempo=0.5");
     remaining /= 0.5;
   }
-  parts.push(`atempo=${Math.round(remaining * 1000) / 1000}`);
+  // Six decimals: rounding to three drifted ~0.9 s over 10 minutes at 1/3 (#186).
+  parts.push(`atempo=${Number(remaining.toFixed(6))}`);
   return parts.join(",");
 }
 

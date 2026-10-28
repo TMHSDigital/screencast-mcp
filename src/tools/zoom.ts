@@ -145,6 +145,7 @@ export function register(server: McpServer): void {
             size.width * size.height,
             (f) => planner.push(f),
             jobTimeoutMs(durationSec),
+            { signal: extra.signal },
           );
           keyframes = planner.finish();
           if (keyframes.length === 0) {

@@ -60,7 +60,9 @@ export function register(server: McpServer): void {
         const hasAudio = info.audioCodec !== null;
         const useAudio = (args.useAudio ?? true) && hasAudio;
 
-        const scan = await runCapture(ffmpeg, buildIdleScanArgs(args.input, minIdle, useAudio), jobTimeoutMs(duration));
+        const scan = await runCapture(ffmpeg, buildIdleScanArgs(args.input, minIdle, useAudio), jobTimeoutMs(duration), {
+          signal: extra.signal,
+        });
         if (scan.code !== 0) throw new ScreencastError(`Idle scan failed (exit ${scan.code}): ${scan.stderr.trim().slice(-400)}`);
         const freezes = parseFreezes(scan.stderr, duration);
         const idle = useAudio ? intersect(freezes, parseSilences(scan.stderr, duration)) : freezes;
@@ -82,6 +84,7 @@ export function register(server: McpServer): void {
         await runEditJob(buildCutIdleArgs(args.input, output, cuts, hasAudio), {
           output,
           durationSec: duration - removedSec,
+          inputDurationSec: duration,
           extra,
         });
         return okResponse({ outputPath: output, ...summary });

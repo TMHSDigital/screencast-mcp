@@ -562,6 +562,46 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     expect(Math.abs(info.durationSec! - 4.6)).toBeLessThan(0.2);
   });
 
+  it("zoom, cut_idle and pipeline speed+zoom keep video and audio the same length on VFR input (#186)", async () => {
+    // 3 s at 30 fps then 3 s at 5 fps, with 6 s of audio: an idle-ish screen recording.
+    const vfr = p("vfr.mp4");
+    await runFfmpeg([
+      "-y",
+      "-f", "lavfi", "-i", "testsrc2=s=160x120:r=30:d=3", "-f", "lavfi", "-i", "testsrc2=s=160x120:r=5:d=3",
+      "-f", "lavfi", "-i", "sine=f=440:d=6",
+      "-filter_complex", "[0][1]concat=n=2:v=1:a=0[v]", "-map", "[v]", "-map", "2:a",
+      "-fps_mode", "vfr", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", vfr,
+    ]);
+    const streams = async (f: string) => {
+      const r = await runCapture(FFPROBE, ["-v", "error", "-show_entries", "stream=codec_type,duration", "-of", "json", f]);
+      const s = JSON.parse(r.stdout).streams as Array<{ codec_type: string; duration: string }>;
+      return Object.fromEntries(s.map((x) => [x.codec_type, Number(x.duration)])) as { video: number; audio: number };
+    };
+    const size = { width: 160, height: 120, fps: 30 };
+
+    const zoomed = p("vfr-zoom.mp4");
+    await runFfmpeg(buildZoomArgs(vfr, zoomed, keyframesToViews([{ t: 1, x: 40, y: 30, width: 80, height: 60 }, { t: 4, full: true }], 160, 120), size, 0.5, "draft"));
+    let d = await streams(zoomed);
+    expect(Math.abs(d.video - d.audio)).toBeLessThan(0.1);
+    expect(d.video).toBeCloseTo(6, 0);
+
+    const cut = p("vfr-cut.mp4");
+    await runFfmpeg(buildCutIdleArgs(vfr, cut, [{ start: 4, end: 4.5 }], true, "draft"));
+    d = await streams(cut);
+    expect(Math.abs(d.video - d.audio)).toBeLessThan(0.25);
+    expect(d.video).toBeCloseTo(5.5, 0);
+
+    const piped = p("vfr-speed-zoom.mp4");
+    const plan = planPipeline(vfr, piped, [{ op: "speed", factor: 2 }, { op: "zoom", keyframes: [{ t: 1, x: 40, y: 30, width: 80, height: 60 }] }], {
+      ...size, durationSec: 6, hasAudio: true,
+    });
+    await runFfmpeg(plan.args);
+    d = await streams(piped);
+    expect(plan.durationSec).toBe(3);
+    expect(Math.abs(d.video - d.audio)).toBeLessThan(0.1);
+    expect(d.video).toBeCloseTo(3, 0);
+  });
+
   it("zoom and cut_idle render far past ffmpeg's expression and command-line limits (#225)", async () => {
     const src = p("long-src.mp4");
     await runFfmpeg(["-y", "-f", "lavfi", "-i", "testsrc2=s=160x120:d=60:r=10", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", src]);
@@ -581,11 +621,11 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     expect(planned.length).toBeGreaterThan(100);
     await runFfmpeg(buildZoomArgs(src, clickZoomed, keyframesToViews(planned, 160, 120), { width: 160, height: 120, fps: 10 }, 0.1, "draft"));
     expect((await probeMedia(clickZoomed)).durationSec).toBeCloseTo(60, 0);
-    // MAX_CUTS cuts, each dropping exactly one 0.1 s frame.
+    // MAX_CUTS cuts of 0.07 s; the timeline shrinks by exactly the cut time (#186).
     const cuts = Array.from({ length: MAX_CUTS }, (_, i) => ({ start: i * 0.3 + 0.05, end: i * 0.3 + 0.12 }));
     const cut = p("long-cut.mp4");
     await runFfmpeg(buildCutIdleArgs(src, cut, cuts, false, "draft"));
-    expect((await probeMedia(cut)).durationSec).toBeCloseTo(60 - MAX_CUTS * 0.1, 0);
+    expect((await probeMedia(cut)).durationSec).toBeCloseTo(60 - MAX_CUTS * 0.07, 0);
   });
 
   it("burn_subtitles draws the cue text only while the cue is on (#120)", async () => {

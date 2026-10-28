@@ -7,6 +7,22 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.41.0]
+
+### Changed
+
+- `convert` to WebM encodes VP9 with `-deadline good -cpu-used 4` instead of libvpx's slowest default, several times faster (#189).
+- GIF and WebP exports never upscale: a clip narrower than the requested width keeps its own width (#189).
+- `burn_subtitles` keeps an `.ass`/`.ssa` file's own styling unless a `style` is passed (#189).
+
+### Fixed
+
+- Video and audio stay the same length on variable-frame-rate input (#186). `zoom` (and `pipeline` zoom) makes the input constant-rate at the source fps before zoompan, so a sped-up pipeline stream or a VFR recording no longer comes out the wrong length; `cut_idle` shifts each kept frame back by the cut time before it instead of renumbering frames at a constant rate; and `speed` writes its last atempo stage to six decimals, which removes ~0.9 s of drift over 10 minutes at 1/3 speed. An integration test covers a VFR fixture through all three.
+- Edit-job lifecycle (#237): passes that decode a whole input (sample_frames fps mode, find_text clip scans, speed, cut_idle, pipeline) size their timeout from the input, not a fixed 5 to 10 minutes or the output's length, and every ffmpeg pass in the tools (transcribe, normalize and denoise measuring, cut_idle and scene scans, zoom analysis, frame grabs) stops when its request is cancelled.
+- A server shutdown cancels running edits and deletes their `.partial` files before exiting, instead of leaving invalid partials behind (#237).
+- The session registry no longer writes without its lock when another server instance holds it: a write waits up to 15 s with backoff, then fails with a clear error, and a stale lock is taken over only from a dead owner (or after 30 s, for recycled pids), by renaming it aside and re-checking. The cross-process registry test no longer flakes (#235).
+- `get_session`, `list_sessions`, `read_events` and the session resources see recordings started or stopped by another server instance, and an update writes only the fields it changed, so a stale copy can no longer overwrite a newer `endReason` or events summary (#235).
+
 ## [0.40.0]
 
 ### Changed

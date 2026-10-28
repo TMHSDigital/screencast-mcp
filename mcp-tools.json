@@ -445,7 +445,7 @@
       "properties": {
         "input": { "type": "string", "description": "Path to the source video" },
         "subtitles": { "type": "string", "description": "Path to an .srt or .ass subtitle file" },
-        "style": { "type": "string", "enum": ["clean", "social"], "description": "clean (default): a modest outlined line; social: large bold text on a dark box" },
+        "style": { "type": "string", "enum": ["clean", "social"], "description": "clean (default for .srt): a modest outlined line; social: large bold text on a dark box. An .ass/.ssa file keeps its own styling unless a style is given" },
         "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
         "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
       },

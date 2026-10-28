@@ -106,7 +106,7 @@ export function register(server: McpServer): void {
       "to a folder and returns their paths, plus the first few frames inline so " +
       "the model can view them directly (disable with returnImages: false).",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         if (!existsSync(args.input)) {
@@ -148,6 +148,7 @@ export function register(server: McpServer): void {
             ffmpeg,
             buildSceneScanArgs(args.input, args.sceneThreshold ?? DEFAULT_SCENE_THRESHOLD),
             jobTimeoutMs(durationSec),
+            { signal: extra.signal },
           );
           if (scan.code !== 0) {
             throw new ScreencastError(`Scene scan failed (exit ${scan.code}): ${scan.stderr.trim().slice(-400)}`);
@@ -169,7 +170,8 @@ export function register(server: McpServer): void {
           const pattern = sequencePattern(dir, "frame_%05d.png");
           await runFfmpeg(
             buildSampleByFpsArgs(args.input, plan.fps, pattern, maxFrames, args.dedupe === true),
-            5 * 60_000,
+            jobTimeoutMs(durationSec),
+            { signal: extra.signal },
           );
           frames = readdirSync(dir)
             .filter(isPng)
@@ -183,7 +185,7 @@ export function register(server: McpServer): void {
             // Clear any stale file at this path (reused outputDir) so existence
             // after the run reflects only what this invocation wrote.
             rmSync(out, { force: true });
-            await runFfmpeg(buildSampleAtTimestampArgs(args.input, ts[i], out), 60_000);
+            await runFfmpeg(buildSampleAtTimestampArgs(args.input, ts[i], out), 60_000, { signal: extra.signal });
             // A timestamp past the end of the video makes ffmpeg exit 0 without
             // writing a file. Report only frames that actually exist (#35).
             if (existsSync(out)) frames.push(out);

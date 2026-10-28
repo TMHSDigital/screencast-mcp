@@ -209,11 +209,14 @@ export function scriptLongFilters(args: string[]): { args: string[]; cleanup: ()
   return { args: out as string[], cleanup: () => d && rmSync(d, { recursive: true, force: true }) };
 }
 
+/** Options for runFfmpegBuffer / runFfmpegFrames. */
+export type StreamOptions = Pick<RunCaptureOptions, "signal">;
+
 /** Run ffmpeg and return its stdout as raw bytes (e.g. `-f rawvideo -`), which
  * runCapture's text decoding would corrupt. Rejects on a non-zero exit. */
-export async function runFfmpegBuffer(args: string[], timeoutMs = 30_000): Promise<Buffer> {
+export async function runFfmpegBuffer(args: string[], timeoutMs = 30_000, opts: StreamOptions = {}): Promise<Buffer> {
   const chunks: Buffer[] = [];
-  await streamFfmpeg(args, timeoutMs, (d) => chunks.push(d));
+  await streamFfmpeg(args, timeoutMs, (d) => chunks.push(d), opts);
   return Buffer.concat(chunks);
 }
 
@@ -226,6 +229,7 @@ export async function runFfmpegFrames(
   frameBytes: number,
   onFrame: (frame: Buffer) => void,
   timeoutMs = 30_000,
+  opts: StreamOptions = {},
 ): Promise<number> {
   if (!(frameBytes > 0)) throw new ScreencastError("frameBytes must be positive.");
   let pending: Buffer = Buffer.alloc(0);
@@ -238,41 +242,60 @@ export async function runFfmpegFrames(
       count++;
     }
     pending = pending.subarray(o);
-  });
+  }, opts);
   return count;
 }
 
-function streamFfmpeg(rawArgs: string[], timeoutMs: number, onData: (d: Buffer) => void): Promise<void> {
+function streamFfmpeg(
+  rawArgs: string[],
+  timeoutMs: number,
+  onData: (d: Buffer) => void,
+  opts: StreamOptions,
+): Promise<void> {
   const { ffmpeg } = requireFfmpeg();
   const { args, cleanup } = scriptLongFilters(rawArgs);
   return new Promise<void>((resolve, reject) => {
     const child = spawn(ffmpeg, args, { windowsHide: true });
     let stderr = "";
-    let timedOut = false;
-    let failed: unknown = null;
-    const timer = setTimeout(() => {
-      timedOut = true;
+    // As in runCapture: on a timeout, cancel, or onData error, settle only once
+    // the child has exited, with a grace timer in case 'close' never arrives.
+    let killError: unknown = null;
+    let graceTimer: NodeJS.Timeout | undefined;
+    const kill = (error: unknown) => {
+      if (killError) return;
+      killError = error;
       child.kill("SIGKILL");
-    }, timeoutMs);
+      graceTimer = setTimeout(() => reject(error), 5_000);
+    };
+    const onAbort = () => kill(new ScreencastError("ffmpeg was cancelled."));
+    const timer = setTimeout(
+      () => kill(new ScreencastError(`ffmpeg timed out after ${Math.round(timeoutMs / 1000)}s.`)),
+      timeoutMs,
+    );
+    const settle = () => {
+      clearTimeout(timer);
+      clearTimeout(graceTimer);
+      opts.signal?.removeEventListener("abort", onAbort);
+    };
+    if (opts.signal?.aborted) onAbort();
+    else opts.signal?.addEventListener("abort", onAbort, { once: true });
     child.stdout?.on("data", (d: Buffer) => {
-      if (failed) return;
+      if (killError) return;
       try {
         onData(d);
       } catch (error) {
-        failed = error;
-        child.kill("SIGKILL");
+        kill(error);
       }
     });
     child.stderr?.on("data", (d) => (stderr += d.toString()));
     child.on("error", (err) => {
-      clearTimeout(timer);
+      settle();
       reject(err);
     });
     child.on("close", (code) => {
-      clearTimeout(timer);
-      if (failed) reject(failed);
+      settle();
+      if (killError) reject(killError);
       else if (code === 0) resolve();
-      else if (timedOut) reject(new ScreencastError(`ffmpeg timed out after ${Math.round(timeoutMs / 1000)}s.`));
       else reject(new ScreencastError(`ffmpeg failed (exit ${code}):\n${stderr.trim().split("\n").slice(-6).join("\n")}`));
     });
   }).finally(cleanup);

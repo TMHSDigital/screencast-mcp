@@ -178,6 +178,8 @@ describe("buildConvertArgs", () => {
   });
   it("uses vp9 for webm", () => {
     expect(buildConvertArgs("in.mp4", "o.webm", "webm").join(" ")).toContain("libvpx-vp9");
+    expect(buildConvertArgs("in.mp4", "o.webm", "webm").join(" ")).toContain("-deadline good -cpu-used 4 -row-mt 1"); // #189
+    expect(buildConvertArgs("in.mp4", "o.gif", "gif").join(" ")).toContain("scale='min(720,iw)':-1"); // #189
   });
   it("uses h264 + faststart for mp4", () => {
     const s = buildConvertArgs("in.webm", "o.mp4", "mp4").join(" ");
@@ -258,6 +260,7 @@ describe("atempoChain / buildSpeedArgs", () => {
   it("chains atempo stages beyond the 0.5-2.0 range", () => {
     expect(atempoChain(4)).toBe("atempo=2.0,atempo=2");
     expect(atempoChain(0.25)).toBe("atempo=0.5,atempo=0.5");
+    expect(atempoChain(1 / 3)).toBe("atempo=0.5,atempo=0.666667"); // not 0.667 (#186)
   });
   it("retempos audio when present and drops it otherwise", () => {
     const withAudio = buildSpeedArgs("in.mp4", "o.mp4", 2, true).join(" ");

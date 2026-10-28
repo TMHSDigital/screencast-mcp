@@ -36,7 +36,9 @@ describe("cut_idle (#122)", () => {
 
   it("drops the cut spans from video and audio with regenerated timestamps", () => {
     const a = buildCutIdleArgs("in.mp4", "o.mp4", [{ start: 2.4, end: 5.6 }, { start: 9, end: 10 }], true);
-    expect(a[a.indexOf("-vf") + 1]).toBe("select='not(between(t,2.4,5.6)+between(t,9,10))',setpts=N/FRAME_RATE/TB");
+    expect(a[a.indexOf("-vf") + 1]).toBe(
+      "select='not(between(t,2.4,5.6)+between(t,9,10))',setpts='(T-(clip(T-2.4,0,3.2)+clip(T-9,0,1)))/TB'",
+    );
     expect(a[a.indexOf("-af") + 1]).toBe("aselect='not(between(t,2.4,5.6)+between(t,9,10))',asetpts=N/SR/TB");
     expect(buildCutIdleArgs("in.mp4", "o.mp4", [{ start: 1, end: 2 }], false)).toContain("-an");
     expect(() => buildCutIdleArgs("in.mp4", "o.mp4", [], true)).toThrow(/Nothing to cut/);

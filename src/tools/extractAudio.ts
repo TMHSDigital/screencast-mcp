@@ -48,7 +48,7 @@ export function register(server: McpServer): void {
         let ext: string;
         if (format === "copy") {
           // The copied codec dictates the container; probe it first.
-          const res = await runCapture(ffprobe, buildProbeArgs(args.input), 30_000);
+          const res = await runCapture(ffprobe, buildProbeArgs(args.input), 30_000, { signal: extra.signal });
           if (res.code !== 0) {
             throw new ScreencastError(
               `ffprobe failed (exit ${res.code}): ${res.stderr.trim().slice(-400)}`,

@@ -104,7 +104,7 @@ export function register(server: McpServer): void {
       },
       _meta: { ui: { visibility: ["app"] } },
     },
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         if (!existsSync(args.input)) throw new ScreencastError(`Input file not found: ${args.input}`);
@@ -114,6 +114,7 @@ export function register(server: McpServer): void {
         const raw = await runFfmpegBuffer(
           buildPlayerFramesArgs(args.input, fps, args.width ?? DEFAULT_PLAYER_WIDTH, count),
           jobTimeoutMs(durationSec),
+          { signal: extra.signal },
         );
         const jpegs = splitJpegs(raw);
         const times = playerFrameTimes(durationSec, jpegs.length);

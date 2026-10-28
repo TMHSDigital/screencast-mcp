@@ -48,14 +48,16 @@ export function register(server: McpServer): void {
         const output = resolveOutput(args.output, subdir("edits"), `loudnorm-${stamp()}-${rand()}${ext}`, args.overwrite);
 
         const timeout = jobTimeoutMs(info.durationSec);
-        const before = await runCapture(ffmpeg, buildLoudnessMeasureArgs(args.input, t), timeout);
+        const before = await runCapture(ffmpeg, buildLoudnessMeasureArgs(args.input, t), timeout, { signal: extra.signal });
         const measured = parseLoudnorm(before.stderr);
         await runEditJob(buildLoudnessApplyArgs(args.input, output, t, measured), {
           output,
           durationSec: info.durationSec,
           extra,
         });
-        const after = parseLoudnorm((await runCapture(ffmpeg, buildLoudnessMeasureArgs(output, t), timeout)).stderr);
+        const after = parseLoudnorm(
+          (await runCapture(ffmpeg, buildLoudnessMeasureArgs(output, t), timeout, { signal: extra.signal })).stderr,
+        );
         return okResponse({
           outputPath: output,
           target: { lufs: t.i, truePeakDb: t.tp, lra: t.lra },

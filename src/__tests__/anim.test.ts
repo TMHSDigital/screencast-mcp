@@ -29,7 +29,7 @@ describe("animated export (#124)", () => {
     const a = buildAnimArgs("in.mp4", "o.gif", "gif", { fps: 10, width: 640, colors: 128 }, { start: 2, duration: 5 });
     expect(a.slice(0, 6)).toEqual(["-y", "-ss", "2", "-t", "5", "-i"]);
     const vf = a[a.indexOf("-vf") + 1];
-    expect(vf).toContain("fps=10,scale=640:-1:flags=lanczos");
+    expect(vf).toContain("fps=10,scale='min(640,iw)':-1:flags=lanczos"); // never upscales (#189)
     expect(vf).toContain("palettegen=stats_mode=diff:max_colors=128");
     expect(vf).toContain("paletteuse=dither=sierra2_4a:diff_mode=rectangle");
     expect(a.at(-1)).toBe("o.gif");

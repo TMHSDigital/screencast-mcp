@@ -43,7 +43,7 @@ export function register(server: McpServer): void {
       "plus b inline with those areas outlined. Use it to check that a UI change happened " +
       "(and only where expected).",
     inputSchema,
-    async (args) => {
+    async (args, extra) => {
       try {
         requireFfmpeg();
         for (const f of [args.a, args.b]) {
@@ -53,9 +53,9 @@ export function register(server: McpServer): void {
         if (!ia.width || !ia.height) throw new ScreencastError(`Could not read the size of ${args.a}.`);
         const size = detectionSize(ia.width, ia.height);
         const [ra, rb, ssimRun] = await Promise.all([
-          runFfmpegBuffer(buildRawFrameArgs(args.a, size)),
-          runFfmpegBuffer(buildRawFrameArgs(args.b, size)),
-          runCapture(requireFfmpeg().ffmpeg, buildSsimArgs(args.a, args.b, size), 30_000),
+          runFfmpegBuffer(buildRawFrameArgs(args.a, size), 30_000, { signal: extra.signal }),
+          runFfmpegBuffer(buildRawFrameArgs(args.b, size), 30_000, { signal: extra.signal }),
+          runCapture(requireFfmpeg().ffmpeg, buildSsimArgs(args.a, args.b, size), 30_000, { signal: extra.signal }),
         ]);
         // Map boxes onto b's own pixels so they can be drawn on (and clicked in)
         // b, per axis: b was stretched to a's aspect ratio (#211).
@@ -70,7 +70,7 @@ export function register(server: McpServer): void {
           // Only returned inline, so it is not left on disk (#209).
           const highlighted = join(tmpdir(), `screencast-diff-${stamp()}-${rand()}.png`);
           try {
-            await runFfmpeg(buildHighlightArgs(args.b, diff.regions, highlighted), 30_000);
+            await runFfmpeg(buildHighlightArgs(args.b, diff.regions, highlighted), 30_000, { signal: extra.signal });
             images.push(...(await encodeInlineImages([highlighted], DEFAULT_MAX_IMAGE_WIDTH, 1)).images);
           } finally {
             rmSync(highlighted, { force: true });

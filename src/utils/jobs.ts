@@ -12,6 +12,9 @@
  *   success and deleted on any failure, timeout, or cancellation;
  * - `-progress pipe:1` is parsed and forwarded as MCP progress notifications
  *   when the request carried a progressToken.
+ *
+ * Running jobs are tracked so a server shutdown can cancel them and remove
+ * their partials before exiting (#237).
  */
 import { basename, dirname, extname, join } from "node:path";
 import { renameSync, rmSync } from "node:fs";
@@ -110,21 +113,46 @@ export interface EditJob {
   output: string;
   /** Duration of the media the job writes, for timeout scaling and progress. */
   durationSec?: number | null;
+  /** Duration of the media ffmpeg must decode, when it differs from the
+   * output's (speed, cut_idle, pipeline): the timeout scales with the longer
+   * of the two (#237). */
+  inputDurationSec?: number | null;
   /** The tool callback's `extra`, for progress and cancellation. */
   extra?: ToolExtra;
 }
 
+interface ActiveJob {
+  partial: string;
+  controller: AbortController;
+  done: Promise<void>;
+}
+
+/** Edit jobs in flight, so a shutdown can cancel them and remove their
+ * partials before the process exits (#237). */
+const activeJobs = new Set<ActiveJob>();
+let jobsClosed = false;
+
 /** Run an ffmpeg edit job atomically: write a .partial sibling, rename it onto
  * the output on success, and delete it on any failure. */
 export async function runEditJob(args: string[], job: EditJob): Promise<void> {
+  if (jobsClosed) throw new ScreencastError("The server is shutting down; the edit was not started.");
   const partial = partialPath(job.output);
   const report = progressReporter(job.extra);
   const parse = createProgressParser();
   const duration = job.durationSec != null && job.durationSec > 0 ? job.durationSec : null;
+  // Size the timeout by whichever is longer: the input ffmpeg decodes or the
+  // output it encodes (a slow-motion speed writes more than it reads).
+  const input = job.inputDurationSec != null && job.inputDurationSec > 0 ? job.inputDurationSec : null;
+  const decoded = input !== null && duration !== null ? Math.max(input, duration) : (input ?? duration);
   const ffArgs = ["-progress", "pipe:1", "-nostats", ...retargetOutput(args, job.output, partial)];
+  const controller = new AbortController();
+  const signal = job.extra?.signal ? AbortSignal.any([job.extra.signal, controller.signal]) : controller.signal;
+  let finish!: () => void;
+  const active: ActiveJob = { partial, controller, done: new Promise((r) => (finish = r)) };
+  activeJobs.add(active);
   try {
-    await runFfmpeg(ffArgs, jobTimeoutMs(duration), {
-      signal: job.extra?.signal,
+    await runFfmpeg(ffArgs, jobTimeoutMs(decoded), {
+      signal,
       onStdout: report && duration
         ? (chunk) => {
             const t = parse(chunk);
@@ -137,7 +165,39 @@ export async function runEditJob(args: string[], job: EditJob): Promise<void> {
   } catch (error) {
     rmSync(partial, { force: true });
     throw error;
+  } finally {
+    activeJobs.delete(active);
+    finish();
   }
+}
+
+/** Number of edit jobs in flight. */
+export function activeEditJobs(): number {
+  return activeJobs.size;
+}
+
+/** Shutdown: refuse new edit jobs, cancel the running ones, wait up to
+ * `graceMs` for their ffmpeg to exit, and delete any partial left behind.
+ * Returns how many jobs were cancelled. Never throws. */
+export async function abortEditJobs(graceMs = 3_000): Promise<number> {
+  jobsClosed = true;
+  const jobs = [...activeJobs];
+  if (jobs.length === 0) return 0;
+  for (const job of jobs) job.controller.abort();
+  let timer: NodeJS.Timeout | undefined;
+  await Promise.race([
+    Promise.all(jobs.map((j) => j.done)),
+    new Promise<void>((r) => (timer = setTimeout(r, graceMs))),
+  ]);
+  clearTimeout(timer);
+  for (const job of jobs) {
+    try {
+      rmSync(job.partial, { force: true });
+    } catch {
+      /* still held by an ffmpeg that has not exited; nothing more to do */
+    }
+  }
+  return jobs.length;
 }
 
 /** Probe a file's duration, or null when it cannot be read. Used to size

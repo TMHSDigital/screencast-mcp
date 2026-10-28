@@ -79,5 +79,8 @@ describe("captions (#120)", () => {
     expect(vf.startsWith("subtitles=filename=C\\\\:/s/a.srt:fontsdir=C\\\\:/fonts:force_style='FontName=Inter,Bold=1")).toBe(true);
     expect(vf).toContain("BorderStyle=3");
     expect(() => buildBurnSubtitlesArgs("i", "s", "o", "f", "neon" as never)).toThrow(/Unknown caption style/);
+    // A null style keeps an .ass file's own styling (#189).
+    const ass = buildBurnSubtitlesArgs("in.mp4", "a.ass", "o.mp4", "f", null);
+    expect(ass[ass.indexOf("-vf") + 1]).not.toContain("force_style");
   });
 });
