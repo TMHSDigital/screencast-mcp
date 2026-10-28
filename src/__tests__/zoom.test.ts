@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { keyframesToViews, viewExpr, buildZoomArgs, planAutoZoom, planClickZoom, fitView, ringFilters, ringSize, RING_SEC } from "../utils/zoom.js";
 
-/** Evaluate a zoompan expression at input time `it` (if/lt/clip as in ffmpeg). */
+/** Evaluate a zoompan expression at input time `it` (clip as in ffmpeg),
+ * rounded to hide float noise from the summed eases. */
 function evalExpr(expr: string, it: number): number {
-  const js = expr.replace(/\bif\(/g, "IF(").replace(/\blt\(/g, "LT(");
-  return new Function("IF", "LT", "it", `return ${js};`)(
-    (c: number, a: number, b: number) => (c ? a : b),
-    (a: number, b: number) => (a < b ? 1 : 0),
+  const v = new Function("clip", "it", `return ${expr};`)(
+    (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x)),
     it,
-  );
+  ) as number;
+  return Math.round(v * 1e9) / 1e9;
 }
 
 const W = 1280;
@@ -44,6 +44,18 @@ describe("zoom (#119)", () => {
     const cx = viewExpr(views, "cx", 0.6);
     expect(evalExpr(cx, 1.55)).toBeGreaterThan(640);
     expect(evalExpr(cx, 1.55)).toBeLessThan(720); // eased: slow at the start
+  });
+
+  it("keeps the expression flat for any number of keyframes (#225)", () => {
+    const kfs = Array.from({ length: 300 }, (_, i) =>
+      i % 2 ? { t: i + 1, full: true } : { t: i + 1, x: 100, y: 100, width: 320, height: 180 },
+    );
+    const z = viewExpr(keyframesToViews(kfs, W, H), "z", 0.6);
+    expect(z).not.toMatch(/if\(/);
+    expect(evalExpr(z, 1)).toBe(4);
+    expect(evalExpr(z, 2)).toBe(1);
+    expect(evalExpr(z, 299)).toBe(4);
+    expect(evalExpr(z, 400)).toBe(1);
   });
 
   it("shortens the transition when keyframes are closer than it", () => {

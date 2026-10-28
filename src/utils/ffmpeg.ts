@@ -7,6 +7,9 @@
  * spawn failure deep inside a tool call.
  */
 import { spawn, spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { ScreencastError } from "./errors.js";
 import { buildProbeArgs, parseMediaInfo, type MediaInfo } from "./media.js";
 
@@ -183,20 +186,83 @@ export function runCapture(
   });
 }
 
+/** Filter options ffmpeg can also read from a file as `-/option path`. */
+const SCRIPTABLE_OPTS = new Set(["-vf", "-af", "-filter_complex", "-lavfi", "-filter:v", "-filter:a"]);
+/** Filter values longer than this go to a file. Windows caps a whole command
+ * line at 32,767 characters, so a long zoom or cut graph cannot go inline (#225). */
+export const MAX_INLINE_FILTER = 8_000;
+
+/** Move long filter values into temp files read with ffmpeg's `-/option file`
+ * syntax (FFmpeg 7+). Returns the new args and a cleanup that deletes the files. */
+export function scriptLongFilters(args: string[]): { args: string[]; cleanup: () => void } {
+  let dir: string | null = null;
+  const out = args.map((a, i) => (i > 0 && SCRIPTABLE_OPTS.has(args[i - 1]) && a.length > MAX_INLINE_FILTER ? null : a));
+  for (let i = 1; i < args.length; i++) {
+    if (out[i] !== null) continue;
+    dir ??= mkdtempSync(join(tmpdir(), "screencast-filter-"));
+    const file = join(dir, `filter${i}.txt`);
+    writeFileSync(file, args[i]);
+    out[i - 1] = `-/${args[i - 1].slice(1)}`;
+    out[i] = file;
+  }
+  const d = dir;
+  return { args: out as string[], cleanup: () => d && rmSync(d, { recursive: true, force: true }) };
+}
+
 /** Run ffmpeg and return its stdout as raw bytes (e.g. `-f rawvideo -`), which
  * runCapture's text decoding would corrupt. Rejects on a non-zero exit. */
-export function runFfmpegBuffer(args: string[], timeoutMs = 30_000): Promise<Buffer> {
+export async function runFfmpegBuffer(args: string[], timeoutMs = 30_000): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  await streamFfmpeg(args, timeoutMs, (d) => chunks.push(d));
+  return Buffer.concat(chunks);
+}
+
+/** Run ffmpeg writing raw fixed-size frames to stdout (`-f rawvideo -`) and
+ * call `onFrame` with each one as it arrives, so memory stays bounded however
+ * long the input is (#241). Each frame is a fresh buffer the callback may keep.
+ * A trailing partial frame is dropped. Rejects on a non-zero exit. */
+export async function runFfmpegFrames(
+  args: string[],
+  frameBytes: number,
+  onFrame: (frame: Buffer) => void,
+  timeoutMs = 30_000,
+): Promise<number> {
+  if (!(frameBytes > 0)) throw new ScreencastError("frameBytes must be positive.");
+  let pending: Buffer = Buffer.alloc(0);
+  let count = 0;
+  await streamFfmpeg(args, timeoutMs, (d) => {
+    pending = pending.length ? Buffer.concat([pending, d]) : d;
+    let o = 0;
+    for (; o + frameBytes <= pending.length; o += frameBytes) {
+      onFrame(Buffer.from(pending.subarray(o, o + frameBytes)));
+      count++;
+    }
+    pending = pending.subarray(o);
+  });
+  return count;
+}
+
+function streamFfmpeg(rawArgs: string[], timeoutMs: number, onData: (d: Buffer) => void): Promise<void> {
   const { ffmpeg } = requireFfmpeg();
-  return new Promise((resolve, reject) => {
+  const { args, cleanup } = scriptLongFilters(rawArgs);
+  return new Promise<void>((resolve, reject) => {
     const child = spawn(ffmpeg, args, { windowsHide: true });
-    const chunks: Buffer[] = [];
     let stderr = "";
     let timedOut = false;
+    let failed: unknown = null;
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill("SIGKILL");
     }, timeoutMs);
-    child.stdout?.on("data", (d: Buffer) => chunks.push(d));
+    child.stdout?.on("data", (d: Buffer) => {
+      if (failed) return;
+      try {
+        onData(d);
+      } catch (error) {
+        failed = error;
+        child.kill("SIGKILL");
+      }
+    });
     child.stderr?.on("data", (d) => (stderr += d.toString()));
     child.on("error", (err) => {
       clearTimeout(timer);
@@ -204,11 +270,12 @@ export function runFfmpegBuffer(args: string[], timeoutMs = 30_000): Promise<Buf
     });
     child.on("close", (code) => {
       clearTimeout(timer);
-      if (code === 0) resolve(Buffer.concat(chunks));
+      if (failed) reject(failed);
+      else if (code === 0) resolve();
       else if (timedOut) reject(new ScreencastError(`ffmpeg timed out after ${Math.round(timeoutMs / 1000)}s.`));
       else reject(new ScreencastError(`ffmpeg failed (exit ${code}):\n${stderr.trim().split("\n").slice(-6).join("\n")}`));
     });
-  });
+  }).finally(cleanup);
 }
 
 /** Run an ffmpeg edit job and reject with the tail of stderr on non-zero exit. */
@@ -218,10 +285,15 @@ export async function runFfmpeg(
   opts: RunCaptureOptions = {},
 ): Promise<void> {
   const { ffmpeg } = requireFfmpeg();
-  const res = await runCapture(ffmpeg, args, timeoutMs, opts);
-  if (res.code !== 0) {
-    const tail = res.stderr.trim().split("\n").slice(-6).join("\n");
-    throw new ScreencastError(`ffmpeg failed (exit ${res.code}):\n${tail}`);
+  const scripted = scriptLongFilters(args);
+  try {
+    const res = await runCapture(ffmpeg, scripted.args, timeoutMs, opts);
+    if (res.code !== 0) {
+      const tail = res.stderr.trim().split("\n").slice(-6).join("\n");
+      throw new ScreencastError(`ffmpeg failed (exit ${res.code}):\n${tail}`);
+    }
+  } finally {
+    scripted.cleanup();
   }
 }
 

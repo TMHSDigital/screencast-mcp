@@ -84,7 +84,7 @@
   },
   {
     "name": "player_frames",
-    "description": "Preview frames for the review player: JPEGs spread evenly over the video, with their times. Used by the inline player (MCP Apps visibility: app); agents should use sample_frames or contact_sheet instead.",
+    "description": "Preview frames for the review player: JPEGs spread evenly over the video, with their times. Used by the inline player (MCP Apps visibility: app), and listed only to clients that advertise MCP Apps; agents should use sample_frames or contact_sheet instead.",
     "inputSchema": {
       "type": "object",
       "properties": {

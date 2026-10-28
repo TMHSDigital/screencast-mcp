@@ -16,6 +16,7 @@
 import { ScreencastError } from "./errors.js";
 import { diffFrames, type Rect } from "./diff.js";
 import { resolveQuality, type Quality } from "./targets.js";
+import { sumExpr } from "./expr.js";
 
 export const DEFAULT_TRANSITION_SEC = 0.6;
 export const MAX_ZOOM = 6;
@@ -60,20 +61,20 @@ const n = (v: number) => Number(v.toFixed(4)).toString();
 
 /** A zoompan expression for one view property over input time `it`: hold each
  * value, then ease (smoothstep) into the next over the transition before its
- * keyframe. Pure. */
+ * keyframe. Written as the first value plus one clipped ease term per change,
+ * summed in groups, so any number of keyframes parses (#225). Pure. */
 export function viewExpr(views: View[], key: "z" | "cx" | "cy", transition: number): string {
-  let expr = n(views[views.length - 1][key]);
-  for (let i = views.length - 2; i >= 0; i--) {
+  const terms = [n(views[0][key])];
+  for (let i = 0; i < views.length - 1; i++) {
     const a = views[i][key];
     const b = views[i + 1][key];
+    if (a === b) continue;
     const end = views[i + 1].t;
     const T = Math.max(0.001, Math.min(transition, end - views[i].t));
-    const start = end - T;
-    const s = `((it-${n(start)})/${n(T)})`;
-    const ease = a === b ? n(a) : `${n(a)}+${n(b - a)}*${s}*${s}*(3-2*${s})`;
-    expr = `if(lt(it,${n(start)}),${n(a)},if(lt(it,${n(end)}),${ease},${expr}))`;
+    const s = `clip((it-${n(end - T)})/${n(T)},0,1)`;
+    terms.push(`(${n(b - a)})*${s}*${s}*(3-2*${s})`);
   }
-  return expr;
+  return sumExpr(terms);
 }
 
 /** The zoom as one filter chain on a W x H stream. The source is upscaled
@@ -143,6 +144,20 @@ export function planAutoZoom(
   H: number,
   opts: AutoOptions = {},
 ): ZoomKeyframe[] {
+  const planner = createAutoZoomPlanner(w, h, W, H, opts);
+  for (const f of frames) planner.push(f);
+  return planner.finish();
+}
+
+/** planAutoZoom one frame at a time, keeping only the previous frame, so a
+ * long video can be planned from a stream without buffering it (#241). */
+export function createAutoZoomPlanner(
+  w: number,
+  h: number,
+  W: number,
+  H: number,
+  opts: AutoOptions = {},
+): { push(frame: Uint8Array): void; finish(): ZoomKeyframe[] } {
   const step = opts.step ?? 0.25;
   const hold = opts.holdSec ?? 2;
   const maxZoom = opts.maxZoom ?? DEFAULT_AUTO_MAX_ZOOM;
@@ -159,16 +174,24 @@ export function planAutoZoom(
     if (cur) focuses.push(cur);
     cur = null;
   };
-  for (let i = 1; i < frames.length; i++) {
-    const t = i * step;
-    const d = diffFrames(frames[i - 1], frames[i], w, h, { scale });
+  let prev: Uint8Array | null = null;
+  let i = 0;
+  const push = (frame: Uint8Array) => {
+    const before = prev;
+    prev = frame;
+    if (!before) {
+      i = 1;
+      return;
+    }
+    const t = i++ * step;
+    const d = diffFrames(before, frame, w, h, { scale });
     if (d.regions.length === 0) {
       if (cur && t - cur.last > hold) close();
-      continue;
+      return;
     }
     if (d.changedFraction > globalFraction) {
       close();
-      continue;
+      return;
     }
     const box = unionRects(d.regions);
     if (cur && t - cur.last <= hold && near(cur.box, box, W, H)) {
@@ -178,20 +201,23 @@ export function planAutoZoom(
       close();
       cur = { start: t, last: t, box };
     }
-  }
-  close();
+  };
 
-  const kfs: ZoomKeyframe[] = [];
-  let lastT = 0;
-  for (const f of focuses) {
-    const view = fitView(f.box, W, H, minW, minH);
-    // Reach the zoom as the change starts; release `hold` after it ends.
-    const inAt = Math.max(f.start, lastT + T);
-    const outAt = Math.max(f.last + hold, inAt + T);
-    kfs.push({ t: round(inAt), ...view }, { t: round(outAt), full: true });
-    lastT = outAt;
-  }
-  return kfs;
+  const finish = (): ZoomKeyframe[] => {
+    close();
+    const kfs: ZoomKeyframe[] = [];
+    let lastT = 0;
+    for (const f of focuses) {
+      const view = fitView(f.box, W, H, minW, minH);
+      // Reach the zoom as the change starts; release `hold` after it ends.
+      const inAt = Math.max(f.start, lastT + T);
+      const outAt = Math.max(f.last + hold, inAt + T);
+      kfs.push({ t: round(inAt), ...view }, { t: round(outAt), full: true });
+      lastT = outAt;
+    }
+    return kfs;
+  };
+  return { push, finish };
 }
 
 const round = (v: number) => Math.round(v * 100) / 100;

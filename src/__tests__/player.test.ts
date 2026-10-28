@@ -3,7 +3,7 @@
  * it is fed, and the page's protocol. Through a real MCP client over an
  * in-memory transport; player_frames needs ffmpeg.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,7 +16,7 @@ const home = mkdtempSync(join(tmpdir(), "screencast-player-"));
 process.env.SCREENCAST_HOME = home;
 const { register: registerReview, playerHtml } = await import("../tools/reviewRecording.js");
 const { register: registerStop } = await import("../tools/stopRecording.js");
-const { playerFramePlan, playerFrameTimes, splitJpegs, PLAYER_URI, MCP_APP_MIME } = await import("../utils/player.js");
+const { playerFramePlan, playerFrameTimes, splitJpegs, clientSupportsApps, PLAYER_URI, MCP_APP_MIME, MCP_APPS_EXTENSION } = await import("../utils/player.js");
 
 const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
 const hasFfmpeg = spawnSync(FFMPEG, ["-version"]).status === 0;
@@ -29,6 +29,14 @@ describe("player helpers", () => {
     expect(playerFramePlan(0.1).count).toBe(1);
     expect(() => playerFramePlan(0)).toThrow(/no duration/);
     expect(playerFrameTimes(4, 4)).toEqual([0.5, 1.5, 2.5, 3.5]);
+  });
+  it("detects MCP Apps support from the client's capabilities (#242)", () => {
+    expect(clientSupportsApps(undefined)).toBe(false);
+    expect(clientSupportsApps({})).toBe(false);
+    expect(clientSupportsApps({ extensions: { [MCP_APPS_EXTENSION]: {} } })).toBe(true);
+    expect(clientSupportsApps({ extensions: { [MCP_APPS_EXTENSION]: { mimeTypes: [MCP_APP_MIME] } } })).toBe(true);
+    expect(clientSupportsApps({ extensions: { [MCP_APPS_EXTENSION]: { mimeTypes: ["text/x-other"] } } })).toBe(false);
+    expect(clientSupportsApps({ experimental: { [MCP_APPS_EXTENSION]: {} } })).toBe(true);
   });
   it("splits concatenated JPEGs at their markers", () => {
     const a = Buffer.from([0xff, 0xd8, 1, 2, 0xff, 0x00, 3, 0xff, 0xd9]);
@@ -45,8 +53,14 @@ describe("review player as an MCP App (#128)", () => {
     registerReview(server);
     registerStop(server);
     const [a, b] = InMemoryTransport.createLinkedPair();
-    client = new Client({ name: "c", version: "0" });
+    client = new Client(
+      { name: "c", version: "0" },
+      { capabilities: { extensions: { [MCP_APPS_EXTENSION]: { mimeTypes: [MCP_APP_MIME] } } } },
+    );
     await Promise.all([server.connect(a), client.connect(b)]);
+    await vi.waitFor(async () => {
+      expect((await client.listTools()).tools.some((t) => t.name === "player_frames")).toBe(true);
+    });
   });
   afterAll(async () => {
     await client.close();
@@ -61,13 +75,12 @@ describe("review player as an MCP App (#128)", () => {
     expect(listed?.mimeType).toBe(MCP_APP_MIME);
   });
 
-  it("links stop_recording and review_recording to it, and keeps player_frames app-only", async () => {
+  it("links review_recording to it (not stop_recording, #242), and keeps player_frames app-only", async () => {
     const tools = (await client.listTools()).tools;
-    for (const name of ["stop_recording", "review_recording"]) {
-      const meta = tools.find((t) => t.name === name)?._meta as Record<string, unknown>;
-      expect(meta.ui).toEqual({ resourceUri: PLAYER_URI });
-      expect(meta["ui/resourceUri"]).toBe(PLAYER_URI);
-    }
+    const meta = tools.find((t) => t.name === "review_recording")?._meta as Record<string, unknown>;
+    expect(meta.ui).toEqual({ resourceUri: PLAYER_URI });
+    expect(meta["ui/resourceUri"]).toBe(PLAYER_URI);
+    expect(tools.find((t) => t.name === "stop_recording")?._meta).toBeUndefined();
     expect(tools.find((t) => t.name === "player_frames")?._meta).toEqual({ ui: { visibility: ["app"] } });
   });
 

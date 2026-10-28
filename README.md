@@ -75,7 +75,7 @@ The design choices are deliberate rather than incidental:
 What it can do beyond record-and-look:
 
 - **Zoom toward clicks.** Record with `events: true` and `zoom` glides in on each click and rings it, Screen Studio style.
-- **Review before sharing.** In clients with MCP Apps, `stop_recording` opens an inline player where a person trims and draws redaction boxes.
+- **Review before sharing.** In clients with MCP Apps, `review_recording` opens an inline player where a person trims and draws redaction boxes.
 - **Find and cover secrets.** `find_text` reads the screen with Windows OCR and returns rectangles for `redact_region`.
 - **One call, one encode.** `pipeline` runs trim, crop, redact, callouts, and an export as a single ffmpeg pass.
 - **Record a covered window.** `backend: "wgc"` records a window's own surface through Windows Graphics Capture.
@@ -92,7 +92,7 @@ What it can do beyond record-and-look:
 | `stop_recording` | Stop a session by id. Sends ffmpeg a graceful quit so the file is **finalized, not truncated**. Returns the final path and duration. |
 | `list_sessions` | List active and finished sessions. |
 | `get_session` | Inspect a single session by id. |
-| `review_recording` | **Review player** in clients that support MCP Apps: an inline player where a person scrubs the recording, drags trim handles, and draws redaction boxes, then exports a trimmed, redacted copy (one `pipeline` call). `stop_recording` results open it too. Elsewhere it returns the video's details. |
+| `review_recording` | **Review player** in clients that support MCP Apps: an inline player where a person scrubs the recording, drags trim handles, and draws redaction boxes, then exports a trimmed, redacted copy (one `pipeline` call). Pass it a stopped recording's `sessionId`. Elsewhere it returns the video's details. |
 | `player_frames` | Preview JPEG frames for the review player; called by the player (app-only), not by agents. |
 | `read_events` | Read a recording's input event log (clicks, scroll, cursor, shortcuts, typing bursts) on the video's clock. Opt in with `start_recording` `events: true`. |
 | `screenshot` | Capture a single PNG of a `target`, and return it inline as an image the model can view. |
@@ -269,7 +269,7 @@ It also offers **resources**, so a client can list and attach recordings without
 - **Capture is always explicit.** Nothing auto-fires; capture is gated behind an explicit tool call.
 - **The server makes no network requests.** Files are written to the local filesystem only. What a tool returns to your agent (frames, OCR text, event summaries) is sent to your model provider like any other tool result; see [Privacy](#privacy).
 - **Public repo, private captures.** The `.gitignore` blocks recordings, frames, screenshots, and common video/image output so test media cannot be committed by accident.
-- **Review before sharing.** Sample frames or inspect a recording before handing a file to another tool or person, so you know what it contains. In clients that support MCP Apps, `stop_recording` and `review_recording` open an inline player where a person can scrub the whole recording and draw redaction boxes before anything leaves the machine. The player gets frames through the MCP connection; no local web server is started.
+- **Review before sharing.** Sample frames or inspect a recording before handing a file to another tool or person, so you know what it contains. In clients that support MCP Apps, `review_recording` opens an inline player where a person can scrub the whole recording and draw redaction boxes before anything leaves the machine. The player gets frames through the MCP connection; no local web server is started.
 - **Redaction covers what you declare.** `redact_region` covers only the rectangles you specify. `find_text` can help find them: OCR with a query such as `regex: "sk-|ghp_|api.?key"` and `redact: true` returns ready-made rectangles, and `scanEverySec` checks a whole video rather than one frame. But OCR is best-effort; it can miss small or stylised text, so treat it as an aid, not a guarantee. Use the default `box` style for a solid irreversible fill, and still review the output before sharing.
 - **The input event log never records what you type.** `start_recording` `events: true` hooks mouse and keyboard input system-wide for that recording only, in a helper that exits with it (or with the server). Typing is logged only as bursts on a 0.5 s grid, never key by key, so the log does not reveal which keys were pressed, how many, or their timing. `keys: "shortcuts"` also names chords held with Ctrl, Alt, or Win (`Ctrl+S`). Cursor positions and clicks still reveal what you pointed at, so treat `.events.jsonl` like the recording beside it. See [Privacy](#privacy) for exactly what each mode records.
 - **System audio is sensitive too.** When `audio.source` = `system`, the recording captures everything playing on the machine (call audio, notifications, media). Treat audio-bearing recordings with the same care as the video.

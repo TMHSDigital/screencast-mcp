@@ -7,6 +7,7 @@ import { requireFfmpeg, probeMedia, runFfmpegBuffer } from "../utils/ffmpeg.js";
 import { jobTimeoutMs } from "../utils/jobs.js";
 import {
   buildPlayerFramesArgs,
+  clientSupportsApps,
   playerFramePlan,
   playerFrameTimes,
   splitJpegs,
@@ -87,8 +88,10 @@ export function register(server: McpServer): void {
     },
   );
 
-  // Called by the player (app visibility only), not by the model.
-  server.registerTool(
+  // Called by the player (app visibility only), not by the model. Hosts
+  // without MCP Apps ignore that visibility, so the tool is listed only for
+  // clients that advertise Apps support (#242).
+  const playerFrames = server.registerTool(
     "player_frames",
     {
       description:
@@ -135,4 +138,10 @@ export function register(server: McpServer): void {
       }
     },
   );
+  playerFrames.disable();
+  const previous = server.server.oninitialized;
+  server.server.oninitialized = () => {
+    previous?.();
+    if (clientSupportsApps(server.server.getClientCapabilities())) playerFrames.enable();
+  };
 }

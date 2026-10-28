@@ -51,7 +51,7 @@ import { encodeInlineImages } from "../../utils/images.js";
 import { animLadder, buildAnimArgs } from "../../utils/anim.js";
 import { buildArrowImageArgs, buildCalloutArgs } from "../../utils/callout.js";
 import { buildBurnSubtitlesArgs, buildTranscribeArgs, parseSrt, normalizeCues } from "../../utils/captions.js";
-import { buildIdleScanArgs, parseFreezes, parseSilences, intersect, cutsFor, buildCutIdleArgs } from "../../utils/idle.js";
+import { buildIdleScanArgs, parseFreezes, parseSilences, intersect, cutsFor, buildCutIdleArgs, MAX_CUTS } from "../../utils/idle.js";
 import { keyframesToViews, buildZoomArgs, planClickZoom } from "../../utils/zoom.js";
 import { loudnessTarget, buildLoudnessMeasureArgs, buildLoudnessApplyArgs, parseLoudnorm, buildDenoiseArgs, buildNoiseFloorArgs, parseNoiseFloor } from "../../utils/audio.js";
 import { analysisSize, diffFrames, buildRawFrameArgs, buildSsimArgs, parseSsim } from "../../utils/diff.js";
@@ -560,6 +560,32 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     await runFfmpeg(buildCutIdleArgs(idle, out, cuts, true, "draft"));
     const info = await probeMedia(out);
     expect(Math.abs(info.durationSec! - 4.6)).toBeLessThan(0.2);
+  });
+
+  it("zoom and cut_idle render far past ffmpeg's expression and command-line limits (#225)", async () => {
+    const src = p("long-src.mp4");
+    await runFfmpeg(["-y", "-f", "lavfi", "-i", "testsrc2=s=160x120:d=60:r=10", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", src]);
+    // 300 keyframes (150 clicks' worth) and 200 rings: tens of KB of filter graph.
+    const clicks = Array.from({ length: 150 }, (_, i) => ({ t: i * 0.39, x: 20 + (i % 7) * 20, y: 20 + (i % 5) * 20 }));
+    const kfs = Array.from({ length: 300 }, (_, i) =>
+      i % 2 ? { t: i * 0.19 + 0.1, full: true } : { t: i * 0.19 + 0.1, x: (i % 9) * 10, y: (i % 4) * 10, width: 64, height: 48 },
+    );
+    const zoomed = p("long-zoom.mp4");
+    await runFfmpeg(buildZoomArgs(src, zoomed, keyframesToViews(kfs, 160, 120), { width: 160, height: 120, fps: 10 }, 0.1, "draft", {
+      clicks: [...clicks, ...clicks.slice(0, 50)].map((c, i) => ({ ...c, t: i * 0.29 })),
+      color: "white",
+    }));
+    expect((await probeMedia(zoomed)).durationSec).toBeCloseTo(60, 0);
+    const clickZoomed = p("long-click-zoom.mp4");
+    const planned = planClickZoom(clicks, 160, 120, { holdSec: 0.1, transition: 0.1 });
+    expect(planned.length).toBeGreaterThan(100);
+    await runFfmpeg(buildZoomArgs(src, clickZoomed, keyframesToViews(planned, 160, 120), { width: 160, height: 120, fps: 10 }, 0.1, "draft"));
+    expect((await probeMedia(clickZoomed)).durationSec).toBeCloseTo(60, 0);
+    // MAX_CUTS cuts, each dropping exactly one 0.1 s frame.
+    const cuts = Array.from({ length: MAX_CUTS }, (_, i) => ({ start: i * 0.3 + 0.05, end: i * 0.3 + 0.12 }));
+    const cut = p("long-cut.mp4");
+    await runFfmpeg(buildCutIdleArgs(src, cut, cuts, false, "draft"));
+    expect((await probeMedia(cut)).durationSec).toBeCloseTo(60 - MAX_CUTS * 0.1, 0);
   });
 
   it("burn_subtitles draws the cue text only while the cue is on (#120)", async () => {

@@ -41,4 +41,11 @@ describe("cut_idle (#122)", () => {
     expect(buildCutIdleArgs("in.mp4", "o.mp4", [{ start: 1, end: 2 }], false)).toContain("-an");
     expect(() => buildCutIdleArgs("in.mp4", "o.mp4", [], true)).toThrow(/Nothing to cut/);
   });
+
+  it("groups a long cut list so ffmpeg can parse it (#225)", () => {
+    const cuts = Array.from({ length: 150 }, (_, i) => ({ start: i * 2, end: i * 2 + 1 }));
+    const a = buildCutIdleArgs("in.mp4", "o.mp4", cuts, false);
+    const vf = a[a.indexOf("-vf") + 1];
+    expect(vf.startsWith("select='not((between(t,0,1)+")).toBe(true);
+  });
 });

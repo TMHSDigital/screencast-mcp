@@ -17,6 +17,21 @@ export const MCP_APP_MIME = "text/html;profile=mcp-app";
  * result. Both the current and the legacy key, as the spec asks hosts to read. */
 export const PLAYER_TOOL_META = { ui: { resourceUri: PLAYER_URI }, "ui/resourceUri": PLAYER_URI } as const;
 
+/** The capability key under which a client advertises MCP Apps support. */
+export const MCP_APPS_EXTENSION = "io.modelcontextprotocol/ui";
+
+/** True when a client's initialize capabilities advertise MCP Apps (under
+ * `extensions`, or `experimental` in older hosts) with the HTML app MIME type
+ * or no MIME list at all. */
+export function clientSupportsApps(caps: unknown): boolean {
+  const c = caps as { extensions?: Record<string, unknown>; experimental?: Record<string, unknown> } | undefined;
+  const ext = (c?.extensions?.[MCP_APPS_EXTENSION] ?? c?.experimental?.[MCP_APPS_EXTENSION]) as
+    | { mimeTypes?: unknown }
+    | undefined;
+  if (!ext || typeof ext !== "object") return false;
+  return !Array.isArray(ext.mimeTypes) || ext.mimeTypes.includes(MCP_APP_MIME);
+}
+
 export const DEFAULT_PLAYER_FRAMES = 120;
 export const MAX_PLAYER_FRAMES = 300;
 export const PLAYER_FPS = 4;

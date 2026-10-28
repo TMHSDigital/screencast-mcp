@@ -7,6 +7,18 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.40.0]
+
+### Changed
+
+- `stop_recording` no longer opens the review player in MCP Apps hosts, so stopping a recording never decodes the whole file for a review nobody asked for. Pass the stopped session's id to `review_recording` to open it (#242).
+- `player_frames` is listed only to clients that advertise MCP Apps (the `io.modelcontextprotocol/ui` extension). Other clients ignored its app-only visibility and could pull up to 300 images into the model (#242).
+
+### Fixed
+
+- `zoom`, `pipeline` zoom, and `cut_idle` no longer fail past ffmpeg's expression limits (#225). Zoom built one nested `if()` per keyframe and failed from about 50 keyframes, which clicks mode reached with 25 clicks; `cut_idle` failed from 100 cuts. Both now build grouped sums that parse at any length, and a filter graph longer than 8,000 characters is passed to ffmpeg in a file (`-/vf`, FFmpeg 7+), so 100 keyframes or 200 rings no longer exceed Windows' 32,767-character command line. An integration test renders 300 keyframes, 200 rings, a 100+ keyframe clicks plan, and 200 cuts.
+- `zoom` auto planning streams the analysis frames and keeps only the previous one, instead of buffering the whole decode (about 1.6 GB for an hour) (#241).
+
 ## [0.39.0]
 
 ### Added

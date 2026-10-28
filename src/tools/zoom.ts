@@ -2,13 +2,13 @@ import { z } from "zod";
 import { existsSync, readFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
-import { requireFfmpeg, runFfmpegBuffer, probeMedia } from "../utils/ffmpeg.js";
+import { requireFfmpeg, runFfmpegFrames, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob, jobTimeoutMs } from "../utils/jobs.js";
 import { analysisSize } from "../utils/diff.js";
 import {
   keyframesToViews,
   buildZoomArgs,
-  planAutoZoom,
+  createAutoZoomPlanner,
   planClickZoom,
   buildAnalysisArgs,
   DEFAULT_TRANSITION_SEC,
@@ -134,16 +134,19 @@ export function register(server: McpServer): void {
         if (!keyframes) {
           const size = analysisSize(W, H);
           const step = 0.25;
-          const raw = await runFfmpegBuffer(buildAnalysisArgs(args.input, size, step), jobTimeoutMs(durationSec));
-          const frameBytes = size.width * size.height;
-          const frames: Uint8Array[] = [];
-          for (let o = 0; o + frameBytes <= raw.length; o += frameBytes) frames.push(raw.subarray(o, o + frameBytes));
-          keyframes = planAutoZoom(frames, size.width, size.height, W, H, {
+          const planner = createAutoZoomPlanner(size.width, size.height, W, H, {
             step,
             holdSec: args.holdSec,
             maxZoom: args.maxZoom,
             transition,
           });
+          await runFfmpegFrames(
+            buildAnalysisArgs(args.input, size, step),
+            size.width * size.height,
+            (f) => planner.push(f),
+            jobTimeoutMs(durationSec),
+          );
+          keyframes = planner.finish();
           if (keyframes.length === 0) {
             return okResponse({ keyframes: [], note: "No localised changes found to zoom into; nothing written." });
           }

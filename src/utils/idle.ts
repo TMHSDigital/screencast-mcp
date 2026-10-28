@@ -7,6 +7,7 @@
  */
 import { ScreencastError } from "./errors.js";
 import { resolveQuality, type Quality } from "./targets.js";
+import { sumExpr } from "./expr.js";
 
 export interface Interval {
   start: number;
@@ -95,7 +96,8 @@ export function buildCutIdleArgs(
 ): string[] {
   if (cuts.length === 0) throw new ScreencastError("Nothing to cut.");
   if (cuts.length > MAX_CUTS) throw new ScreencastError(`Too many idle stretches (${cuts.length}); raise minIdleSec.`);
-  const drop = cuts.map((c) => `between(t,${c.start},${c.end})`).join("+");
+  // Grouped, since ffmpeg rejects a flat sum of 100+ terms (#225).
+  const drop = sumExpr(cuts.map((c) => `between(t,${c.start},${c.end})`));
   return [
     "-y", "-i", input,
     "-vf", `select='not(${drop})',setpts=N/FRAME_RATE/TB`,

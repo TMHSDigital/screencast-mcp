@@ -13,6 +13,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Monitor } from "../utils/monitors.js";
 import type { WindowQuery } from "../utils/windows.js";
+import { MCP_APPS_EXTENSION, MCP_APP_MIME } from "../utils/player.js";
 
 const MONITORS: Monitor[] = [
   { index: 0, x: 0, y: 0, width: 1920, height: 1080, primary: true },
@@ -46,6 +47,9 @@ vi.mock("../utils/ffmpeg.js", async (importOriginal) => ({
   requireFfmpeg: () => ({ ffmpeg: "ffmpeg-not-called", ffprobe: "ffprobe-not-called" }),
   wgcAvailable: () => true,
 }));
+
+/** Tools listed only to MCP Apps clients. */
+const APP_ONLY = ["player_frames"];
 
 const home = mkdtempSync(join(tmpdir(), "sc-server-"));
 process.env.SCREENCAST_HOME = home;
@@ -93,8 +97,28 @@ describe("MCP tool layer (#192)", () => {
       .map((t) => t.name)
       .sort();
     const listed = (await client.listTools()).tools.map((t) => t.name).sort();
-    expect(listed).toEqual(declared);
+    expect(listed).toEqual(declared.filter((n) => !APP_ONLY.includes(n)));
     expect(new Set(listed).size).toBe(listed.length);
+  });
+
+  it("lists the app-only player_frames only to clients that advertise MCP Apps (#242)", async () => {
+    const { createServer } = await import("../server.js");
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await createServer().connect(serverSide);
+    const apps = new Client(
+      { name: "apps-test", version: "0.0.0" },
+      { capabilities: { extensions: { [MCP_APPS_EXTENSION]: { mimeTypes: [MCP_APP_MIME] } } } },
+    );
+    await apps.connect(clientSide);
+    try {
+      await vi.waitFor(async () => {
+        expect((await apps.listTools()).tools.map((t) => t.name)).toContain("player_frames");
+      });
+    } finally {
+      await apps.close();
+    }
+    const res = await call("player_frames", { input: "x.mp4" });
+    expect(res.isError).toBe(true);
   });
 
   it("answers invalid arguments to every tool with an isError result", async () => {
