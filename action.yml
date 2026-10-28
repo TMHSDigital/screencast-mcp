@@ -1,0 +1,155 @@
+name: Screencast test recording
+description: Record the Windows desktop while a test command runs and keep a GIF, contact sheet, and video of the failure as a workflow artifact.
+author: TMHSDigital
+branding:
+  icon: video
+  color: red
+
+# Runs `screencast-mcp record` (#179): the same capture and edit tools the MCP
+# server exposes, driven from the command line. Windows runners only: capture
+# uses gdigrab on the runner's interactive desktop.
+inputs:
+  command:
+    description: The test command to run while recording (run by cmd.exe, so `npm test && npm run e2e` works).
+    required: true
+  target:
+    description: "What to record: full | monitor:<i> | window:<title> | window:exe=<app.exe> | region:x,y,w,h."
+    default: full
+  fps:
+    description: Capture frame rate (1-120).
+    default: "15"
+  artifacts:
+    description: "When to make the GIF and contact sheet: failure, always, or never."
+    default: failure
+  last-seconds:
+    description: The GIF covers the last this-many seconds of the run (0 = all of it).
+    default: "30"
+  discard-on-success:
+    description: Delete the recording when the command passes, so green runs upload nothing but evidence.json.
+    default: "true"
+  output-dir:
+    description: Folder for recording.mp4, evidence.gif, contact-sheet.png, and evidence.json.
+    default: screencast-evidence
+  upload:
+    description: Upload the output folder as a workflow artifact.
+    default: "true"
+  artifact-name:
+    description: Name of the uploaded artifact.
+    default: screencast-evidence
+  retention-days:
+    description: Days to keep the artifact.
+    default: "14"
+  package:
+    description: The npm package (and version) to run with npx.
+    default: "@tmhs/screencast-mcp@latest"
+  cli-path:
+    description: Run a local build instead of the npm package, e.g. dist/index.js in a checkout of screencast-mcp.
+    default: ""
+  install-ffmpeg:
+    description: Install ffmpeg with Chocolatey when it is not on PATH.
+    default: "true"
+
+outputs:
+  exit-code:
+    description: The test command's exit code.
+    value: ${{ steps.record.outputs.exit-code }}
+  gif:
+    description: Path of the GIF, when one was made.
+    value: ${{ steps.record.outputs.gif }}
+  contact-sheet:
+    description: Path of the contact sheet, when one was made.
+    value: ${{ steps.record.outputs.contact-sheet }}
+  recording:
+    description: Path of the full recording, when kept.
+    value: ${{ steps.record.outputs.recording }}
+  evidence-dir:
+    description: The output folder.
+    value: ${{ steps.record.outputs.evidence-dir }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check the runner
+      id: check
+      shell: pwsh
+      run: |
+        if ($env:RUNNER_OS -ne 'Windows') { throw "screencast-mcp records the Windows desktop; use runs-on: windows-latest." }
+        $major = 0
+        try { $major = [int](node -p "process.versions.node.split('.')[0]") } catch { }
+        "node-major=$major" >> $env:GITHUB_OUTPUT
+
+    - name: Use Node.js 22
+      if: steps.check.outputs.node-major < 22
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+      with:
+        node-version: 22
+
+    - name: Ensure ffmpeg
+      shell: pwsh
+      env:
+        SC_INSTALL_FFMPEG: ${{ inputs.install-ffmpeg }}
+      run: |
+        if (Get-Command ffmpeg -ErrorAction SilentlyContinue) { ffmpeg -hide_banner -version | Select-Object -First 1; exit 0 }
+        if ($env:SC_INSTALL_FFMPEG -ne 'true') { throw "ffmpeg is not on PATH and install-ffmpeg is false." }
+        choco install ffmpeg -y --no-progress
+        if ($LASTEXITCODE -ne 0) { throw "choco install ffmpeg failed." }
+        "C:\ProgramData\chocolatey\bin" >> $env:GITHUB_PATH
+
+    - name: Run the command while recording
+      id: record
+      shell: pwsh
+      env:
+        SC_COMMAND: ${{ inputs.command }}
+        SC_TARGET: ${{ inputs.target }}
+        SC_FPS: ${{ inputs.fps }}
+        SC_ARTIFACTS: ${{ inputs.artifacts }}
+        SC_LAST: ${{ inputs.last-seconds }}
+        SC_DISCARD: ${{ inputs.discard-on-success }}
+        SC_OUT: ${{ inputs.output-dir }}
+        SC_PACKAGE: ${{ inputs.package }}
+        SC_CLI_PATH: ${{ inputs.cli-path }}
+      run: |
+        $PSNativeCommandArgumentPassing = 'Windows'
+        $cliArgs = @('record', '--target', $env:SC_TARGET, '--fps', $env:SC_FPS, '--out', $env:SC_OUT,
+          '--artifacts', $env:SC_ARTIFACTS, '--last', $env:SC_LAST)
+        if ($env:SC_DISCARD -eq 'true') { $cliArgs += '--discard-on-success' }
+        $cliArgs += @('--', $env:SC_COMMAND)
+        if ($env:SC_CLI_PATH) { & node $env:SC_CLI_PATH @cliArgs } else { & npx -y $env:SC_PACKAGE @cliArgs }
+        $code = $LASTEXITCODE
+        "exit-code=$code" >> $env:GITHUB_OUTPUT
+        $dir = (Resolve-Path -LiteralPath $env:SC_OUT -ErrorAction SilentlyContinue)
+        "evidence-dir=$dir" >> $env:GITHUB_OUTPUT
+        $json = Join-Path $env:SC_OUT 'evidence.json'
+        if (Test-Path $json) {
+          $e = Get-Content $json -Raw | ConvertFrom-Json
+          "gif=$($e.gif)" >> $env:GITHUB_OUTPUT
+          "contact-sheet=$($e.contactSheet)" >> $env:GITHUB_OUTPUT
+          "recording=$($e.recording)" >> $env:GITHUB_OUTPUT
+          $status = if ($code -eq 0) { 'passed' } else { "failed (exit $code)" }
+          $lines = @("### Screencast: ``$($e.command)`` $status", "")
+          if ($e.gif) { $lines += "- GIF: ``$(Split-Path $e.gif -Leaf)``" }
+          if ($e.contactSheet) { $lines += "- Contact sheet: ``$(Split-Path $e.contactSheet -Leaf)``" }
+          if ($e.recording) { $lines += "- Recording: ``$(Split-Path $e.recording -Leaf)`` ($($e.durationSec) s)" }
+          foreach ($w in $e.warnings) { $lines += "- Warning: $w" }
+          $lines += ""
+          $lines -join "`n" >> $env:GITHUB_STEP_SUMMARY
+        }
+        exit 0
+
+    - name: Upload the evidence
+      if: always() && inputs.upload == 'true' && steps.record.outputs.evidence-dir != ''
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.output-dir }}
+        retention-days: ${{ inputs.retention-days }}
+        if-no-files-found: ignore
+
+    - name: Fail with the command's exit code
+      if: steps.record.outputs.exit-code != '0'
+      shell: pwsh
+      env:
+        SC_CODE: ${{ steps.record.outputs.exit-code }}
+      run: |
+        Write-Host "::error::The recorded command failed with exit code $env:SC_CODE; the screencast evidence is in the uploaded artifact."
+        exit [int]$env:SC_CODE

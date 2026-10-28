@@ -68,4 +68,59 @@ describe.skipIf(!RUN)("capture smoke (RUN_CAPTURE_SMOKE)", () => {
     expect(info.width).toBe(640);
     expect(info.durationSec!).toBeGreaterThan(1);
   }, 60_000);
+
+  it("leaves a paused stretch out of the file and the markers (#200)", async () => {
+    const { probeMedia } = await import("../utils/ffmpeg.js");
+    const start = await call("start_recording", { target: "region:0,0,640,480", quality: "draft", fps: 15 });
+    expect(start.isError, start.text).toBe(false);
+    const id = start.json.sessionId;
+    await sleep(2000);
+    const pause = await call("pause_recording", { sessionId: id });
+    expect(pause.isError, pause.text).toBe(false);
+    expect(pause.json.status).toBe("paused");
+    const recorded = pause.json.recordedSec as number;
+    await sleep(3000);
+    const mark = await call("add_marker", { sessionId: id, label: "at the pause" });
+    expect((mark.json.marker as { t: number }).t).toBeCloseTo(recorded, 1);
+    const resume = await call("resume_recording", { sessionId: id });
+    expect(resume.isError, resume.text).toBe(false);
+    await sleep(2000);
+    const stop = await call("stop_recording", { sessionId: id });
+    expect(stop.isError, stop.text).toBe(false);
+    expect(stop.json.segmentsJoined).toBe(2);
+    const info = await probeMedia(start.json.outputPath as string);
+    // About 4 s recorded over about 7 s of wall time.
+    expect(info.durationSec!).toBeGreaterThan(recorded + 1);
+    expect(info.durationSec!).toBeLessThan(recorded + 3.5);
+    expect(existsSync(`${start.json.outputPath as string}.parts`)).toBe(false);
+  }, 90_000);
+
+  it("records with ddagrab and the auto encoder (#199)", async () => {
+    const { probeMedia } = await import("../utils/ffmpeg.js");
+    const start = await call("start_recording", { target: "region:0,0,640,480", backend: "ddagrab", fps: 30 });
+    if (start.isError && /Desktop Duplication|second GPU|single one/.test(start.text)) return; // no DDA here
+    expect(start.isError, start.text).toBe(false);
+    expect(start.json.backend).toBe("ddagrab");
+    expect(["x264", "nvenc", "qsv", "amf"]).toContain(start.json.encoder);
+    await sleep(2000);
+    const stop = await call("stop_recording", { sessionId: start.json.sessionId });
+    expect(stop.isError, stop.text).toBe(false);
+    const info = await probeMedia(start.json.outputPath as string);
+    expect(info.width).toBe(640);
+    expect(info.durationSec!).toBeGreaterThan(1);
+  }, 60_000);
+
+  // A camera is needed too, so this one has its own switch.
+  it.skipIf(!process.env.RUN_WEBCAM_SMOKE)("records a webcam aligned with the screen (#200)", async () => {
+    const { probeMedia } = await import("../utils/ffmpeg.js");
+    const start = await call("start_recording", { target: "region:0,0,640,480", fps: 15, webcam: { corner: "top_right" } });
+    expect(start.isError, start.text).toBe(false);
+    await sleep(2500);
+    const stop = await call("stop_recording", { sessionId: start.json.sessionId });
+    expect(stop.isError, stop.text).toBe(false);
+    const cam = stop.json.webcam as { path: string; overlay: { x: number } };
+    const [screen, webcam] = await Promise.all([probeMedia(start.json.outputPath as string), probeMedia(cam.path)]);
+    expect(Math.abs(webcam.durationSec! - screen.durationSec!)).toBeLessThan(0.2);
+    expect(cam.overlay.x).toBeGreaterThan(320);
+  }, 90_000);
 });

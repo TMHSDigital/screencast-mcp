@@ -19,6 +19,8 @@ import {
   versionText,
 } from "../utils/capabilities.js";
 import { parseToolsets, SELECTABLE_TOOLSETS } from "../utils/toolsets.js";
+import { ttsStatus } from "../utils/narrate.js";
+import { probeHwEncoders } from "../utils/gpu.js";
 
 const { version: serverVersion } = createRequire(import.meta.url)("../../package.json") as { version: string };
 
@@ -113,9 +115,22 @@ export function register(server: McpServer): void {
           problems.push("Not Windows: capture (screenshot, start_recording, list_targets) and OCR are unavailable; the watch and edit tools work.");
         }
 
-        const ocr = await ocrStatus();
+        // GPU capture (#199): ddagrab and which hardware encoders pass a
+        // trial encode (synthetic frames; nothing is captured). Optional, so
+        // a missing one is not a problem: auto falls back to libx264.
+        const gpu = tools
+          ? {
+              ddagrab: process.platform === "win32" && hasFilter("ddagrab"),
+              encoders: await probeHwEncoders(tools.ffmpeg),
+            }
+          : null;
+
+        const [ocr, tts] = await Promise.all([ocrStatus(), ttsStatus()]);
         if (process.platform === "win32" && !ocr.available) {
           problems.push(`Windows OCR unavailable: find_text cannot read the screen. ${ocr.error ?? "Install an OCR language (Settings > Time & language > Language)."}`);
+        }
+        if (process.platform === "win32" && !tts.available) {
+          problems.push(`Windows speech unavailable: narrate cannot speak. ${tts.error ?? ""} Install a voice (Settings > Time & language > Speech).`.replace(/\s+/g, " "));
         }
 
         const env = envSettings();
@@ -139,7 +154,10 @@ export function register(server: McpServer): void {
           filters,
           devices,
           wgc: { available: filters.gfxcapture === true },
+          ...(gpu ? { gpu } : {}),
           ocr,
+          // Installed Windows voices for narrate (#175).
+          tts,
           storage: {
             home,
             homeExists: existsSync(home),

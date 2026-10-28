@@ -72,7 +72,7 @@ export function register(server: McpServer): void {
                 "Start the recording with events: true.",
             );
           }
-          if (record.status === "recording") {
+          if (record.status === "recording" || record.status === "paused") {
             throw new ScreencastError("The recording is still running; its event log is written when it stops.");
           }
           path = record.events.path;

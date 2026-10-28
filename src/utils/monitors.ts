@@ -106,6 +106,8 @@ export interface RunPowerShellOptions {
   timeoutMs?: number;
   /** Tests: run this command and args instead of powershell. */
   command?: { file: string; args: string[] };
+  /** Kill the script when this aborts (the tool call was cancelled). */
+  signal?: AbortSignal;
 }
 
 /** Run a base64-encoded PowerShell script without blocking the event loop and
@@ -121,9 +123,11 @@ export function runPowerShell(script: string, what: string, opts: RunPowerShellO
     execFile(
       file,
       args,
-      { encoding: "utf8", windowsHide: true, maxBuffer: 8 * 1024 * 1024, timeout, killSignal: "SIGKILL" },
+      { encoding: "utf8", windowsHide: true, maxBuffer: 8 * 1024 * 1024, timeout, killSignal: "SIGKILL", signal: opts.signal },
       (err, stdout, stderr) => {
-        if (err && (err as { killed?: boolean }).killed) {
+        if (opts.signal?.aborted) {
+          reject(new ScreencastError(`Cancelled while reading ${what}.`));
+        } else if (err && (err as { killed?: boolean }).killed) {
           reject(
             new ScreencastError(
               `Timed out reading ${what} after ${timeout / 1000} s (PowerShell did not answer).`,

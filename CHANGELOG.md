@@ -7,6 +7,25 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.47.0]
+
+### Added
+
+- `start_recording` `backend: "ddagrab"`: GPU screen capture (Desktop Duplication) for one display, region, or window, matched to its DXGI output by geometry. With NVENC, frames go straight from capture to the encoder: a 1080p60 recording took 0.5% CPU against 12.7% for gdigrab + x264, with no dropped frames (#199).
+- `start_recording` `encoder: "auto" | "x264" | "nvenc" | "qsv" | "amf"`: hardware H.264 encoding with draft/standard/high mapped to each encoder's constant quality. `auto` (the default with ddagrab) runs a one-time trial encode and falls back to libx264 on machines without a GPU encoder. `doctor` lists ddagrab and the encoders that work (#199).
+- `pause_recording` / `resume_recording`: leave setup (logging in, loading fixtures) out of a recording. Paused stretches are absent from the final file, the event log, and markers; `stop_recording` joins the segments with a stream copy. Sessions gain a `paused` status, and shutdown finalizes paused sessions (#200).
+- `list_video_devices` and `start_recording { webcam: { device, corner, size, shape } }`: records a camera beside the screen into `<output>.webcam.mp4`, aligned frame for frame with the recording (across pauses too); `stop_recording` returns a ready `overlay` call, and `overlay` gains `shape: "circle"` (#200).
+- `cursor` (#170): record with `start_recording` `cursor: "events"` (the OS cursor left out, the event log on), then draw a cursor from the log, smoothed by a critically damped spring timed to arrive on time, scaled, hidden after `hideAfterSec` idle, with a ripple at each click and an optional `spotlight`. Positions drive the overlays through a sendcmd script, so a long recording costs no more per frame than a short one. Also a `pipeline` step that follows earlier trims, speed changes, cuts, crops, and scales.
+- `narrate` (#175): offline voiceover. Each of `lines` (`{ t | marker, text }`) is spoken by the built-in Windows voices (no download or API key), placed at its second or at a marker, and mixed over the original audio, which is ducked under the voice by default. A matching `.srt` is written beside the output, and lines that run into the next one or past the end are reported in `warnings`. The text never leaves the machine; `doctor` lists the installed voices.
+- A generated tool reference (#202): `npm run docs` builds the server, reads its live tool list and schemas, and writes a page per tool under `docs/tools/`, the README and home-page tool tables, `mcp-tools.json`, `docs/llms.txt` and `docs/llms-full.txt`, and the sitemap. The docs test regenerates them and fails on a stale copy; `npm run docs:check` checks without writing.
+- A Claude Code plugin (#177): `/plugin install screencast --marketplace TMHSDigital/screencast-mcp` installs the server plus `bug-repro`, `readme-demo`, and `verify-ui` skills. A test keeps every tool and recipe the skills name in step with the server.
+- A headless CLI and GitHub Action (#179): `screencast-mcp record -- <command>` records the screen while a test command runs, exits with its code, and on failure writes a GIF of the last 30 s, a contact sheet, and `evidence.json`; `screencast-mcp call <tool> '<json>'` runs any tool. No arguments still starts the MCP server. The composite action in `action.yml` runs it on `windows-latest` and uploads the evidence.
+
+### Changed
+
+- `mcp-tools.json` is generated and carries each tool's full input schema as the server reports it; the README's per-tool descriptions are each tool's own description, linked to its reference page (#202).
+- The tools/list size budget test is raised to 99 KB for this release's new tools and options (about 97.6 KB by default).
+
 ## [0.46.0]
 
 ### Added

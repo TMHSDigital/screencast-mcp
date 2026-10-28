@@ -3,10 +3,11 @@ import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { STOPS_SESSION, looseOutput } from "../utils/toolSpec.js";
-import { requireFfmpeg } from "../utils/ffmpeg.js";
+import { probeMedia, requireFfmpeg } from "../utils/ffmpeg.js";
 import { probeDuration, stopSession } from "../utils/lifecycle.js";
 import { getStore } from "../context.js";
 import { finishReplay, type ReplayStopResult } from "../utils/replay.js";
+import { webcamPlacement, type WebcamInfo } from "../utils/pause.js";
 
 /** A replay buffer's fate, for the stop result (#197). */
 function replayReport(r: ReplayStopResult): Record<string, unknown> {
@@ -15,6 +16,38 @@ function replayReport(r: ReplayStopResult): Record<string, unknown> {
     discarded: r.discarded,
     ...(r.save ? { durationSec: r.save.durationSec, eventsPath: r.save.eventsPath } : {}),
     ...(r.error ? { error: r.error, note: "The buffer was kept; call stop_recording with save: true again, or save_replay." } : {}),
+  };
+}
+
+/** The aligned webcam file and where overlay would put it (#200). */
+async function webcamReport(cam: WebcamInfo, output: string): Promise<Record<string, unknown>> {
+  if (cam.error || !existsSync(cam.path)) return { error: cam.error ?? `No webcam file was written (${cam.path}).` };
+  const size = async (p: string) => {
+    try {
+      const info = await probeMedia(p);
+      return info.width && info.height ? { width: info.width, height: info.height } : null;
+    } catch {
+      return null;
+    }
+  };
+  const [screen, camSize] = await Promise.all([size(output), size(cam.path)]);
+  // A circle is the centre square of the camera, sized by its height.
+  const circle = cam.shape === "circle";
+  const place = screen && camSize ? webcamPlacement(screen, circle ? { width: 1, height: 1 } : camSize, cam.corner, cam.size) : null;
+  return {
+    path: cam.path,
+    ...(place
+      ? {
+          overlay: {
+            input: output,
+            overlay: cam.path,
+            x: place.x,
+            y: place.y,
+            ...(circle ? { height: place.height, shape: "circle" } : { width: place.width }),
+          },
+          note: "Aligned with the recording: pass `overlay` to the overlay tool (any corner or size works).",
+        }
+      : {}),
   };
 }
 
@@ -49,7 +82,7 @@ export function register(server: McpServer): void {
         if (!record) {
           throw new ScreencastError(`No session with id "${args.sessionId}".`);
         }
-        if (record.status !== "recording") {
+        if (record.status !== "recording" && record.status !== "paused") {
           // A replay buffer outlives a session that ended on its own (the
           // maxDurationSec cap) until it is saved or discarded here (#197).
           const replay =
@@ -78,7 +111,7 @@ export function register(server: McpServer): void {
         }
 
         const { ffprobe } = requireFfmpeg();
-        const { record: updated, graceful, durationSec, replay } = await stopSession(store, record, {
+        const { record: updated, graceful, durationSec, replay, segments } = await stopSession(store, record, {
           reason: "stopped",
           probe: (path) => probeDuration(ffprobe, path),
           saveReplay: args.save,
@@ -91,6 +124,9 @@ export function register(server: McpServer): void {
           durationSec: durationSec ?? null,
           finalizedGracefully: graceful,
           ...(replay ? { replay: replayReport(replay) } : {}),
+          ...(segments && segments.count > 1 ? { segmentsJoined: segments.count } : {}),
+          ...(segments?.error ? { segmentsError: segments.error } : {}),
+          ...(updated?.webcam ? { webcam: await webcamReport(updated.webcam, record.outputPath) } : {}),
           ...(updated?.events
             ? { eventsPath: updated.events.path, events: updated.events.summary ?? {}, ...(updated.events.error ? { eventsError: updated.events.error } : {}) }
             : {}),

@@ -32,6 +32,7 @@
     </div>
     <div class="hud-right">
       <a class="home" href="./">screencast-mcp</a>
+      <a href="./tools/">Tools</a>
       <a href="./workflows/">Workflows</a>
       <a href="./connect.html" class="here">Connect</a>
       <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
@@ -58,6 +59,9 @@
       <p>One command. On native Windows, <code>npx</code> needs the <code>cmd /c</code> wrapper:</p>
       <pre class="copyable"><code>claude mcp add screencast -- cmd /c npx -y @tmhs/screencast-mcp</code></pre>
       <p>Add <code>--scope user</code> to make it available in every project, or <code>--scope project</code> to share it through a checked-in <code>.mcp.json</code>. Check it with <code>claude mcp list</code>, or <code>/mcp</code> inside a session.</p>
+      <p><strong>Or install the plugin:</strong> the same server plus skills that load when you ask for a bug-repro GIF, a README demo, or a check of a UI change on screen.</p>
+      <pre class="copyable"><code>/plugin install screencast --marketplace TMHSDigital/screencast-mcp</code></pre>
+      <p>On an older Claude Code, add the marketplace first: <code>/plugin marketplace add TMHSDigital/screencast-mcp</code>, then <code>/plugin install screencast@screencast-mcp</code>.</p>
       </div>
       <div class="panel" role="tabpanel" id="claude-desktop" aria-labelledby="tab-claude-desktop">
         <h3>Claude Desktop</h3>

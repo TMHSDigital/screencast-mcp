@@ -27,16 +27,18 @@ export interface WgcRecorderConfig {
   output: string;
   /** 0 = no cap. */
   maxDurationSec: number;
+  /** False leaves the cursor out of the frames (#170). */
+  cursor?: boolean;
 }
 
 /** ffmpeg args that turn a window's WGC frames into raw yuv420p on stdout,
  * cropped to even dimensions for the encoder. */
-export function buildWgcGrabArgs(hwnd: number, fps: number): string[] {
+export function buildWgcGrabArgs(hwnd: number, fps: number, cursor = true): string[] {
   if (!Number.isSafeInteger(hwnd) || hwnd <= 0) throw new ScreencastError("Invalid window handle.");
   return [
     "-hide_banner", "-nostats", "-loglevel", "info",
     "-f", "lavfi",
-    "-i", `gfxcapture=hwnd=${hwnd}:max_framerate=${fps},hwdownload,format=bgra,crop=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p`,
+    "-i", `gfxcapture=hwnd=${hwnd}:max_framerate=${fps}${cursor ? "" : ":capture_cursor=0"},hwdownload,format=bgra,crop=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p`,
     // Without this the end of a frame waits in ffmpeg's output buffer until the
     // next frame pushes it out, so a window that repaints once never shows it.
     "-flush_packets", "1",

@@ -371,7 +371,7 @@ export async function resolveRecording(args: { input?: string; sessionId?: strin
   if (args.sessionId !== undefined) {
     const record = getStore().get(args.sessionId);
     if (!record) throw new ScreencastError(`No session with id "${args.sessionId}".`);
-    if (record.status === "recording") throw new ScreencastError("The recording is still running; stop_recording it first.");
+    if (record.status === "recording" || record.status === "paused") throw new ScreencastError("The recording is still running; stop_recording it first.");
     await whenFinalized(record.id);
     if (!existsSync(record.outputPath)) throw new ScreencastError(`The session's recording is missing: ${record.outputPath}`);
     const events = record.events?.path;

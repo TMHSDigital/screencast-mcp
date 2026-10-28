@@ -252,6 +252,29 @@ export interface CaptureOptions {
   audio?: AudioCaptureOptions;
   /** Stop capturing after this many seconds (ffmpeg -t). 0 / absent = no cap. */
   maxDurationSec?: number;
+  /** False leaves the OS cursor out of gdigrab's frames (#170); the cursor tool redraws it. */
+  drawMouse?: boolean;
+  /** The video input args in place of gdigrab's (ddagrab, #199). */
+  videoInput?: string[];
+  /** Video encoder args in place of libx264's (a hardware encoder, #199). */
+  videoCodec?: string[];
+  /** Also record a dshow camera to a second file (#200). */
+  webcam?: WebcamCaptureOptions;
+}
+
+export interface WebcamCaptureOptions {
+  /** dshow video device name (see list_video_devices). */
+  device: string;
+  output: string;
+  /** Encoder args for the camera (system-memory frames). */
+  codec?: string[];
+}
+
+/** A dshow camera input. Wall-clock timestamps make its banner start time
+ * comparable with gdigrab's, which is how the two files are lined up. Pure. */
+export function buildWebcamInputArgs(device: string): string[] {
+  if (device.trim().length === 0) throw new ScreencastError("webcam device must not be empty.");
+  return ["-f", "dshow", "-use_wallclock_as_timestamps", "1", "-rtbufsize", "256M", "-i", `video=${device}`];
 }
 
 /** Default recording cap when start_recording is given none (#82): one hour. */
@@ -306,32 +329,54 @@ export function captureKeyframeArgs(fps: number): string[] {
   return ["-g", String(Math.max(1, Math.round(fps * 2)))];
 }
 
+/** Fragmented mp4: keeps the file playable even if the process is killed
+ * before the trailing moov atom would normally be written. */
+const FRAGMENTED_MP4 = ["-movflags", "+frag_keyframe+empty_moov+default_base_moof"];
+
 /** Build the full ffmpeg argument vector for a recording (gdigrab -> mp4). */
 export function buildCaptureArgs(target: Target, opts: CaptureOptions): string[] {
   const fps = validateFps(opts.fps ?? DEFAULT_FPS);
   const quality = opts.quality ?? DEFAULT_QUALITY;
   const monitors = opts.monitors ?? [];
   const cap = validateMaxDuration(opts.maxDurationSec ?? 0);
+  // Output-side -t: ffmpeg stops and finalizes the file cleanly at the cap.
+  const capArgs = cap > 0 ? ["-t", String(cap)] : [];
+  const cam = opts.webcam;
+  // A second output needs explicit maps, or ffmpeg would pick the "best"
+  // (largest) video for both files.
+  const camInput = opts.audio ? 2 : 1;
   return [
     "-y",
-    "-f", "gdigrab",
-    "-framerate", String(fps),
-    ...targetInputArgs(target, monitors, { evenSize: true }),
+    ...(opts.videoInput ?? [
+      "-f", "gdigrab",
+      "-framerate", String(fps),
+      ...(opts.drawMouse === false ? ["-draw_mouse", "0"] : []),
+      ...targetInputArgs(target, monitors, { evenSize: true }),
+    ]),
     ...buildAudioInputArgs(opts.audio),
+    ...(cam ? buildWebcamInputArgs(cam.device) : []),
+    ...(cam ? ["-map", "0:v", ...(opts.audio ? ["-map", "1:a"] : [])] : []),
     // Without monitor geometry `full` cannot be sized up front, so crop it to
     // even dimensions in the filter graph instead (#226).
-    ...(target.kind === "full" && monitors.length === 0
+    ...(!opts.videoInput && target.kind === "full" && monitors.length === 0
       ? ["-vf", "crop=trunc(iw/2)*2:trunc(ih/2)*2"]
       : []),
-    ...resolveQuality(quality),
+    ...(opts.videoCodec ?? resolveQuality(quality)),
     ...captureKeyframeArgs(fps),
     ...(opts.audio ? ["-c:a", "aac", "-b:a", "160k"] : []),
-    // Fragmented mp4: keeps the file playable even if the process is killed
-    // before the trailing moov atom would normally be written.
-    "-movflags", "+frag_keyframe+empty_moov+default_base_moof",
-    // Output-side -t: ffmpeg stops and finalizes the file cleanly at the cap.
-    ...(cap > 0 ? ["-t", String(cap)] : []),
+    ...FRAGMENTED_MP4,
+    ...capArgs,
     opts.output,
+    ...(cam
+      ? [
+          "-map", `${camInput}:v`,
+          ...(cam.codec ?? resolveQuality(quality)),
+          ...captureKeyframeArgs(fps),
+          ...FRAGMENTED_MP4,
+          ...capArgs,
+          cam.output,
+        ]
+      : []),
   ];
 }
 

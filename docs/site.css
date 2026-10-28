@@ -410,3 +410,38 @@ figure.output figcaption .tc { color: var(--amber); }
   .vf-strip { height: 44px; }
   .vf-note { min-height: 7.2em; }
 }
+
+/* ---- Tool reference (generated, #202) ---- */
+td code a, .tool-id code { color: var(--amber); text-decoration: none; }
+td code a:hover { color: var(--ink); text-decoration: underline; }
+.tool-id { margin: 0.6rem 0 0; }
+.tool-id code { font-size: 1rem; background: none; border: 0; padding: 0; }
+/* Slate chips: the take's metadata, in the HUD's mono caps. */
+.chips { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 1.4rem 0 0; }
+.chip {
+  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 0.15rem 0.5rem;
+}
+.chip.set { color: var(--desktop); background: var(--amber); border-color: var(--amber); }
+.chip.warn { color: var(--rec); border-color: color-mix(in srgb, var(--rec) 45%, var(--line)); }
+.table-scroll { overflow-x: auto; }
+table.params td:first-child { white-space: nowrap; }
+table.params td:nth-child(2) { white-space: normal; min-width: 6rem; }
+table.params code.type { color: var(--ink); font-size: 0.8rem; overflow-wrap: anywhere; }
+table.params .req {
+  font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--rec); margin-left: 0.4rem;
+}
+table.params .bounds { display: block; margin-top: 0.2rem; font-family: var(--mono); font-size: 0.78rem; color: var(--dim); opacity: 0.85; }
+/* Nested fields hang off their parent like tracks in a timeline. */
+table.params tr.nested td:first-child { padding-left: 1.6rem; position: relative; }
+table.params tr.nested.d2 td:first-child { padding-left: 2.6rem; }
+table.params tr.nested.d3 td:first-child { padding-left: 3.6rem; }
+table.params tr.nested td:first-child::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 0.8rem; border-left: 1px solid var(--line);
+}
+table.params tr.nested.d2 td:first-child::before { left: 1.8rem; }
+table.params tr.nested.d3 td:first-child::before { left: 2.8rem; }
+@media (max-width: 640px) {
+  table.params td:first-child { white-space: normal; overflow-wrap: anywhere; }
+}

@@ -30,12 +30,24 @@ import type { Quality } from "./targets.js";
 import { WGC_WINDOW_CLOSED_EXIT } from "./wgc.js";
 import type { ReplayBuffer } from "./replay.js";
 import type { Marker } from "./chapters.js";
+import type { VideoEncoder } from "./gpu.js";
+import type { SegmentCapture, SegmentState, WebcamInfo } from "./pause.js";
+
+/** gdigrab (screen rectangle), wgc (one window, #113), or ddagrab (Desktop
+ * Duplication on the GPU, #199). */
+export type CaptureBackend = "gdigrab" | "wgc" | "ddagrab";
 
 /** Cap on retained finished records, so the registry does not grow without
  * bound. Active ("recording") records are always kept. */
 export const MAX_FINISHED_RECORDS = 100;
 
-export type SessionStatus = "recording" | "stopped" | "failed" | "orphaned";
+export type SessionStatus = "recording" | "paused" | "stopped" | "failed" | "orphaned";
+
+/** Statuses of a session that has not ended: recording, or paused between
+ * segments (#200). */
+export function isLive(status: SessionStatus): boolean {
+  return status === "recording" || status === "paused";
+}
 
 /** Why a recording ended: an explicit stop_recording, the maxDurationSec cap,
  * an ffmpeg crash, the server shutting down (client disconnect / signal), or
@@ -69,7 +81,15 @@ export interface SessionRecord {
   matchedWindow?: string;
   /** Capture backend: the screen rectangle (gdigrab) or the window itself
    * through Windows Graphics Capture (wgc, #113). Absent on older records. */
-  backend?: "gdigrab" | "wgc";
+  backend?: CaptureBackend;
+  /** Video encoder (#199): libx264, or a hardware one. Absent = x264. */
+  encoder?: VideoEncoder;
+  /** How to start another segment after pause_recording (#200). */
+  capture?: SegmentCapture;
+  /** The recorded segments (#200): finished parts and the one running now. */
+  segments?: SegmentState;
+  /** Webcam sidecar (#200). */
+  webcam?: WebcamInfo;
   /** Image name of the process behind `pid` (ffmpeg.exe, or node.exe for the
    * wgc recorder), checked before a kill by pid (#182). Absent on older
    * records; see expectedImage. */
@@ -100,6 +120,9 @@ export function classifyOrphan(
   record: SessionRecord,
   alive: boolean,
 ): { status: SessionStatus; reaped: boolean } {
+  // A paused session has no process; its owner is gone, so it simply ended
+  // (its parts stay on disk, #200).
+  if (record.status === "paused") return { status: "stopped", reaped: false };
   if (record.status !== "recording") {
     return { status: record.status, reaped: false };
   }
@@ -123,7 +146,7 @@ export function isForeignLiveRecording(
   ownerAlive: boolean,
 ): boolean {
   return (
-    record.status === "recording" &&
+    isLive(record.status) &&
     record.serverPid !== undefined &&
     record.serverPid !== currentServerPid &&
     ownerAlive
@@ -227,7 +250,7 @@ export function isFfmpegProcess(pid: number | null): boolean {
  * only once the cap could actually have been reached (#240). Pure. */
 export function classifyUnrequestedExit(opts: {
   code: number | null;
-  backend: "gdigrab" | "wgc";
+  backend: CaptureBackend;
   maxDurationSec: number;
   elapsedMs: number;
 }): { status: "stopped" | "failed"; endReason: EndReason } {
@@ -257,9 +280,9 @@ export function killPid(pid: number): void {
 /** Keep every active recording plus the most recent MAX_FINISHED_RECORDS
  * finished records (newest first), so the registry stays bounded. Pure. */
 export function pruneRecords(records: SessionRecord[]): SessionRecord[] {
-  const active = records.filter((r) => r.status === "recording");
+  const active = records.filter((r) => isLive(r.status));
   const finished = records
-    .filter((r) => r.status !== "recording")
+    .filter((r) => !isLive(r.status))
     .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))
     .slice(0, MAX_FINISHED_RECORDS);
   return [...active, ...finished];
@@ -627,9 +650,29 @@ export class SessionStore {
     this.children.delete(id);
   }
 
-  /** Ids of recordings this instance owns a live child handle for. */
+  /** Ids of recordings this instance owns a live child handle for, plus the
+   * ones it paused (#200): shutdown finalizes both. */
   activeIds(): string[] {
-    return [...this.children.keys()].filter((id) => this.records.get(id)?.status === "recording");
+    return [
+      ...[...this.children.keys()].filter((id) => this.records.get(id)?.status === "recording"),
+      ...[...this.paused].filter((id) => this.records.get(id)?.status === "paused" && !this.children.has(id)),
+    ];
+  }
+
+  /** Sessions this instance paused and can resume (its event logger and
+   * capture settings live here). */
+  private paused = new Set<string>();
+
+  markPaused(id: string): void {
+    this.paused.add(id);
+  }
+
+  ownsPaused(id: string): boolean {
+    return this.paused.has(id);
+  }
+
+  clearPaused(id: string): void {
+    this.paused.delete(id);
   }
 
   markStopping(id: string): void {
@@ -662,7 +705,7 @@ export class SessionStore {
       return isSameServer(record, owners.get(pid) ?? null);
     };
     for (const record of this.records.values()) {
-      if (record.status !== "recording") continue;
+      if (!isLive(record.status)) continue;
       // Never reap a recording owned by another still-live server instance:
       // that would kill its active capture. Leave the record untouched.
       if (isForeignLiveRecording(record, process.pid, ownerAlive(record))) {
@@ -679,6 +722,12 @@ export class SessionStore {
         ...(record.stoppedAt ? {} : { stoppedAt: new Date().toISOString() }),
         ...(verdict.status === "orphaned"
           ? { error: "Reaped on server restart (recording was interrupted)." }
+          : {}),
+        ...(record.status === "paused"
+          ? {
+              endReason: "shutdown" as const,
+              error: `The server exited while this recording was paused; its parts were not joined (${record.segments?.parts.map((p) => p.path).join(", ") ?? record.outputPath}).`,
+            }
           : {}),
       };
       this.records.set(record.id, { ...record, ...patch });

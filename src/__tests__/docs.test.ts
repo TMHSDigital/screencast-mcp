@@ -1,16 +1,39 @@
 /**
- * Drift guard: the tools table on the GitHub Pages site (docs/index.html) is
- * hand-mirrored from mcp-tools.json (the registered-tool manifest). Nothing
- * else keeps them in sync, so this test fails a PR that adds/removes a tool
- * without updating the site, or documents a tool that does not exist.
+ * Docs drift guard (#202). mcp-tools.json, the README tool and toolset tables,
+ * the home page tool tables, docs/tools/, llms.txt, the sitemap, and the
+ * workflow pages are all generated from the live tool registry by
+ * scripts/build-tool-docs.mjs (`npm run docs`). This test regenerates them
+ * in memory from src/ and fails when a committed copy differs, so a tool
+ * added, renamed, or re-described without `npm run docs` cannot ship stale
+ * docs. The checks below that keep hand-written pages honest stay as they were.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { defined } from "./testUtils.js";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { createServer } from "../server.js";
+import { toolsetOf } from "../utils/toolsets.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+// A plain .mjs build helper: imported by URL, typed by hand.
+interface Tool {
+  name: string;
+}
+const toolDocs = (await import(pathToFileURL(join(root, "scripts", "tool-docs.mjs")).href)) as {
+  collectTools: (create: typeof createServer, setOf: typeof toolsetOf) => Promise<Tool[]>;
+  buildAll: (o: { tools: Tool[]; root: string }) => Map<string, string>;
+  staleFiles: (files: Map<string, string>, root: string) => string[];
+};
+
+let tools: Tool[] = [];
+let files = new Map<string, string>();
+beforeAll(async () => {
+  tools = await toolDocs.collectTools(createServer, toolsetOf);
+  files = toolDocs.buildAll({ tools, root });
+});
 
 const registered = (
   JSON.parse(readFileSync(join(root, "mcp-tools.json"), "utf8")) as Array<{
@@ -18,29 +41,33 @@ const registered = (
   }>
 ).map((t) => t.name);
 
-const html = readFileSync(join(root, "docs", "index.html"), "utf8");
-const documented = [...html.matchAll(/<td><code>([a-z_]+)<\/code><\/td>/g)].map(
-  (m) => defined(m[1]),
-);
-
-describe("docs/index.html tools table stays in sync with mcp-tools.json", () => {
-  it("documents every registered tool", () => {
-    const missing = registered.filter((t) => !documented.includes(t));
-    expect(missing, `tools missing from docs/index.html: ${missing.join(", ")}`).toEqual([]);
+describe("generated docs are fresh (#202)", () => {
+  it("every generated file matches a regeneration from the registry (run `npm run docs`)", () => {
+    const stale = toolDocs.staleFiles(files, root);
+    expect(stale, `stale generated files; run \`npm run docs\`:\n${stale.join("\n")}`).toEqual([]);
   });
-  it("documents no tool that is not registered", () => {
-    const phantom = documented.filter((t) => !registered.includes(t));
-    expect(phantom, `tools in docs/index.html but not registered: ${phantom.join(", ")}`).toEqual([]);
-  });
-  it("actually parsed the table (sanity check against a silent regex miss)", () => {
-    expect(documented.length).toBeGreaterThan(0);
+  it("covers every registered tool with a page, a README row, and a home-page row", () => {
+    expect(tools.map((t) => t.name).sort()).toEqual([...registered].sort());
+    const readme = readFileSync(join(root, "README.md"), "utf8");
+    const home = readFileSync(join(root, "docs", "index.html"), "utf8");
+    const homeRows = [...home.matchAll(/<td><code><a href="tools\/([a-z_]+)\.html">/g)].map((m) => defined(m[1]));
+    const readmeRows = [...readme.matchAll(/^\| \[`([a-z_]+)`\]\(/gm)].map((m) => defined(m[1]));
+    for (const name of registered) {
+      expect(existsSync(join(root, "docs", "tools", `${name}.html`)), `docs/tools/${name}.html`).toBe(true);
+    }
+    expect([...homeRows].sort()).toEqual([...registered].sort());
+    expect([...readmeRows].sort()).toEqual([...registered].sort());
   });
 });
 
 // The workflow recipes (#129) reference tools by name in their call lists and
 // link to each other and to media files; keep both honest.
-const pages = ["index.html", "connect.html", ...readdirSync(join(root, "docs", "workflows")).map((f) => `workflows/${f}`)]
-  .filter((p) => p.endsWith(".html"));
+const pages = [
+  // 404.html links by absolute path and is not a page to index.
+  ...readdirSync(join(root, "docs")).filter((f) => f !== "404.html"),
+  ...readdirSync(join(root, "docs", "workflows")).map((f) => `workflows/${f}`),
+  ...(existsSync(join(root, "docs", "tools")) ? readdirSync(join(root, "docs", "tools")).map((f) => `tools/${f}`) : []),
+].filter((p) => p.endsWith(".html"));
 
 describe("docs pages", () => {
   it("every relative link, image, stylesheet, and script resolves to a file", () => {
@@ -99,13 +126,9 @@ describe("docs/sitemap.xml", () => {
 describe("README", () => {
   const readme = readFileSync(join(root, "README.md"), "utf8");
   it("states the real tool count", () => {
-    const counts = [...readme.matchAll(/\b(\d+) (?:typed )?tools\b/g)].map((m) => Number(m[1]));
+    const counts = [...readme.matchAll(/\b(\d+)(?:<!--\/tool-count-->)? (?:typed )?tools\b/g)].map((m) => Number(m[1]));
     expect(counts.length).toBeGreaterThan(0);
     expect(counts.every((n) => n === registered.length), `README says ${counts.join(", ")}; manifest has ${registered.length}`).toBe(true);
-  });
-  it("documents every registered tool in a table", () => {
-    const rows = [...readme.matchAll(/^\| `([a-z_]+)` \|/gm)].map((m) => m[1]);
-    expect(registered.filter((t) => !rows.includes(t))).toEqual([]);
   });
 });
 

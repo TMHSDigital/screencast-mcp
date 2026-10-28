@@ -8,7 +8,6 @@ import { fileURLToPath } from "node:url";
 import {
   buildCaptureArgs,
   captureFrame,
-  resolveQuality,
   DEFAULT_FPS,
   DEFAULT_QUALITY,
   DEFAULT_MAX_RECORDING_SEC,
@@ -19,13 +18,36 @@ import {
 } from "../utils/targets.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
 import { windowMatchReport } from "../utils/windows.js";
-import { resolveLoopbackDevice } from "../utils/audioDevices.js";
+import { resolveLoopbackDevice, resolveVideoDevice } from "../utils/audioDevices.js";
 import { confirmCapture, describeTarget } from "../utils/consent.js";
-import { logMessage, StderrWatch } from "../utils/logging.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { getStore } from "../context.js";
-import { classifyUnrequestedExit, killPid, serverIdentity, type SessionRecord } from "../utils/sessions.js";
-import { rmSync } from "node:fs";
+import { killPid, serverIdentity, type SessionRecord } from "../utils/sessions.js";
+import { mkdirSync, rmSync } from "node:fs";
+import {
+  buildDdaInputArgs,
+  ddagrabWorks,
+  encoderArgs,
+  getDxgiOutputs,
+  planDdaSource,
+  resolveEncoder,
+} from "../utils/gpu.js";
+import {
+  attachExitHandler,
+  captureStartMs,
+  settleCapture,
+  tailLines,
+  watchStderr,
+  type CaptureWatch,
+} from "../utils/recorder.js";
+import {
+  DEFAULT_WEBCAM_SIZE,
+  eventClock,
+  partsDir,
+  sessionEnded,
+  webcamOutputPath,
+  webcamPartPath,
+} from "../utils/pause.js";
 import { basename, join } from "node:path";
 import {
   MAX_REPLAY_SEC,
@@ -114,13 +136,30 @@ const inputSchema = {
       "With events: masked (default) logs typing only as 0.5 s-grid bursts, never keys; shortcuts " +
         "also names Ctrl/Alt/Win chords. Typed text is never logged.",
     ),
+  cursor: z
+    .enum(["os", "events"])
+    .optional()
+    .describe('events: leave the OS cursor out and log it (implies events) for the cursor tool to redraw.'),
   backend: z
-    .enum(["gdigrab", "wgc"])
+    .enum(["gdigrab", "wgc", "ddagrab"])
     .optional()
     .describe(
       "gdigrab (default): the screen rectangle. wgc (window: targets, FFmpeg 8+): the window's own " +
-        "surface, even when covered or moved; client area only, no audio.",
+        "surface, even when covered or moved; client area only, no audio. ddagrab: one display on the GPU, low CPU.",
     ),
+  encoder: z
+    .enum(["auto", "x264", "nvenc", "qsv", "amf"])
+    .optional()
+    .describe("auto = first working GPU encoder, else x264 (default with ddagrab; else x264)."),
+  webcam: z
+    .object({
+      device: z.string().optional().describe("list_video_devices name (default: first)."),
+      corner: z.enum(["top_left", "top_right", "bottom_left", "bottom_right"]).optional(),
+      size: z.number().min(0.1).max(0.5).optional().describe("Share of width (0.25)."),
+      shape: z.enum(["rect", "circle"]).optional(),
+    })
+    .optional()
+    .describe("Also record a camera to <output>.webcam.mp4, aligned for overlay."),
   replayBufferSec: z
     .number()
     .int()
@@ -129,6 +168,12 @@ const inputSchema = {
     .optional()
     .describe("Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab only."),
 };
+
+/** The camera's first-frame epoch from its banner (input 1, or 2 after audio). */
+function webcamStart(watch: CaptureWatch, audio: boolean): { webcamStartMs?: number } {
+  const ms = parseCaptureStart(watch.head(), audio ? 2 : 1);
+  return ms !== null ? { webcamStartMs: ms } : {};
+}
 
 export function register(server: McpServer): void {
   server.registerTool(
@@ -150,6 +195,9 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         const { ffmpeg } = requireFfmpeg();
+        // A cursor left out of the video is redrawn from the event log (#170).
+        const hideCursor = args.cursor === "events";
+        if (hideCursor) args.events = true;
         const { target, monitors, window } = await resolveCaptureTarget(args.target, {
           exactTitle: args.exactTitle,
           backend: args.backend,
@@ -183,24 +231,57 @@ export function register(server: McpServer): void {
           args.audio?.source === "system"
             ? { device: await resolveLoopbackDevice(args.audio.device) }
             : undefined;
+        // A webcam records beside the screen into its own file (#200).
+        if (args.webcam && (backend === "wgc" || replay)) {
+          throw new ScreencastError("webcam works with backend gdigrab or ddagrab, without replayBufferSec.");
+        }
+        const webcamDevice = args.webcam ? await resolveVideoDevice(args.webcam.device) : undefined;
+        // ddagrab captures one display, picked by its DXGI output (#199).
+        const dda = backend === "ddagrab" ? planDdaSource(captureFrame(target, monitors), await getDxgiOutputs()) : null;
         await confirmCapture(
           server,
           (replay ? `Keep a rolling ${replay.bufferSec} s replay buffer of ` : "Record ") +
             `${describeTarget(args.target, window)} ` +
             (maxDurationSec > 0 ? `for up to ${maxDurationSec} s` : "with no time limit") +
             (audio ? `, with system audio (${audio.device})` : ", without audio") +
+            (webcamDevice ? `, with the webcam (${webcamDevice})` : "") +
             (args.events ? ", logging mouse clicks and typing" : "") +
             (replay ? ", kept only until save_replay or stop_recording { save: true } writes it out?" : `, saved to ${output}?`),
           extra.signal,
         );
 
-        const captureArgs = buildCaptureArgs(target, {
+        // GPU encode (#199): auto probes once per process, else libx264.
+        const pick = await resolveEncoder(
+          args.encoder ?? (backend === "ddagrab" ? "auto" : "x264"),
+          backend === "ddagrab" ? "ddagrab" : "gdigrab",
+          ffmpeg,
+        );
+        if (dda && !pick.gpuFrames && !(await ddagrabWorks(ffmpeg))) {
+          throw new ScreencastError(
+            "Desktop Duplication (ddagrab) does not capture on this machine (a remote session, or no D3D11 GPU).",
+            'Use backend "gdigrab".',
+          );
+        }
+        const hw = pick.encoder !== "x264";
+        const captureOpts = {
           fps,
           quality,
-          output,
           monitors,
           audio,
+          drawMouse: !hideCursor,
+          ...(dda ? { videoInput: buildDdaInputArgs(dda, fps, { download: !pick.gpuFrames, drawMouse: !hideCursor }) } : {}),
+          ...(hw ? { videoCodec: encoderArgs(pick.encoder, quality, { gpuFrames: pick.gpuFrames }) } : {}),
+        };
+        const webcam = webcamDevice
+          ? { device: webcamDevice, ...(hw ? { codec: encoderArgs(pick.encoder, quality) } : {}) }
+          : undefined;
+        const webcamRaw = webcam ? webcamPartPath(output, 0) : undefined;
+        if (webcamRaw) mkdirSync(partsDir(output), { recursive: true });
+        const captureArgs = buildCaptureArgs(target, {
+          ...captureOpts,
+          output,
           maxDurationSec,
+          ...(webcam && webcamRaw ? { webcam: { ...webcam, output: webcamRaw } } : {}),
         });
         const ffArgs = replay ? segmentOutputArgs(captureArgs, replay) : captureArgs;
         if (replay) prepareReplayDir(replay);
@@ -222,7 +303,7 @@ export function register(server: McpServer): void {
                 process.execPath,
                 [
                   fileURLToPath(new URL("../wgcRecorder.js", import.meta.url)),
-                  JSON.stringify({ ffmpeg, hwnd: window!.hwnd, fps, encode: [...resolveQuality(quality), ...captureKeyframeArgs(fps)], output, maxDurationSec }),
+                  JSON.stringify({ ffmpeg, hwnd: window!.hwnd, fps, encode: [...encoderArgs(pick.encoder, quality), ...captureKeyframeArgs(fps)], output, maxDurationSec, cursor: !hideCursor }),
                 ],
                 { stdio: ["pipe", "ignore", "pipe"], windowsHide: true },
               )
@@ -234,50 +315,23 @@ export function register(server: McpServer): void {
         // Detect an immediate failure (bad window title, busy device, etc.).
         // The head keeps the input banner, whose start: time aligns events.
         // Warnings and dropped frames go to the client as log messages (#222).
-        let stderrTail = "";
-        let stderrHead = "";
         const id = `rec-${stamp()}-${rand(6)}`;
-        const watch = new StderrWatch(() => ({ sessionId: id }));
-        child.stderr?.on("data", (d) => {
-          const text = d.toString();
-          stderrTail = (stderrTail + text).slice(-2000);
-          if (stderrHead.length < 8000) stderrHead += text;
-          watch.feed(text);
-        });
-        // gdigrab is running once it survives a moment; the wgc recorder says
-        // so when its first frame is written (a repaint can take a second).
-        const settled = await new Promise<"running" | "exited">((resolve) => {
-          const timer = setTimeout(() => resolve("running"), backend === "wgc" ? 15_000 : 1200);
-          if (backend === "wgc") {
-            child.stderr?.on("data", () => {
-              if (parseCaptureStart(stderrHead) !== null) {
-                clearTimeout(timer);
-                resolve("running");
-              }
-            });
-          }
-          child.on("error", (err) => {
-            clearTimeout(timer);
-            stderrTail += `\n${err.message}`;
-            resolve("exited");
-          });
-          child.on("exit", () => {
-            clearTimeout(timer);
-            resolve("exited");
-          });
-        });
+        const watch = watchStderr(child, id);
+        const settled = await settleCapture(child, watch, backend);
 
         if (settled === "exited") {
           if (logger) await stopEventLogger(logger);
           if (evPaths) rmSync(evPaths.raw, { force: true });
           if (replay) discardReplay(replay);
-          const tail = stderrTail.trim().split("\n").slice(-6).join("\n");
+          if (webcamRaw) rmSync(partsDir(output), { recursive: true, force: true });
           throw new ScreencastError(
-            `Recording failed to start (${backend === "wgc" ? "window capture" : "ffmpeg"} exited immediately):\n${tail}`,
+            `Recording failed to start (${backend === "wgc" ? "window capture" : "ffmpeg"} exited immediately):\n${tailLines(watch)}`,
           );
         }
+        // The video clock's zero, for add_marker (#174) and the event log.
+        const startMs = captureStartMs(watch, backend, spawnedAt);
         if (backend === "wgc" && frame && window?.client) {
-          const m = /wgc: (\d+)x(\d+)/.exec(stderrHead);
+          const m = /wgc: (\d+)x(\d+)/.exec(watch.head());
           frame = { x: window.client.x, y: window.client.y, w: m ? Number(m[1]) : frame.w, h: m ? Number(m[2]) : frame.h };
         }
 
@@ -291,8 +345,7 @@ export function register(server: McpServer): void {
           ...serverIdentity(),
           status: "recording",
           startedAt: new Date().toISOString(),
-          // The video clock's zero, for add_marker (#174).
-          videoStartMs: parseCaptureStart(stderrHead) ?? spawnedAt,
+          videoStartMs: startMs,
           ...(maxDurationSec > 0 ? { maxDurationSec } : {}),
           ...(window ? { matchedWindow: window.matchedTitle } : {}),
           ...(evPaths && !replay ? { events: { path: evPaths.jsonl, keys: keyMode } } : {}),
@@ -301,12 +354,38 @@ export function register(server: McpServer): void {
                 replay: {
                   ...replay,
                   ...(evPaths && frame
-                    ? { events: { raw: evPaths.raw, keys: keyMode, startMs: parseCaptureStart(stderrHead) ?? spawnedAt, frame } }
+                    ? { events: { raw: evPaths.raw, keys: keyMode, startMs, frame } }
                     : {}),
                 },
               }
             : {}),
           backend,
+          ...(pick.encoder !== "x264" ? { encoder: pick.encoder } : {}),
+          // ffmpeg captures can pause into segments (#200).
+          ...(backend !== "wgc" && !replay
+            ? {
+                capture: { target, opts: captureOpts, ...(webcam ? { webcam } : {}) },
+                segments: {
+                  parts: [],
+                  current: {
+                    path: output,
+                    startMs,
+                    ...(webcamRaw ? { webcamPath: webcamRaw, ...webcamStart(watch, !!audio) } : {}),
+                  },
+                },
+              }
+            : {}),
+          ...(webcamDevice
+            ? {
+                webcam: {
+                  device: webcamDevice,
+                  path: webcamOutputPath(output),
+                  corner: args.webcam?.corner ?? "bottom_right",
+                  size: args.webcam?.size ?? DEFAULT_WEBCAM_SIZE,
+                  shape: args.webcam?.shape ?? "rect",
+                },
+              }
+            : {}),
           processImage: backend === "wgc" ? basename(process.execPath).toLowerCase() : "ffmpeg.exe",
         };
         const store = getStore();
@@ -321,6 +400,7 @@ export function register(server: McpServer): void {
           if (logger) await stopEventLogger(logger);
           if (evPaths) rmSync(evPaths.raw, { force: true });
           if (replay) discardReplay(replay);
+          if (webcamRaw) rmSync(partsDir(output), { recursive: true, force: true });
           throw new ScreencastError(
             `Recording stopped: the session registry could not be written (${(err as Error).message}).`,
           );
@@ -330,14 +410,15 @@ export function register(server: McpServer): void {
           const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
           trackFinalizer(id, exited.then(() => stopEventLogger(logger)));
         } else if (logger && evPaths && frame) {
-          const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+          // The log converts when the capture ends, not at a pause; paused
+          // stretches are cut out of its clock (#200).
           trackFinalizer(
             id,
-            exited.then(async () => {
+            sessionEnded(id).then(async () => {
               await stopEventLogger(logger);
-              const startMs = parseCaptureStart(stderrHead) ?? spawnedAt;
               try {
-                const events = writeEventsFile(evPaths, { startMs, frame, endSec: (Date.now() - startMs) / 1000 });
+                const clock = eventClock(store.get(id)?.segments, startMs, Date.now());
+                const events = writeEventsFile(evPaths, { ...clock, frame });
                 store.tryUpdate(id, {
                   events: { path: evPaths.jsonl, keys: keyMode, count: events.length, summary: summarizeEvents(events) },
                 });
@@ -351,33 +432,10 @@ export function register(server: McpServer): void {
             }),
           );
         }
-        // Keep the on-disk record consistent if the child dies on its own. A
-        // non-zero exit is a crash (disk full, encoder failure), not a clean
-        // stop - record it as "failed" with the stderr tail so the caller can
-        // tell the two apart. A clean exit nobody requested is the
-        // maxDurationSec cap, or the recorded window closing (#240).
-        child.on("exit", (code) => {
-          store.detachChild(id);
-          const cur = store.get(id);
-          // A deliberate stop (stop_recording / shutdown) records its own final
-          // state; only an exit nobody asked for is classified here.
-          if (!cur || cur.status !== "recording" || store.isStopping(id)) return;
-          const verdict = classifyUnrequestedExit({ code, backend, maxDurationSec, elapsedMs: Date.now() - spawnedAt });
-          logMessage(
-            verdict.status === "failed" ? "error" : "notice",
-            verdict.status === "failed"
-              ? `Recording ${id} failed: the recorder exited with code ${code}.`
-              : `Recording ${id} ended on its own (${verdict.endReason}).`,
-            { sessionId: id, ...verdict },
-          );
-          store.tryUpdate(id, {
-            ...verdict,
-            stoppedAt: new Date().toISOString(),
-            ...(verdict.status === "failed"
-              ? { error: `${backend === "wgc" ? "The window recorder" : "ffmpeg"} exited with code ${code}:\n${stderrTail.trim().split("\n").slice(-6).join("\n")}` }
-              : {}),
-          });
-        });
+        // Keep the on-disk record consistent if the child dies on its own: a
+        // crash is "failed" with the stderr tail, a clean exit the cap or the
+        // window closing (#240).
+        attachExitHandler(store, id, child, { backend, maxDurationSec, spawnedAt, watch });
 
         return okResponse({
           sessionId: id,
@@ -389,6 +447,10 @@ export function register(server: McpServer): void {
           quality,
           audioDevice: audio?.device ?? null,
           maxDurationSec: maxDurationSec > 0 ? maxDurationSec : null,
+          encoder: pick.encoder,
+          ...(pick.note ? { encoderNote: pick.note } : {}),
+          ...(dda ? { gpuFrames: pick.gpuFrames } : {}),
+          ...(webcamDevice ? { webcam: { device: webcamDevice, path: webcamOutputPath(output) } } : {}),
           ...(window ? windowMatchReport(window) : {}),
           ...(evPaths && !replay ? { eventsPath: evPaths.jsonl, keys: keyMode } : {}),
           ...(replay
@@ -398,7 +460,8 @@ export function register(server: McpServer): void {
             (replay
               ? `Replay buffer running: save_replay keeps the last seconds (up to ${replay.bufferSec}s) without stopping it; ` +
                 "stop_recording discards the buffer unless save: true (then it writes outputPath)."
-              : "Call stop_recording with this sessionId to finalize the file.") +
+              : "Call stop_recording with this sessionId to finalize the file" +
+                (backend === "wgc" ? "." : " (pause_recording/resume_recording leave stretches out).")) +
             (maxDurationSec > 0
               ? ` It stops on its own after ${maxDurationSec}s (maxDurationSec).`
               : ""),

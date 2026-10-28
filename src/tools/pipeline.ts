@@ -17,7 +17,9 @@ import { redactRegionSchema } from "./redactRegion.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { PLATFORMS } from "../utils/produce.js";
 import { buildChapters, ffmetadata, markerPoints, markersOrChapters, retimeMarkers, writeMarkers, type Chapter, type Marker } from "../utils/chapters.js";
-import type { KeystrokeStepAssets } from "../utils/pipeline.js";
+import type { CursorStepAssets, KeystrokeStepAssets } from "../utils/pipeline.js";
+import { cursorOptionsSchema, loadCursor } from "./cursor.js";
+import { cursorSpritePath } from "../utils/cursor.js";
 import { backdropOptionsSchema } from "./backdrop.js";
 import { keystrokeOptionsSchema, loadBadges, prepareKeystrokeAssets } from "./keystrokeOverlay.js";
 import { MAX_ZOOM, type ClickPoint } from "../utils/zoom.js";
@@ -90,6 +92,7 @@ const step = z.discriminatedUnion("op", [
   }),
   z.object({ op: z.literal("backdrop"), ...backdropOptionsSchema }),
   z.object({ op: z.literal("keystroke_overlay"), ...keystrokeOptionsSchema }),
+  z.object({ op: z.literal("cursor"), ...cursorOptionsSchema }),
   z.object({ op: z.literal("export_preset"), platform: z.enum(PLATFORMS), fit }),
   z.object({
     op: z.literal("export_gif"),
@@ -134,7 +137,7 @@ export function register(server: McpServer): void {
     {
       title: "Edit Pipeline",
       description:
-        "Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, reframe, zoom, backdrop, " +
+        "Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, " +
         "audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no " +
         "intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.",
       inputSchema,
@@ -244,6 +247,17 @@ export function register(server: McpServer): void {
             keystrokes[i] = { badges, fontFile: k.fontFile, textFiles: k.textFiles };
             warnings.push(...k.warnings.map((w) => `Step ${i}, ${w.charAt(0).toLowerCase()}${w.slice(1)}`));
           }
+          // The cursor (#170) is planned on the source's clock too; planPipeline
+          // moves it through earlier trims, speed, cuts, crops and scales.
+          const cursor: Record<number, CursorStepAssets> = {};
+          for (const [i, s] of steps.entries()) {
+            if (s.op !== "cursor") continue;
+            cursor[i] = {
+              plan: loadCursor(args.input, s.events, s, info.durationSec),
+              sprite: cursorSpritePath(),
+              commandsFile: args.dryRun ? `<cursor ${i}.cmd>` : join(work, `s${i}_cursor.cmd`),
+            };
+          }
           // An export_gif tail renders to a temporary mp4 first; a dry run names it plainly.
           const target = last.op === "export_gif" ? (args.dryRun ? "<temporary stage1.mp4>" : join(work, "stage1.mp4")) : output;
           const audioM: Record<number, AudioMeasurements> = {};
@@ -251,7 +265,7 @@ export function register(server: McpServer): void {
           const fontsDir = dirname(bundledFontPath("regular"));
           const planWith = (chaptersFile?: string) =>
             planPipeline(args.input, target, steps, src, assets, args.quality ?? "standard", {
-              keystrokes, idle, clicks, audio: audioM, subtitles, fontsDir, chaptersFile,
+              keystrokes, cursor, idle, clicks, audio: audioM, subtitles, fontsDir, chaptersFile,
             });
           let plan = planWith();
           // Probes run in step order with a re-plan after each, since each one
@@ -341,6 +355,7 @@ export function register(server: McpServer): void {
           };
           if (args.dryRun) return okResponse({ dryRun: true, ...result, ffmpegArgs: plan.args });
 
+          for (const f of plan.files) writeFileSync(f.path, f.content);
           // The timeout follows the input ffmpeg decodes, not the (maybe sped-up) output (#237).
           await runEditJob(plan.args, { output: target, durationSec: plan.durationSec, inputDurationSec: info.durationSec, extra });
           if (plan.gif) {

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Record test runs in CI — Screencast MCP</title>
+  <meta name="description" content="Record the Windows desktop while a desktop-app test suite runs on windows-latest, and keep a GIF, contact sheet, and video of every failure.">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/ci.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="Record test runs in CI — Screencast MCP">
+  <meta property="og:description" content="Record the Windows desktop while a desktop-app test suite runs on windows-latest, and keep a GIF, contact sheet, and video of every failure.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/ci.html">
+  <meta property="og:site_name" content="Screencast MCP">
+  <meta property="og:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Screencast MCP: give your agent eyes on the screen. A recorded window zooms in on a clicked Save button.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <link rel="preload" href="./fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="./fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="./site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="./">screencast-mcp</a>
+      <a href="./tools/">Tools</a>
+      <a href="./workflows/">Workflows</a>
+      <a href="./connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="./">SCREENCAST-MCP</a> / CI</p>
+      <h1>Record test runs in CI</h1>
+      <p class="lede">Browser tests get a video of every failure for free. Desktop apps on Windows (Electron, WPF, WinUI, WinForms, games) don't. <code>screencast-mcp record</code> runs your test command while it records the runner's desktop, then turns a failure into a GIF and a contact sheet you can open from the run.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>THE COMMAND LINE</span></div>
+      <p>The same tools the MCP server exposes, without an MCP client. The command's exit code passes straight through.</p>
+      <pre class="copyable"><code>npx -y @tmhs/screencast-mcp record --target full -- npm run test:e2e</code></pre>
+      <ul>
+        <li><code>--target</code>: <code>full</code> (default), <code>monitor:0</code>, <code>window:exe=MyApp.exe</code>, or <code>region:x,y,w,h</code>.</li>
+        <li><code>--artifacts failure|always|never</code>: when to make <code>evidence.gif</code> and <code>contact-sheet.png</code> (default <code>failure</code>).</li>
+        <li><code>--last 30</code>: the GIF covers the last 30 s, where the failure usually is; <code>0</code> keeps it all.</li>
+        <li><code>--out</code>, <code>--fps</code>, <code>--no-gif</code>, <code>--no-contact-sheet</code>, <code>--discard-on-success</code>, <code>--max-duration</code>.</li>
+      </ul>
+      <p>Everything lands in <code>screencast-evidence/</code> with an <code>evidence.json</code> summary. Any single tool works the same way: <code>npx -y @tmhs/screencast-mcp call doctor</code>, or <code>call pipeline @recipe.json</code>.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:10</span><span>THE ACTION</span></div>
+      <p>A composite action wraps it for <code>windows-latest</code>: it checks Node, installs ffmpeg if it is missing, records the command, uploads the evidence folder as an artifact, writes a job summary, and then fails the step with the command's exit code.</p>
+      <pre class="copyable"><code>jobs:
+  ui-tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 22
+      - run: npm ci
+      - uses: TMHSDigital/screencast-mcp@main # pin a release tag or SHA
+        with:
+          command: npm run test:e2e
+          target: full          # or window:exe=MyApp.exe
+          artifacts: failure    # GIF and contact sheet only when it fails</code></pre>
+      <p>Outputs: <code>exit-code</code>, <code>gif</code>, <code>contact-sheet</code>, <code>recording</code>, and <code>evidence-dir</code>, for a later step that comments on the PR. All inputs are in <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/action.yml"><code>action.yml</code></a>.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:20</span><span>WHAT TO KNOW</span></div>
+      <ul>
+        <li>Hosted Windows runners have an interactive desktop, so <code>gdigrab</code> records what your app draws. This repo records its own capture smoke test with the action on every change to it.</li>
+        <li>A recording holds whatever is on screen. Keep secrets off the runner's desktop, and remember artifacts are visible to anyone who can read the run.</li>
+        <li>For a longer suite, keep the default <code>discard-on-success</code> so green runs upload only <code>evidence.json</code>.</li>
+      </ul>
+      <nav class="pager" aria-label="More">
+        <span><a href="workflows/">&larr; Workflows</a></span>
+        <span><a href="tools/">Tool reference &rarr;</a></span>
+      </nav>
+    </section>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>License: <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/LICENSE">CC BY-NC-ND 4.0</a> &middot; free for non-commercial use</span>
+    </footer>
+  </main>
+
+  <script src="./site.js"></script>
+</body>
+</html>

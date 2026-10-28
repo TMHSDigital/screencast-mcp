@@ -1,0 +1,1401 @@
+# Screencast MCP: full tool reference
+
+> An MCP server (stdio) that lets AI agents record the Windows screen, watch the footage as frames, and edit it with ffmpeg. Install: `npx -y @tmhs/screencast-mcp`. Capture is Windows-only; the watch and edit tools run anywhere ffmpeg runs.
+
+58 tools. Generated from the server's schemas; the same content is on https://tmhsdigital.github.io/screencast-mcp/tools/.
+
+# Core toolset
+
+Always loaded, whatever `SCREENCAST_TOOLSETS` selects.
+
+## get_media_info
+
+**Get Media Info** (since v0.2.0)
+
+Probe a media file with ffprobe and return duration, resolution, frame rate, codecs, container format, and size.
+
+Parameters:
+
+- `input` (string; required): Path to the media file to probe.
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+## doctor
+
+**Check Setup** (since v0.43.0)
+
+Check the setup: ffmpeg/ffprobe (FFmpeg 8+?), optional filters, capture devices, Windows OCR, settings, and enabled toolsets; `problems` says what is missing and how to fix it. Call on first use or when a tool reports a missing feature.
+
+Minimal call:
+
+```json
+{}
+```
+
+# Capture toolset
+
+Record or screenshot the desktop, a monitor, a window, or a region. Every capture is an explicit tool call: nothing records on its own.
+
+## start_recording
+
+**Start Recording** (since v0.2.0)
+
+Start a background screen recording. Returns a session id; finalize it with stop_recording. Never auto-starts.
+
+Parameters:
+
+- `target` (string; required): full | monitor:<i> (0 = primary) | window:<title> (or window:exe=<app.exe> / window:hwnd=<n>) | region:<x>,<y>,<w>,<h>. With gdigrab a window's rectangle is resolved once at start (visible, on top); it does not follow the window.
+- `exactTitle` (boolean): window: targets match the whole title only, never a substring (default false).
+- `fps` (integer; ≥ 1, ≤ 120): Frames per second (default 30).
+- `quality` ("draft" | "standard" | "high"): Encoder preset (default standard).
+- `audio` (object): Audio (default none). No microphone capture.
+- `audio.source` ("system" | "none"; required): system = what the machine plays (needs a loopback device); none = video only.
+- `audio.device` (string): dshow loopback device (from list_audio_devices); auto-detected if omitted.
+- `output` (string): Output .mp4 path (default under SCREENCAST_HOME/recordings).
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+- `maxDurationSec` (integer; ≥ 0, ≤ 604800): Auto-stop after this many seconds (default 3600 or SCREENCAST_MAX_RECORDING_SEC; max 7 days; 0 = no cap).
+- `events` (boolean): Also log clicks, scroll, cursor, and typing (video-timed, video pixels) for read_events (default false; ~1 s slower start).
+- `keys` ("masked" | "shortcuts"): With events: masked (default) logs typing only as 0.5 s-grid bursts, never keys; shortcuts also names Ctrl/Alt/Win chords. Typed text is never logged.
+- `cursor` ("os" | "events"): events: leave the OS cursor out and log it (implies events) for the cursor tool to redraw.
+- `backend` ("gdigrab" | "wgc" | "ddagrab"): gdigrab (default): the screen rectangle. wgc (window: targets, FFmpeg 8+): the window's own surface, even when covered or moved; client area only, no audio. ddagrab: one display on the GPU, low CPU.
+- `encoder` ("auto" | "x264" | "nvenc" | "qsv" | "amf"): auto = first working GPU encoder, else x264 (default with ddagrab; else x264).
+- `webcam` (object): Also record a camera to <output>.webcam.mp4, aligned for overlay.
+- `webcam.device` (string): list_video_devices name (default: first).
+- `webcam.corner` ("top_left" | "top_right" | "bottom_left" | "bottom_right")
+- `webcam.size` (number; ≥ 0.1, ≤ 0.5): Share of width (0.25).
+- `webcam.shape` ("rect" | "circle")
+- `replayBufferSec` (integer; ≥ 4, ≤ 3600): Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab only.
+
+Minimal call:
+
+```json
+{"target":"window:Notepad"}
+```
+
+## stop_recording
+
+**Stop Recording** (since v0.2.0)
+
+Stop a recording gracefully so the file is finalized; returns the path and duration.
+
+Parameters:
+
+- `sessionId` (string; required): Session id returned by start_recording.
+- `save` (boolean): Replay buffer: write it all to outputPath first (default: discard).
+
+Minimal call:
+
+```json
+{"sessionId":"rec-20260101-120000-ab12"}
+```
+
+## pause_recording
+
+**Pause Recording** (since v0.47.0)
+
+Pause a recording; until resume_recording nothing is captured, and the gap is left out of the file, events, and markers.
+
+Parameters:
+
+- `sessionId` (string; required): From start_recording.
+
+Minimal call:
+
+```json
+{"sessionId":"rec-20260101-120000-ab12"}
+```
+
+## resume_recording
+
+**Resume Recording** (since v0.47.0)
+
+Resume a paused recording (same target and settings).
+
+Parameters:
+
+- `sessionId` (string; required): From start_recording.
+
+Minimal call:
+
+```json
+{"sessionId":"rec-20260101-120000-ab12"}
+```
+
+## save_replay
+
+**Save Replay** (since v0.45.0)
+
+Save the last N seconds of a replay buffer (start_recording replayBufferSec) to an mp4; the buffer keeps running.
+
+Parameters:
+
+- `sessionId` (string; required): Session id of a replay buffer.
+- `lastSec` (number; > 0, ≤ 3600): Seconds back from now (default and max: the buffer length).
+- `output` (string): Output .mp4 path (default under SCREENCAST_HOME/recordings).
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+- `reencode` (boolean): Frame-exact re-encode. Default: instant stream copy that may hide up to 2 s of earlier frames.
+
+Minimal call:
+
+```json
+{"sessionId":"rec-20260101-120000-ab12"}
+```
+
+## list_sessions
+
+**List Sessions** (since v0.2.0)
+
+List all recording sessions (active and finished) with their status, target, output path, and whether the process is still alive.
+
+Minimal call:
+
+```json
+{}
+```
+
+## get_session
+
+**Get Session** (since v0.2.0)
+
+Inspect a single recording session by id, including live status and whether its output file exists on disk.
+
+Parameters:
+
+- `sessionId` (string; required): Session id returned by start_recording.
+
+Minimal call:
+
+```json
+{"sessionId":"rec-20260101-120000-ab12"}
+```
+
+## read_events
+
+**Read Input Events** (since v0.28.0)
+
+Read the input events (clicks, scroll, cursor, shortcuts, typing bursts) of a recording made with events: true, in video seconds and pixels; e.g. types: ['down'], then sample_frames there.
+
+Parameters:
+
+- `sessionId` (string): Session id of a recording started with events: true.
+- `input` (string): Or a recording path, or its .events.jsonl.
+- `from` (number; ≥ 0): Earliest video second.
+- `to` (number; ≥ 0): Latest video second.
+- `types` (("down" | "up" | "move" | "wheel" | "key" | "typing" | "gap")[]): down/up (mouse buttons; clicks are down), move (sampled cursor), wheel, key (shortcut), typing (burst), gap (events may be missing).
+- `inFrameOnly` (boolean): Drop events whose cursor was outside the recorded area.
+- `limit` (integer; ≥ 1, ≤ 5000): Most events to return (default 200).
+
+Minimal call:
+
+```json
+{}
+```
+
+## add_marker
+
+**Add Marker** (since v0.45.0)
+
+Mark a labelled moment on a recording, live or at a second. Kept in the session and a sidecar; chapters and pipeline turn markers into chapters.
+
+Parameters:
+
+- `label` (string; required, at most 200 characters): e.g. "bug appears".
+- `sessionId` (string): Recording to mark (a stopped one needs at).
+- `input` (string): Or a video path (needs at).
+- `at` (number; ≥ 0): Video second (default: now, while recording).
+
+Minimal call:
+
+```json
+{"label":"Save"}
+```
+
+## screenshot
+
+**Take Screenshot** (since v0.2.0)
+
+Capture one PNG of the screen, a monitor, a window, or a region, returned inline and by path.
+
+Parameters:
+
+- `target` (string; required): full | monitor:<i> (0 = primary) | window:<title> (or window:exe=<app.exe> / window:hwnd=<n>) | region:<x>,<y>,<w>,<h>. Titles match exactly, else as a substring; topmost wins.
+- `exactTitle` (boolean): window: targets match the whole title only, never a substring (default false).
+- `backend` ("gdigrab" | "wgc"): gdigrab (default, ~0.2 s): what is visible. wgc (window:, FFmpeg 8+, ~1-2 s): the window even if covered.
+- `output` (string): Optional output .png path. Defaults to a file under SCREENCAST_HOME/screenshots.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+- `returnImage` (boolean): Return the image inline (default true; the PNG on disk stays full size).
+- `maxImageWidth` (integer; ≥ 16, ≤ 9007199254740991): Max inline image width (default 1280).
+
+Minimal call:
+
+```json
+{"target":"window:Notepad"}
+```
+
+## list_audio_devices
+
+**List Audio Devices** (since v0.5.0)
+
+List DirectShow audio devices and flag a likely loopback (Stereo Mix or a virtual-audio driver), for start_recording's audio.device.
+
+Minimal call:
+
+```json
+{}
+```
+
+## list_video_devices
+
+**List Video Devices** (since v0.47.0)
+
+List DirectShow cameras for start_recording's webcam.device.
+
+Minimal call:
+
+```json
+{}
+```
+
+## list_targets
+
+**List Capture Targets** (since v0.43.0)
+
+List the desktop, monitors, and visible windows (topmost first, with capturability per backend). Each entry has a `target` string to pass as-is to capture tools; use it instead of guessing a title.
+
+Parameters:
+
+- `exe` (string): Only list windows of this executable, e.g. 'Code.exe' or 'code'.
+- `titleContains` (string): Only list windows whose title contains this text (case-insensitive).
+- `capturableOnly` (boolean): Leave out windows neither backend can capture (minimized, off screen). Default false.
+
+Minimal call:
+
+```json
+{}
+```
+
+# Watch toolset
+
+Turn footage into something a model can read: frames, contact sheets, diffs, OCR, and a searchable text timeline.
+
+## review_recording
+
+**Review Recording** (since v0.33.0)
+
+Open a recording for a person to review: in MCP Apps clients an inline player to scrub, trim, and redact, then export; elsewhere just the video's details.
+
+Parameters:
+
+- `input` (string): Path to the video.
+- `sessionId` (string): Or the session id of a stopped recording.
+
+Minimal call:
+
+```json
+{}
+```
+
+## player_frames
+
+**Player Frames** (since v0.33.0) (app-only)
+
+Preview frames for the review player: JPEGs on an even grid over the video plus frames at scene changes, with their real times. Used by the inline player; agents should use sample_frames or contact_sheet instead.
+
+Parameters:
+
+- `input` (string; required): Path to the video.
+- `maxFrames` (integer; ≥ 1, ≤ 300): Frames on the even grid (default 120); scene-change frames come on top, up to as many again.
+- `width` (integer; ≥ 64, ≤ 1280): Frame width (default 640).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+## sample_frames
+
+**Sample Frames** (since v0.2.0)
+
+Sample PNG frames from a video (by fps, timestamps, or scene changes) and return the first few inline so the model can see what happened.
+
+Parameters:
+
+- `input` (string; required): Path to the source video file.
+- `mode` ("fps" | "timestamps" | "scenes"): scenes: only frames where the screen changed (strongest first), usually the cheapest review. Default: fps or timestamps, whichever is given.
+- `fps` (number; > 0): Frames per second (mode fps).
+- `timestamps` (number[]): Seconds to grab a frame at (mode timestamps).
+- `sceneThreshold` (number; > 0, < 1): Mode scenes: change needed to count, 0-1 (default 0.1).
+- `dedupe` (boolean): Mode fps: drop near-duplicate frames (default false).
+- `outputDir` (string): Optional folder for the frames (a relative path resolves under SCREENCAST_HOME/frames). Defaults to SCREENCAST_HOME/frames/<id>.
+- `maxFrames` (integer; ≥ 1, ≤ 1000): Frame cap (default 100); fps is lowered to fit while still spanning the video.
+- `returnImages` (boolean): Return the first maxInlineImages frames inline (default true).
+- `maxInlineImages` (integer; ≥ 0, ≤ 20): Frames to embed inline (default 8); all are listed by path.
+- `maxImageWidth` (integer; ≥ 16, ≤ 9007199254740991): Max inline image width (default 1280).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+## contact_sheet
+
+**Contact Sheet** (since v0.16.0)
+
+Tile timestamped frames of a video into one image to see a whole recording at a glance (the cheapest first look).
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `count` (integer; ≥ 1, ≤ 48): Frames to tile (default 12).
+- `mode` ("even" | "scenes"): even (default) or scenes (strongest changes; static stretches take no tiles).
+- `sceneThreshold` (number; > 0, < 1): Mode scenes: change needed, 0-1 (default 0.1).
+- `columns` (integer; ≥ 1, ≤ 12): Tiles per row (default: roughly square).
+- `tileWidth` (integer; ≥ 64, ≤ 1920): Tile width in px (default 320).
+- `poster` (boolean): Write one representative poster frame instead of a sheet.
+- `output` (string): Optional output .png path. Defaults under SCREENCAST_HOME/frames.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+- `returnImage` (boolean): Return the sheet inline (default true).
+- `maxImageWidth` (integer; ≥ 16, ≤ 9007199254740991): Max inline image width (default 1280).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+## screen_diff
+
+**Screen Diff** (since v0.18.0)
+
+Compare two screenshots or frames: SSIM score, changed share, and changed boxes in b's pixels, to check a UI change happened only where expected.
+
+Parameters:
+
+- `a` (string; required): Before image (or video: first frame).
+- `b` (string; required): After image (or video); scaled to a's size.
+- `pixelThreshold` (number; ≥ 0, ≤ 255): Mean 0-255 difference for a ~32x32 cell to count as changed (default 12).
+- `returnImage` (boolean): Return b inline with changes outlined (default true).
+
+Minimal call:
+
+```json
+{"a":"before.png","b":"after.png"}
+```
+
+## wait_for_change
+
+**Wait for Screen Change** (since v0.18.0)
+
+Wait until part of the screen changes or settles, instead of guessing a sleep. Returns the elapsed time, changed regions (screenshot pixels; add `origin` for desktop), and the final state.
+
+Parameters:
+
+- `target` (string; required): What to watch: full | monitor:<i> | window:<title> (or exe=/hwnd=) | region:<x>,<y>,<w>,<h>.
+- `exactTitle` (boolean): window: targets match the whole title only (default false).
+- `mode` ("change" | "settle"): change (default): return once it differs from the start. settle: once it has been still for settleSec.
+- `timeoutSec` (number; > 0, ≤ 600): Give up after this many seconds (default 30; a timeout is a result, not an error).
+- `settleSec` (number; > 0, ≤ 60): Mode settle: seconds of stillness (default 1).
+- `intervalMs` (integer; ≥ 100, ≤ 5000): Pause between checks in ms (default 250).
+- `pixelThreshold` (number; ≥ 0, ≤ 255): Mean 0-255 difference for a ~32x32 cell to count as changed (default 12).
+- `returnImage` (boolean): Return the final state inline (default true).
+- `keep` (boolean): Keep the final screenshot on disk and return its path (default false).
+
+Minimal call:
+
+```json
+{"target":"window:Notepad"}
+```
+
+## find_text
+
+**Find Text (OCR)** (since v0.19.0)
+
+OCR (built into Windows) on the screen, an image, or video frames, with line and match boxes in image pixels (add `origin` for desktop coordinates). Locate UI text or secrets (e.g. regex 'sk-|ghp_|api.?key') to redact. Best-effort: review results.
+
+Parameters:
+
+- `target` (string): Live screen target (full | monitor:<i> | window:... | region:...), or pass input.
+- `input` (string): Image or video file to read instead of a live target.
+- `timestamp` (number; ≥ 0): Video input: second to read (default 0).
+- `scanEverySec` (number; > 0): Video input: scan a frame every N s across the clip (e.g. for secrets before sharing); matches and redactRegions get times. Widens to stay within maxFrames.
+- `maxFrames` (integer; ≥ 1, ≤ 120): scanEverySec frame cap (default 30; ~1 s each).
+- `exactTitle` (boolean): window: targets match the whole title only (default false).
+- `backend` ("gdigrab" | "wgc"): Live target: gdigrab (default) = what is visible; wgc (window:, FFmpeg 8+) = the window even if covered.
+- `query` (string): Text to find (case-insensitive, tolerates OCR misreads like I/l, O/0, _/-). Omit to return all text.
+- `regex` (boolean): Treat query as a regular expression (case-insensitive).
+- `redact` (boolean): Also return padded match rectangles ready for redact_region's regions.
+- `keep` (boolean): Live target: keep the capture and return its path (default false: deleted after reading).
+- `returnImage` (boolean): Return the image with matches outlined (default: true with a query).
+
+Minimal call:
+
+```json
+{}
+```
+
+## index_recording
+
+**Index Recording** (since v0.46.0)
+
+Build a recording's text timeline (<video>.index.json: OCR per scene, events, markers, transcript) for search_recording.
+
+Parameters:
+
+- `input` (string): Recording path.
+- `sessionId` (string): Or a stopped session id.
+- `sceneThreshold` (number; > 0, < 1): Change starting a segment (default 0.03).
+- `maxFrames` (integer; ≥ 1, ≤ 600): Keyframes to OCR (default 120).
+- `transcript` (string): An .srt, or 'whisper' to transcribe. Default: <video>.srt if any.
+- `force` (boolean): Re-OCR despite a matching cached index.
+
+Minimal call:
+
+```json
+{}
+```
+
+## search_recording
+
+**Search Recording** (since v0.46.0)
+
+Search an index_recording timeline (screen text, events, markers, transcript): timecoded hits, best first, secrets masked. No frames unless asked.
+
+Parameters:
+
+- `input` (string): Recording path.
+- `sessionId` (string): Or a stopped session id.
+- `query` (string; required): Text; tolerates OCR misreads.
+- `regex` (boolean): query is a regex.
+- `limit` (integer; ≥ 1, ≤ 50): Max hits (default 10).
+- `images` (integer; ≥ 0, ≤ 20): Thumbnails of the top N hits (default 0).
+
+Minimal call:
+
+```json
+{"query":"Save"}
+```
+
+# Edit toolset
+
+Cut, convert, compress, and redact. A tool that writes a file refuses to replace an existing `output` unless `overwrite: true`; default output paths are always unique.
+
+## trim
+
+**Trim Video** (since v0.2.0)
+
+Cut a video down to one sub-clip by start + (end or duration). For several segments use clip; to combine with other edits use pipeline.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `start` (number; required, ≥ 0): Start time in seconds.
+- `end` (number; > 0): End time in seconds. Use end OR duration.
+- `duration` (number; > 0): Clip length in seconds. Use end OR duration.
+- `exact` (boolean): Re-encode for a frame-exact cut with the removed content really gone (default true). false = fast stream copy that snaps to a keyframe and keeps hidden earlier frames; never use it to remove secrets.
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4","start":0}
+```
+
+## concat
+
+**Concatenate Videos** (since v0.2.0)
+
+Join videos end to end with hard cuts: stream copy when they match, else a re-encode (`mode` says which). For transitions use xfade_transition or assemble_highlights.
+
+Parameters:
+
+- `inputs` (string[]; required, at least 2 items): Video paths to join, in order.
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"inputs":["recording.mp4","recording.mp4"]}
+```
+
+## convert
+
+**Convert Format** (since v0.2.0)
+
+Convert media to mp4, webm, or gif. For a size-bounded GIF/WebP prefer export_gif; for a smaller mp4, compress or export_preset.
+
+Parameters:
+
+- `input` (string; required): Path to the source media.
+- `format` ("mp4" | "gif" | "webm"; required): mp4 (H.264), webm (VP9), or gif (palette).
+- `fps` (number; > 0): gif only: fps (default 12).
+- `width` (number; > 0): gif only: width in px (default 720).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4","format":"mp4"}
+```
+
+## export_gif
+
+**Export GIF or WebP** (since v0.17.0)
+
+Export an animated GIF or WebP that fits a size budget (for PRs, issues, READMEs), stepping fps, width, and quality down until it fits.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `format` ("gif" | "webp"): gif (default) or webp (usually much smaller).
+- `maxBytes` (integer; ≥ 10000, ≤ 9007199254740991): Size budget in bytes (default 10000000, under GitHub's 10 MB image limit).
+- `fps` (number; > 0, ≤ 30): Starting frame rate (default 12).
+- `width` (integer; ≥ 64, ≤ 1920): Starting width in px (default 960).
+- `start` (number; ≥ 0): Start second.
+- `duration` (number; > 0): Seconds to export (default: to the end).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+## crop
+
+**Crop Video** (since v0.3.0)
+
+Crop a video to a pixel rectangle; one running off the frame is rejected.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `x` (integer; required, ≥ 0, ≤ 9007199254740991)
+- `y` (integer; required, ≥ 0, ≤ 9007199254740991)
+- `width` (integer; required, > 0, ≤ 9007199254740991)
+- `height` (integer; required, > 0, ≤ 9007199254740991)
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4","x":0,"y":0,"width":1,"height":1}
+```
+
+## scale
+
+**Scale Video** (since v0.3.0)
+
+Resize a video to a target width and/or height and re-encode. Provide one side to keep the aspect ratio, or both to set an exact size.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `width` (integer; > 0, ≤ 9007199254740991): Target width in px. Omit to derive from height (keeps aspect).
+- `height` (integer; > 0, ≤ 9007199254740991): Target height in px. Omit to derive from width (keeps aspect).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+## speed
+
+**Change Speed** (since v0.3.0)
+
+Change playback speed by a factor (>1 faster, <1 slower) and re-encode. Audio is retempo'd to match when the source has an audio track.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `factor` (number; required, > 0): Speed multiplier: >1 is faster, <1 is slower (e.g. 2 = double speed).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4","factor":1}
+```
+
+## compress
+
+**Compress Video** (since v0.3.0)
+
+Re-encode a video smaller (H.264 CRF ladder, optional width cap). For a platform target use export_preset.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `level` ("light" | "medium" | "heavy"): CRF 23 / 28 / 32 (default medium).
+- `maxWidth` (integer; > 0, ≤ 9007199254740991): Width cap in px (only downscales).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+## clip
+
+**Extract Clips** (since v0.3.0)
+
+Extract several frame-exact segments, each to its own file. For one segment, trim does the same.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `segments` (object[]; required, at least 1 items): {start, end} segments in seconds; each becomes its own file.
+- `segments[].start` (number; required, ≥ 0)
+- `segments[].end` (number; required, > 0)
+- `output` (string): Optional output path. Only honored for a single segment; multi-segment output lands under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4","segments":[{"start":0,"end":1}]}
+```
+
+## cut_idle
+
+**Cut Idle Stretches** (since v0.26.0)
+
+Remove dead air: cut stretches where the screen is frozen (and silent), keeping a short pad. Returns the time saved.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `minIdleSec` (number; > 0): Only cut still stretches at least this long (default 2).
+- `keepSec` (number; ≥ 0): Seconds kept at each edge of a cut (default 0.4).
+- `useAudio` (boolean): Require silent audio too (default true when there is audio).
+- `dryRun` (boolean): Only report what would be cut.
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+## cut_by_transcript
+
+**Cut By Transcript** (since v0.46.0)
+
+Edit a video by its transcript: cut quoted text, cue numbers, or fillers. Also writes the re-timed .srt.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `srt` (string; required): Its .srt (transcribe; words: true for word timing).
+- `remove` ((integer | string)[]): Cue numbers, or transcript text quoted exactly (must occur once).
+- `fillers` (boolean): Also cut fillers (um, uh...) that have their own cue.
+- `dryRun` (boolean): Only report the cuts.
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4","srt":"captions.srt"}
+```
+
+## redact_region
+
+**Redact Regions** (since v0.4.0)
+
+Cover given rectangles in a video (e.g. secrets on screen). Not automatic detection: find them with find_text redact: true. Off-frame regions are rejected.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `regions` (object[]; required, at least 1 items): Pixel rectangles (x, y, width, height), each optionally limited to start..end seconds.
+- `regions[].x` (integer; required, ≥ 0, ≤ 9007199254740991)
+- `regions[].y` (integer; required, ≥ 0, ≤ 9007199254740991)
+- `regions[].width` (integer; required, > 0, ≤ 9007199254740991)
+- `regions[].height` (integer; required, > 0, ≤ 9007199254740991)
+- `regions[].start` (number; ≥ 0)
+- `regions[].end` (number; > 0)
+- `style` ("box" | "blur" | "pixelate"): box (default): irreversible fill; blur/pixelate are partially recoverable.
+- `pad` (integer; ≥ 0, ≤ 9007199254740991): Grow each region by this many px (default 0).
+- `color` (string): Box fill color (default black).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4","regions":[{"x":0,"y":0,"width":1,"height":1}]}
+```
+
+## pipeline
+
+**Edit Pipeline** (since v0.30.0)
+
+Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `steps` (object[]; at most 30 items): Edits in order, each { op, ...its tool's options }; export_preset/export_gif only last. Times and pixels are relative to the video as it is at that step (after earlier trims, speed, crops). zoom follow:"clicks" plans from the event log; burn_subtitles takes subtitles or transcribe:true.
+- `steps[trim].start` (number; required, ≥ 0)
+- `steps[trim].end` (number; > 0)
+- `steps[trim].duration` (number; > 0)
+- `steps[crop].x` (integer; required, ≥ 0, ≤ 9007199254740991)
+- `steps[crop].y` (integer; required, ≥ 0, ≤ 9007199254740991)
+- `steps[crop].width` (integer; required, > 0, ≤ 9007199254740991)
+- `steps[crop].height` (integer; required, > 0, ≤ 9007199254740991)
+- `steps[scale].width` (integer; > 0, ≤ 9007199254740991)
+- `steps[scale].height` (integer; > 0, ≤ 9007199254740991)
+- `steps[speed].factor` (number; required, > 0)
+- `steps[redact].regions` (object[]; required, at least 1 items)
+- `steps[redact].regions[].x` (integer; required, ≥ 0, ≤ 9007199254740991)
+- `steps[redact].regions[].y` (integer; required, ≥ 0, ≤ 9007199254740991)
+- `steps[redact].regions[].width` (integer; required, > 0, ≤ 9007199254740991)
+- `steps[redact].regions[].height` (integer; required, > 0, ≤ 9007199254740991)
+- `steps[redact].regions[].start` (number; ≥ 0)
+- `steps[redact].regions[].end` (number; > 0)
+- `steps[redact].style` ("box" | "blur" | "pixelate")
+- `steps[redact].pad` (integer; ≥ 0, ≤ 9007199254740991)
+- `steps[redact].color` (string)
+- `steps[callout].items` (object[]; required, at least 1 items, at most 50 items)
+- `steps[callout].items[box].x` (number; required)
+- `steps[callout].items[box].y` (number; required)
+- `steps[callout].items[box].width` (number; required, > 0)
+- `steps[callout].items[box].height` (number; required, > 0)
+- `steps[callout].items[box].thickness` (number; > 0): Outline px (default 4).
+- `steps[callout].items[box].fill` (boolean): Fill instead of outline.
+- `steps[callout].items[box].from` (number; ≥ 0)
+- `steps[callout].items[box].to` (number; > 0)
+- `steps[callout].items[box].color` (string)
+- `steps[callout].items[text].x` (number; required)
+- `steps[callout].items[text].y` (number; required)
+- `steps[callout].items[text].text` (string; required)
+- `steps[callout].items[text].size` (number; > 0): Font size px (default 32).
+- `steps[callout].items[text].background` (boolean): Dark panel behind the text (default true).
+- `steps[callout].items[text].from` (number; ≥ 0)
+- `steps[callout].items[text].to` (number; > 0)
+- `steps[callout].items[text].color` (string)
+- `steps[callout].items[arrow].x1` (number; required)
+- `steps[callout].items[arrow].y1` (number; required)
+- `steps[callout].items[arrow].x2` (number; required): Head (x2,y2) is the point the arrow points at.
+- `steps[callout].items[arrow].y2` (number; required)
+- `steps[callout].items[arrow].thickness` (number; > 0): Shaft px (default 8).
+- `steps[callout].items[arrow].from` (number; ≥ 0)
+- `steps[callout].items[arrow].to` (number; > 0)
+- `steps[callout].items[arrow].color` (string)
+- `steps[callout].fontFile` (string): Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).
+- `steps[reframe].aspect` ("16:9" | "9:16" | "1:1" | "4:5"; required)
+- `steps[reframe].fit` ("pad" | "crop")
+- `steps[zoom].keyframes` (object[]; at least 1 items, at most 100 items)
+- `steps[zoom].keyframes[].t` (number; required, ≥ 0)
+- `steps[zoom].keyframes[].x` (number)
+- `steps[zoom].keyframes[].y` (number)
+- `steps[zoom].keyframes[].width` (number; > 0)
+- `steps[zoom].keyframes[].height` (number; > 0)
+- `steps[zoom].keyframes[].full` (boolean)
+- `steps[zoom].follow` ("clicks")
+- `steps[zoom].maxZoom` (number; ≥ 1, ≤ 6)
+- `steps[zoom].holdSec` (number; > 0, ≤ 30)
+- `steps[zoom].transitionSec` (number; > 0, ≤ 5)
+- `steps[cut_idle].minIdleSec` (number; > 0)
+- `steps[cut_idle].keepSec` (number; ≥ 0)
+- `steps[audio].normalize` ("youtube" | "podcast" | "broadcast" | number)
+- `steps[audio].denoise` ("light" | "medium" | "strong")
+- `steps[burn_subtitles].subtitles` (string)
+- `steps[burn_subtitles].transcribe` (boolean)
+- `steps[burn_subtitles].style` ("clean" | "social")
+- `steps[backdrop].preset` ("desktop" | "rec" | "amber" | "light")
+- `steps[backdrop].colors` (string[]; at least 1 items, at most 4 items)
+- `steps[backdrop].image` (string)
+- `steps[backdrop].padding` (integer; ≥ 0, ≤ 2000)
+- `steps[backdrop].radius` (integer; ≥ 0, ≤ 1000)
+- `steps[backdrop].shadow` (integer; ≥ 0, ≤ 200)
+- `steps[backdrop].shadowOpacity` (number; ≥ 0, ≤ 1)
+- `steps[backdrop].aspect` ("16:9" | "9:16" | "1:1" | "4:5")
+- `steps[keystroke_overlay].events` (string)
+- `steps[keystroke_overlay].clicks` (boolean)
+- `steps[keystroke_overlay].typing` (boolean)
+- `steps[keystroke_overlay].keys` ("shortcuts" | "masked")
+- `steps[keystroke_overlay].lingerSec` (number; > 0, ≤ 10)
+- `steps[keystroke_overlay].position` ("bottom" | "bottom-left" | "bottom-right" | "top" | "top-left" | "top-right")
+- `steps[keystroke_overlay].size` (number; ≥ 8, ≤ 400)
+- `steps[keystroke_overlay].color` (string)
+- `steps[keystroke_overlay].fontFile` (string)
+- `steps[cursor].events` (string)
+- `steps[cursor].size` (number; ≥ 0.25, ≤ 8)
+- `steps[cursor].smoothing` (number; ≥ 0, ≤ 1)
+- `steps[cursor].hideAfterSec` (number; ≥ 0, ≤ 600)
+- `steps[cursor].clicks` (boolean)
+- `steps[cursor].spotlight` (boolean)
+- `steps[export_preset].platform` ("youtube" | "instagram_reel" | "tiktok" | "x" | "square" | "steam_trailer" | "vertical_reel"; required)
+- `steps[export_preset].fit` ("pad" | "crop")
+- `steps[export_gif].format` ("gif" | "webp")
+- `steps[export_gif].maxBytes` (integer; ≥ 10000, ≤ 9007199254740991)
+- `steps[export_gif].fps` (number; > 0, ≤ 30)
+- `steps[export_gif].width` (integer; ≥ 64, ≤ 1920)
+- `recipe` ("pr_demo" | "tutorial" | "social_reel"): Polish preset expanded to steps (see dryRun): pr_demo = cut_idle, click zoom, GIF <=10 MB; tutorial = + audio, captions, 1080p mp4; social_reel = 9:16, big captions. Given steps replace its same-op step.
+- `quality` ("draft" | "standard" | "high"): Encoder preset for an mp4 result (default standard).
+- `dryRun` (boolean): Return the plan (ffmpeg command, output size) without running it.
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+- `chapters` (boolean): Keep the input's markers as chapters, re-timed through trims and speed.
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+# Produce toolset
+
+Annotate, frame, and assemble a finished piece. Tools that combine clips normalize each input to a common resolution, fps, and audio rate first.
+
+## overlay
+
+**Overlay Image or Video** (since v0.3.0)
+
+Composite an image or video (logo, watermark, picture-in-picture) onto a video at a pixel position, optionally scaled and time-limited; keeps the base's audio and length.
+
+Parameters:
+
+- `input` (string; required): Path to the base video.
+- `overlay` (string; required): Overlay image or video path.
+- `x` (integer; required, ≥ 0, ≤ 9007199254740991): Left, px.
+- `y` (integer; required, ≥ 0, ≤ 9007199254740991): Top, px.
+- `width` (integer; > 0, ≤ 9007199254740991): Scale to this width (other side keeps aspect).
+- `height` (integer; > 0, ≤ 9007199254740991): Scale to this height.
+- `start` (number; ≥ 0): Show from this second.
+- `end` (number; > 0): Hide after this second.
+- `shape` ("rect" | "circle"): circle: centre square masked round (webcam).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4","overlay":"…","x":0,"y":0}
+```
+
+## callout
+
+**Add Callouts** (since v0.21.0)
+
+Annotate a video with timed boxes, text labels, and arrows. Fallback fonts used are listed in fallbackFonts; characters no font covers are reported in warnings.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `items` (object[]; required, at least 1 items, at most 50 items): Boxes, text labels, and arrows, drawn in order (later on top), in video pixels. Each shows from..to seconds (default: whole video); color is a name, #RRGGBB, or name@alpha.
+- `items[box].x` (number; required)
+- `items[box].y` (number; required)
+- `items[box].width` (number; required, > 0)
+- `items[box].height` (number; required, > 0)
+- `items[box].thickness` (number; > 0): Outline px (default 4).
+- `items[box].fill` (boolean): Fill instead of outline.
+- `items[box].from` (number; ≥ 0)
+- `items[box].to` (number; > 0)
+- `items[box].color` (string)
+- `items[text].x` (number; required)
+- `items[text].y` (number; required)
+- `items[text].text` (string; required)
+- `items[text].size` (number; > 0): Font size px (default 32).
+- `items[text].background` (boolean): Dark panel behind the text (default true).
+- `items[text].from` (number; ≥ 0)
+- `items[text].to` (number; > 0)
+- `items[text].color` (string)
+- `items[arrow].x1` (number; required)
+- `items[arrow].y1` (number; required)
+- `items[arrow].x2` (number; required): Head (x2,y2) is the point the arrow points at.
+- `items[arrow].y2` (number; required)
+- `items[arrow].thickness` (number; > 0): Shaft px (default 8).
+- `items[arrow].from` (number; ≥ 0)
+- `items[arrow].to` (number; > 0)
+- `items[arrow].color` (string)
+- `fontFile` (string): Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4","items":[{"type":"box","x":1,"y":1,"width":1,"height":1}]}
+```
+
+## keystroke_overlay
+
+**Keystroke Overlay** (since v0.45.0)
+
+Burn keycast-style badges for shortcuts, clicks, and typing from the recording's input event log (start_recording events: true). Never shows typed text: the log has none.
+
+Parameters:
+
+- `input` (string; required): Path to the recording.
+- `events` (string): Event log (default: the input's .events.jsonl).
+- `clicks` (boolean): Show clicks (default true).
+- `typing` (boolean): Show typing as "Typing…" (default true).
+- `keys` ("shortcuts" | "masked"): shortcuts (default): the chord (Ctrl + S); masked: modifiers only (Ctrl + …).
+- `lingerSec` (number; > 0, ≤ 10): Seconds a badge stays up (default 1.2).
+- `position` ("bottom" | "bottom-left" | "bottom-right" | "top" | "top-left" | "top-right"): Default bottom (centred).
+- `size` (number; ≥ 8, ≤ 400): Font px (default 4.5% of the frame height).
+- `color` (string): Text color (default white).
+- `fontFile` (string): Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).
+- `dryRun` (boolean): Return the planned badges; write nothing.
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+## cursor
+
+**Re-rendered Cursor** (since v0.47.0)
+
+Draw a smoothed, scaled cursor that hides when idle from the event log of a start_recording cursor: "events" recording (no OS cursor in the video), with click ripples and an optional spotlight.
+
+Parameters:
+
+- `input` (string; required): Path to the recording.
+- `events` (string): Event log (default: the input's .events.jsonl).
+- `size` (number; ≥ 0.25, ≤ 8): Times a typical cursor's size (default 1.5).
+- `smoothing` (number; ≥ 0, ≤ 1): 0 = as logged, 1 = floaty (default 0.5).
+- `hideAfterSec` (number; ≥ 0, ≤ 600): Hide when the mouse rests this long; 0 = never (default 2).
+- `clicks` (boolean): Ripple on clicks (default true).
+- `spotlight` (boolean): Dim all but the area around the cursor.
+- `dryRun` (boolean): Return the plan; write nothing.
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+## backdrop
+
+**Add Backdrop** (since v0.45.0)
+
+Frame a video or screenshot on a gradient, color, or wallpaper with padding, rounded corners, and a drop shadow, optionally on a 16:9/1:1/9:16/4:5 canvas.
+
+Parameters:
+
+- `input` (string; required): Path to the source video or image (png/jpg).
+- `preset` ("desktop" | "rec" | "amber" | "light"): Gradient: desktop (default, dark slate), rec (red), amber, light.
+- `colors` (string[]; at least 1 items, at most 4 items): Instead: 1 color = solid, 2-4 = diagonal gradient.
+- `image` (string): Instead: a wallpaper image, scaled to cover.
+- `padding` (integer; ≥ 0, ≤ 2000): px around the content (default 6% of the longer side).
+- `radius` (integer; ≥ 0, ≤ 1000): Corner radius px (default ~1.2% of the longer side; 0 = square).
+- `shadow` (integer; ≥ 0, ≤ 200): Shadow blur px (default ~2.5%; 0 = none).
+- `shadowOpacity` (number; ≥ 0, ≤ 1): Default 0.5.
+- `aspect` ("16:9" | "9:16" | "1:1" | "4:5"): Output on this aspect's canvas (1920x1080, ...), content scaled to fit.
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits (screenshots for an image).
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"before.png"}
+```
+
+## burn_subtitles
+
+**Burn In Subtitles** (since v0.25.0)
+
+Burn SRT/ASS subtitles (e.g. from transcribe) into a video in the bundled font.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `subtitles` (string; required): Path to an .srt (e.g. from transcribe) or .ass subtitle file.
+- `style` ("clean" | "social"): clean (default for .srt): outlined line. social: big bold text on a dark box. .ass keeps its own styling unless set.
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4","subtitles":"captions.srt"}
+```
+
+## chapters
+
+**Chapters** (since v0.45.0)
+
+Write chapters (markers, scene changes, transcript, or a list) into an mp4/mkv/mov copy without re-encoding; returns YouTube chapter text. Can mux an SRT as soft subtitles.
+
+Parameters:
+
+- `input` (string): Path to the video.
+- `sessionId` (string): Or a stopped recording's id.
+- `from` ("markers" | "scenes" | "transcript"): markers (default; add_marker, else the file's chapters), scenes (screen changes), or transcript (SRT sections).
+- `chapters` (object[]; at least 1 items, at most 200 items): Or explicit { start, title } chapters.
+- `chapters[].start` (number; required, ≥ 0)
+- `chapters[].title` (string; required, at most 100 characters)
+- `transcript` (string): The .srt for from: transcript.
+- `minChapterSec` (number; ≥ 0): Shortest chapter (default 1; scenes 10, transcript 30).
+- `subtitles` (string): Also mux this .srt/.vtt/.ass as a soft subtitle track.
+- `subtitleLanguage` (string): ISO 639-2, e.g. "eng".
+- `textOnly` (boolean): Return chapters and YouTube text only; write no file.
+- `output` (string): Optional .mp4/.mkv/.mov path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing output file.
+
+Minimal call:
+
+```json
+{}
+```
+
+## xfade_transition
+
+**Crossfade Transition** (since v0.6.0)
+
+Join two videos with an xfade transition (audio crossfaded); they need not match in size, fps, or audio. For more clips use assemble_highlights.
+
+Parameters:
+
+- `inputA` (string; required): Outgoing video.
+- `inputB` (string; required): Incoming video.
+- `transition` (string): xfade name (default fade): fade, wipeleft, slideup, circleopen, dissolve, ...
+- `duration` (number; > 0): Transition length in seconds (default 1).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"inputA":"recording.mp4","inputB":"recording.mp4"}
+```
+
+## assemble_highlights
+
+**Assemble Highlights** (since v0.6.0)
+
+Stitch clips (including title cards) into one video with cuts or xfade transitions; they need not match in size, fps, or audio.
+
+Parameters:
+
+- `clips` (string[]; required, at least 2 items): Clip paths, in order.
+- `transition` (string): cut (default) or an xfade name (fade, wipeleft, slideup, ...).
+- `duration` (number; > 0): Transition seconds (default 1).
+- `width` (integer; > 0, ≤ 9007199254740991): Common output width (default 1920).
+- `height` (integer; > 0, ≤ 9007199254740991): Common output height (default 1080).
+- `fps` (integer; > 0, ≤ 9007199254740991): Common output fps (default 30).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"clips":["recording.mp4","recording.mp4"]}
+```
+
+## title_card
+
+**Title Card** (since v0.7.0)
+
+Generate a title card clip (centered text on a solid background, silent audio track) to stitch in with assemble_highlights. Uncoverable characters are reported in warnings.
+
+Parameters:
+
+- `text` (string; required): Title text. Multiple lines are allowed (use \n).
+- `duration` (number; > 0): Card length in seconds (default 3).
+- `width` (integer; > 0, ≤ 9007199254740991): Card width (default 1920).
+- `height` (integer; > 0, ≤ 9007199254740991): Card height (default 1080).
+- `fps` (integer; > 0, ≤ 9007199254740991): Card fps (default 30).
+- `bg` (string): Background color (default black).
+- `fontColor` (string): Text color (default white).
+- `fontSize` (integer; > 0, ≤ 9007199254740991): Text size in px (default 96).
+- `bold` (boolean): Use the bold weight (default true).
+- `fontFile` (string): Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"text":"Save"}
+```
+
+## reframe
+
+**Reframe Aspect Ratio** (since v0.8.0)
+
+Re-aspect a video to 16:9, 9:16, 1:1, or 4:5 by padding or cropping.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `aspect` ("16:9" | "9:16" | "1:1" | "4:5"; required): Target aspect ratio.
+- `fit` ("pad" | "crop"): pad (default): letterbox, nothing lost. crop: fill and center-crop.
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4","aspect":"16:9"}
+```
+
+## zoom
+
+**Zoom and Pan** (since v0.27.0)
+
+Smooth animated zoom-and-pan into the action and back out, from keyframes or planned from logged clicks or screen changes.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `keyframes` (object[]; at most 100 items): Views reached by time t: a source rectangle (x, y, width, height), or { t, full: true } to zoom out. Omit to plan them (see follow).
+- `keyframes[].t` (number; required, ≥ 0)
+- `keyframes[].x` (number)
+- `keyframes[].y` (number)
+- `keyframes[].width` (number; > 0)
+- `keyframes[].height` (number; > 0)
+- `keyframes[].full` (boolean)
+- `follow` ("auto" | "clicks" | "changes"): Without keyframes: clicks (from the events log of start_recording events: true) or changes (where the screen changed). auto (default): clicks if logged, else changes.
+- `events` (string): Events log (default: the input's .events.jsonl); must match the input's timing and size, so use the original recording.
+- `highlightClicks` (boolean): Ring each logged click (default false).
+- `highlightColor` (string): Ring color (default #FF4545).
+- `transitionSec` (number; > 0, ≤ 5): How long each zoom/pan eases (default 0.6).
+- `maxZoom` (number; ≥ 1, ≤ 6): Auto mode: the furthest it zooms in (default 2.5).
+- `holdSec` (number; > 0, ≤ 30): Auto mode: stay zoomed this long after activity (default 2).
+- `dryRun` (boolean): Return the planned keyframes only (editable, pass back).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+## export_preset
+
+**Export for Platform** (since v0.8.0)
+
+Encode a platform-ready H.264 file (aspect, fps, bitrate, faststart) for a named platform.
+
+Parameters:
+
+- `input` (string; required): Path to the source video.
+- `platform` ("youtube" | "instagram_reel" | "tiktok" | "x" | "square" | "steam_trailer" | "vertical_reel"; required): Sets aspect, size, fps, bitrate. steam_trailer: 1080p 5.5 Mbps CBR, -14 LUFS. vertical_reel: 1080x1920 over a blurred copy of itself, -14 LUFS (ignores fit).
+- `fit` ("pad" | "crop"): Fit to the platform aspect: pad (default) or crop.
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4","platform":"youtube"}
+```
+
+## bug_report
+
+**Bug Report Package** (since v0.45.0)
+
+Package a recording as a paste-ready repro folder: secret-scanned, redacted clip and GIF, contact sheet, steps from the event log, OCR'd errors, environment, report.md for gh issue create --body-file.
+
+Parameters:
+
+- `input` (string): Recording path (uses its .events.jsonl).
+- `sessionId` (string): Or a stopped session's id.
+- `title` (string; at most 200 characters): Issue title.
+- `actual` (string; at most 4000 characters): What happened.
+- `expected` (string; at most 4000 characters): What should happen.
+- `start` (number; ≥ 0): Clip start s (default: end - clipSec).
+- `end` (number; > 0): Clip end s (default: recording end).
+- `clipSec` (number; > 0, ≤ 600): Clip length without start (default 30).
+- `redact` (boolean): Box out OCR-found secrets in every output (default true; needs Windows OCR).
+- `secretPattern` (string): Secret regex (default: API keys, tokens, password: values).
+- `regions` (object[]): Extra boxes (video px; start/end on the clip clock).
+- `regions[].x` (integer; required, ≥ 0, ≤ 9007199254740991)
+- `regions[].y` (integer; required, ≥ 0, ≤ 9007199254740991)
+- `regions[].width` (integer; required, > 0, ≤ 9007199254740991)
+- `regions[].height` (integer; required, > 0, ≤ 9007199254740991)
+- `regions[].start` (number; ≥ 0)
+- `regions[].end` (number; > 0)
+- `errorPattern` (string): Error-line regex.
+- `scanEverySec` (number; > 0): OCR every N s (default 1).
+- `maxFrames` (integer; ≥ 1, ≤ 120): Scan frame cap (default 30).
+- `gif` (boolean): Also export a GIF (default true).
+- `maxBytes` (integer; ≥ 10000, ≤ 9007199254740991): GIF size budget (default 10000000).
+- `outputDir` (string): Package folder (default: a new one in SCREENCAST_HOME/edits).
+- `overwrite` (boolean): Replace a report already in outputDir.
+
+Minimal call:
+
+```json
+{}
+```
+
+## step_guide
+
+**Step-by-Step Guide** (since v0.46.0)
+
+Turn a recording's event log into a numbered how-to: a ringed screenshot and caption per step, marker headings; Markdown and/or one HTML file. Never includes typed text.
+
+Parameters:
+
+- `input` (string): Recording path (uses its .events.jsonl).
+- `sessionId` (string): Or a stopped session's id.
+- `title` (string; at most 200 characters): Guide title.
+- `format` ("md" | "html" | "both"): md + images/, self-contained html, or both (default).
+- `ocr` (boolean): OCR shots for captions and secret boxes (default true; needs Windows OCR).
+- `outputDir` (string): Guide folder (default: new in SCREENCAST_HOME/edits).
+- `overwrite` (boolean): Replace a guide already in outputDir.
+
+Minimal call:
+
+```json
+{}
+```
+
+# Audio toolset
+
+Extract, clean up, level, transcribe, and score the soundtrack.
+
+## extract_audio
+
+**Extract Audio** (since v0.3.0)
+
+Extract the audio track of a media file to its own file (mp3, aac, wav, or copy). Returns the output path.
+
+Parameters:
+
+- `input` (string; required): Path to the source media.
+- `format` ("mp3" | "aac" | "wav" | "copy"; required): Audio output codec. copy keeps the source codec without re-encoding.
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4","format":"mp3"}
+```
+
+## normalize_audio
+
+**Normalize Loudness** (since v0.22.0)
+
+Normalize loudness to a delivery target (two-pass EBU R128 loudnorm); video is copied. Reports loudness before and after.
+
+Parameters:
+
+- `input` (string; required): Path to the source video or audio file.
+- `target` ("youtube" | "podcast" | "broadcast" | number): youtube (-14 LUFS, default), podcast (-16), broadcast (-23), or a LUFS number.
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+## denoise
+
+**Denoise Audio** (since v0.22.0)
+
+Reduce steady background noise (fan, hum, hiss) in a recording's audio with an adaptive FFT denoiser. Video is copied untouched. Returns the output path.
+
+Parameters:
+
+- `input` (string; required): Path to the source video or audio file.
+- `strength` ("light" | "medium" | "strong"): How hard to reduce noise: light (6 dB), medium (12 dB, default), strong (20 dB).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+## transcribe
+
+**Transcribe Speech** (since v0.25.0)
+
+Transcribe a recording's speech to an SRT subtitle file, locally, with FFmpeg 8's whisper filter (needs a whisper.cpp model file). Returns the SRT path and the text. Pair with burn_subtitles to caption the video.
+
+Parameters:
+
+- `input` (string; required): Path to the video or audio to transcribe.
+- `model` (string): Path to a whisper.cpp model file (ggml-*.bin). Defaults to SCREENCAST_WHISPER_MODEL.
+- `language` (string): Spoken language code, e.g. 'en', or 'auto' (default).
+- `words` (boolean): One word per cue, for word timing (cut_by_transcript).
+- `output` (string): Optional output .srt path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
+```
+
+## music_bed
+
+**Add Music Bed** (since v0.7.0)
+
+Lay music under a video: looped or trimmed to length, faded, leveled, and mixed with any existing audio. Video is stream-copied.
+
+Parameters:
+
+- `video` (string; required): Path to the video.
+- `music` (string; required): Music audio file.
+- `musicVolume` (number; ≥ 0): 0..1 (default 0.25 over existing audio, 0.8 alone).
+- `fadeIn` (number; ≥ 0): Fade-in seconds (default 1).
+- `fadeOut` (number; ≥ 0): Fade-out seconds (default 2).
+- `duck` (boolean): Duck the music under the original audio (default false).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"video":"recording.mp4","music":"music.mp3"}
+```
+
+## narrate
+
+**Narrate** (since v0.47.0)
+
+Offline voiceover with the built-in Windows voices: speaks each line at its time or marker over the audio, plus an SRT.
+
+Parameters:
+
+- `video` (string; required): Path to the video.
+- `lines` (object[]; required, at least 1 items)
+- `lines[].t` (number; ≥ 0): Seconds.
+- `lines[].marker` (string): Or a marker label.
+- `lines[].text` (string; required)
+- `voice` (string): Voice name or part (doctor lists them).
+- `rate` (number; ≥ 0.5, ≤ 3): Default 1.
+- `duck` (boolean): Duck the original audio (default true).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"video":"recording.mp4","lines":[{"text":"Save"}]}
+```

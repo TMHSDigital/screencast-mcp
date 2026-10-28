@@ -33,6 +33,7 @@
     </div>
     <div class="hud-right">
       <span class="pkg">@tmhs/screencast-mcp</span>
+      <a href="tools/">Tools</a>
       <a href="workflows/">Workflows</a>
       <a href="connect.html">Connect</a>
       <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
@@ -134,19 +135,23 @@
         <table>
           <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td><code>start_recording</code></td><td>Start a background recording. Target = full, a monitor, a window by title, or a region. Optional fps, quality preset, system audio, an input event log, and an instant-replay buffer.</td></tr>
-            <tr><td><code>stop_recording</code></td><td>Stop a session by id with a graceful quit so the file is finalized, not truncated.</td></tr>
-            <tr><td><code>save_replay</code></td><td>Instant replay: write the last N seconds of a rolling buffer (start_recording replayBufferSec) to an mp4 after something fails, without stopping it.</td></tr>
-            <tr><td><code>screenshot</code></td><td>Capture a single PNG of a target, returned inline for the model to view.</td></tr>
-            <tr><td><code>list_sessions</code></td><td>List active and finished recording sessions.</td></tr>
-            <tr><td><code>get_session</code></td><td>Inspect a single session by id.</td></tr>
-            <tr><td><code>review_recording</code></td><td>Open a recording in an inline player (in clients with MCP Apps): scrub, trim, draw redaction boxes, export a redacted copy.</td></tr>
-            <tr><td><code>player_frames</code></td><td>Preview frames for the review player (called by the player, not the agent).</td></tr>
-            <tr><td><code>read_events</code></td><td>Read a recording&rsquo;s input event log: clicks, scroll, cursor, and key presses on the video&rsquo;s clock. Opt in with <code>start_recording</code> <code>events: true</code>.</td></tr>
-            <tr><td><code>add_marker</code></td><td>Stamp a labelled moment on a recording as it runs, or at a second of a file; markers become ticks in the review player and chapters on export.</td></tr>
-            <tr><td><code>list_audio_devices</code></td><td>List DirectShow audio devices and flag a likely system-audio loopback device for start_recording.</td></tr>
-            <tr><td><code>list_targets</code></td><td>List what can be captured &mdash; the desktop, each monitor, each window &mdash; with a ready-to-use <code>target</code> string and whether it can be captured.</td></tr>
-            <tr><td><code>doctor</code></td><td>Check the setup: ffmpeg version (FFmpeg 8+), the filters that gate tools, Windows OCR, folders and settings, with a fix for each problem.</td></tr>
+            <!-- tools:capture:start -->
+            <tr><td><code><a href="tools/start_recording.html">start_recording</a></code></td><td>Start a background screen recording.</td></tr>
+            <tr><td><code><a href="tools/stop_recording.html">stop_recording</a></code></td><td>Stop a recording gracefully so the file is finalized; returns the path and duration.</td></tr>
+            <tr><td><code><a href="tools/pause_recording.html">pause_recording</a></code></td><td>Pause a recording; until resume_recording nothing is captured, and the gap is left out of the file, events, and markers.</td></tr>
+            <tr><td><code><a href="tools/resume_recording.html">resume_recording</a></code></td><td>Resume a paused recording (same target and settings).</td></tr>
+            <tr><td><code><a href="tools/save_replay.html">save_replay</a></code></td><td>Save the last N seconds of a replay buffer (start_recording replayBufferSec) to an mp4; the buffer keeps running.</td></tr>
+            <tr><td><code><a href="tools/list_sessions.html">list_sessions</a></code></td><td>List all recording sessions (active and finished) with their status, target, output path, and whether the process is still alive.</td></tr>
+            <tr><td><code><a href="tools/get_session.html">get_session</a></code></td><td>Inspect a single recording session by id, including live status and whether its output file exists on disk.</td></tr>
+            <tr><td><code><a href="tools/read_events.html">read_events</a></code></td><td>Read the input events (clicks, scroll, cursor, shortcuts, typing bursts) of a recording made with events: true, in video seconds and pixels; e.g. types: ['down'], then sample_frames there.</td></tr>
+            <tr><td><code><a href="tools/add_marker.html">add_marker</a></code></td><td>Mark a labelled moment on a recording, live or at a second.</td></tr>
+            <tr><td><code><a href="tools/screenshot.html">screenshot</a></code></td><td>Capture one PNG of the screen, a monitor, a window, or a region, returned inline and by path.</td></tr>
+            <tr><td><code><a href="tools/get_media_info.html">get_media_info</a></code></td><td>Probe a media file with ffprobe and return duration, resolution, frame rate, codecs, container format, and size.</td></tr>
+            <tr><td><code><a href="tools/list_audio_devices.html">list_audio_devices</a></code></td><td>List DirectShow audio devices and flag a likely loopback (Stereo Mix or a virtual-audio driver), for start_recording's audio.device.</td></tr>
+            <tr><td><code><a href="tools/list_video_devices.html">list_video_devices</a></code></td><td>List DirectShow cameras for start_recording's webcam.device.</td></tr>
+            <tr><td><code><a href="tools/list_targets.html">list_targets</a></code></td><td>List the desktop, monitors, and visible windows (topmost first, with capturability per backend).</td></tr>
+            <tr><td><code><a href="tools/doctor.html">doctor</a></code></td><td>Check the setup: ffmpeg/ffprobe (FFmpeg 8+?), optional filters, capture devices, Windows OCR, settings, and enabled toolsets; <code>problems</code> says what is missing and how to fix it.</td></tr>
+<!-- tools:capture:end -->
           </tbody>
         </table>
       </section>
@@ -160,14 +165,17 @@
         <table>
           <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td><code>sample_frames</code></td><td>Extract frames at a fixed fps, at explicit timestamps, or only where the screen changed; the first few come back inline so the agent sees what happened.</td></tr>
-            <tr><td><code>contact_sheet</code></td><td>Tile timestamped frames into one image, evenly spaced or at the scene changes, so the agent sees a whole recording at a glance.</td></tr>
-            <tr><td><code>screen_diff</code></td><td>Compare two screenshots: SSIM score and boxes around what changed.</td></tr>
-            <tr><td><code>wait_for_change</code></td><td>Return when the screen changes or settles, instead of guessing a sleep.</td></tr>
-            <tr><td><code>find_text</code></td><td>Read on-screen text with Windows' built-in OCR, with bounding boxes; find secrets and get redaction rectangles.</td></tr>
-            <tr><td><code>index_recording</code></td><td>Build a recording's text timeline: OCR per scene, input events, markers, and transcript, saved next to the video.</td></tr>
-            <tr><td><code>search_recording</code></td><td>Find a moment in a long recording as text: timecoded hits with secrets masked, and thumbnails only when asked.</td></tr>
-            <tr><td><code>get_media_info</code></td><td>ffprobe wrapper: duration, resolution, fps, codecs, format, size.</td></tr>
+            <!-- tools:watch:start -->
+            <tr><td><code><a href="tools/review_recording.html">review_recording</a></code></td><td>Open a recording for a person to review: in MCP Apps clients an inline player to scrub, trim, and redact, then export; elsewhere just the video's details.</td></tr>
+            <tr><td><code><a href="tools/player_frames.html">player_frames</a></code></td><td>Preview frames for the review player: JPEGs on an even grid over the video plus frames at scene changes, with their real times.</td></tr>
+            <tr><td><code><a href="tools/sample_frames.html">sample_frames</a></code></td><td>Sample PNG frames from a video (by fps, timestamps, or scene changes) and return the first few inline so the model can see what happened.</td></tr>
+            <tr><td><code><a href="tools/contact_sheet.html">contact_sheet</a></code></td><td>Tile timestamped frames of a video into one image to see a whole recording at a glance (the cheapest first look).</td></tr>
+            <tr><td><code><a href="tools/screen_diff.html">screen_diff</a></code></td><td>Compare two screenshots or frames: SSIM score, changed share, and changed boxes in b's pixels, to check a UI change happened only where expected.</td></tr>
+            <tr><td><code><a href="tools/wait_for_change.html">wait_for_change</a></code></td><td>Wait until part of the screen changes or settles, instead of guessing a sleep.</td></tr>
+            <tr><td><code><a href="tools/find_text.html">find_text</a></code></td><td>OCR (built into Windows) on the screen, an image, or video frames, with line and match boxes in image pixels (add <code>origin</code> for desktop coordinates).</td></tr>
+            <tr><td><code><a href="tools/index_recording.html">index_recording</a></code></td><td>Build a recording's text timeline (&lt;video&gt;.index.json: OCR per scene, events, markers, transcript) for search_recording.</td></tr>
+            <tr><td><code><a href="tools/search_recording.html">search_recording</a></code></td><td>Search an index_recording timeline (screen text, events, markers, transcript): timecoded hits, best first, secrets masked.</td></tr>
+<!-- tools:watch:end -->
           </tbody>
         </table>
       </section>
@@ -184,26 +192,27 @@
         <table>
           <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td><code>trim</code></td><td>Cut a sub-clip by start + end or duration. Stream copy, snaps to keyframes.</td></tr>
-            <tr><td><code>clip</code></td><td>Extract one or more frame-accurate sub-segments to separate files.</td></tr>
-            <tr><td><code>cut_idle</code></td><td>Cut dead air: frozen, silent stretches, with a short pad kept.</td></tr>
-            <tr><td><code>cut_by_transcript</code></td><td>Edit by the transcript: cut quoted lines, cue numbers, or um/uh fillers, with a re-timed SRT.</td></tr>
-            <tr><td><code>concat</code></td><td>Join two or more videos into one.</td></tr>
-            <tr><td><code>convert</code></td><td>Convert between mp4, gif, and webm.</td></tr>
-            <tr><td><code>export_gif</code></td><td>Animated GIF or WebP that fits a size budget (default: GitHub's 10 MB limit), for PRs and READMEs.</td></tr>
-            <tr><td><code>crop</code></td><td>Crop to a pixel rectangle; an off-frame rectangle is rejected.</td></tr>
-            <tr><td><code>scale</code></td><td>Resize to a width and/or height, keeping aspect when one side is given.</td></tr>
-            <tr><td><code>speed</code></td><td>Change playback speed by a factor; audio is retempo'd when present.</td></tr>
-            <tr><td><code>overlay</code></td><td>Composite a logo, watermark, or picture-in-picture, optionally scaled and time-limited.</td></tr>
-            <tr><td><code>callout</code></td><td>Timed boxes, text labels, and arrows over the video.</td></tr>
-            <tr><td><code>compress</code></td><td>Re-encode smaller with a CRF ladder and an optional width cap.</td></tr>
-            <tr><td><code>extract_audio</code></td><td>Write the audio track to its own file (mp3, aac, wav, or copy &mdash; copy picks a container that fits the source codec).</td></tr>
-            <tr><td><code>normalize_audio</code></td><td>Loudness to a target (YouTube, podcast, broadcast) with two-pass loudnorm.</td></tr>
-            <tr><td><code>denoise</code></td><td>Reduce steady background noise, tuned to the measured noise floor.</td></tr>
-            <tr><td><code>transcribe</code></td><td>Speech to SRT locally, with FFmpeg 8's whisper filter.</td></tr>
-            <tr><td><code>burn_subtitles</code></td><td>Burn captions into the video, clean or social style.</td></tr>
-            <tr><td><code>chapters</code></td><td>Write markers, scene changes, or transcript sections as mp4/mkv chapters without a re-encode, return YouTube chapter text, and mux an SRT as a soft subtitle track.</td></tr>
-            <tr><td><code>redact_region</code></td><td>Cover declared rectangles (solid box, blur, or pixelate) to hide on-screen secrets. Declared regions only, not automatic detection.</td></tr>
+            <!-- tools:edit:start -->
+            <tr><td><code><a href="tools/trim.html">trim</a></code></td><td>Cut a video down to one sub-clip by start + (end or duration).</td></tr>
+            <tr><td><code><a href="tools/concat.html">concat</a></code></td><td>Join videos end to end with hard cuts: stream copy when they match, else a re-encode (<code>mode</code> says which).</td></tr>
+            <tr><td><code><a href="tools/convert.html">convert</a></code></td><td>Convert media to mp4, webm, or gif.</td></tr>
+            <tr><td><code><a href="tools/export_gif.html">export_gif</a></code></td><td>Export an animated GIF or WebP that fits a size budget (for PRs, issues, READMEs), stepping fps, width, and quality down until it fits.</td></tr>
+            <tr><td><code><a href="tools/crop.html">crop</a></code></td><td>Crop a video to a pixel rectangle; one running off the frame is rejected.</td></tr>
+            <tr><td><code><a href="tools/scale.html">scale</a></code></td><td>Resize a video to a target width and/or height and re-encode.</td></tr>
+            <tr><td><code><a href="tools/speed.html">speed</a></code></td><td>Change playback speed by a factor (&gt;1 faster, &lt;1 slower) and re-encode.</td></tr>
+            <tr><td><code><a href="tools/compress.html">compress</a></code></td><td>Re-encode a video smaller (H.264 CRF ladder, optional width cap).</td></tr>
+            <tr><td><code><a href="tools/extract_audio.html">extract_audio</a></code></td><td>Extract the audio track of a media file to its own file (mp3, aac, wav, or copy).</td></tr>
+            <tr><td><code><a href="tools/normalize_audio.html">normalize_audio</a></code></td><td>Normalize loudness to a delivery target (two-pass EBU R128 loudnorm); video is copied.</td></tr>
+            <tr><td><code><a href="tools/denoise.html">denoise</a></code></td><td>Reduce steady background noise (fan, hum, hiss) in a recording's audio with an adaptive FFT denoiser.</td></tr>
+            <tr><td><code><a href="tools/transcribe.html">transcribe</a></code></td><td>Transcribe a recording's speech to an SRT subtitle file, locally, with FFmpeg 8's whisper filter (needs a whisper.cpp model file).</td></tr>
+            <tr><td><code><a href="tools/clip.html">clip</a></code></td><td>Extract several frame-exact segments, each to its own file.</td></tr>
+            <tr><td><code><a href="tools/cut_idle.html">cut_idle</a></code></td><td>Remove dead air: cut stretches where the screen is frozen (and silent), keeping a short pad.</td></tr>
+            <tr><td><code><a href="tools/cut_by_transcript.html">cut_by_transcript</a></code></td><td>Edit a video by its transcript: cut quoted text, cue numbers, or fillers.</td></tr>
+            <tr><td><code><a href="tools/redact_region.html">redact_region</a></code></td><td>Cover given rectangles in a video (e.g. secrets on screen).</td></tr>
+            <tr><td><code><a href="tools/music_bed.html">music_bed</a></code></td><td>Lay music under a video: looped or trimmed to length, faded, leveled, and mixed with any existing audio.</td></tr>
+            <tr><td><code><a href="tools/narrate.html">narrate</a></code></td><td>Offline voiceover with the built-in Windows voices: speaks each line at its time or marker over the audio, plus an SRT.</td></tr>
+            <tr><td><code><a href="tools/pipeline.html">pipeline</a></code></td><td>Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files.</td></tr>
+<!-- tools:edit:end -->
           </tbody>
         </table>
       </section>
@@ -217,18 +226,23 @@
         <table>
           <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td><code>assemble_highlights</code></td><td>Stitch two or more clips into one with hard cuts or an xfade transition between each.</td></tr>
-            <tr><td><code>xfade_transition</code></td><td>Crossfade two videos into one with an xfade transition. Inputs are auto-normalized first.</td></tr>
-            <tr><td><code>title_card</code></td><td>Generate a standalone title card with centered text on a solid background. Uses a bundled font, falling back to a Windows system font for CJK, emoji and other scripts.</td></tr>
-            <tr><td><code>music_bed</code></td><td>Lay a music track under a video: looped/trimmed, faded, leveled, and mixed with any existing audio.</td></tr>
-            <tr><td><code>reframe</code></td><td>Re-aspect to 16:9, 9:16, 1:1, or 4:5 with pad (letterbox) or crop (fill).</td></tr>
-            <tr><td><code>zoom</code></td><td>Smooth zoom-and-pan into the action: from keyframes, toward each click in the input event log (with optional click rings), or toward where the screen changed.</td></tr>
-            <tr><td><code>keystroke_overlay</code></td><td>Keycast-style badges (Ctrl + Shift + P, Double click, Typing&hellip;) burned in from the input event log. Never typed text: the log has none.</td></tr>
-            <tr><td><code>backdrop</code></td><td>Frame a clip or screenshot on a gradient, color, or wallpaper with padding, rounded corners, and a drop shadow, optionally on a 16:9, 9:16, 1:1, or 4:5 canvas. Presets: desktop, rec, amber, light.</td></tr>
-            <tr><td><code>pipeline</code></td><td>Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, reframe, zoom, backdrop, audio, burn_subtitles, then an export) as one ffmpeg process: one re-encode, no intermediate files. Recipes (pr_demo, tutorial, social_reel) do the usual polish in one call.</td></tr>
-            <tr><td><code>export_preset</code></td><td>Encode a platform-ready file (youtube, instagram_reel, tiktok, x, square, steam_trailer, vertical_reel) at the right aspect, fps, and bitrate.</td></tr>
-            <tr><td><code>bug_report</code></td><td>Turn a recording into a paste-ready repro folder: a secret-scanned, redacted clip and GIF, contact sheet, steps from the event log, OCR&rsquo;d error text, environment, and a report.md for <code>gh issue create</code>.</td></tr>
-            <tr><td><code>step_guide</code></td><td>Turn a recording and its event log into a step-by-step how-to: a ringed screenshot and OCR caption per step, markers as headings, secrets boxed out, as Markdown or one self-contained HTML page.</td></tr>
+            <!-- tools:produce:start -->
+            <tr><td><code><a href="tools/overlay.html">overlay</a></code></td><td>Composite an image or video (logo, watermark, picture-in-picture) onto a video at a pixel position, optionally scaled and time-limited; keeps the base's audio and length.</td></tr>
+            <tr><td><code><a href="tools/callout.html">callout</a></code></td><td>Annotate a video with timed boxes, text labels, and arrows.</td></tr>
+            <tr><td><code><a href="tools/keystroke_overlay.html">keystroke_overlay</a></code></td><td>Burn keycast-style badges for shortcuts, clicks, and typing from the recording's input event log (start_recording events: true).</td></tr>
+            <tr><td><code><a href="tools/cursor.html">cursor</a></code></td><td>Draw a smoothed, scaled cursor that hides when idle from the event log of a start_recording cursor: &quot;events&quot; recording (no OS cursor in the video), with click ripples and an optional spotlight.</td></tr>
+            <tr><td><code><a href="tools/backdrop.html">backdrop</a></code></td><td>Frame a video or screenshot on a gradient, color, or wallpaper with padding, rounded corners, and a drop shadow, optionally on a 16:9/1:1/9:16/4:5 canvas.</td></tr>
+            <tr><td><code><a href="tools/burn_subtitles.html">burn_subtitles</a></code></td><td>Burn SRT/ASS subtitles (e.g. from transcribe) into a video in the bundled font.</td></tr>
+            <tr><td><code><a href="tools/chapters.html">chapters</a></code></td><td>Write chapters (markers, scene changes, transcript, or a list) into an mp4/mkv/mov copy without re-encoding; returns YouTube chapter text.</td></tr>
+            <tr><td><code><a href="tools/xfade_transition.html">xfade_transition</a></code></td><td>Join two videos with an xfade transition (audio crossfaded); they need not match in size, fps, or audio.</td></tr>
+            <tr><td><code><a href="tools/assemble_highlights.html">assemble_highlights</a></code></td><td>Stitch clips (including title cards) into one video with cuts or xfade transitions; they need not match in size, fps, or audio.</td></tr>
+            <tr><td><code><a href="tools/title_card.html">title_card</a></code></td><td>Generate a title card clip (centered text on a solid background, silent audio track) to stitch in with assemble_highlights.</td></tr>
+            <tr><td><code><a href="tools/reframe.html">reframe</a></code></td><td>Re-aspect a video to 16:9, 9:16, 1:1, or 4:5 by padding or cropping.</td></tr>
+            <tr><td><code><a href="tools/zoom.html">zoom</a></code></td><td>Smooth animated zoom-and-pan into the action and back out, from keyframes or planned from logged clicks or screen changes.</td></tr>
+            <tr><td><code><a href="tools/export_preset.html">export_preset</a></code></td><td>Encode a platform-ready H.264 file (aspect, fps, bitrate, faststart) for a named platform.</td></tr>
+            <tr><td><code><a href="tools/bug_report.html">bug_report</a></code></td><td>Package a recording as a paste-ready repro folder: secret-scanned, redacted clip and GIF, contact sheet, steps from the event log, OCR'd errors, environment, report.md for gh issue create --body-file.</td></tr>
+            <tr><td><code><a href="tools/step_guide.html">step_guide</a></code></td><td>Turn a recording's event log into a numbered how-to: a ringed screenshot and caption per step, marker headings; Markdown and/or one HTML file.</td></tr>
+<!-- tools:produce:end -->
           </tbody>
         </table>
       </section>

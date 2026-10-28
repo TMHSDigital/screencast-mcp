@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>pipeline — Screencast MCP</title>
+  <meta name="description" content="Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files.">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/tools/pipeline.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="pipeline — Screencast MCP">
+  <meta property="og:description" content="Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/tools/pipeline.html">
+  <meta property="og:site_name" content="Screencast MCP">
+  <meta property="og:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Screencast MCP: give your agent eyes on the screen. A recorded window zooms in on a clicked Save button.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <link rel="preload" href="../fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../tools/" class="here">Tools</a>
+      <a href="../workflows/">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">TOOLS</a> / EDIT</p>
+      <h1>Edit Pipeline</h1>
+      <p class="tool-id"><code>pipeline</code></p>
+      <p class="lede">Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.</p>
+      <p class="chips"><span class="chip set">edit</span><span class="chip warn">writes</span><span class="chip warn">destructive</span><span class="chip">since v0.30.0</span></p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>PARAMETERS</span></div>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video.</td></tr>
+          <tr><td><code>steps</code></td><td><code class="type">object[]</code></td><td>Edits in order, each { op, ...its tool's options }; export_preset/export_gif only last. Times and pixels are relative to the video as it is at that step (after earlier trims, speed, crops). zoom follow:&quot;clicks&quot; plans from the event log; burn_subtitles takes subtitles or transcribe:true. <span class="bounds">at most 30 items</span></td></tr>
+          <tr class="nested d1"><td><code>steps[trim].start</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr class="nested d1"><td><code>steps[trim].end</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d1"><td><code>steps[trim].duration</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d1"><td><code>steps[crop].x</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
+          <tr class="nested d1"><td><code>steps[crop].y</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
+          <tr class="nested d1"><td><code>steps[crop].width</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
+          <tr class="nested d1"><td><code>steps[crop].height</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
+          <tr class="nested d1"><td><code>steps[scale].width</code></td><td><code class="type">integer</code></td><td> <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
+          <tr class="nested d1"><td><code>steps[scale].height</code></td><td><code class="type">integer</code></td><td> <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
+          <tr class="nested d1"><td><code>steps[speed].factor</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d1"><td><code>steps[redact].regions</code> <span class="req">required</span></td><td><code class="type">object[]</code></td><td> <span class="bounds">at least 1 items</span></td></tr>
+          <tr class="nested d2"><td><code>steps[redact].regions[].x</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
+          <tr class="nested d2"><td><code>steps[redact].regions[].y</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
+          <tr class="nested d2"><td><code>steps[redact].regions[].width</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
+          <tr class="nested d2"><td><code>steps[redact].regions[].height</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
+          <tr class="nested d2"><td><code>steps[redact].regions[].start</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[redact].regions[].end</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d1"><td><code>steps[redact].style</code></td><td><code class="type">&quot;box&quot; | &quot;blur&quot; | &quot;pixelate&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[redact].pad</code></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
+          <tr class="nested d1"><td><code>steps[redact].color</code></td><td><code class="type">string</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[callout].items</code> <span class="req">required</span></td><td><code class="type">object[]</code></td><td> <span class="bounds">at least 1 items, at most 50 items</span></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[box].x</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[box].y</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[box].width</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[box].height</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[box].thickness</code></td><td><code class="type">number</code></td><td>Outline px (default 4). <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[box].fill</code></td><td><code class="type">boolean</code></td><td>Fill instead of outline.</td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[box].from</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[box].to</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[box].color</code></td><td><code class="type">string</code></td><td></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[text].x</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[text].y</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[text].text</code> <span class="req">required</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[text].size</code></td><td><code class="type">number</code></td><td>Font size px (default 32). <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[text].background</code></td><td><code class="type">boolean</code></td><td>Dark panel behind the text (default true).</td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[text].from</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[text].to</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[text].color</code></td><td><code class="type">string</code></td><td></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[arrow].x1</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[arrow].y1</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[arrow].x2</code> <span class="req">required</span></td><td><code class="type">number</code></td><td>Head (x2,y2) is the point the arrow points at.</td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[arrow].y2</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[arrow].thickness</code></td><td><code class="type">number</code></td><td>Shaft px (default 8). <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[arrow].from</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[arrow].to</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[callout].items[arrow].color</code></td><td><code class="type">string</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[callout].fontFile</code></td><td><code class="type">string</code></td><td>Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).</td></tr>
+          <tr class="nested d1"><td><code>steps[reframe].aspect</code> <span class="req">required</span></td><td><code class="type">&quot;16:9&quot; | &quot;9:16&quot; | &quot;1:1&quot; | &quot;4:5&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[reframe].fit</code></td><td><code class="type">&quot;pad&quot; | &quot;crop&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[zoom].keyframes</code></td><td><code class="type">object[]</code></td><td> <span class="bounds">at least 1 items, at most 100 items</span></td></tr>
+          <tr class="nested d2"><td><code>steps[zoom].keyframes[].t</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[zoom].keyframes[].x</code></td><td><code class="type">number</code></td><td></td></tr>
+          <tr class="nested d2"><td><code>steps[zoom].keyframes[].y</code></td><td><code class="type">number</code></td><td></td></tr>
+          <tr class="nested d2"><td><code>steps[zoom].keyframes[].width</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[zoom].keyframes[].height</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[zoom].keyframes[].full</code></td><td><code class="type">boolean</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[zoom].follow</code></td><td><code class="type">&quot;clicks&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[zoom].maxZoom</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 1, ≤ 6</span></td></tr>
+          <tr class="nested d1"><td><code>steps[zoom].holdSec</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0, ≤ 30</span></td></tr>
+          <tr class="nested d1"><td><code>steps[zoom].transitionSec</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0, ≤ 5</span></td></tr>
+          <tr class="nested d1"><td><code>steps[cut_idle].minIdleSec</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d1"><td><code>steps[cut_idle].keepSec</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr class="nested d1"><td><code>steps[audio].normalize</code></td><td><code class="type">&quot;youtube&quot; | &quot;podcast&quot; | &quot;broadcast&quot; | number</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[audio].denoise</code></td><td><code class="type">&quot;light&quot; | &quot;medium&quot; | &quot;strong&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[burn_subtitles].subtitles</code></td><td><code class="type">string</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[burn_subtitles].transcribe</code></td><td><code class="type">boolean</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[burn_subtitles].style</code></td><td><code class="type">&quot;clean&quot; | &quot;social&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[backdrop].preset</code></td><td><code class="type">&quot;desktop&quot; | &quot;rec&quot; | &quot;amber&quot; | &quot;light&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[backdrop].colors</code></td><td><code class="type">string[]</code></td><td> <span class="bounds">at least 1 items, at most 4 items</span></td></tr>
+          <tr class="nested d1"><td><code>steps[backdrop].image</code></td><td><code class="type">string</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[backdrop].padding</code></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 2000</span></td></tr>
+          <tr class="nested d1"><td><code>steps[backdrop].radius</code></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 1000</span></td></tr>
+          <tr class="nested d1"><td><code>steps[backdrop].shadow</code></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 200</span></td></tr>
+          <tr class="nested d1"><td><code>steps[backdrop].shadowOpacity</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0, ≤ 1</span></td></tr>
+          <tr class="nested d1"><td><code>steps[backdrop].aspect</code></td><td><code class="type">&quot;16:9&quot; | &quot;9:16&quot; | &quot;1:1&quot; | &quot;4:5&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[keystroke_overlay].events</code></td><td><code class="type">string</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[keystroke_overlay].clicks</code></td><td><code class="type">boolean</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[keystroke_overlay].typing</code></td><td><code class="type">boolean</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[keystroke_overlay].keys</code></td><td><code class="type">&quot;shortcuts&quot; | &quot;masked&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[keystroke_overlay].lingerSec</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0, ≤ 10</span></td></tr>
+          <tr class="nested d1"><td><code>steps[keystroke_overlay].position</code></td><td><code class="type">&quot;bottom&quot; | &quot;bottom-left&quot; | &quot;bottom-right&quot; | &quot;top&quot; | &quot;top-left&quot; | &quot;top-right&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[keystroke_overlay].size</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 8, ≤ 400</span></td></tr>
+          <tr class="nested d1"><td><code>steps[keystroke_overlay].color</code></td><td><code class="type">string</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[keystroke_overlay].fontFile</code></td><td><code class="type">string</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[cursor].events</code></td><td><code class="type">string</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[cursor].size</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0.25, ≤ 8</span></td></tr>
+          <tr class="nested d1"><td><code>steps[cursor].smoothing</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0, ≤ 1</span></td></tr>
+          <tr class="nested d1"><td><code>steps[cursor].hideAfterSec</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0, ≤ 600</span></td></tr>
+          <tr class="nested d1"><td><code>steps[cursor].clicks</code></td><td><code class="type">boolean</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[cursor].spotlight</code></td><td><code class="type">boolean</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[export_preset].platform</code> <span class="req">required</span></td><td><code class="type">&quot;youtube&quot; | &quot;instagram_reel&quot; | &quot;tiktok&quot; | &quot;x&quot; | &quot;square&quot; | &quot;steam_trailer&quot; | &quot;vertical_reel&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[export_preset].fit</code></td><td><code class="type">&quot;pad&quot; | &quot;crop&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[export_gif].format</code></td><td><code class="type">&quot;gif&quot; | &quot;webp&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[export_gif].maxBytes</code></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 10000, ≤ 9007199254740991</span></td></tr>
+          <tr class="nested d1"><td><code>steps[export_gif].fps</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0, ≤ 30</span></td></tr>
+          <tr class="nested d1"><td><code>steps[export_gif].width</code></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 64, ≤ 1920</span></td></tr>
+          <tr><td><code>recipe</code></td><td><code class="type">&quot;pr_demo&quot; | &quot;tutorial&quot; | &quot;social_reel&quot;</code></td><td>Polish preset expanded to steps (see dryRun): pr_demo = cut_idle, click zoom, GIF &lt;=10 MB; tutorial = + audio, captions, 1080p mp4; social_reel = 9:16, big captions. Given steps replace its same-op step.</td></tr>
+          <tr><td><code>quality</code></td><td><code class="type">&quot;draft&quot; | &quot;standard&quot; | &quot;high&quot;</code></td><td>Encoder preset for an mp4 result (default standard).</td></tr>
+          <tr><td><code>dryRun</code></td><td><code class="type">boolean</code></td><td>Return the plan (ffmpeg command, output size) without running it.</td></tr>
+          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
+          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr><td><code>chapters</code></td><td><code class="type">boolean</code></td><td>Keep the input's markers as chapters, re-timed through trims and speed.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>A MINIMAL CALL</span></div>
+      <pre class="copyable"><code>pipeline { &quot;input&quot;: &quot;recording.mp4&quot; }</code></pre>
+      <p>The required arguments only, with placeholder values. Everything else takes its default.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:10</span><span>WHAT COMES BACK</span></div>
+      <p>Structured content (<code>structuredContent</code>), alongside a text summary:</p>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>processes</code> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
+          <tr><td><code>steps</code> <span class="req">always</span></td><td><code class="type">string[]</code></td><td></td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:15</span><span>SEEN IN</span></div>
+      <ul class="recipes">
+        <li><a href="../workflows/pipeline.html"><span class="tc">REC 07</span><span class="name">The whole edit in one call</span><span class="chain">start_recording &rarr; find_text &rarr; pipeline (redact &rarr; trim &rarr; callout &rarr; export_gif)</span></a></li>
+      </ul>
+    </section>
+      <nav class="pager" aria-label="More tools">
+        <span><a href="zoom.html">&larr; zoom</a></span>
+        <span><a href="export_preset.html">export_preset &rarr;</a></span>
+      </nav>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>License: <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/LICENSE">CC BY-NC-ND 4.0</a> &middot; free for non-commercial use</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>

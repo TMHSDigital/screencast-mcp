@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>music_bed — Screencast MCP</title>
+  <meta name="description" content="Lay music under a video: looped or trimmed to length, faded, leveled, and mixed with any existing audio.">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/tools/music_bed.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="music_bed — Screencast MCP">
+  <meta property="og:description" content="Lay music under a video: looped or trimmed to length, faded, leveled, and mixed with any existing audio.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/tools/music_bed.html">
+  <meta property="og:site_name" content="Screencast MCP">
+  <meta property="og:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Screencast MCP: give your agent eyes on the screen. A recorded window zooms in on a clicked Save button.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <link rel="preload" href="../fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../tools/" class="here">Tools</a>
+      <a href="../workflows/">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">TOOLS</a> / AUDIO</p>
+      <h1>Add Music Bed</h1>
+      <p class="tool-id"><code>music_bed</code></p>
+      <p class="lede">Lay music under a video: looped or trimmed to length, faded, leveled, and mixed with any existing audio. Video is stream-copied.</p>
+      <p class="chips"><span class="chip set">audio</span><span class="chip warn">writes</span><span class="chip warn">destructive</span><span class="chip">since v0.7.0</span></p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>PARAMETERS</span></div>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>video</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the video.</td></tr>
+          <tr><td><code>music</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Music audio file.</td></tr>
+          <tr><td><code>musicVolume</code></td><td><code class="type">number</code></td><td>0..1 (default 0.25 over existing audio, 0.8 alone). <span class="bounds">≥ 0</span></td></tr>
+          <tr><td><code>fadeIn</code></td><td><code class="type">number</code></td><td>Fade-in seconds (default 1). <span class="bounds">≥ 0</span></td></tr>
+          <tr><td><code>fadeOut</code></td><td><code class="type">number</code></td><td>Fade-out seconds (default 2). <span class="bounds">≥ 0</span></td></tr>
+          <tr><td><code>duck</code></td><td><code class="type">boolean</code></td><td>Duck the music under the original audio (default false).</td></tr>
+          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
+          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>A MINIMAL CALL</span></div>
+      <pre class="copyable"><code>music_bed { &quot;video&quot;: &quot;recording.mp4&quot;, &quot;music&quot;: &quot;music.mp3&quot; }</code></pre>
+      <p>The required arguments only, with placeholder values. Everything else takes its default.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:10</span><span>WHAT COMES BACK</span></div>
+      <p>Structured content (<code>structuredContent</code>), alongside a text summary:</p>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:15</span><span>SEEN IN</span></div>
+      <ul class="recipes">
+        <li><a href="../workflows/social-clip.html"><span class="tc">REC 04</span><span class="name">Social clip</span><span class="chain">reframe &rarr; title_card &rarr; assemble_highlights &rarr; music_bed &rarr; normalize_audio &rarr; export_preset</span></a></li>
+      </ul>
+    </section>
+      <nav class="pager" aria-label="More tools">
+        <span><a href="title_card.html">&larr; title_card</a></span>
+        <span><a href="narrate.html">narrate &rarr;</a></span>
+      </nav>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>License: <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/LICENSE">CC BY-NC-ND 4.0</a> &middot; free for non-commercial use</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>

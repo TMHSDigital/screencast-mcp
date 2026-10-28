@@ -3,106 +3,380 @@
     "name": "start_recording",
     "toolset": "capture",
     "title": "Start Recording",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Start a background screen recording. Returns a session id; finalize it with stop_recording. Never auto-starts.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "target": { "type": "string", "description": "full | monitor:<index> (0 = primary) | window:<title> (or window:exe=<app.exe> / window:hwnd=<handle>) | region:<x>,<y>,<w>,<h>. window: captures the rectangle the window occupies as displayed (case-insensitive exact title, else substring; topmost match)" },
-        "exactTitle": { "type": "boolean", "description": "For window: targets, match only a window whose title equals the given title (case-insensitive); never fall back to a substring (default false)" },
-        "fps": { "type": "integer", "minimum": 1, "maximum": 120, "description": "Frames per second (default 30)" },
-        "quality": { "type": "string", "enum": ["draft", "standard", "high"], "description": "Encoder preset (default standard)" },
-        "audio": {
-          "type": "object",
-          "description": "Audio capture (default none, video-only). source system needs a loopback device; microphone capture is not supported.",
-          "properties": {
-            "source": { "type": "string", "enum": ["system", "none"], "description": "system captures what is playing on the machine; none is video-only" },
-            "device": { "type": "string", "description": "Optional dshow loopback device name (from list_audio_devices); auto-detected when omitted" }
-          },
-          "required": ["source"]
+        "target": {
+          "type": "string",
+          "description": "full | monitor:<i> (0 = primary) | window:<title> (or window:exe=<app.exe> / window:hwnd=<n>) | region:<x>,<y>,<w>,<h>. With gdigrab a window's rectangle is resolved once at start (visible, on top); it does not follow the window."
         },
-        "output": { "type": "string", "description": "Optional output .mp4 path (defaults under SCREENCAST_HOME/recordings)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
-        "maxDurationSec": { "type": "integer", "minimum": 0, "maximum": 604800, "description": "Stop automatically after this many seconds, finalizing the file (default 3600, or SCREENCAST_MAX_RECORDING_SEC; at most 604800, 7 days). 0 = no cap" },
-        "backend": { "type": "string", "enum": ["gdigrab", "wgc"], "description": "gdigrab (default) records the screen rectangle. wgc (window: targets, FFmpeg 8+) records the window's own surface through Windows Graphics Capture: covered, moved, or background windows keep recording; frames only its client area. No audio with wgc" },
-        "events": { "type": "boolean", "description": "Also log mouse clicks, scroll, cursor positions, and typing to <recording>.events.jsonl, timed to the video and in video pixels (default false). Read it with read_events" },
-        "keys": { "type": "string", "enum": ["masked", "shortcuts"], "description": "With events: masked (default) logs typing only as bursts (start and length on a 0.5 s grid), never which keys or per-key times; shortcuts also names Ctrl/Alt/Win chords (e.g. Ctrl+S) with their times. Typed text is never logged" },
-        "replayBufferSec": { "type": "integer", "minimum": 4, "maximum": 3600, "description": "Instant replay: keep only the last N seconds in a rolling ring of 2 s segments under SCREENCAST_HOME/replay (disk bounded to about N s); save_replay writes the last seconds to an mp4 without stopping it, and stop_recording discards the buffer unless save: true. gdigrab only" }
+        "exactTitle": {
+          "description": "window: targets match the whole title only, never a substring (default false).",
+          "type": "boolean"
+        },
+        "fps": {
+          "description": "Frames per second (default 30).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120
+        },
+        "quality": {
+          "description": "Encoder preset (default standard).",
+          "type": "string",
+          "enum": [
+            "draft",
+            "standard",
+            "high"
+          ]
+        },
+        "audio": {
+          "description": "Audio (default none). No microphone capture.",
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": [
+                "system",
+                "none"
+              ],
+              "description": "system = what the machine plays (needs a loopback device); none = video only."
+            },
+            "device": {
+              "description": "dshow loopback device (from list_audio_devices); auto-detected if omitted.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "source"
+          ]
+        },
+        "output": {
+          "description": "Output .mp4 path (default under SCREENCAST_HOME/recordings).",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        },
+        "maxDurationSec": {
+          "description": "Auto-stop after this many seconds (default 3600 or SCREENCAST_MAX_RECORDING_SEC; max 7 days; 0 = no cap).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 604800
+        },
+        "events": {
+          "description": "Also log clicks, scroll, cursor, and typing (video-timed, video pixels) for read_events (default false; ~1 s slower start).",
+          "type": "boolean"
+        },
+        "keys": {
+          "description": "With events: masked (default) logs typing only as 0.5 s-grid bursts, never keys; shortcuts also names Ctrl/Alt/Win chords. Typed text is never logged.",
+          "type": "string",
+          "enum": [
+            "masked",
+            "shortcuts"
+          ]
+        },
+        "cursor": {
+          "description": "events: leave the OS cursor out and log it (implies events) for the cursor tool to redraw.",
+          "type": "string",
+          "enum": [
+            "os",
+            "events"
+          ]
+        },
+        "backend": {
+          "description": "gdigrab (default): the screen rectangle. wgc (window: targets, FFmpeg 8+): the window's own surface, even when covered or moved; client area only, no audio. ddagrab: one display on the GPU, low CPU.",
+          "type": "string",
+          "enum": [
+            "gdigrab",
+            "wgc",
+            "ddagrab"
+          ]
+        },
+        "encoder": {
+          "description": "auto = first working GPU encoder, else x264 (default with ddagrab; else x264).",
+          "type": "string",
+          "enum": [
+            "auto",
+            "x264",
+            "nvenc",
+            "qsv",
+            "amf"
+          ]
+        },
+        "webcam": {
+          "description": "Also record a camera to <output>.webcam.mp4, aligned for overlay.",
+          "type": "object",
+          "properties": {
+            "device": {
+              "description": "list_video_devices name (default: first).",
+              "type": "string"
+            },
+            "corner": {
+              "type": "string",
+              "enum": [
+                "top_left",
+                "top_right",
+                "bottom_left",
+                "bottom_right"
+              ]
+            },
+            "size": {
+              "description": "Share of width (0.25).",
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 0.5
+            },
+            "shape": {
+              "type": "string",
+              "enum": [
+                "rect",
+                "circle"
+              ]
+            }
+          }
+        },
+        "replayBufferSec": {
+          "description": "Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab only.",
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 3600
+        }
       },
-      "required": ["target"]
+      "required": [
+        "target"
+      ]
     }
   },
   {
     "name": "stop_recording",
     "toolset": "capture",
     "title": "Stop Recording",
-    "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "Stop a recording gracefully so the file is finalized; returns the path and duration.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "sessionId": { "type": "string", "description": "Session id returned by start_recording" },
-        "save": { "type": "boolean", "description": "Replay-buffer sessions: write the whole buffer to outputPath before discarding it (default false: the buffer is discarded)" }
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Session id returned by start_recording."
+        },
+        "save": {
+          "description": "Replay buffer: write it all to outputPath first (default: discard).",
+          "type": "boolean"
+        }
       },
-      "required": ["sessionId"]
+      "required": [
+        "sessionId"
+      ]
+    }
+  },
+  {
+    "name": "pause_recording",
+    "toolset": "capture",
+    "title": "Pause Recording",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "description": "Pause a recording; until resume_recording nothing is captured, and the gap is left out of the file, events, and markers.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "From start_recording."
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    }
+  },
+  {
+    "name": "resume_recording",
+    "toolset": "capture",
+    "title": "Resume Recording",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Resume a paused recording (same target and settings).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "From start_recording."
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
     }
   },
   {
     "name": "save_replay",
     "toolset": "capture",
     "title": "Save Replay",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Save the last N seconds of a replay buffer (start_recording replayBufferSec) to an mp4; the buffer keeps running.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "sessionId": { "type": "string", "description": "Session id of a recording started with replayBufferSec" },
-        "lastSec": { "type": "number", "exclusiveMinimum": 0, "maximum": 3600, "description": "Seconds to keep, back from now (default: the whole buffer; capped at replayBufferSec)" },
-        "output": { "type": "string", "description": "Output .mp4 path (default under SCREENCAST_HOME/recordings). With an events buffer, the sliced <output>.events.jsonl is written beside it" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
-        "reencode": { "type": "boolean", "description": "Frame-exact re-encode (slower). Default: a near-instant stream copy that keeps up to one segment (2 s) of earlier frames hidden behind an edit list; never rely on it to remove secrets" }
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Session id of a replay buffer."
+        },
+        "lastSec": {
+          "description": "Seconds back from now (default and max: the buffer length).",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 3600
+        },
+        "output": {
+          "description": "Output .mp4 path (default under SCREENCAST_HOME/recordings).",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        },
+        "reencode": {
+          "description": "Frame-exact re-encode. Default: instant stream copy that may hide up to 2 s of earlier frames.",
+          "type": "boolean"
+        }
       },
-      "required": ["sessionId"]
+      "required": [
+        "sessionId"
+      ]
     }
   },
   {
     "name": "list_sessions",
     "toolset": "capture",
     "title": "List Sessions",
-    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "List all recording sessions (active and finished) with their status, target, output path, and whether the process is still alive.",
-    "inputSchema": { "type": "object", "properties": {}, "required": [] }
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
   },
   {
     "name": "get_session",
     "toolset": "capture",
     "title": "Get Session",
-    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "Inspect a single recording session by id, including live status and whether its output file exists on disk.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "sessionId": { "type": "string", "description": "Session id returned by start_recording" }
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Session id returned by start_recording."
+        }
       },
-      "required": ["sessionId"]
+      "required": [
+        "sessionId"
+      ]
     }
   },
   {
     "name": "read_events",
     "toolset": "capture",
     "title": "Read Input Events",
-    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "Read the input events (clicks, scroll, cursor, shortcuts, typing bursts) of a recording made with events: true, in video seconds and pixels; e.g. types: ['down'], then sample_frames there.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "sessionId": { "type": "string", "description": "Session id of a recording started with events: true" },
-        "input": { "type": "string", "description": "Or a recording path (its sibling .events.jsonl is read) or the .events.jsonl itself" },
-        "from": { "type": "number", "minimum": 0, "description": "Only events at or after this video time, in seconds" },
-        "to": { "type": "number", "minimum": 0, "description": "Only events at or before this video time, in seconds" },
-        "types": { "type": "array", "items": { "type": "string", "enum": ["down", "up", "move", "wheel", "key", "typing", "gap"] }, "description": "Only these event types; clicks are down, key is a named shortcut, typing a burst of typing, gap a stretch where events may be missing" },
-        "inFrameOnly": { "type": "boolean", "description": "Drop events whose cursor was outside the recorded area" },
-        "limit": { "type": "integer", "minimum": 1, "maximum": 5000, "description": "Most events to return (default 200)" }
+        "sessionId": {
+          "description": "Session id of a recording started with events: true.",
+          "type": "string",
+          "minLength": 1
+        },
+        "input": {
+          "description": "Or a recording path, or its .events.jsonl.",
+          "type": "string"
+        },
+        "from": {
+          "description": "Earliest video second.",
+          "type": "number",
+          "minimum": 0
+        },
+        "to": {
+          "description": "Latest video second.",
+          "type": "number",
+          "minimum": 0
+        },
+        "types": {
+          "description": "down/up (mouse buttons; clicks are down), move (sampled cursor), wheel, key (shortcut), typing (burst), gap (events may be missing).",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "down",
+              "up",
+              "move",
+              "wheel",
+              "key",
+              "typing",
+              "gap"
+            ]
+          }
+        },
+        "inFrameOnly": {
+          "description": "Drop events whose cursor was outside the recorded area.",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "Most events to return (default 200).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        }
       }
     }
   },
@@ -110,30 +384,65 @@
     "name": "add_marker",
     "toolset": "capture",
     "title": "Add Marker",
-    "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Mark a labelled moment on a recording, live or at a second. Kept in the session and a sidecar; chapters and pipeline turn markers into chapters.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "label": { "type": "string", "description": "What happens here, e.g. \"bug appears\" or \"step 3: save\" (at most 200 characters)" },
-        "sessionId": { "type": "string", "description": "The recording to mark (running, or stopped with at)" },
-        "input": { "type": "string", "description": "Or a video path (needs at); the marker goes in its .markers.json sidecar" },
-        "at": { "type": "number", "minimum": 0, "description": "Video second to mark. Default: now, on the running recording's clock" }
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "e.g. \"bug appears\"."
+        },
+        "sessionId": {
+          "description": "Recording to mark (a stopped one needs at).",
+          "type": "string",
+          "minLength": 1
+        },
+        "input": {
+          "description": "Or a video path (needs at).",
+          "type": "string",
+          "minLength": 1
+        },
+        "at": {
+          "description": "Video second (default: now, while recording).",
+          "type": "number",
+          "minimum": 0
+        }
       },
-      "required": ["label"]
+      "required": [
+        "label"
+      ]
     }
   },
   {
     "name": "review_recording",
     "toolset": "watch",
     "title": "Review Recording",
-    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "Open a recording for a person to review: in MCP Apps clients an inline player to scrub, trim, and redact, then export; elsewhere just the video's details.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the video" },
-        "sessionId": { "type": "string", "description": "Or the session id of a stopped recording" }
+        "input": {
+          "description": "Path to the video.",
+          "type": "string"
+        },
+        "sessionId": {
+          "description": "Or the session id of a stopped recording.",
+          "type": "string"
+        }
       }
     }
   },
@@ -141,551 +450,1792 @@
     "name": "player_frames",
     "toolset": "watch",
     "title": "Player Frames",
-    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "appOnly": true,
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "Preview frames for the review player: JPEGs on an even grid over the video plus frames at scene changes, with their real times. Used by the inline player; agents should use sample_frames or contact_sheet instead.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the video" },
-        "maxFrames": { "type": "integer", "minimum": 1, "maximum": 300, "description": "Frames on the even grid (default 120); scene-change frames come on top, up to as many again" },
-        "width": { "type": "integer", "minimum": 64, "maximum": 1280, "description": "Frame width (default 640)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the video."
+        },
+        "maxFrames": {
+          "description": "Frames on the even grid (default 120); scene-change frames come on top, up to as many again.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300
+        },
+        "width": {
+          "description": "Frame width (default 640).",
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 1280
+        }
       },
-      "required": ["input"]
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "screenshot",
     "toolset": "capture",
     "title": "Take Screenshot",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Capture one PNG of the screen, a monitor, a window, or a region, returned inline and by path.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "target": { "type": "string", "description": "full | monitor:<index> | window:<title> (or window:exe=<app.exe> / window:hwnd=<handle>) | region:<x>,<y>,<w>,<h>. window: captures the rectangle the window occupies as displayed (case-insensitive exact title, else substring; topmost match)" },
-        "exactTitle": { "type": "boolean", "description": "For window: targets, match only a window whose title equals the given title (case-insensitive); never fall back to a substring (default false)" },
-        "backend": { "type": "string", "enum": ["gdigrab", "wgc"], "description": "gdigrab (default) captures what is visible; wgc (window: targets, FFmpeg 8+) captures the window itself even when covered, via Windows Graphics Capture" },
-        "output": { "type": "string", "description": "Optional output .png path (defaults under SCREENCAST_HOME/screenshots)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
-        "returnImage": { "type": "boolean", "description": "Also return the screenshot inline as a downscaled JPEG image (default true)" },
-        "maxImageWidth": { "type": "integer", "description": "Downscale the inline image to at most this width (default 1280)" }
+        "target": {
+          "type": "string",
+          "description": "full | monitor:<i> (0 = primary) | window:<title> (or window:exe=<app.exe> / window:hwnd=<n>) | region:<x>,<y>,<w>,<h>. Titles match exactly, else as a substring; topmost wins."
+        },
+        "exactTitle": {
+          "description": "window: targets match the whole title only, never a substring (default false).",
+          "type": "boolean"
+        },
+        "backend": {
+          "description": "gdigrab (default, ~0.2 s): what is visible. wgc (window:, FFmpeg 8+, ~1-2 s): the window even if covered.",
+          "type": "string",
+          "enum": [
+            "gdigrab",
+            "wgc"
+          ]
+        },
+        "output": {
+          "description": "Optional output .png path. Defaults to a file under SCREENCAST_HOME/screenshots.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        },
+        "returnImage": {
+          "description": "Return the image inline (default true; the PNG on disk stays full size).",
+          "type": "boolean"
+        },
+        "maxImageWidth": {
+          "description": "Max inline image width (default 1280).",
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 9007199254740991
+        }
       },
-      "required": ["target"]
+      "required": [
+        "target"
+      ]
     }
   },
   {
     "name": "sample_frames",
     "toolset": "watch",
     "title": "Sample Frames",
-    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "Sample PNG frames from a video (by fps, timestamps, or scene changes) and return the first few inline so the model can see what happened.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video file" },
-        "mode": { "type": "string", "enum": ["fps", "timestamps", "scenes"], "description": "How to pick frames; scenes returns only frames where the screen changed (plus the first), strongest first up to maxFrames. Defaults to fps or timestamps, whichever is given" },
-        "fps": { "type": "number", "description": "Sample this many frames per second (mode fps)" },
-        "timestamps": { "type": "array", "items": { "type": "number" }, "description": "Explicit second offsets to grab one frame at each (mode timestamps)" },
-        "sceneThreshold": { "type": "number", "description": "Mode scenes: how much a frame must change to count, 0-1 (default 0.1)" },
-        "dedupe": { "type": "boolean", "description": "Mode fps: drop frames nearly identical to the previous one (default false)" },
-        "outputDir": { "type": "string", "description": "Optional folder for the frames (defaults under SCREENCAST_HOME/frames)" },
-        "maxFrames": { "type": "integer", "description": "Most frames this call may write (default 100, max 1000); in fps mode a rate that would exceed it is lowered so frames still span the whole video" },
-        "returnImages": { "type": "boolean", "description": "Also return frames inline as downscaled JPEG images (default true)" },
-        "maxInlineImages": { "type": "integer", "description": "How many frames to embed inline (default 8, max 20); every frame is still listed by path" },
-        "maxImageWidth": { "type": "integer", "description": "Downscale inline images to at most this width (default 1280)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video file."
+        },
+        "mode": {
+          "description": "scenes: only frames where the screen changed (strongest first), usually the cheapest review. Default: fps or timestamps, whichever is given.",
+          "type": "string",
+          "enum": [
+            "fps",
+            "timestamps",
+            "scenes"
+          ]
+        },
+        "fps": {
+          "description": "Frames per second (mode fps).",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "timestamps": {
+          "description": "Seconds to grab a frame at (mode timestamps).",
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "sceneThreshold": {
+          "description": "Mode scenes: change needed to count, 0-1 (default 0.1).",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "dedupe": {
+          "description": "Mode fps: drop near-duplicate frames (default false).",
+          "type": "boolean"
+        },
+        "outputDir": {
+          "description": "Optional folder for the frames (a relative path resolves under SCREENCAST_HOME/frames). Defaults to SCREENCAST_HOME/frames/<id>.",
+          "type": "string"
+        },
+        "maxFrames": {
+          "description": "Frame cap (default 100); fps is lowered to fit while still spanning the video.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "returnImages": {
+          "description": "Return the first maxInlineImages frames inline (default true).",
+          "type": "boolean"
+        },
+        "maxInlineImages": {
+          "description": "Frames to embed inline (default 8); all are listed by path.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "maxImageWidth": {
+          "description": "Max inline image width (default 1280).",
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 9007199254740991
+        }
       },
-      "required": ["input"]
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "contact_sheet",
     "toolset": "watch",
     "title": "Contact Sheet",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Tile timestamped frames of a video into one image to see a whole recording at a glance (the cheapest first look).",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "count": { "type": "integer", "description": "How many frames to tile (default 12, max 48)" },
-        "mode": { "type": "string", "enum": ["even", "scenes"], "description": "even spreads frames across the video (default); scenes uses the opening frame plus the strongest scene changes" },
-        "sceneThreshold": { "type": "number", "description": "Mode scenes: how much a frame must change to count (default 0.1)" },
-        "columns": { "type": "integer", "description": "Tiles per row (default: one row up to 4 tiles, then roughly square)" },
-        "tileWidth": { "type": "integer", "description": "Width of each tile in px (default 320)" },
-        "poster": { "type": "boolean", "description": "Write one representative poster frame instead of a sheet" },
-        "output": { "type": "string", "description": "Optional output .png path (defaults under SCREENCAST_HOME/frames)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
-        "returnImage": { "type": "boolean", "description": "Also return the sheet inline as a downscaled JPEG image (default true)" },
-        "maxImageWidth": { "type": "integer", "description": "Downscale the inline image to at most this width (default 1280)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
+        "count": {
+          "description": "Frames to tile (default 12).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 48
+        },
+        "mode": {
+          "description": "even (default) or scenes (strongest changes; static stretches take no tiles).",
+          "type": "string",
+          "enum": [
+            "even",
+            "scenes"
+          ]
+        },
+        "sceneThreshold": {
+          "description": "Mode scenes: change needed, 0-1 (default 0.1).",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "columns": {
+          "description": "Tiles per row (default: roughly square).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "tileWidth": {
+          "description": "Tile width in px (default 320).",
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 1920
+        },
+        "poster": {
+          "description": "Write one representative poster frame instead of a sheet.",
+          "type": "boolean"
+        },
+        "output": {
+          "description": "Optional output .png path. Defaults under SCREENCAST_HOME/frames.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        },
+        "returnImage": {
+          "description": "Return the sheet inline (default true).",
+          "type": "boolean"
+        },
+        "maxImageWidth": {
+          "description": "Max inline image width (default 1280).",
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 9007199254740991
+        }
       },
-      "required": ["input"]
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "screen_diff",
     "toolset": "watch",
     "title": "Screen Diff",
-    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "Compare two screenshots or frames: SSIM score, changed share, and changed boxes in b's pixels, to check a UI change happened only where expected.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "a": { "type": "string", "description": "The before image (or video: its first frame)" },
-        "b": { "type": "string", "description": "The after image (or video); scaled to a's size if it differs" },
-        "pixelThreshold": { "type": "number", "description": "How different (0-255 mean) a cell of about 32x32 image pixels must be to count as changed (default 12)" },
-        "returnImage": { "type": "boolean", "description": "Also return b inline with changed regions outlined (default true)" }
+        "a": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Before image (or video: first frame)."
+        },
+        "b": {
+          "type": "string",
+          "minLength": 1,
+          "description": "After image (or video); scaled to a's size."
+        },
+        "pixelThreshold": {
+          "description": "Mean 0-255 difference for a ~32x32 cell to count as changed (default 12).",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "returnImage": {
+          "description": "Return b inline with changes outlined (default true).",
+          "type": "boolean"
+        }
       },
-      "required": ["a", "b"]
+      "required": [
+        "a",
+        "b"
+      ]
     }
   },
   {
     "name": "wait_for_change",
     "toolset": "watch",
     "title": "Wait for Screen Change",
-    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "Wait until part of the screen changes or settles, instead of guessing a sleep. Returns the elapsed time, changed regions (screenshot pixels; add `origin` for desktop), and the final state.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "target": { "type": "string", "description": "full | monitor:<index> | window:<title> (or window:exe=<app.exe> / window:hwnd=<handle>) | region:<x>,<y>,<w>,<h>" },
-        "exactTitle": { "type": "boolean", "description": "For window: targets, match the title exactly (default false)" },
-        "mode": { "type": "string", "enum": ["change", "settle"], "description": "change (default): return when the target differs from the start; settle: return once it has stopped changing for settleSec" },
-        "timeoutSec": { "type": "number", "description": "Give up after this many seconds (default 30, max 600); a timeout is a normal result" },
-        "settleSec": { "type": "number", "description": "Mode settle: how long the screen must stay still (default 1)" },
-        "intervalMs": { "type": "integer", "description": "Pause between checks in ms (default 250)" },
-        "pixelThreshold": { "type": "number", "description": "How different (0-255 mean) a cell of about 32x32 screen pixels must be to count as changed (default 12)" },
-        "returnImage": { "type": "boolean", "description": "Also return a screenshot of the final state inline (default true)" },
-        "keep": { "type": "boolean", "description": "Keep the final screenshot on disk and return its path (default false: only returned inline)" }
+        "target": {
+          "type": "string",
+          "description": "What to watch: full | monitor:<i> | window:<title> (or exe=/hwnd=) | region:<x>,<y>,<w>,<h>."
+        },
+        "exactTitle": {
+          "description": "window: targets match the whole title only (default false).",
+          "type": "boolean"
+        },
+        "mode": {
+          "description": "change (default): return once it differs from the start. settle: once it has been still for settleSec.",
+          "type": "string",
+          "enum": [
+            "change",
+            "settle"
+          ]
+        },
+        "timeoutSec": {
+          "description": "Give up after this many seconds (default 30; a timeout is a result, not an error).",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 600
+        },
+        "settleSec": {
+          "description": "Mode settle: seconds of stillness (default 1).",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 60
+        },
+        "intervalMs": {
+          "description": "Pause between checks in ms (default 250).",
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 5000
+        },
+        "pixelThreshold": {
+          "description": "Mean 0-255 difference for a ~32x32 cell to count as changed (default 12).",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "returnImage": {
+          "description": "Return the final state inline (default true).",
+          "type": "boolean"
+        },
+        "keep": {
+          "description": "Keep the final screenshot on disk and return its path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["target"]
+      "required": [
+        "target"
+      ]
     }
   },
   {
     "name": "find_text",
     "toolset": "watch",
     "title": "Find Text (OCR)",
-    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "OCR (built into Windows) on the screen, an image, or video frames, with line and match boxes in image pixels (add `origin` for desktop coordinates). Locate UI text or secrets (e.g. regex 'sk-|ghp_|api.?key') to redact. Best-effort: review results.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "target": { "type": "string", "description": "Read live from the screen: full | monitor:<index> | window:<title> (or window:exe=<app.exe> / window:hwnd=<handle>) | region:<x>,<y>,<w>,<h> (one of target / input)" },
-        "input": { "type": "string", "description": "Or read from an image or video file" },
-        "timestamp": { "type": "number", "description": "For a video input: the second to read (default 0)" },
-        "scanEverySec": { "type": "number", "description": "For a video input: read a frame every N seconds across the whole clip; each match gets its time and redactRegions get start/end" },
-        "maxFrames": { "type": "integer", "minimum": 1, "maximum": 120, "description": "With scanEverySec: most frames to read (default 30)" },
-        "exactTitle": { "type": "boolean", "description": "For window: targets, match the title exactly (default false)" },
-        "backend": { "type": "string", "enum": ["gdigrab", "wgc"], "description": "For a live target: gdigrab (default) reads what is visible; wgc (window: targets, FFmpeg 8+) reads the window itself even when covered" },
-        "query": { "type": "string", "description": "Text to look for; case-insensitive and tolerant of OCR misreads (_ vs -, I vs l, O vs 0; regexes get the _ vs - tolerance)" },
-        "regex": { "type": "boolean", "description": "Treat query as a regular expression" },
-        "redact": { "type": "boolean", "description": "Also return padded rectangles around matches, ready for redact_region" },
-        "keep": { "type": "boolean", "description": "For a live target: keep the captured screenshot and return its path (default false: deleted after reading)" },
-        "returnImage": { "type": "boolean", "description": "Return the image inline with matches outlined (default true when there is a query)" }
-      },
-      "required": []
+        "target": {
+          "description": "Live screen target (full | monitor:<i> | window:... | region:...), or pass input.",
+          "type": "string"
+        },
+        "input": {
+          "description": "Image or video file to read instead of a live target.",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Video input: second to read (default 0).",
+          "type": "number",
+          "minimum": 0
+        },
+        "scanEverySec": {
+          "description": "Video input: scan a frame every N s across the clip (e.g. for secrets before sharing); matches and redactRegions get times. Widens to stay within maxFrames.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maxFrames": {
+          "description": "scanEverySec frame cap (default 30; ~1 s each).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120
+        },
+        "exactTitle": {
+          "description": "window: targets match the whole title only (default false).",
+          "type": "boolean"
+        },
+        "backend": {
+          "description": "Live target: gdigrab (default) = what is visible; wgc (window:, FFmpeg 8+) = the window even if covered.",
+          "type": "string",
+          "enum": [
+            "gdigrab",
+            "wgc"
+          ]
+        },
+        "query": {
+          "description": "Text to find (case-insensitive, tolerates OCR misreads like I/l, O/0, _/-). Omit to return all text.",
+          "type": "string"
+        },
+        "regex": {
+          "description": "Treat query as a regular expression (case-insensitive).",
+          "type": "boolean"
+        },
+        "redact": {
+          "description": "Also return padded match rectangles ready for redact_region's regions.",
+          "type": "boolean"
+        },
+        "keep": {
+          "description": "Live target: keep the capture and return its path (default false: deleted after reading).",
+          "type": "boolean"
+        },
+        "returnImage": {
+          "description": "Return the image with matches outlined (default: true with a query).",
+          "type": "boolean"
+        }
+      }
     }
   },
   {
     "name": "index_recording",
     "toolset": "watch",
     "title": "Index Recording",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Build a recording's text timeline (<video>.index.json: OCR per scene, events, markers, transcript) for search_recording.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Recording path (one of input / sessionId)" },
-        "sessionId": { "type": "string", "description": "Or a stopped session's id" },
-        "sceneThreshold": { "type": "number", "description": "Scene change (0-1, exclusive) that starts a new segment (default 0.03)" },
-        "maxFrames": { "type": "integer", "minimum": 1, "maximum": 600, "description": "Most keyframes to OCR (default 120); gaps over 10 s get fill keyframes while the cap allows" },
-        "transcript": { "type": "string", "description": "An .srt file to include, or 'whisper' to transcribe now (FFmpeg 8 whisper + SCREENCAST_WHISPER_MODEL). Default: <video>.srt when it exists" },
-        "force": { "type": "boolean", "description": "Re-run scene detection and OCR even when a cached index matches the file and options" }
-      },
-      "required": []
+        "input": {
+          "description": "Recording path.",
+          "type": "string"
+        },
+        "sessionId": {
+          "description": "Or a stopped session id.",
+          "type": "string"
+        },
+        "sceneThreshold": {
+          "description": "Change starting a segment (default 0.03).",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "maxFrames": {
+          "description": "Keyframes to OCR (default 120).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "transcript": {
+          "description": "An .srt, or 'whisper' to transcribe. Default: <video>.srt if any.",
+          "type": "string"
+        },
+        "force": {
+          "description": "Re-OCR despite a matching cached index.",
+          "type": "boolean"
+        }
+      }
     }
   },
   {
     "name": "search_recording",
     "toolset": "watch",
     "title": "Search Recording",
-    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "Search an index_recording timeline (screen text, events, markers, transcript): timecoded hits, best first, secrets masked. No frames unless asked.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Recording path (one of input / sessionId)" },
-        "sessionId": { "type": "string", "description": "Or a stopped session's id" },
-        "query": { "type": "string", "description": "Text to find; case-insensitive and tolerant of OCR misreads. Several words also match a segment holding all of them" },
-        "regex": { "type": "boolean", "description": "Treat query as a regular expression" },
-        "limit": { "type": "integer", "minimum": 1, "maximum": 50, "description": "Most hits to return (default 10)" },
-        "images": { "type": "integer", "minimum": 0, "maximum": 20, "description": "Inline thumbnails (480 px) for the top N hits (default 0: text only)" }
+        "input": {
+          "description": "Recording path.",
+          "type": "string"
+        },
+        "sessionId": {
+          "description": "Or a stopped session id.",
+          "type": "string"
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Text; tolerates OCR misreads."
+        },
+        "regex": {
+          "description": "query is a regex.",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "Max hits (default 10).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "images": {
+          "description": "Thumbnails of the top N hits (default 0).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        }
       },
-      "required": ["query"]
+      "required": [
+        "query"
+      ]
     }
   },
   {
     "name": "get_media_info",
     "toolset": "core",
     "title": "Get Media Info",
-    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "Probe a media file with ffprobe and return duration, resolution, frame rate, codecs, container format, and size.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the media file to probe" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the media file to probe."
+        }
       },
-      "required": ["input"]
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "trim",
     "toolset": "edit",
     "title": "Trim Video",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Cut a video down to one sub-clip by start + (end or duration). For several segments use clip; to combine with other edits use pipeline.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "start": { "type": "number", "description": "Start time in seconds" },
-        "end": { "type": "number", "description": "End time in seconds (use end OR duration)" },
-        "duration": { "type": "number", "description": "Clip length in seconds (use end OR duration)" },
-        "exact": { "type": "boolean", "description": "Re-encode so nothing before start stays in the file (default true); false stream-copies and keeps hidden frames" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
+        "start": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Start time in seconds."
+        },
+        "end": {
+          "description": "End time in seconds. Use end OR duration.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "duration": {
+          "description": "Clip length in seconds. Use end OR duration.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "exact": {
+          "description": "Re-encode for a frame-exact cut with the removed content really gone (default true). false = fast stream copy that snaps to a keyframe and keeps hidden earlier frames; never use it to remove secrets.",
+          "type": "boolean"
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input", "start"]
+      "required": [
+        "input",
+        "start"
+      ]
     }
   },
   {
     "name": "concat",
     "toolset": "edit",
     "title": "Concatenate Videos",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Join videos end to end with hard cuts: stream copy when they match, else a re-encode (`mode` says which). For transitions use xfade_transition or assemble_highlights.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "inputs": { "type": "array", "items": { "type": "string" }, "minItems": 2, "description": "Two or more video paths to join, in order" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "inputs": {
+          "minItems": 2,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Video paths to join, in order."
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["inputs"]
+      "required": [
+        "inputs"
+      ]
     }
   },
   {
     "name": "convert",
     "toolset": "edit",
     "title": "Convert Format",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Convert media to mp4, webm, or gif. For a size-bounded GIF/WebP prefer export_gif; for a smaller mp4, compress or export_preset.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source media" },
-        "format": { "type": "string", "enum": ["mp4", "gif", "webm"], "description": "Target format" },
-        "fps": { "type": "number", "description": "Output fps (gif only; default 12)" },
-        "width": { "type": "number", "description": "Output width in px, height auto (gif only; default 720)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source media."
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "mp4",
+            "gif",
+            "webm"
+          ],
+          "description": "mp4 (H.264), webm (VP9), or gif (palette)."
+        },
+        "fps": {
+          "description": "gif only: fps (default 12).",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "width": {
+          "description": "gif only: width in px (default 720).",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input", "format"]
+      "required": [
+        "input",
+        "format"
+      ]
     }
   },
   {
     "name": "export_gif",
     "toolset": "edit",
     "title": "Export GIF or WebP",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Export an animated GIF or WebP that fits a size budget (for PRs, issues, READMEs), stepping fps, width, and quality down until it fits.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "format": { "type": "string", "enum": ["gif", "webp"], "description": "gif (default) or webp (animated WebP, usually much smaller)" },
-        "maxBytes": { "type": "integer", "description": "File-size budget in bytes (default 10000000)" },
-        "fps": { "type": "number", "description": "Starting frame rate (default 12)" },
-        "width": { "type": "integer", "description": "Starting width in px (default 960)" },
-        "start": { "type": "number", "description": "Start at this many seconds into the video" },
-        "duration": { "type": "number", "description": "Export only this many seconds (default: to the end)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
+        "format": {
+          "description": "gif (default) or webp (usually much smaller).",
+          "type": "string",
+          "enum": [
+            "gif",
+            "webp"
+          ]
+        },
+        "maxBytes": {
+          "description": "Size budget in bytes (default 10000000, under GitHub's 10 MB image limit).",
+          "type": "integer",
+          "minimum": 10000,
+          "maximum": 9007199254740991
+        },
+        "fps": {
+          "description": "Starting frame rate (default 12).",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 30
+        },
+        "width": {
+          "description": "Starting width in px (default 960).",
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 1920
+        },
+        "start": {
+          "description": "Start second.",
+          "type": "number",
+          "minimum": 0
+        },
+        "duration": {
+          "description": "Seconds to export (default: to the end).",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input"]
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "crop",
     "toolset": "edit",
     "title": "Crop Video",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Crop a video to a pixel rectangle; one running off the frame is rejected.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "x": { "type": "integer", "minimum": 0, "description": "Left edge of the crop in pixels" },
-        "y": { "type": "integer", "minimum": 0, "description": "Top edge of the crop in pixels" },
-        "width": { "type": "integer", "minimum": 1, "description": "Crop width in pixels" },
-        "height": { "type": "integer", "minimum": 1, "description": "Crop height in pixels" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
+        "x": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "width": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "height": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input", "x", "y", "width", "height"]
+      "required": [
+        "input",
+        "x",
+        "y",
+        "width",
+        "height"
+      ]
     }
   },
   {
     "name": "scale",
     "toolset": "edit",
     "title": "Scale Video",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Resize a video to a target width and/or height and re-encode. Provide one side to keep the aspect ratio, or both to set an exact size.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "width": { "type": "integer", "minimum": 1, "description": "Target width in px (omit to derive from height)" },
-        "height": { "type": "integer", "minimum": 1, "description": "Target height in px (omit to derive from width)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
+        "width": {
+          "description": "Target width in px. Omit to derive from height (keeps aspect).",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "height": {
+          "description": "Target height in px. Omit to derive from width (keeps aspect).",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input"]
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "speed",
     "toolset": "edit",
     "title": "Change Speed",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Change playback speed by a factor (>1 faster, <1 slower) and re-encode. Audio is retempo'd to match when the source has an audio track.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "factor": { "type": "number", "exclusiveMinimum": 0, "description": "Speed multiplier: >1 faster, <1 slower (2 = double speed)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
+        "factor": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Speed multiplier: >1 is faster, <1 is slower (e.g. 2 = double speed)."
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input", "factor"]
+      "required": [
+        "input",
+        "factor"
+      ]
     }
   },
   {
     "name": "overlay",
     "toolset": "produce",
     "title": "Overlay Image or Video",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Composite an image or video (logo, watermark, picture-in-picture) onto a video at a pixel position, optionally scaled and time-limited; keeps the base's audio and length.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the base video" },
-        "overlay": { "type": "string", "description": "Path to the overlay image or video" },
-        "x": { "type": "integer", "minimum": 0, "description": "Overlay left position in pixels" },
-        "y": { "type": "integer", "minimum": 0, "description": "Overlay top position in pixels" },
-        "width": { "type": "integer", "minimum": 1, "description": "Optional overlay width in px (height auto)" },
-        "height": { "type": "integer", "minimum": 1, "description": "Optional overlay height in px (width auto)" },
-        "start": { "type": "number", "minimum": 0, "description": "Optional second to show the overlay from" },
-        "end": { "type": "number", "exclusiveMinimum": 0, "description": "Optional second to hide the overlay after" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the base video."
+        },
+        "overlay": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Overlay image or video path."
+        },
+        "x": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Left, px."
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Top, px."
+        },
+        "width": {
+          "description": "Scale to this width (other side keeps aspect).",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "height": {
+          "description": "Scale to this height.",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "start": {
+          "description": "Show from this second.",
+          "type": "number",
+          "minimum": 0
+        },
+        "end": {
+          "description": "Hide after this second.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "shape": {
+          "description": "circle: centre square masked round (webcam).",
+          "type": "string",
+          "enum": [
+            "rect",
+            "circle"
+          ]
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input", "overlay", "x", "y"]
+      "required": [
+        "input",
+        "overlay",
+        "x",
+        "y"
+      ]
     }
   },
   {
     "name": "callout",
     "toolset": "produce",
     "title": "Add Callouts",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Annotate a video with timed boxes, text labels, and arrows. Fallback fonts used are listed in fallbackFonts; characters no font covers are reported in warnings.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "items": { "type": "array", "description": "Annotations drawn in order (later on top). box: {type, x, y, width, height, thickness?, fill?}; text: {type, x, y, text, size?, background?}; arrow: {type, x1, y1, x2, y2 (head), thickness?}. All take from?, to? (seconds) and color?", "items": {"type": "object"} },
-        "fontFile": { "type": "string", "description": "Font for the text: a .ttf/.otf/.ttc path, or a file name in C:\\Windows\\Fonts (e.g. msyh.ttc). Default: the bundled Inter, or a Windows system font that covers characters Inter lacks (CJK, emoji, Arabic, Hebrew, Indic, Thai, ...)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
+        "items": {
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "box"
+                  },
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "width": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "height": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "thickness": {
+                    "description": "Outline px (default 4).",
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "fill": {
+                    "description": "Fill instead of outline.",
+                    "type": "boolean"
+                  },
+                  "from": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "to": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "color": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "text"
+                  },
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "size": {
+                    "description": "Font size px (default 32).",
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "background": {
+                    "description": "Dark panel behind the text (default true).",
+                    "type": "boolean"
+                  },
+                  "from": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "to": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "color": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "x",
+                  "y",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "arrow"
+                  },
+                  "x1": {
+                    "type": "number"
+                  },
+                  "y1": {
+                    "type": "number"
+                  },
+                  "x2": {
+                    "type": "number",
+                    "description": "Head (x2,y2) is the point the arrow points at."
+                  },
+                  "y2": {
+                    "type": "number"
+                  },
+                  "thickness": {
+                    "description": "Shaft px (default 8).",
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "from": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "to": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "color": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "x1",
+                  "y1",
+                  "x2",
+                  "y2"
+                ]
+              }
+            ]
+          },
+          "description": "Boxes, text labels, and arrows, drawn in order (later on top), in video pixels. Each shows from..to seconds (default: whole video); color is a name, #RRGGBB, or name@alpha."
+        },
+        "fontFile": {
+          "description": "Font: a .ttf/.otf/.ttc path or a C:\\Windows\\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).",
+          "type": "string",
+          "minLength": 1
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input", "items"]
+      "required": [
+        "input",
+        "items"
+      ]
     }
   },
   {
     "name": "keystroke_overlay",
     "toolset": "produce",
     "title": "Keystroke Overlay",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Burn keycast-style badges for shortcuts, clicks, and typing from the recording's input event log (start_recording events: true). Never shows typed text: the log has none.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the recording" },
-        "events": { "type": "string", "description": "Event log (default: the input's .events.jsonl from start_recording events: true)" },
-        "clicks": { "type": "boolean", "description": "Show clicks, double clicks, and right clicks (default true)" },
-        "typing": { "type": "boolean", "description": "Show typing bursts as \"Typing…\" (default true); typed text is never logged" },
-        "keys": { "type": "string", "enum": ["shortcuts", "masked"], "description": "shortcuts (default): the logged chord (Ctrl + S, repeats as ×N); masked: its modifiers only (Ctrl + …). Shortcuts are only logged with start_recording keys: \"shortcuts\"" },
-        "lingerSec": { "type": "number", "description": "Seconds a badge stays up after its input (default 1.2); the next badge replaces it" },
-        "position": { "type": "string", "enum": ["bottom", "bottom-left", "bottom-right", "top", "top-left", "top-right"], "description": "Where the badge sits (default bottom, centred)" },
-        "size": { "type": "number", "description": "Font size px (default 4.5% of the frame height)" },
-        "color": { "type": "string", "description": "Text color (default white), on the same dark panel as a callout" },
-        "fontFile": { "type": "string", "description": "Font for the badges: a .ttf/.otf/.ttc path or a C:\\Windows\\Fonts file name. Default: the bundled Inter, with a covering system font as fallback" },
-        "dryRun": { "type": "boolean", "description": "Return the planned badges; write nothing" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the recording."
+        },
+        "events": {
+          "description": "Event log (default: the input's .events.jsonl).",
+          "type": "string"
+        },
+        "clicks": {
+          "description": "Show clicks (default true).",
+          "type": "boolean"
+        },
+        "typing": {
+          "description": "Show typing as \"Typing…\" (default true).",
+          "type": "boolean"
+        },
+        "keys": {
+          "description": "shortcuts (default): the chord (Ctrl + S); masked: modifiers only (Ctrl + …).",
+          "type": "string",
+          "enum": [
+            "shortcuts",
+            "masked"
+          ]
+        },
+        "lingerSec": {
+          "description": "Seconds a badge stays up (default 1.2).",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10
+        },
+        "position": {
+          "description": "Default bottom (centred).",
+          "type": "string",
+          "enum": [
+            "bottom",
+            "bottom-left",
+            "bottom-right",
+            "top",
+            "top-left",
+            "top-right"
+          ]
+        },
+        "size": {
+          "description": "Font px (default 4.5% of the frame height).",
+          "type": "number",
+          "minimum": 8,
+          "maximum": 400
+        },
+        "color": {
+          "description": "Text color (default white).",
+          "type": "string"
+        },
+        "fontFile": {
+          "description": "Font: a .ttf/.otf/.ttc path or a C:\\Windows\\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).",
+          "type": "string",
+          "minLength": 1
+        },
+        "dryRun": {
+          "description": "Return the planned badges; write nothing.",
+          "type": "boolean"
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input"]
+      "required": [
+        "input"
+      ]
+    }
+  },
+  {
+    "name": "cursor",
+    "toolset": "produce",
+    "title": "Re-rendered Cursor",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Draw a smoothed, scaled cursor that hides when idle from the event log of a start_recording cursor: \"events\" recording (no OS cursor in the video), with click ripples and an optional spotlight.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the recording."
+        },
+        "events": {
+          "description": "Event log (default: the input's .events.jsonl).",
+          "type": "string"
+        },
+        "size": {
+          "description": "Times a typical cursor's size (default 1.5).",
+          "type": "number",
+          "minimum": 0.25,
+          "maximum": 8
+        },
+        "smoothing": {
+          "description": "0 = as logged, 1 = floaty (default 0.5).",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "hideAfterSec": {
+          "description": "Hide when the mouse rests this long; 0 = never (default 2).",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 600
+        },
+        "clicks": {
+          "description": "Ripple on clicks (default true).",
+          "type": "boolean"
+        },
+        "spotlight": {
+          "description": "Dim all but the area around the cursor.",
+          "type": "boolean"
+        },
+        "dryRun": {
+          "description": "Return the plan; write nothing.",
+          "type": "boolean"
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "backdrop",
     "toolset": "produce",
     "title": "Add Backdrop",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Frame a video or screenshot on a gradient, color, or wallpaper with padding, rounded corners, and a drop shadow, optionally on a 16:9/1:1/9:16/4:5 canvas.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video, or an image (png/jpg) for a framed still" },
-        "preset": { "type": "string", "enum": ["desktop", "rec", "amber", "light"], "description": "Gradient look in the project's palette: desktop (default, dark slate), rec (record red), amber (amber to red), light (pale, for light UIs)" },
-        "colors": { "type": "array", "description": "Instead of a preset: 1 color = solid, 2-4 = a diagonal gradient (name or #RRGGBB)", "items": { "type": "string" } },
-        "image": { "type": "string", "description": "A wallpaper image instead, scaled to cover the canvas" },
-        "padding": { "type": "integer", "description": "Space around the content in px (default 6% of the longer side)" },
-        "radius": { "type": "integer", "description": "Corner radius px (default about 1.2% of the longer side; 0 = square)" },
-        "shadow": { "type": "integer", "description": "Drop shadow blur px (default about 2.5% of the longer side; 0 = none)" },
-        "shadowOpacity": { "type": "number", "description": "Shadow opacity 0-1 (default 0.5)" },
-        "aspect": { "type": "string", "enum": ["16:9", "9:16", "1:1", "4:5"], "description": "Put the result on this aspect's canvas (1920x1080, 1080x1920, 1080x1080, 1080x1350), content scaled to fit inside the padding" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits, or screenshots for an image)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video or image (png/jpg)."
+        },
+        "preset": {
+          "description": "Gradient: desktop (default, dark slate), rec (red), amber, light.",
+          "type": "string",
+          "enum": [
+            "desktop",
+            "rec",
+            "amber",
+            "light"
+          ]
+        },
+        "colors": {
+          "description": "Instead: 1 color = solid, 2-4 = diagonal gradient.",
+          "minItems": 1,
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "image": {
+          "description": "Instead: a wallpaper image, scaled to cover.",
+          "type": "string",
+          "minLength": 1
+        },
+        "padding": {
+          "description": "px around the content (default 6% of the longer side).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2000
+        },
+        "radius": {
+          "description": "Corner radius px (default ~1.2% of the longer side; 0 = square).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "shadow": {
+          "description": "Shadow blur px (default ~2.5%; 0 = none).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "shadowOpacity": {
+          "description": "Default 0.5.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "aspect": {
+          "description": "Output on this aspect's canvas (1920x1080, ...), content scaled to fit.",
+          "type": "string",
+          "enum": [
+            "16:9",
+            "9:16",
+            "1:1",
+            "4:5"
+          ]
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits (screenshots for an image).",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input"]
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "compress",
     "toolset": "edit",
     "title": "Compress Video",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Re-encode a video smaller (H.264 CRF ladder, optional width cap). For a platform target use export_preset.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "level": { "type": "string", "enum": ["light", "medium", "heavy"], "description": "Compression strength (CRF 23 / 28 / 32; default medium)" },
-        "maxWidth": { "type": "integer", "minimum": 1, "description": "Optional width cap in px; only ever downscales" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
+        "level": {
+          "description": "CRF 23 / 28 / 32 (default medium).",
+          "type": "string",
+          "enum": [
+            "light",
+            "medium",
+            "heavy"
+          ]
+        },
+        "maxWidth": {
+          "description": "Width cap in px (only downscales).",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input"]
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "extract_audio",
     "toolset": "audio",
     "title": "Extract Audio",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Extract the audio track of a media file to its own file (mp3, aac, wav, or copy). Returns the output path.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source media" },
-        "format": { "type": "string", "enum": ["mp3", "aac", "wav", "copy"], "description": "Audio output codec; copy keeps the source codec without re-encoding" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source media."
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "mp3",
+            "aac",
+            "wav",
+            "copy"
+          ],
+          "description": "Audio output codec. copy keeps the source codec without re-encoding."
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input", "format"]
+      "required": [
+        "input",
+        "format"
+      ]
     }
   },
   {
     "name": "normalize_audio",
     "toolset": "audio",
     "title": "Normalize Loudness",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Normalize loudness to a delivery target (two-pass EBU R128 loudnorm); video is copied. Reports loudness before and after.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video or audio file" },
-        "target": { "description": "youtube (-14 LUFS, default), podcast (-16), broadcast (EBU R128, -23), or a LUFS number such as -18", "anyOf": [{"type": "string", "enum": ["youtube", "podcast", "broadcast"]},{"type": "number"}] },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video or audio file."
+        },
+        "target": {
+          "description": "youtube (-14 LUFS, default), podcast (-16), broadcast (-23), or a LUFS number.",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "youtube",
+                "podcast",
+                "broadcast"
+              ]
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input"]
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "denoise",
     "toolset": "audio",
     "title": "Denoise Audio",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Reduce steady background noise (fan, hum, hiss) in a recording's audio with an adaptive FFT denoiser. Video is copied untouched. Returns the output path.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video or audio file" },
-        "strength": { "type": "string", "enum": ["light", "medium", "strong"], "description": "How hard to reduce noise: light (6 dB), medium (12 dB, default), strong (20 dB)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video or audio file."
+        },
+        "strength": {
+          "description": "How hard to reduce noise: light (6 dB), medium (12 dB, default), strong (20 dB).",
+          "type": "string",
+          "enum": [
+            "light",
+            "medium",
+            "strong"
+          ]
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input"]
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "transcribe",
     "toolset": "audio",
     "title": "Transcribe Speech",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Transcribe a recording's speech to an SRT subtitle file, locally, with FFmpeg 8's whisper filter (needs a whisper.cpp model file). Returns the SRT path and the text. Pair with burn_subtitles to caption the video.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the video or audio to transcribe" },
-        "model": { "type": "string", "description": "Path to a whisper.cpp model file (ggml-*.bin); defaults to SCREENCAST_WHISPER_MODEL" },
-        "language": { "type": "string", "description": "Spoken language code, e.g. en, or auto (default)" },
-        "words": { "type": "boolean", "description": "One word per cue, for word timing (cut_by_transcript)" },
-        "output": { "type": "string", "description": "Optional output .srt path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the video or audio to transcribe."
+        },
+        "model": {
+          "description": "Path to a whisper.cpp model file (ggml-*.bin). Defaults to SCREENCAST_WHISPER_MODEL.",
+          "type": "string"
+        },
+        "language": {
+          "description": "Spoken language code, e.g. 'en', or 'auto' (default).",
+          "type": "string"
+        },
+        "words": {
+          "description": "One word per cue, for word timing (cut_by_transcript).",
+          "type": "boolean"
+        },
+        "output": {
+          "description": "Optional output .srt path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input"]
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "burn_subtitles",
     "toolset": "produce",
     "title": "Burn In Subtitles",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Burn SRT/ASS subtitles (e.g. from transcribe) into a video in the bundled font.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "subtitles": { "type": "string", "description": "Path to an .srt or .ass subtitle file" },
-        "style": { "type": "string", "enum": ["clean", "social"], "description": "clean (default for .srt): a modest outlined line; social: large bold text on a dark box. An .ass/.ssa file keeps its own styling unless a style is given" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
+        "subtitles": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to an .srt (e.g. from transcribe) or .ass subtitle file."
+        },
+        "style": {
+          "description": "clean (default for .srt): outlined line. social: big bold text on a dark box. .ass keeps its own styling unless set.",
+          "type": "string",
+          "enum": [
+            "clean",
+            "social"
+          ]
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input", "subtitles"]
+      "required": [
+        "input",
+        "subtitles"
+      ]
     }
   },
   {
     "name": "chapters",
     "toolset": "produce",
     "title": "Chapters",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Write chapters (markers, scene changes, transcript, or a list) into an mp4/mkv/mov copy without re-encoding; returns YouTube chapter text. Can mux an SRT as soft subtitles.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the video" },
-        "sessionId": { "type": "string", "description": "Or a stopped recording's session id (uses its markers)" },
-        "from": { "type": "string", "enum": ["markers", "scenes", "transcript"], "description": "Where chapters come from (ignored with chapters): markers (default; add_marker, else the file's own chapters), scenes (strongest screen changes), or transcript (an SRT, split at pauses)" },
-        "chapters": { "type": "array", "items": { "type": "object", "properties": { "start": { "type": "number", "minimum": 0 }, "title": { "type": "string" } }, "required": ["start", "title"] }, "description": "Explicit chapters, { start (s), title }, instead of from" },
-        "transcript": { "type": "string", "description": "from: transcript: the .srt (e.g. from transcribe)" },
-        "minChapterSec": { "type": "number", "minimum": 0, "description": "Shortest chapter; closer points merge (default 1, or 10 for scenes and 30 for transcript). Scenes picks at most 12 chapters, the strongest screen changes" },
-        "subtitles": { "type": "string", "description": "Also mux this .srt/.vtt/.ass as a soft (toggleable) subtitle track (mov_text in mp4/mov), instead of burning it in" },
-        "subtitleLanguage": { "type": "string", "description": "ISO 639-2 language of subtitles, e.g. eng" },
-        "textOnly": { "type": "boolean", "description": "Only return the chapters and YouTube text; write no file" },
-        "output": { "type": "string", "description": "Optional .mp4/.mkv/.mov output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "description": "Path to the video.",
+          "type": "string",
+          "minLength": 1
+        },
+        "sessionId": {
+          "description": "Or a stopped recording's id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "from": {
+          "description": "markers (default; add_marker, else the file's chapters), scenes (screen changes), or transcript (SRT sections).",
+          "type": "string",
+          "enum": [
+            "markers",
+            "scenes",
+            "transcript"
+          ]
+        },
+        "chapters": {
+          "description": "Or explicit { start, title } chapters.",
+          "minItems": 1,
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "number",
+                "minimum": 0
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            },
+            "required": [
+              "start",
+              "title"
+            ]
+          }
+        },
+        "transcript": {
+          "description": "The .srt for from: transcript.",
+          "type": "string"
+        },
+        "minChapterSec": {
+          "description": "Shortest chapter (default 1; scenes 10, transcript 30).",
+          "type": "number",
+          "minimum": 0
+        },
+        "subtitles": {
+          "description": "Also mux this .srt/.vtt/.ass as a soft subtitle track.",
+          "type": "string"
+        },
+        "subtitleLanguage": {
+          "description": "ISO 639-2, e.g. \"eng\".",
+          "type": "string",
+          "pattern": "^[a-z]{3}$"
+        },
+        "textOnly": {
+          "description": "Return chapters and YouTube text only; write no file.",
+          "type": "boolean"
+        },
+        "output": {
+          "description": "Optional .mp4/.mkv/.mov path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing output file.",
+          "type": "boolean"
+        }
       }
     }
   },
@@ -693,337 +2243,1830 @@
     "name": "clip",
     "toolset": "edit",
     "title": "Extract Clips",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Extract several frame-exact segments, each to its own file. For one segment, trim does the same.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
         "segments": {
-          "type": "array",
           "minItems": 1,
+          "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "start": { "type": "number", "minimum": 0, "description": "Segment start in seconds" },
-              "end": { "type": "number", "exclusiveMinimum": 0, "description": "Segment end in seconds" }
+              "start": {
+                "type": "number",
+                "minimum": 0
+              },
+              "end": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
             },
-            "required": ["start", "end"]
+            "required": [
+              "start",
+              "end"
+            ]
           },
-          "description": "One or more {start, end} segments; each becomes its own output file"
+          "description": "{start, end} segments in seconds; each becomes its own file."
         },
-        "output": { "type": "string", "description": "Optional output path (single segment only; multi-segment lands under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "output": {
+          "description": "Optional output path. Only honored for a single segment; multi-segment output lands under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input", "segments"]
+      "required": [
+        "input",
+        "segments"
+      ]
     }
   },
   {
     "name": "cut_idle",
     "toolset": "edit",
     "title": "Cut Idle Stretches",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Remove dead air: cut stretches where the screen is frozen (and silent), keeping a short pad. Returns the time saved.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "minIdleSec": { "type": "number", "description": "Only cut still stretches at least this long (default 2)" },
-        "keepSec": { "type": "number", "description": "Keep this much of each stretch at both edges (default 0.4)" },
-        "useAudio": { "type": "boolean", "description": "Idle only if the audio is also silent (default true when there is audio)" },
-        "dryRun": { "type": "boolean", "description": "Only report the stretches that would be cut" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
+        "minIdleSec": {
+          "description": "Only cut still stretches at least this long (default 2).",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "keepSec": {
+          "description": "Seconds kept at each edge of a cut (default 0.4).",
+          "type": "number",
+          "minimum": 0
+        },
+        "useAudio": {
+          "description": "Require silent audio too (default true when there is audio).",
+          "type": "boolean"
+        },
+        "dryRun": {
+          "description": "Only report what would be cut.",
+          "type": "boolean"
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input"]
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "cut_by_transcript",
     "toolset": "edit",
     "title": "Cut By Transcript",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Edit a video by its transcript: cut quoted text, cue numbers, or fillers. Also writes the re-timed .srt.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "srt": { "type": "string", "description": "Its .srt (transcribe; words: true for word timing)" },
-        "remove": {
-          "type": "array",
-          "items": { "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "string" }] },
-          "description": "Cue numbers, or transcript text quoted exactly (must occur once)"
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
         },
-        "fillers": { "type": "boolean", "description": "Also cut fillers (um, uh...) that have their own cue" },
-        "dryRun": { "type": "boolean", "description": "Only report the cuts" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "srt": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Its .srt (transcribe; words: true for word timing)."
+        },
+        "remove": {
+          "description": "Cue numbers, or transcript text quoted exactly (must occur once).",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 99999
+              },
+              {
+                "type": "string",
+                "minLength": 1
+              }
+            ]
+          }
+        },
+        "fillers": {
+          "description": "Also cut fillers (um, uh...) that have their own cue.",
+          "type": "boolean"
+        },
+        "dryRun": {
+          "description": "Only report the cuts.",
+          "type": "boolean"
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input", "srt"]
+      "required": [
+        "input",
+        "srt"
+      ]
     }
   },
   {
     "name": "redact_region",
     "toolset": "edit",
     "title": "Redact Regions",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Cover given rectangles in a video (e.g. secrets on screen). Not automatic detection: find them with find_text redact: true. Off-frame regions are rejected.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
         "regions": {
-          "type": "array",
           "minItems": 1,
+          "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "x": { "type": "integer", "minimum": 0, "description": "Left edge in pixels" },
-              "y": { "type": "integer", "minimum": 0, "description": "Top edge in pixels" },
-              "width": { "type": "integer", "minimum": 1, "description": "Region width in pixels" },
-              "height": { "type": "integer", "minimum": 1, "description": "Region height in pixels" },
-              "start": { "type": "number", "minimum": 0, "description": "Optional second to start redacting from" },
-              "end": { "type": "number", "exclusiveMinimum": 0, "description": "Optional second to stop redacting after" }
+              "x": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "y": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "width": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "height": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "start": {
+                "type": "number",
+                "minimum": 0
+              },
+              "end": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
             },
-            "required": ["x", "y", "width", "height"]
+            "required": [
+              "x",
+              "y",
+              "width",
+              "height"
+            ]
           },
-          "description": "One or more rectangles to redact; each may be limited to a time window"
+          "description": "Pixel rectangles (x, y, width, height), each optionally limited to start..end seconds."
         },
-        "style": { "type": "string", "enum": ["box", "blur", "pixelate"], "description": "box (default) draws an irreversible solid fill; blur and pixelate are softer but partially recoverable" },
-        "pad": { "type": "integer", "minimum": 0, "description": "Optional pixels to expand each region by, to cover anti-aliased edges (default 0)" },
-        "color": { "type": "string", "description": "Fill color for box style (default black)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "style": {
+          "description": "box (default): irreversible fill; blur/pixelate are partially recoverable.",
+          "type": "string",
+          "enum": [
+            "box",
+            "blur",
+            "pixelate"
+          ]
+        },
+        "pad": {
+          "description": "Grow each region by this many px (default 0).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "color": {
+          "description": "Box fill color (default black).",
+          "type": "string"
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input", "regions"]
+      "required": [
+        "input",
+        "regions"
+      ]
     }
   },
   {
     "name": "list_audio_devices",
     "toolset": "capture",
     "title": "List Audio Devices",
-    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "List DirectShow audio devices and flag a likely loopback (Stereo Mix or a virtual-audio driver), for start_recording's audio.device.",
-    "inputSchema": { "type": "object", "properties": {}, "required": [] }
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "list_video_devices",
+    "toolset": "capture",
+    "title": "List Video Devices",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "description": "List DirectShow cameras for start_recording's webcam.device.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
   },
   {
     "name": "list_targets",
     "toolset": "capture",
     "title": "List Capture Targets",
-    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "List the desktop, monitors, and visible windows (topmost first, with capturability per backend). Each entry has a `target` string to pass as-is to capture tools; use it instead of guessing a title.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "exe": { "type": "string", "minLength": 1, "description": "Only list windows of this executable, e.g. Code.exe or code" },
-        "titleContains": { "type": "string", "minLength": 1, "description": "Only list windows whose title contains this text (case-insensitive)" },
-        "capturableOnly": { "type": "boolean", "description": "Leave out windows neither backend can capture (minimized, off screen). Default false" }
-      },
-      "required": []
+        "exe": {
+          "description": "Only list windows of this executable, e.g. 'Code.exe' or 'code'.",
+          "type": "string",
+          "minLength": 1
+        },
+        "titleContains": {
+          "description": "Only list windows whose title contains this text (case-insensitive).",
+          "type": "string",
+          "minLength": 1
+        },
+        "capturableOnly": {
+          "description": "Leave out windows neither backend can capture (minimized, off screen). Default false.",
+          "type": "boolean"
+        }
+      }
     }
   },
   {
     "name": "doctor",
     "toolset": "core",
     "title": "Check Setup",
-    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
     "description": "Check the setup: ffmpeg/ffprobe (FFmpeg 8+?), optional filters, capture devices, Windows OCR, settings, and enabled toolsets; `problems` says what is missing and how to fix it. Call on first use or when a tool reports a missing feature.",
-    "inputSchema": { "type": "object", "properties": {}, "required": [] }
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
   },
   {
     "name": "xfade_transition",
     "toolset": "produce",
     "title": "Crossfade Transition",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Join two videos with an xfade transition (audio crossfaded); they need not match in size, fps, or audio. For more clips use assemble_highlights.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "inputA": { "type": "string", "description": "Path to the first (outgoing) video" },
-        "inputB": { "type": "string", "description": "Path to the second (incoming) video" },
-        "transition": { "type": "string", "description": "xfade transition name (default fade): fade, wipeleft, slideup, circleopen, dissolve, ..." },
-        "duration": { "type": "number", "exclusiveMinimum": 0, "description": "Transition length in seconds (default 1)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "inputA": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Outgoing video."
+        },
+        "inputB": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Incoming video."
+        },
+        "transition": {
+          "description": "xfade name (default fade): fade, wipeleft, slideup, circleopen, dissolve, ...",
+          "type": "string"
+        },
+        "duration": {
+          "description": "Transition length in seconds (default 1).",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["inputA", "inputB"]
+      "required": [
+        "inputA",
+        "inputB"
+      ]
     }
   },
   {
     "name": "assemble_highlights",
     "toolset": "produce",
     "title": "Assemble Highlights",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Stitch clips (including title cards) into one video with cuts or xfade transitions; they need not match in size, fps, or audio.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "clips": { "type": "array", "items": { "type": "string" }, "minItems": 2, "description": "Two or more clip paths, in order" },
-        "transition": { "type": "string", "description": "'cut' (default, hard cuts) or an xfade transition name (fade, wipeleft, slideup, ...)" },
-        "duration": { "type": "number", "exclusiveMinimum": 0, "description": "Transition length in seconds when not a cut (default 1)" },
-        "width": { "type": "integer", "minimum": 1, "description": "Common output width (default 1920)" },
-        "height": { "type": "integer", "minimum": 1, "description": "Common output height (default 1080)" },
-        "fps": { "type": "integer", "minimum": 1, "description": "Common output fps (default 30)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "clips": {
+          "minItems": 2,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Clip paths, in order."
+        },
+        "transition": {
+          "description": "cut (default) or an xfade name (fade, wipeleft, slideup, ...).",
+          "type": "string"
+        },
+        "duration": {
+          "description": "Transition seconds (default 1).",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "width": {
+          "description": "Common output width (default 1920).",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "height": {
+          "description": "Common output height (default 1080).",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "fps": {
+          "description": "Common output fps (default 30).",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["clips"]
+      "required": [
+        "clips"
+      ]
     }
   },
   {
     "name": "title_card",
     "toolset": "produce",
     "title": "Title Card",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Generate a title card clip (centered text on a solid background, silent audio track) to stitch in with assemble_highlights. Uncoverable characters are reported in warnings.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "text": { "type": "string", "description": "Title text; multiple lines allowed (use \\n)" },
-        "duration": { "type": "number", "exclusiveMinimum": 0, "description": "Card length in seconds (default 3)" },
-        "width": { "type": "integer", "minimum": 1, "description": "Card width (default 1920)" },
-        "height": { "type": "integer", "minimum": 1, "description": "Card height (default 1080)" },
-        "fps": { "type": "integer", "minimum": 1, "description": "Card fps (default 30)" },
-        "bg": { "type": "string", "description": "Background color (default black)" },
-        "fontColor": { "type": "string", "description": "Text color (default white)" },
-        "fontSize": { "type": "integer", "minimum": 1, "description": "Text size in px (default 96)" },
-        "bold": { "type": "boolean", "description": "Use the bold weight (default true)" },
-        "fontFile": { "type": "string", "description": "Font for the text: a .ttf/.otf/.ttc path, or a file name in C:\\Windows\\Fonts (e.g. msyh.ttc). Default: the bundled Inter, or a Windows system font that covers characters Inter lacks (CJK, emoji, Arabic, Hebrew, Indic, Thai, ...)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Title text. Multiple lines are allowed (use \\n)."
+        },
+        "duration": {
+          "description": "Card length in seconds (default 3).",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "width": {
+          "description": "Card width (default 1920).",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "height": {
+          "description": "Card height (default 1080).",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "fps": {
+          "description": "Card fps (default 30).",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "bg": {
+          "description": "Background color (default black).",
+          "type": "string"
+        },
+        "fontColor": {
+          "description": "Text color (default white).",
+          "type": "string"
+        },
+        "fontSize": {
+          "description": "Text size in px (default 96).",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "bold": {
+          "description": "Use the bold weight (default true).",
+          "type": "boolean"
+        },
+        "fontFile": {
+          "description": "Font: a .ttf/.otf/.ttc path or a C:\\Windows\\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).",
+          "type": "string",
+          "minLength": 1
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["text"]
+      "required": [
+        "text"
+      ]
     }
   },
   {
     "name": "music_bed",
     "toolset": "audio",
     "title": "Add Music Bed",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Lay music under a video: looped or trimmed to length, faded, leveled, and mixed with any existing audio. Video is stream-copied.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "video": { "type": "string", "description": "Path to the video" },
-        "music": { "type": "string", "description": "Path to the music audio file (looped/trimmed to the video length)" },
-        "musicVolume": { "type": "number", "minimum": 0, "description": "Music level 0..1 (default 0.25 over existing audio, 0.8 alone)" },
-        "fadeIn": { "type": "number", "minimum": 0, "description": "Music fade-in seconds (default 1)" },
-        "fadeOut": { "type": "number", "minimum": 0, "description": "Music fade-out seconds (default 2)" },
-        "duck": { "type": "boolean", "description": "Duck the music under the original audio via a sidechain (default false)" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "video": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the video."
+        },
+        "music": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Music audio file."
+        },
+        "musicVolume": {
+          "description": "0..1 (default 0.25 over existing audio, 0.8 alone).",
+          "type": "number",
+          "minimum": 0
+        },
+        "fadeIn": {
+          "description": "Fade-in seconds (default 1).",
+          "type": "number",
+          "minimum": 0
+        },
+        "fadeOut": {
+          "description": "Fade-out seconds (default 2).",
+          "type": "number",
+          "minimum": 0
+        },
+        "duck": {
+          "description": "Duck the music under the original audio (default false).",
+          "type": "boolean"
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["video", "music"]
+      "required": [
+        "video",
+        "music"
+      ]
+    }
+  },
+  {
+    "name": "narrate",
+    "toolset": "audio",
+    "title": "Narrate",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Offline voiceover with the built-in Windows voices: speaks each line at its time or marker over the audio, plus an SRT.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "video": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the video."
+        },
+        "lines": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "t": {
+                "description": "Seconds.",
+                "type": "number",
+                "minimum": 0
+              },
+              "marker": {
+                "description": "Or a marker label.",
+                "type": "string"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "text"
+            ]
+          }
+        },
+        "voice": {
+          "description": "Voice name or part (doctor lists them).",
+          "type": "string"
+        },
+        "rate": {
+          "description": "Default 1.",
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 3
+        },
+        "duck": {
+          "description": "Duck the original audio (default true).",
+          "type": "boolean"
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "video",
+        "lines"
+      ]
     }
   },
   {
     "name": "reframe",
     "toolset": "produce",
     "title": "Reframe Aspect Ratio",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Re-aspect a video to 16:9, 9:16, 1:1, or 4:5 by padding or cropping.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "aspect": { "type": "string", "enum": ["16:9", "9:16", "1:1", "4:5"], "description": "Target aspect ratio" },
-        "fit": { "type": "string", "enum": ["pad", "crop"], "description": "pad (default): scale to fit and letterbox. crop: scale to fill and center-crop." },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
+        "aspect": {
+          "type": "string",
+          "enum": [
+            "16:9",
+            "9:16",
+            "1:1",
+            "4:5"
+          ],
+          "description": "Target aspect ratio."
+        },
+        "fit": {
+          "description": "pad (default): letterbox, nothing lost. crop: fill and center-crop.",
+          "type": "string",
+          "enum": [
+            "pad",
+            "crop"
+          ]
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input", "aspect"]
+      "required": [
+        "input",
+        "aspect"
+      ]
     }
   },
   {
     "name": "zoom",
     "toolset": "produce",
     "title": "Zoom and Pan",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Smooth animated zoom-and-pan into the action and back out, from keyframes or planned from logged clicks or screen changes.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "keyframes": { "type": "array", "description": "Views to animate between: {t, x, y, width, height} fills the frame with that rectangle by time t; {t, full: true} zooms out. Omit to plan automatically (see follow)", "items": {"type": "object"} },
-        "transitionSec": { "type": "number", "description": "How long each zoom/pan eases (default 0.6)" },
-        "maxZoom": { "type": "number", "description": "Auto mode: the furthest it zooms in (default 2.5)" },
-        "follow": { "type": "string", "enum": ["auto", "clicks", "changes"], "description": "Without keyframes: clicks zooms toward each click in the input event log (start_recording events: true), changes toward where the screen changed; auto (default) uses clicks when the log has any" },
-        "events": { "type": "string", "description": "Event log to read clicks from (default: the input's sibling .events.jsonl); must match the input's timeline and size" },
-        "highlightClicks": { "type": "boolean", "description": "Draw an expanding ring at each click from the event log (default false)" },
-        "highlightColor": { "type": "string", "description": "Ring color: name, #RRGGBB, or name@alpha (default #FF4545)" },
-        "holdSec": { "type": "number", "description": "Auto mode: stay zoomed this long after activity stops (default 2)" },
-        "dryRun": { "type": "boolean", "description": "Only return the planned keyframes; write nothing" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
+        "keyframes": {
+          "description": "Views reached by time t: a source rectangle (x, y, width, height), or { t, full: true } to zoom out. Omit to plan them (see follow).",
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "t": {
+                "type": "number",
+                "minimum": 0
+              },
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "width": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "height": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "full": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "t"
+            ]
+          }
+        },
+        "follow": {
+          "description": "Without keyframes: clicks (from the events log of start_recording events: true) or changes (where the screen changed). auto (default): clicks if logged, else changes.",
+          "type": "string",
+          "enum": [
+            "auto",
+            "clicks",
+            "changes"
+          ]
+        },
+        "events": {
+          "description": "Events log (default: the input's .events.jsonl); must match the input's timing and size, so use the original recording.",
+          "type": "string"
+        },
+        "highlightClicks": {
+          "description": "Ring each logged click (default false).",
+          "type": "boolean"
+        },
+        "highlightColor": {
+          "description": "Ring color (default #FF4545).",
+          "type": "string"
+        },
+        "transitionSec": {
+          "description": "How long each zoom/pan eases (default 0.6).",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 5
+        },
+        "maxZoom": {
+          "description": "Auto mode: the furthest it zooms in (default 2.5).",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "holdSec": {
+          "description": "Auto mode: stay zoomed this long after activity (default 2).",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 30
+        },
+        "dryRun": {
+          "description": "Return the planned keyframes only (editable, pass back).",
+          "type": "boolean"
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input"]
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "pipeline",
     "toolset": "edit",
     "title": "Edit Pipeline",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-    "description": "Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "steps": { "type": "array", "description": "Edits in order, each { op, ...the same options as its tool }: trim, crop, scale, speed, redact, callout, keystroke_overlay (badges re-timed through earlier trims and speed changes), reframe, zoom (keyframes), backdrop, and as the last step only export_preset or export_gif. Times and pixels in a step are on the timeline and frame as they are at that step", "items": { "type": "object" } },
-        "quality": { "type": "string", "enum": ["draft", "standard", "high"], "description": "Encoder preset for an mp4 result (default standard)" },
-        "dryRun": { "type": "boolean", "description": "Return the planned ffmpeg command and output size without running it" },
-        "output": { "type": "string", "description": "Optional output path. Defaults under SCREENCAST_HOME/edits" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" },
-        "chapters": { "type": "boolean", "description": "Write the input's markers (add_marker; else its own chapters) into the output as chapters, re-timed through trims and speed changes. Not for a GIF/WebP result" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
+        "steps": {
+          "description": "Edits in order, each { op, ...its tool's options }; export_preset/export_gif only last. Times and pixels are relative to the video as it is at that step (after earlier trims, speed, crops). zoom follow:\"clicks\" plans from the event log; burn_subtitles takes subtitles or transcribe:true.",
+          "maxItems": 30,
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "trim"
+                  },
+                  "start": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "end": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "duration": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": [
+                  "op",
+                  "start"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "crop"
+                  },
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "width": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "height": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "op",
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "scale"
+                  },
+                  "width": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "height": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "op"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "speed"
+                  },
+                  "factor": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": [
+                  "op",
+                  "factor"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "redact"
+                  },
+                  "regions": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "width": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "height": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "start": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "end": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y",
+                        "width",
+                        "height"
+                      ]
+                    }
+                  },
+                  "style": {
+                    "type": "string",
+                    "enum": [
+                      "box",
+                      "blur",
+                      "pixelate"
+                    ]
+                  },
+                  "pad": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "color": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "regions"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "callout"
+                  },
+                  "items": {
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "box"
+                            },
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            },
+                            "width": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "height": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "thickness": {
+                              "description": "Outline px (default 4).",
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "fill": {
+                              "description": "Fill instead of outline.",
+                              "type": "boolean"
+                            },
+                            "from": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "to": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "color": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "x",
+                            "y",
+                            "width",
+                            "height"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "text"
+                            },
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            },
+                            "text": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "size": {
+                              "description": "Font size px (default 32).",
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "background": {
+                              "description": "Dark panel behind the text (default true).",
+                              "type": "boolean"
+                            },
+                            "from": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "to": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "color": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "x",
+                            "y",
+                            "text"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "arrow"
+                            },
+                            "x1": {
+                              "type": "number"
+                            },
+                            "y1": {
+                              "type": "number"
+                            },
+                            "x2": {
+                              "type": "number",
+                              "description": "Head (x2,y2) is the point the arrow points at."
+                            },
+                            "y2": {
+                              "type": "number"
+                            },
+                            "thickness": {
+                              "description": "Shaft px (default 8).",
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "from": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "to": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "color": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "x1",
+                            "y1",
+                            "x2",
+                            "y2"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "fontFile": {
+                    "description": "Font: a .ttf/.otf/.ttc path or a C:\\Windows\\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).",
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "op",
+                  "items"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "reframe"
+                  },
+                  "aspect": {
+                    "type": "string",
+                    "enum": [
+                      "16:9",
+                      "9:16",
+                      "1:1",
+                      "4:5"
+                    ]
+                  },
+                  "fit": {
+                    "type": "string",
+                    "enum": [
+                      "pad",
+                      "crop"
+                    ]
+                  }
+                },
+                "required": [
+                  "op",
+                  "aspect"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "zoom"
+                  },
+                  "keyframes": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "t": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        },
+                        "width": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "height": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "full": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "t"
+                      ]
+                    }
+                  },
+                  "follow": {
+                    "type": "string",
+                    "const": "clicks"
+                  },
+                  "maxZoom": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 6
+                  },
+                  "holdSec": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 30
+                  },
+                  "transitionSec": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 5
+                  }
+                },
+                "required": [
+                  "op"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "cut_idle"
+                  },
+                  "minIdleSec": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "keepSec": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "op"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "audio"
+                  },
+                  "normalize": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "youtube",
+                          "podcast",
+                          "broadcast"
+                        ]
+                      },
+                      {
+                        "type": "number",
+                        "minimum": -70,
+                        "maximum": -5
+                      }
+                    ]
+                  },
+                  "denoise": {
+                    "type": "string",
+                    "enum": [
+                      "light",
+                      "medium",
+                      "strong"
+                    ]
+                  }
+                },
+                "required": [
+                  "op"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "burn_subtitles"
+                  },
+                  "subtitles": {
+                    "type": "string"
+                  },
+                  "transcribe": {
+                    "type": "boolean"
+                  },
+                  "style": {
+                    "type": "string",
+                    "enum": [
+                      "clean",
+                      "social"
+                    ]
+                  }
+                },
+                "required": [
+                  "op"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "backdrop"
+                  },
+                  "preset": {
+                    "type": "string",
+                    "enum": [
+                      "desktop",
+                      "rec",
+                      "amber",
+                      "light"
+                    ]
+                  },
+                  "colors": {
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "image": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "padding": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2000
+                  },
+                  "radius": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  "shadow": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 200
+                  },
+                  "shadowOpacity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "aspect": {
+                    "type": "string",
+                    "enum": [
+                      "16:9",
+                      "9:16",
+                      "1:1",
+                      "4:5"
+                    ]
+                  }
+                },
+                "required": [
+                  "op"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "keystroke_overlay"
+                  },
+                  "events": {
+                    "type": "string"
+                  },
+                  "clicks": {
+                    "type": "boolean"
+                  },
+                  "typing": {
+                    "type": "boolean"
+                  },
+                  "keys": {
+                    "type": "string",
+                    "enum": [
+                      "shortcuts",
+                      "masked"
+                    ]
+                  },
+                  "lingerSec": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 10
+                  },
+                  "position": {
+                    "type": "string",
+                    "enum": [
+                      "bottom",
+                      "bottom-left",
+                      "bottom-right",
+                      "top",
+                      "top-left",
+                      "top-right"
+                    ]
+                  },
+                  "size": {
+                    "type": "number",
+                    "minimum": 8,
+                    "maximum": 400
+                  },
+                  "color": {
+                    "type": "string"
+                  },
+                  "fontFile": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "op"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "cursor"
+                  },
+                  "events": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "number",
+                    "minimum": 0.25,
+                    "maximum": 8
+                  },
+                  "smoothing": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "hideAfterSec": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 600
+                  },
+                  "clicks": {
+                    "type": "boolean"
+                  },
+                  "spotlight": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "op"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "export_preset"
+                  },
+                  "platform": {
+                    "type": "string",
+                    "enum": [
+                      "youtube",
+                      "instagram_reel",
+                      "tiktok",
+                      "x",
+                      "square",
+                      "steam_trailer",
+                      "vertical_reel"
+                    ]
+                  },
+                  "fit": {
+                    "type": "string",
+                    "enum": [
+                      "pad",
+                      "crop"
+                    ]
+                  }
+                },
+                "required": [
+                  "op",
+                  "platform"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "export_gif"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "gif",
+                      "webp"
+                    ]
+                  },
+                  "maxBytes": {
+                    "type": "integer",
+                    "minimum": 10000,
+                    "maximum": 9007199254740991
+                  },
+                  "fps": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 30
+                  },
+                  "width": {
+                    "type": "integer",
+                    "minimum": 64,
+                    "maximum": 1920
+                  }
+                },
+                "required": [
+                  "op"
+                ]
+              }
+            ]
+          }
+        },
+        "recipe": {
+          "description": "Polish preset expanded to steps (see dryRun): pr_demo = cut_idle, click zoom, GIF <=10 MB; tutorial = + audio, captions, 1080p mp4; social_reel = 9:16, big captions. Given steps replace its same-op step.",
+          "type": "string",
+          "enum": [
+            "pr_demo",
+            "tutorial",
+            "social_reel"
+          ]
+        },
+        "quality": {
+          "description": "Encoder preset for an mp4 result (default standard).",
+          "type": "string",
+          "enum": [
+            "draft",
+            "standard",
+            "high"
+          ]
+        },
+        "dryRun": {
+          "description": "Return the plan (ffmpeg command, output size) without running it.",
+          "type": "boolean"
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        },
+        "chapters": {
+          "description": "Keep the input's markers as chapters, re-timed through trims and speed.",
+          "type": "boolean"
+        }
       },
-      "required": ["input", "steps"]
+      "required": [
+        "input"
+      ]
     }
   },
   {
     "name": "export_preset",
     "toolset": "produce",
     "title": "Export for Platform",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Encode a platform-ready H.264 file (aspect, fps, bitrate, faststart) for a named platform.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Path to the source video" },
-        "platform": { "type": "string", "enum": ["youtube", "instagram_reel", "tiktok", "x", "square", "steam_trailer", "vertical_reel"], "description": "Target platform (sets aspect, resolution, fps, bitrate). steam_trailer: 1080p H.264 High, padded 5.5 Mbps CBR, 48 kHz audio at -14 LUFS. vertical_reel: 1080x1920, footage centred over a blurred copy, audio at -14 LUFS" },
-        "fit": { "type": "string", "enum": ["pad", "crop"], "description": "How to fit the source into the platform aspect: pad (default) or crop" },
-        "output": { "type": "string", "description": "Optional output path (defaults under SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Allow replacing an existing file at the output path (default false)" }
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the source video."
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "youtube",
+            "instagram_reel",
+            "tiktok",
+            "x",
+            "square",
+            "steam_trailer",
+            "vertical_reel"
+          ],
+          "description": "Sets aspect, size, fps, bitrate. steam_trailer: 1080p 5.5 Mbps CBR, -14 LUFS. vertical_reel: 1080x1920 over a blurred copy of itself, -14 LUFS (ignores fit)."
+        },
+        "fit": {
+          "description": "Fit to the platform aspect: pad (default) or crop.",
+          "type": "string",
+          "enum": [
+            "pad",
+            "crop"
+          ]
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
       },
-      "required": ["input", "platform"]
+      "required": [
+        "input",
+        "platform"
+      ]
     }
   },
   {
     "name": "bug_report",
     "toolset": "produce",
     "title": "Bug Report Package",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Package a recording as a paste-ready repro folder: secret-scanned, redacted clip and GIF, contact sheet, steps from the event log, OCR'd errors, environment, report.md for gh issue create --body-file.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Recording path (uses its .events.jsonl)" },
-        "sessionId": { "type": "string", "description": "Or a stopped session's id" },
-        "title": { "type": "string", "description": "Issue title" },
-        "actual": { "type": "string", "description": "What happened" },
-        "expected": { "type": "string", "description": "What should happen" },
-        "start": { "type": "number", "description": "Clip start s (default: end - clipSec)" },
-        "end": { "type": "number", "description": "Clip end s (default: recording end)" },
-        "clipSec": { "type": "number", "description": "Clip length without start (default 30)" },
-        "redact": { "type": "boolean", "description": "Box out OCR-found secrets in every output (default true; needs Windows OCR)" },
-        "secretPattern": { "type": "string", "description": "Secret regex (default: API keys, tokens, password: values)" },
-        "regions": { "type": "array", "description": "Extra boxes (video px; start/end on the clip clock)", "items": { "type": "object" } },
-        "errorPattern": { "type": "string", "description": "Error-line regex" },
-        "scanEverySec": { "type": "number", "description": "OCR every N s (default 1)" },
-        "maxFrames": { "type": "integer", "description": "Scan frame cap (default 30)" },
-        "gif": { "type": "boolean", "description": "Also export a GIF (default true)" },
-        "maxBytes": { "type": "integer", "description": "GIF size budget (default 10000000)" },
-        "outputDir": { "type": "string", "description": "Package folder (default: a new one in SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Replace a report already in outputDir" }
+        "input": {
+          "description": "Recording path (uses its .events.jsonl).",
+          "type": "string",
+          "minLength": 1
+        },
+        "sessionId": {
+          "description": "Or a stopped session's id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "description": "Issue title.",
+          "type": "string",
+          "maxLength": 200
+        },
+        "actual": {
+          "description": "What happened.",
+          "type": "string",
+          "maxLength": 4000
+        },
+        "expected": {
+          "description": "What should happen.",
+          "type": "string",
+          "maxLength": 4000
+        },
+        "start": {
+          "description": "Clip start s (default: end - clipSec).",
+          "type": "number",
+          "minimum": 0
+        },
+        "end": {
+          "description": "Clip end s (default: recording end).",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "clipSec": {
+          "description": "Clip length without start (default 30).",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 600
+        },
+        "redact": {
+          "description": "Box out OCR-found secrets in every output (default true; needs Windows OCR).",
+          "type": "boolean"
+        },
+        "secretPattern": {
+          "description": "Secret regex (default: API keys, tokens, password: values).",
+          "type": "string"
+        },
+        "regions": {
+          "description": "Extra boxes (video px; start/end on the clip clock).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "y": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "width": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "height": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "start": {
+                "type": "number",
+                "minimum": 0
+              },
+              "end": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "x",
+              "y",
+              "width",
+              "height"
+            ]
+          }
+        },
+        "errorPattern": {
+          "description": "Error-line regex.",
+          "type": "string"
+        },
+        "scanEverySec": {
+          "description": "OCR every N s (default 1).",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maxFrames": {
+          "description": "Scan frame cap (default 30).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120
+        },
+        "gif": {
+          "description": "Also export a GIF (default true).",
+          "type": "boolean"
+        },
+        "maxBytes": {
+          "description": "GIF size budget (default 10000000).",
+          "type": "integer",
+          "minimum": 10000,
+          "maximum": 9007199254740991
+        },
+        "outputDir": {
+          "description": "Package folder (default: a new one in SCREENCAST_HOME/edits).",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Replace a report already in outputDir.",
+          "type": "boolean"
+        }
       }
     }
   },
@@ -1031,18 +4074,52 @@
     "name": "step_guide",
     "toolset": "produce",
     "title": "Step-by-Step Guide",
-    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
     "description": "Turn a recording's event log into a numbered how-to: a ringed screenshot and caption per step, marker headings; Markdown and/or one HTML file. Never includes typed text.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "input": { "type": "string", "description": "Recording path (uses its .events.jsonl)" },
-        "sessionId": { "type": "string", "description": "Or a stopped session's id" },
-        "title": { "type": "string", "description": "Guide title" },
-        "format": { "type": "string", "enum": ["md", "html", "both"], "description": "md + images/, self-contained html, or both (default)" },
-        "ocr": { "type": "boolean", "description": "OCR shots for captions and secret boxes (default true; needs Windows OCR)" },
-        "outputDir": { "type": "string", "description": "Guide folder (default: new in SCREENCAST_HOME/edits)" },
-        "overwrite": { "type": "boolean", "description": "Replace a guide already in outputDir" }
+        "input": {
+          "description": "Recording path (uses its .events.jsonl).",
+          "type": "string",
+          "minLength": 1
+        },
+        "sessionId": {
+          "description": "Or a stopped session's id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "description": "Guide title.",
+          "type": "string",
+          "maxLength": 200
+        },
+        "format": {
+          "description": "md + images/, self-contained html, or both (default).",
+          "type": "string",
+          "enum": [
+            "md",
+            "html",
+            "both"
+          ]
+        },
+        "ocr": {
+          "description": "OCR shots for captions and secret boxes (default true; needs Windows OCR).",
+          "type": "boolean"
+        },
+        "outputDir": {
+          "description": "Guide folder (default: new in SCREENCAST_HOME/edits).",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Replace a guide already in outputDir.",
+          "type": "boolean"
+        }
       }
     }
   }

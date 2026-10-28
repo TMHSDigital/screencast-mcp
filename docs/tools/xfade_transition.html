@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>xfade_transition — Screencast MCP</title>
+  <meta name="description" content="Join two videos with an xfade transition (audio crossfaded); they need not match in size, fps, or audio.">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/tools/xfade_transition.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="xfade_transition — Screencast MCP">
+  <meta property="og:description" content="Join two videos with an xfade transition (audio crossfaded); they need not match in size, fps, or audio.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/tools/xfade_transition.html">
+  <meta property="og:site_name" content="Screencast MCP">
+  <meta property="og:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Screencast MCP: give your agent eyes on the screen. A recorded window zooms in on a clicked Save button.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <link rel="preload" href="../fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../tools/" class="here">Tools</a>
+      <a href="../workflows/">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">TOOLS</a> / PRODUCE</p>
+      <h1>Crossfade Transition</h1>
+      <p class="tool-id"><code>xfade_transition</code></p>
+      <p class="lede">Join two videos with an xfade transition (audio crossfaded); they need not match in size, fps, or audio. For more clips use assemble_highlights.</p>
+      <p class="chips"><span class="chip set">produce</span><span class="chip warn">writes</span><span class="chip warn">destructive</span><span class="chip">since v0.6.0</span></p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>PARAMETERS</span></div>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>inputA</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Outgoing video.</td></tr>
+          <tr><td><code>inputB</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Incoming video.</td></tr>
+          <tr><td><code>transition</code></td><td><code class="type">string</code></td><td>xfade name (default fade): fade, wipeleft, slideup, circleopen, dissolve, ...</td></tr>
+          <tr><td><code>duration</code></td><td><code class="type">number</code></td><td>Transition length in seconds (default 1). <span class="bounds">&gt; 0</span></td></tr>
+          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
+          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>A MINIMAL CALL</span></div>
+      <pre class="copyable"><code>xfade_transition { &quot;inputA&quot;: &quot;recording.mp4&quot;, &quot;inputB&quot;: &quot;recording.mp4&quot; }</code></pre>
+      <p>The required arguments only, with placeholder values. Everything else takes its default.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:10</span><span>WHAT COMES BACK</span></div>
+      <p>Structured content (<code>structuredContent</code>), alongside a text summary:</p>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+      <nav class="pager" aria-label="More tools">
+        <span><a href="doctor.html">&larr; doctor</a></span>
+        <span><a href="assemble_highlights.html">assemble_highlights &rarr;</a></span>
+      </nav>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>License: <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/LICENSE">CC BY-NC-ND 4.0</a> &middot; free for non-commercial use</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>

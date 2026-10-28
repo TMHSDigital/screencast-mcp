@@ -10,6 +10,7 @@
  */
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
+import { isCliInvocation, runCli } from "./cli.js";
 import { getStore, isShuttingDown, markShuttingDown } from "./context.js";
 import { requireFfmpeg } from "./utils/ffmpeg.js";
 import { abortEditJobs } from "./utils/jobs.js";
@@ -117,9 +118,18 @@ async function shutdown(reason: string, exitCode = 0): Promise<void> {
   process.exit(exitCode);
 }
 
-main().catch((error: unknown) => {
+const fatal = (error: unknown): void => {
   process.stderr.write(
     `Fatal error: ${error instanceof Error ? error.message : String(error)}\n`,
   );
   process.exit(1);
-});
+};
+
+// `screencast-mcp record -- <cmd>` and friends run the headless CLI (#179);
+// no arguments (the way every MCP client starts it) is the stdio server.
+const argv = process.argv.slice(2);
+if (isCliInvocation(argv)) {
+  runCli(argv).then((code) => process.exit(code), fatal);
+} else {
+  main().catch(fatal);
+}

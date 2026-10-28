@@ -35,7 +35,7 @@ const MAX_QUEUED_FRAMES = 4;
 const cfg = JSON.parse(process.argv[2] ?? "{}") as WgcRecorderConfig;
 const log = (s: string) => process.stderr.write(s.endsWith("\n") ? s : `${s}\n`);
 
-const grab = spawn(cfg.ffmpeg, buildWgcGrabArgs(cfg.hwnd, cfg.fps), { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+const grab = spawn(cfg.ffmpeg, buildWgcGrabArgs(cfg.hwnd, cfg.fps, cfg.cursor !== false), { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
 // Tiny repaints for the whole recording; see nudgeScript.
 const nudge = spawn("powershell", ["-NoProfile", "-NonInteractive", "-Command", nudgeScript(cfg.hwnd, 200, process.pid)], {
   stdio: "ignore",

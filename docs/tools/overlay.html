@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>overlay — Screencast MCP</title>
+  <meta name="description" content="Composite an image or video (logo, watermark, picture-in-picture) onto a video at a pixel position, optionally scaled and time-limited; keeps the base's audio and length.">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/tools/overlay.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="overlay — Screencast MCP">
+  <meta property="og:description" content="Composite an image or video (logo, watermark, picture-in-picture) onto a video at a pixel position, optionally scaled and time-limited; keeps the base's audio and length.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/tools/overlay.html">
+  <meta property="og:site_name" content="Screencast MCP">
+  <meta property="og:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Screencast MCP: give your agent eyes on the screen. A recorded window zooms in on a clicked Save button.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <link rel="preload" href="../fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../tools/" class="here">Tools</a>
+      <a href="../workflows/">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">TOOLS</a> / PRODUCE</p>
+      <h1>Overlay Image or Video</h1>
+      <p class="tool-id"><code>overlay</code></p>
+      <p class="lede">Composite an image or video (logo, watermark, picture-in-picture) onto a video at a pixel position, optionally scaled and time-limited; keeps the base's audio and length.</p>
+      <p class="chips"><span class="chip set">produce</span><span class="chip warn">writes</span><span class="chip warn">destructive</span><span class="chip">since v0.3.0</span></p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>PARAMETERS</span></div>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the base video.</td></tr>
+          <tr><td><code>overlay</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Overlay image or video path.</td></tr>
+          <tr><td><code>x</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td>Left, px. <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
+          <tr><td><code>y</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td>Top, px. <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
+          <tr><td><code>width</code></td><td><code class="type">integer</code></td><td>Scale to this width (other side keeps aspect). <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
+          <tr><td><code>height</code></td><td><code class="type">integer</code></td><td>Scale to this height. <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
+          <tr><td><code>start</code></td><td><code class="type">number</code></td><td>Show from this second. <span class="bounds">≥ 0</span></td></tr>
+          <tr><td><code>end</code></td><td><code class="type">number</code></td><td>Hide after this second. <span class="bounds">&gt; 0</span></td></tr>
+          <tr><td><code>shape</code></td><td><code class="type">&quot;rect&quot; | &quot;circle&quot;</code></td><td>circle: centre square masked round (webcam).</td></tr>
+          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
+          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>A MINIMAL CALL</span></div>
+      <pre class="copyable"><code>overlay { &quot;input&quot;: &quot;recording.mp4&quot;, &quot;overlay&quot;: &quot;…&quot;, &quot;x&quot;: 0, &quot;y&quot;: 0 }</code></pre>
+      <p>The required arguments only, with placeholder values. Everything else takes its default.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:10</span><span>WHAT COMES BACK</span></div>
+      <p>Structured content (<code>structuredContent</code>), alongside a text summary and any inline images:</p>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+      <nav class="pager" aria-label="More tools">
+        <span><a href="speed.html">&larr; speed</a></span>
+        <span><a href="callout.html">callout &rarr;</a></span>
+      </nav>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>License: <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/LICENSE">CC BY-NC-ND 4.0</a> &middot; free for non-commercial use</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>

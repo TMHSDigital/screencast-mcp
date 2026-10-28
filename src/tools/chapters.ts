@@ -79,7 +79,7 @@ export function register(server: McpServer): void {
         if (args.sessionId) {
           const record = getStore().get(args.sessionId);
           if (!record) throw new ScreencastError(`No session with id "${args.sessionId}".`);
-          if (record.status === "recording") throw new ScreencastError("The recording is still running; stop it first.");
+          if (record.status === "recording" || record.status === "paused") throw new ScreencastError("The recording is still running; stop it first.");
           input ??= record.outputPath;
           sessionMarkers = record.markers;
         }

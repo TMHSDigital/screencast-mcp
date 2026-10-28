@@ -1,0 +1,87 @@
+# Screencast MCP
+
+> An MCP server (stdio) that lets AI agents record the Windows screen, watch the footage as frames, and edit it with ffmpeg. Install: `npx -y @tmhs/screencast-mcp`. Capture is Windows-only; the watch and edit tools run anywhere ffmpeg runs.
+
+Every tool is an explicit call: nothing records on its own. Tools return file paths plus structured results; screenshot, sample_frames, and contact_sheet also return images inline.
+
+## Docs
+
+- [Connect your client](https://tmhsdigital.github.io/screencast-mcp/connect.html): set up Claude Code, Claude Desktop, Cursor, or VS Code
+- [Workflows](https://tmhsdigital.github.io/screencast-mcp/workflows/): copy-paste recipes from a prompt to the tool calls and the real output
+- [Bug-repro clip for a PR](https://tmhsdigital.github.io/screencast-mcp/workflows/bug-repro.html): Have your agent record a bug, hide the secrets on screen, trim it, mark the problem, and export a GIF small enough for a GitHub PR.
+- [README demo GIF](https://tmhsdigital.github.io/screencast-mcp/workflows/demo-gif.html): Record a feature, check the take at a glance, and export an animated WebP or GIF sized for a README.
+- [Agent UI verification loop](https://tmhsdigital.github.io/screencast-mcp/workflows/verify-ui.html): Let a coding agent check its own UI change: screenshot, wait for the screen to settle, diff before and after, and read the result.
+- [Social clip](https://tmhsdigital.github.io/screencast-mcp/workflows/social-clip.html): Turn a landscape screen recording into a vertical clip with a title card, music, normalized loudness, and a platform preset.
+- [Review a long recording cheaply](https://tmhsdigital.github.io/screencast-mcp/workflows/review-recording.html): Have an agent review a long screen recording without sending it hundreds of frames: contact sheet, scene sampling, and dead-air detection.
+- [Zoom toward every click](https://tmhsdigital.github.io/screencast-mcp/workflows/zoom-clicks.html): Record with an input event log, then zoom smoothly toward each click and ring it, Screen Studio style, all from one tool call.
+- [The whole edit in one call](https://tmhsdigital.github.io/screencast-mcp/workflows/pipeline.html): Redact, trim, annotate, and export a bug-repro GIF in one pipeline call: one ffmpeg pass, no intermediate files, and a recipe you can re-run on the next recording.
+- [Edit by the transcript](https://tmhsdigital.github.io/screencast-mcp/workflows/edit-by-transcript.html): Cut a narrated recording by editing its transcript: quote the lines to drop, remove um and uh, and get a re-timed SRT that still lines up.
+- [Tool reference](https://tmhsdigital.github.io/screencast-mcp/tools/): every tool's parameters, a minimal call, and its result
+- [Record test runs in CI](https://tmhsdigital.github.io/screencast-mcp/ci.html): the `screencast-mcp record -- <command>` CLI and the GitHub Action for windows-latest
+
+## Tools
+
+- [start_recording](https://tmhsdigital.github.io/screencast-mcp/tools/start_recording.html): Start a background screen recording.
+- [stop_recording](https://tmhsdigital.github.io/screencast-mcp/tools/stop_recording.html): Stop a recording gracefully so the file is finalized; returns the path and duration.
+- [pause_recording](https://tmhsdigital.github.io/screencast-mcp/tools/pause_recording.html): Pause a recording; until resume_recording nothing is captured, and the gap is left out of the file, events, and markers.
+- [resume_recording](https://tmhsdigital.github.io/screencast-mcp/tools/resume_recording.html): Resume a paused recording (same target and settings).
+- [save_replay](https://tmhsdigital.github.io/screencast-mcp/tools/save_replay.html): Save the last N seconds of a replay buffer (start_recording replayBufferSec) to an mp4; the buffer keeps running.
+- [list_sessions](https://tmhsdigital.github.io/screencast-mcp/tools/list_sessions.html): List all recording sessions (active and finished) with their status, target, output path, and whether the process is still alive.
+- [get_session](https://tmhsdigital.github.io/screencast-mcp/tools/get_session.html): Inspect a single recording session by id, including live status and whether its output file exists on disk.
+- [read_events](https://tmhsdigital.github.io/screencast-mcp/tools/read_events.html): Read the input events (clicks, scroll, cursor, shortcuts, typing bursts) of a recording made with events: true, in video seconds and pixels; e.g. types: ['down'], then sample_frames there.
+- [add_marker](https://tmhsdigital.github.io/screencast-mcp/tools/add_marker.html): Mark a labelled moment on a recording, live or at a second.
+- [review_recording](https://tmhsdigital.github.io/screencast-mcp/tools/review_recording.html): Open a recording for a person to review: in MCP Apps clients an inline player to scrub, trim, and redact, then export; elsewhere just the video's details.
+- [player_frames](https://tmhsdigital.github.io/screencast-mcp/tools/player_frames.html): Preview frames for the review player: JPEGs on an even grid over the video plus frames at scene changes, with their real times.
+- [screenshot](https://tmhsdigital.github.io/screencast-mcp/tools/screenshot.html): Capture one PNG of the screen, a monitor, a window, or a region, returned inline and by path.
+- [sample_frames](https://tmhsdigital.github.io/screencast-mcp/tools/sample_frames.html): Sample PNG frames from a video (by fps, timestamps, or scene changes) and return the first few inline so the model can see what happened.
+- [contact_sheet](https://tmhsdigital.github.io/screencast-mcp/tools/contact_sheet.html): Tile timestamped frames of a video into one image to see a whole recording at a glance (the cheapest first look).
+- [screen_diff](https://tmhsdigital.github.io/screencast-mcp/tools/screen_diff.html): Compare two screenshots or frames: SSIM score, changed share, and changed boxes in b's pixels, to check a UI change happened only where expected.
+- [wait_for_change](https://tmhsdigital.github.io/screencast-mcp/tools/wait_for_change.html): Wait until part of the screen changes or settles, instead of guessing a sleep.
+- [find_text](https://tmhsdigital.github.io/screencast-mcp/tools/find_text.html): OCR (built into Windows) on the screen, an image, or video frames, with line and match boxes in image pixels (add `origin` for desktop coordinates).
+- [index_recording](https://tmhsdigital.github.io/screencast-mcp/tools/index_recording.html): Build a recording's text timeline (<video>.index.json: OCR per scene, events, markers, transcript) for search_recording.
+- [search_recording](https://tmhsdigital.github.io/screencast-mcp/tools/search_recording.html): Search an index_recording timeline (screen text, events, markers, transcript): timecoded hits, best first, secrets masked.
+- [get_media_info](https://tmhsdigital.github.io/screencast-mcp/tools/get_media_info.html): Probe a media file with ffprobe and return duration, resolution, frame rate, codecs, container format, and size.
+- [trim](https://tmhsdigital.github.io/screencast-mcp/tools/trim.html): Cut a video down to one sub-clip by start + (end or duration).
+- [concat](https://tmhsdigital.github.io/screencast-mcp/tools/concat.html): Join videos end to end with hard cuts: stream copy when they match, else a re-encode (`mode` says which).
+- [convert](https://tmhsdigital.github.io/screencast-mcp/tools/convert.html): Convert media to mp4, webm, or gif.
+- [export_gif](https://tmhsdigital.github.io/screencast-mcp/tools/export_gif.html): Export an animated GIF or WebP that fits a size budget (for PRs, issues, READMEs), stepping fps, width, and quality down until it fits.
+- [crop](https://tmhsdigital.github.io/screencast-mcp/tools/crop.html): Crop a video to a pixel rectangle; one running off the frame is rejected.
+- [scale](https://tmhsdigital.github.io/screencast-mcp/tools/scale.html): Resize a video to a target width and/or height and re-encode.
+- [speed](https://tmhsdigital.github.io/screencast-mcp/tools/speed.html): Change playback speed by a factor (>1 faster, <1 slower) and re-encode.
+- [overlay](https://tmhsdigital.github.io/screencast-mcp/tools/overlay.html): Composite an image or video (logo, watermark, picture-in-picture) onto a video at a pixel position, optionally scaled and time-limited; keeps the base's audio and length.
+- [callout](https://tmhsdigital.github.io/screencast-mcp/tools/callout.html): Annotate a video with timed boxes, text labels, and arrows.
+- [keystroke_overlay](https://tmhsdigital.github.io/screencast-mcp/tools/keystroke_overlay.html): Burn keycast-style badges for shortcuts, clicks, and typing from the recording's input event log (start_recording events: true).
+- [cursor](https://tmhsdigital.github.io/screencast-mcp/tools/cursor.html): Draw a smoothed, scaled cursor that hides when idle from the event log of a start_recording cursor: "events" recording (no OS cursor in the video), with click ripples and an optional spotlight.
+- [backdrop](https://tmhsdigital.github.io/screencast-mcp/tools/backdrop.html): Frame a video or screenshot on a gradient, color, or wallpaper with padding, rounded corners, and a drop shadow, optionally on a 16:9/1:1/9:16/4:5 canvas.
+- [compress](https://tmhsdigital.github.io/screencast-mcp/tools/compress.html): Re-encode a video smaller (H.264 CRF ladder, optional width cap).
+- [extract_audio](https://tmhsdigital.github.io/screencast-mcp/tools/extract_audio.html): Extract the audio track of a media file to its own file (mp3, aac, wav, or copy).
+- [normalize_audio](https://tmhsdigital.github.io/screencast-mcp/tools/normalize_audio.html): Normalize loudness to a delivery target (two-pass EBU R128 loudnorm); video is copied.
+- [denoise](https://tmhsdigital.github.io/screencast-mcp/tools/denoise.html): Reduce steady background noise (fan, hum, hiss) in a recording's audio with an adaptive FFT denoiser.
+- [transcribe](https://tmhsdigital.github.io/screencast-mcp/tools/transcribe.html): Transcribe a recording's speech to an SRT subtitle file, locally, with FFmpeg 8's whisper filter (needs a whisper.cpp model file).
+- [burn_subtitles](https://tmhsdigital.github.io/screencast-mcp/tools/burn_subtitles.html): Burn SRT/ASS subtitles (e.g. from transcribe) into a video in the bundled font.
+- [chapters](https://tmhsdigital.github.io/screencast-mcp/tools/chapters.html): Write chapters (markers, scene changes, transcript, or a list) into an mp4/mkv/mov copy without re-encoding; returns YouTube chapter text.
+- [clip](https://tmhsdigital.github.io/screencast-mcp/tools/clip.html): Extract several frame-exact segments, each to its own file.
+- [cut_idle](https://tmhsdigital.github.io/screencast-mcp/tools/cut_idle.html): Remove dead air: cut stretches where the screen is frozen (and silent), keeping a short pad.
+- [cut_by_transcript](https://tmhsdigital.github.io/screencast-mcp/tools/cut_by_transcript.html): Edit a video by its transcript: cut quoted text, cue numbers, or fillers.
+- [redact_region](https://tmhsdigital.github.io/screencast-mcp/tools/redact_region.html): Cover given rectangles in a video (e.g. secrets on screen).
+- [list_audio_devices](https://tmhsdigital.github.io/screencast-mcp/tools/list_audio_devices.html): List DirectShow audio devices and flag a likely loopback (Stereo Mix or a virtual-audio driver), for start_recording's audio.device.
+- [list_video_devices](https://tmhsdigital.github.io/screencast-mcp/tools/list_video_devices.html): List DirectShow cameras for start_recording's webcam.device.
+- [list_targets](https://tmhsdigital.github.io/screencast-mcp/tools/list_targets.html): List the desktop, monitors, and visible windows (topmost first, with capturability per backend).
+- [doctor](https://tmhsdigital.github.io/screencast-mcp/tools/doctor.html): Check the setup: ffmpeg/ffprobe (FFmpeg 8+?), optional filters, capture devices, Windows OCR, settings, and enabled toolsets; `problems` says what is missing and how to fix it.
+- [xfade_transition](https://tmhsdigital.github.io/screencast-mcp/tools/xfade_transition.html): Join two videos with an xfade transition (audio crossfaded); they need not match in size, fps, or audio.
+- [assemble_highlights](https://tmhsdigital.github.io/screencast-mcp/tools/assemble_highlights.html): Stitch clips (including title cards) into one video with cuts or xfade transitions; they need not match in size, fps, or audio.
+- [title_card](https://tmhsdigital.github.io/screencast-mcp/tools/title_card.html): Generate a title card clip (centered text on a solid background, silent audio track) to stitch in with assemble_highlights.
+- [music_bed](https://tmhsdigital.github.io/screencast-mcp/tools/music_bed.html): Lay music under a video: looped or trimmed to length, faded, leveled, and mixed with any existing audio.
+- [narrate](https://tmhsdigital.github.io/screencast-mcp/tools/narrate.html): Offline voiceover with the built-in Windows voices: speaks each line at its time or marker over the audio, plus an SRT.
+- [reframe](https://tmhsdigital.github.io/screencast-mcp/tools/reframe.html): Re-aspect a video to 16:9, 9:16, 1:1, or 4:5 by padding or cropping.
+- [zoom](https://tmhsdigital.github.io/screencast-mcp/tools/zoom.html): Smooth animated zoom-and-pan into the action and back out, from keyframes or planned from logged clicks or screen changes.
+- [pipeline](https://tmhsdigital.github.io/screencast-mcp/tools/pipeline.html): Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files.
+- [export_preset](https://tmhsdigital.github.io/screencast-mcp/tools/export_preset.html): Encode a platform-ready H.264 file (aspect, fps, bitrate, faststart) for a named platform.
+- [bug_report](https://tmhsdigital.github.io/screencast-mcp/tools/bug_report.html): Package a recording as a paste-ready repro folder: secret-scanned, redacted clip and GIF, contact sheet, steps from the event log, OCR'd errors, environment, report.md for gh issue create --body-file.
+- [step_guide](https://tmhsdigital.github.io/screencast-mcp/tools/step_guide.html): Turn a recording's event log into a numbered how-to: a ringed screenshot and caption per step, marker headings; Markdown and/or one HTML file.
+
+## Optional
+
+- [Full tool reference](https://tmhsdigital.github.io/screencast-mcp/llms-full.txt): every tool and parameter in one file
+- [mcp-tools.json](https://github.com/TMHSDigital/screencast-mcp/blob/main/mcp-tools.json): the tool list with JSON Schemas
+- [README](https://github.com/TMHSDigital/screencast-mcp#readme): configuration, safety, and the threat model

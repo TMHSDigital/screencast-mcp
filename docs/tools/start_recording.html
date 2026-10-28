@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>start_recording — Screencast MCP</title>
+  <meta name="description" content="Start a background screen recording.">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/tools/start_recording.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="start_recording — Screencast MCP">
+  <meta property="og:description" content="Start a background screen recording.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/tools/start_recording.html">
+  <meta property="og:site_name" content="Screencast MCP">
+  <meta property="og:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Screencast MCP: give your agent eyes on the screen. A recorded window zooms in on a clicked Save button.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <link rel="preload" href="../fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../tools/" class="here">Tools</a>
+      <a href="../workflows/">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">TOOLS</a> / CAPTURE</p>
+      <h1>Start Recording</h1>
+      <p class="tool-id"><code>start_recording</code></p>
+      <p class="lede">Start a background screen recording. Returns a session id; finalize it with stop_recording. Never auto-starts.</p>
+      <p class="chips"><span class="chip set">capture</span><span class="chip warn">writes</span><span class="chip warn">destructive</span><span class="chip">since v0.2.0</span></p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>PARAMETERS</span></div>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>target</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>full | monitor:&lt;i&gt; (0 = primary) | window:&lt;title&gt; (or window:exe=&lt;app.exe&gt; / window:hwnd=&lt;n&gt;) | region:&lt;x&gt;,&lt;y&gt;,&lt;w&gt;,&lt;h&gt;. With gdigrab a window's rectangle is resolved once at start (visible, on top); it does not follow the window.</td></tr>
+          <tr><td><code>exactTitle</code></td><td><code class="type">boolean</code></td><td>window: targets match the whole title only, never a substring (default false).</td></tr>
+          <tr><td><code>fps</code></td><td><code class="type">integer</code></td><td>Frames per second (default 30). <span class="bounds">≥ 1, ≤ 120</span></td></tr>
+          <tr><td><code>quality</code></td><td><code class="type">&quot;draft&quot; | &quot;standard&quot; | &quot;high&quot;</code></td><td>Encoder preset (default standard).</td></tr>
+          <tr><td><code>audio</code></td><td><code class="type">object</code></td><td>Audio (default none). No microphone capture.</td></tr>
+          <tr class="nested d1"><td><code>audio.source</code> <span class="req">required</span></td><td><code class="type">&quot;system&quot; | &quot;none&quot;</code></td><td>system = what the machine plays (needs a loopback device); none = video only.</td></tr>
+          <tr class="nested d1"><td><code>audio.device</code></td><td><code class="type">string</code></td><td>dshow loopback device (from list_audio_devices); auto-detected if omitted.</td></tr>
+          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Output .mp4 path (default under SCREENCAST_HOME/recordings).</td></tr>
+          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr><td><code>maxDurationSec</code></td><td><code class="type">integer</code></td><td>Auto-stop after this many seconds (default 3600 or SCREENCAST_MAX_RECORDING_SEC; max 7 days; 0 = no cap). <span class="bounds">≥ 0, ≤ 604800</span></td></tr>
+          <tr><td><code>events</code></td><td><code class="type">boolean</code></td><td>Also log clicks, scroll, cursor, and typing (video-timed, video pixels) for read_events (default false; ~1 s slower start).</td></tr>
+          <tr><td><code>keys</code></td><td><code class="type">&quot;masked&quot; | &quot;shortcuts&quot;</code></td><td>With events: masked (default) logs typing only as 0.5 s-grid bursts, never keys; shortcuts also names Ctrl/Alt/Win chords. Typed text is never logged.</td></tr>
+          <tr><td><code>cursor</code></td><td><code class="type">&quot;os&quot; | &quot;events&quot;</code></td><td>events: leave the OS cursor out and log it (implies events) for the cursor tool to redraw.</td></tr>
+          <tr><td><code>backend</code></td><td><code class="type">&quot;gdigrab&quot; | &quot;wgc&quot; | &quot;ddagrab&quot;</code></td><td>gdigrab (default): the screen rectangle. wgc (window: targets, FFmpeg 8+): the window's own surface, even when covered or moved; client area only, no audio. ddagrab: one display on the GPU, low CPU.</td></tr>
+          <tr><td><code>encoder</code></td><td><code class="type">&quot;auto&quot; | &quot;x264&quot; | &quot;nvenc&quot; | &quot;qsv&quot; | &quot;amf&quot;</code></td><td>auto = first working GPU encoder, else x264 (default with ddagrab; else x264).</td></tr>
+          <tr><td><code>webcam</code></td><td><code class="type">object</code></td><td>Also record a camera to &lt;output&gt;.webcam.mp4, aligned for overlay.</td></tr>
+          <tr class="nested d1"><td><code>webcam.device</code></td><td><code class="type">string</code></td><td>list_video_devices name (default: first).</td></tr>
+          <tr class="nested d1"><td><code>webcam.corner</code></td><td><code class="type">&quot;top_left&quot; | &quot;top_right&quot; | &quot;bottom_left&quot; | &quot;bottom_right&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>webcam.size</code></td><td><code class="type">number</code></td><td>Share of width (0.25). <span class="bounds">≥ 0.1, ≤ 0.5</span></td></tr>
+          <tr class="nested d1"><td><code>webcam.shape</code></td><td><code class="type">&quot;rect&quot; | &quot;circle&quot;</code></td><td></td></tr>
+          <tr><td><code>replayBufferSec</code></td><td><code class="type">integer</code></td><td>Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab only. <span class="bounds">≥ 4, ≤ 3600</span></td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>A MINIMAL CALL</span></div>
+      <pre class="copyable"><code>start_recording { &quot;target&quot;: &quot;window:Notepad&quot; }</code></pre>
+      <p>The required arguments only, with placeholder values. Everything else takes its default.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:10</span><span>WHAT COMES BACK</span></div>
+      <p>Structured content (<code>structuredContent</code>), alongside a text summary:</p>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Field</th><th>Type</th></tr></thead>
+        <tbody>
+          <tr><td><code>sessionId</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr><td><code>status</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr><td><code>backend</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:15</span><span>SEEN IN</span></div>
+      <ul class="recipes">
+        <li><a href="../workflows/bug-repro.html"><span class="tc">REC 01</span><span class="name">Bug-repro clip for a PR</span><span class="chain">start_recording &rarr; find_text &rarr; redact_region &rarr; trim &rarr; callout &rarr; export_gif</span></a></li>
+        <li><a href="../workflows/demo-gif.html"><span class="tc">REC 02</span><span class="name">README demo GIF</span><span class="chain">start_recording &rarr; contact_sheet &rarr; export_gif (webp)</span></a></li>
+        <li><a href="../workflows/zoom-clicks.html"><span class="tc">REC 06</span><span class="name">Zoom toward every click</span><span class="chain">start_recording (events) &rarr; stop_recording &rarr; read_events &rarr; zoom (follow clicks, highlightClicks) &rarr; export_gif</span></a></li>
+        <li><a href="../workflows/pipeline.html"><span class="tc">REC 07</span><span class="name">The whole edit in one call</span><span class="chain">start_recording &rarr; find_text &rarr; pipeline (redact &rarr; trim &rarr; callout &rarr; export_gif)</span></a></li>
+      </ul>
+    </section>
+      <nav class="pager" aria-label="More tools">
+        <span><a href="./">&larr; All tools</a></span>
+        <span><a href="stop_recording.html">stop_recording &rarr;</a></span>
+      </nav>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>License: <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/LICENSE">CC BY-NC-ND 4.0</a> &middot; free for non-commercial use</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>

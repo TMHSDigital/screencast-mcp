@@ -40,7 +40,7 @@ function resolveInput(args: { input?: string; sessionId?: string }): string {
   if (args.sessionId) {
     const record = getStore().get(args.sessionId);
     if (!record) throw new ScreencastError(`No session with id "${args.sessionId}".`);
-    if (record.status === "recording") throw new ScreencastError("The recording is still running; stop it first.");
+    if (record.status === "recording" || record.status === "paused") throw new ScreencastError("The recording is still running; stop it first.");
     return record.outputPath;
   }
   if (args.input) return args.input;

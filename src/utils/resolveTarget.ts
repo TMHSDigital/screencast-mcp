@@ -27,7 +27,7 @@ export interface ResolveOptions {
   /** For window: targets, refuse the substring fallback (#89). */
   exactTitle?: boolean;
   /** The capture backend: "wgc" may pick a cloaked window, gdigrab may not (#227). */
-  backend?: "gdigrab" | "wgc";
+  backend?: "gdigrab" | "wgc" | "ddagrab";
 }
 
 /** Resolve a raw target spec into builder-ready (target, monitors). */

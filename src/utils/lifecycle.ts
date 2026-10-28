@@ -14,6 +14,17 @@ import { whenFinalized } from "./events.js";
 import { buildProbeArgs, parseMediaInfo } from "./media.js";
 import { ScreencastError } from "./errors.js";
 import { wgcStopFile } from "./wgc.js";
+import { encoderArgs } from "./gpu.js";
+import {
+  clearPausing,
+  endSession,
+  finishSegments,
+  markPausing,
+  pauseBlocker,
+  recordedSec,
+  webcamOutputPath,
+  type SegmentPart,
+} from "./pause.js";
 import {
   expectedImage,
   isAlive,
@@ -74,6 +85,96 @@ export interface StopResult {
   durationSec: number | null;
   /** What happened to a replay session's buffer (#197). */
   replay?: ReplayStopResult;
+  /** Segments joined after pauses (#200), and a join error. */
+  segments?: { count: number; error?: string };
+}
+
+/** Quit a capture child gracefully ('q'), killing it if it does not exit in
+ * time. Resolves whether it quit on its own. */
+async function quitChild(child: ChildProcess, pid: number | null, gracefulMs: number): Promise<boolean> {
+  if (!child.stdin || !child.stdin.writable) return false;
+  child.stdin.write("q\n");
+  child.stdin.end();
+  const graceful = await waitForExit(child, gracefulMs);
+  if (!graceful && pid !== null) {
+    killPid(pid);
+    await waitForPidExit(pid, 2000);
+    await waitForExit(child, 2000);
+  }
+  return graceful;
+}
+
+/** The finished parts of a session, the running one included (its length
+ * probed now that it has exited). */
+export async function finalParts(record: SessionRecord, ffprobe: string): Promise<SegmentPart[]> {
+  const seg = record.segments;
+  if (!seg) return [];
+  const parts = [...seg.parts];
+  if (seg.current) {
+    const durationSec = (await probeDuration(ffprobe, seg.current.path)) ?? 0;
+    parts.push({ ...seg.current, durationSec });
+  }
+  return parts;
+}
+
+/** True when a segmented session needs joining or a webcam aligned at stop. */
+export function needsJoin(record: SessionRecord): boolean {
+  const seg = record.segments;
+  return !!seg && (seg.parts.length > 0 || !!record.webcam);
+}
+
+/** Join a segmented recording and align its webcam (#200); returns the
+ * record update and a join error. */
+export async function joinSegments(
+  record: SessionRecord,
+  tools: { ffmpeg: string; ffprobe: string },
+): Promise<{ patch: Partial<SessionRecord>; count: number; error?: string }> {
+  const parts = await finalParts(record, tools.ffprobe);
+  const res = await finishSegments(record.outputPath, parts, {
+    ffmpeg: tools.ffmpeg,
+    webcamOutput: record.webcam ? webcamOutputPath(record.outputPath) : undefined,
+    webcamCodec: encoderArgs(record.encoder ?? "x264", record.quality, { gpuFrames: false }),
+  });
+  return {
+    patch: {
+      segments: { parts },
+      ...(record.webcam ? { webcam: { ...record.webcam, error: res.webcamError } } : {}),
+    },
+    count: parts.length,
+    error: res.error,
+  };
+}
+
+/**
+ * Pause a recording (#200): quit the running segment gracefully, probe its
+ * length, and park the session as "paused". The event logger keeps running;
+ * the capture settings stay on the record for resume_recording.
+ */
+export async function pauseSession(
+  store: SessionStore,
+  record: SessionRecord,
+  opts: { probe: (path: string) => Promise<number | null>; gracefulMs?: number },
+): Promise<{ record: SessionRecord | undefined; recordedSec: number; segmentSec: number; graceful: boolean }> {
+  const child = store.getChild(record.id);
+  const blocker = pauseBlocker(record, !!child);
+  if (blocker) throw new ScreencastError(`Cannot pause ${record.id}: ${blocker}.`);
+  markPausing(record.id);
+  store.markStopping(record.id);
+  try {
+    const graceful = await quitChild(child!, record.pid, opts.gracefulMs ?? 8000);
+    store.detachChild(record.id);
+    const cur = record.segments!.current!;
+    const segmentSec = (await opts.probe(cur.path)) ?? 0;
+    const parts = record.segments!.parts;
+    const next = segmentSec > 0 ? [...parts, { ...cur, durationSec: segmentSec }] : parts;
+    if (segmentSec <= 0 && cur.path !== record.outputPath) rmSync(cur.path, { force: true });
+    store.markPaused(record.id);
+    const updated = store.update(record.id, { status: "paused", pid: null, segments: { parts: next } });
+    return { record: updated, recordedSec: recordedSec(next), segmentSec, graceful };
+  } finally {
+    clearPausing(record.id);
+    store.clearStopping(record.id);
+  }
 }
 
 /**
@@ -170,8 +271,22 @@ async function runStop(
       }
     }
     store.detachChild(record.id);
+    // A paused session has nothing running: its last segment ended at the
+    // pause, cleanly (#200).
+    if (record.status === "paused") graceful = true;
+    endSession(record.id);
+    store.clearPaused(record.id);
     // The input event log converts once ffmpeg has exited (#118).
     await whenFinalized(record.id);
+    // Segments after pauses are joined into outputPath, and a webcam lined up
+    // with the recording (#200).
+    let segments: StopResult["segments"];
+    let segmentPatch: Partial<SessionRecord> = {};
+    if (needsJoin(record)) {
+      const join = await joinSegments(record, requireFfmpeg());
+      segmentPatch = join.patch;
+      segments = { count: join.count, ...(join.error ? { error: join.error } : {}) };
+    }
     // A replay buffer is saved to outputPath on request, else discarded (#197).
     const replay = record.replay
       ? await finishReplay(record.replay, {
@@ -184,15 +299,16 @@ async function runStop(
 
     const durationSec = await opts.probe(record.outputPath);
     const updated = store.update(record.id, {
+      ...segmentPatch,
       status: "stopped",
       stoppedAt: new Date().toISOString(),
       durationSec: durationSec ?? undefined,
       endReason: opts.reason,
       // A forced kill can transiently mark the record "failed" via the crash
       // detector in start_recording; a deliberate stop is not a failure.
-      error: undefined,
+      error: segments?.error,
     });
-    return { record: updated, graceful, durationSec, ...(replay ? { replay } : {}) };
+    return { record: updated, graceful, durationSec, ...(replay ? { replay } : {}), ...(segments ? { segments } : {}) };
   } finally {
     if (stopFile) rmSync(stopFile, { force: true });
     store.clearStopping(record.id);

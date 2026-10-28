@@ -1,0 +1,54 @@
+name: Screencast action
+
+# Dogfoods the composite action in action.yml (#179): records this repo's own
+# capture smoke test on windows-latest with the CLI from this checkout, and
+# keeps the GIF, contact sheet, and video as an artifact (always, so a green
+# run still shows what the runner desktop looked like).
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "action.yml"
+      - "src/cli.ts"
+      - "src/index.ts"
+      - ".github/workflows/screencast-action.yml"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  record-smoke-test:
+    permissions:
+      contents: read
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Record the capture smoke test
+        id: screencast
+        uses: ./
+        env:
+          RUN_CAPTURE_SMOKE: "1"
+        with:
+          command: npx vitest run src/__tests__/captureSmoke.test.ts
+          cli-path: dist/index.js
+          artifacts: always
+          discard-on-success: "false"
+          artifact-name: screencast-smoke-test
+          retention-days: "7"
+      - name: Show the outputs
+        shell: pwsh
+        env:
+          EXIT_CODE: ${{ steps.screencast.outputs.exit-code }}
+          GIF: ${{ steps.screencast.outputs.gif }}
+          SHEET: ${{ steps.screencast.outputs.contact-sheet }}
+        run: |
+          "exit code: $env:EXIT_CODE"
+          "gif: $env:GIF"
+          "contact sheet: $env:SHEET"
+          if (-not $env:GIF -or -not (Test-Path $env:GIF)) { throw "The action made no GIF." }

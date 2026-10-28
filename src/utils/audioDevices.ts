@@ -39,6 +39,15 @@ export const NO_LOOPBACK_HINT =
  * audio devices" header) and the inline "(audio)" tag used by newer ffmpeg.
  */
 export function parseDshowAudioDevices(stderr: string): string[] {
+  return parseDshowDevices(stderr, "audio");
+}
+
+/** The video (camera) devices from the same listing, for webcam capture (#200). */
+export function parseDshowVideoDevices(stderr: string): string[] {
+  return parseDshowDevices(stderr, "video");
+}
+
+function parseDshowDevices(stderr: string, kind: "audio" | "video"): string[] {
   const names: string[] = [];
   let section: "audio" | "video" | null = null;
   for (const line of stderr.split(/\r?\n/)) {
@@ -57,7 +66,8 @@ export function parseDshowAudioDevices(stderr: string): string[] {
     const inlineAudio = /\(audio\)/i.test(line);
     const inlineVideo = /\(video\)/i.test(line);
     const isAudio = inlineAudio || (!inlineVideo && section === "audio");
-    if (isAudio && quoted[1]) names.push(quoted[1]);
+    const isVideo = inlineVideo || (!inlineAudio && section === "video");
+    if ((kind === "audio" ? isAudio : isVideo) && quoted[1]) names.push(quoted[1]);
   }
   return [...new Set(names)];
 }
@@ -97,6 +107,7 @@ const ENUM_FAILED_HINT =
 // list_audio_devices tool forces a refresh, so a device enabled mid-session is
 // still discoverable.
 let cachedDevices: string[] | null = null;
+let cachedVideo: string[] | null = null;
 
 /** Run ffmpeg's device list and return the audio device names. ffmpeg exits
  * non-zero for the dummy input by design, so the exit code is ignored and the
@@ -104,6 +115,32 @@ let cachedDevices: string[] | null = null;
  * actionable error rather than the raw "ffmpeg timed out" text. */
 export async function listDshowAudioDevices(forceRefresh = false): Promise<string[]> {
   if (!forceRefresh && cachedDevices) return cachedDevices;
+  await enumerateDshow();
+  return cachedDevices ?? [];
+}
+
+/** The dshow video (camera) device names (#200), cached like the audio list. */
+export async function listDshowVideoDevices(forceRefresh = false): Promise<string[]> {
+  if (!forceRefresh && cachedVideo) return cachedVideo;
+  await enumerateDshow();
+  return cachedVideo ?? [];
+}
+
+/** Pick the camera: an explicit name must be listed; else the first one. */
+export async function resolveVideoDevice(explicit?: string): Promise<string> {
+  const devices = await listDshowVideoDevices();
+  if (explicit && explicit.trim().length > 0) {
+    if (devices.includes(explicit)) return explicit;
+    throw new ScreencastError(
+      `Video device "${explicit}" not found. Available dshow video devices: ${devices.join(", ") || "none"}.`,
+    );
+  }
+  const first = devices[0];
+  if (!first) throw new ScreencastError("No webcam (dshow video device) found.", "Connect a camera, then run list_video_devices.");
+  return first;
+}
+
+async function enumerateDshow(): Promise<void> {
   const { ffmpeg } = requireFfmpeg();
   let res;
   try {
@@ -122,14 +159,14 @@ export async function listDshowAudioDevices(forceRefresh = false): Promise<strin
       ENUM_FAILED_HINT,
     );
   }
-  const devices = parseDshowAudioDevices(res.stderr);
-  cachedDevices = devices;
-  return devices;
+  cachedDevices = parseDshowAudioDevices(res.stderr);
+  cachedVideo = parseDshowVideoDevices(res.stderr);
 }
 
 /** Drop the cached device list (test seam; also lets a caller force a re-probe). */
 export function clearAudioDeviceCache(): void {
   cachedDevices = null;
+  cachedVideo = null;
 }
 
 /** Resolve the loopback device to use, throwing a clear, actionable error when

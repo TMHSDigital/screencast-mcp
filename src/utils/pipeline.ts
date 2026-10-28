@@ -37,6 +37,16 @@ import { cutFilters, cutsFor, DEFAULT_KEEP_SEC, DEFAULT_MIN_IDLE_SEC } from "./i
 import { denoiseFilter, loudnessTarget, loudnormFilter, type DenoiseStrength, type LoudnessMeasurement, type LoudnessPreset } from "./audio.js";
 import { subtitlesFilter, type CaptionStyle } from "./captions.js";
 import { mapSpans, mapTime, type Span } from "./timeline.js";
+import { cursorSteps, transformCursor, type CursorPlan, type CursorPlanOptions, type CursorStyle } from "./cursor.js";
+
+/** What a cursor step needs (#170): the cursor planned from the event log on
+ * the source's clock and pixels (moved here through earlier timing changes,
+ * crops and scales), the sprite, and where its sendcmd script will be. */
+export interface CursorStepAssets {
+  plan: CursorPlan;
+  sprite: string;
+  commandsFile: string;
+}
 
 /** What a keystroke_overlay step needs: the badges planned from the event log
  * on the source's clock (retimed here through earlier trims and speed
@@ -69,6 +79,7 @@ export type PipelineStep =
   | { op: "burn_subtitles"; subtitles?: string; transcribe?: boolean; style?: CaptionStyle }
   | ({ op: "backdrop" } & BackdropOptions)
   | ({ op: "keystroke_overlay"; events?: string; fontFile?: string } & BadgePlanOptions & BadgeStyle)
+  | ({ op: "cursor"; events?: string } & CursorPlanOptions & CursorStyle)
   | { op: "export_preset"; platform: Platform; fit?: ReframeFit }
   | ({ op: "export_gif" } & AnimExportOptions);
 
@@ -105,6 +116,7 @@ export interface PipelineOptions {
   /** An FFMETADATA file whose chapters the output gets (#174). */
   chaptersFile?: string;
   keystrokes?: Record<number, KeystrokeStepAssets>;
+  cursor?: Record<number, CursorStepAssets>;
   /** Idle stretches (frozen, and silent when scanned with audio) on the source's clock, for cut_idle. */
   idle?: Span[];
   /** Logged clicks on the source's clock and pixels, per zoom step that follows them. */
@@ -132,6 +144,9 @@ export interface PipelinePlan {
   timeOps: TimeOp[];
   /** Probes still to run, in step order; until then the plan uses stand-ins. */
   pending: PipelinePending[];
+  /** Files the command reads that the plan wrote the text of (cursor sendcmd
+   * scripts): the caller writes them before running it. */
+  files: Array<{ path: string; content: string }>;
 }
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -193,6 +208,7 @@ export function planPipeline(
   const summary: string[] = [];
   const timeOps: TimeOp[] = [];
   const pending: PipelinePending[] = [];
+  const files: PipelinePlan["files"] = [];
   // Source pixels -> current pixels (x * sx + ox), while only crops and scales
   // have changed the frame; null once a zoom, reframe or backdrop has.
   let geo: { sx: number; sy: number; ox: number; oy: number } | null = { sx: 1, sy: 1, ox: 0, oy: 0 };
@@ -409,6 +425,31 @@ export function planPipeline(
         summary.push(`keystroke_overlay ${badges.length} badge(s)`);
         break;
       }
+      case "cursor": {
+        // Like zoom follow:"clicks": logged positions only match the frame
+        // until a zoom, reframe or backdrop moves the content. Before a zoom,
+        // the zoom then moves the drawn cursor with everything else.
+        if (!geo) {
+          throw new ScreencastError(
+            `step ${at}: cursor must come before zoom, reframe or backdrop; the logged positions no longer match the frame after them.`,
+          );
+        }
+        const c = opts.cursor?.[i];
+        if (!c) throw new ScreencastError(`Internal: missing cursor plan for step ${at}.`);
+        const moved = transformCursor(c.plan, timeOps, geo);
+        if (moved.path.length === 0 || moved.visible.length === 0) {
+          summary.push("cursor: no cursor movement in this part of the video");
+          break;
+        }
+        const { steps: st, out: o, extraInputs: ex, commands } = cursorSteps(moved, s, { width: W, height: H }, cur, nextInput, tag, c.sprite, c.commandsFile);
+        graph.push(...st);
+        extraInputs.push(...ex);
+        nextInput += ex.length / 2;
+        cur = o;
+        files.push({ path: c.commandsFile, content: commands });
+        summary.push(`cursor ${moved.path.length} segment(s), ${moved.clicks.length} click(s)${s.spotlight ? ", spotlight" : ""}`);
+        break;
+      }
       case "export_preset": {
         const p = exportPresetParts(s.platform, s.fit ?? "pad", tag);
         geo = null;
@@ -454,5 +495,5 @@ export function planPipeline(
   }
   if (chaptersInput !== -1) args.push("-map_chapters", String(chaptersInput));
   args.push(output);
-  return { args, width: W, height: H, fps, durationSec: dur === null ? null : r3(dur), gif, summary, timeOps, pending };
+  return { args, width: W, height: H, fps, durationSec: dur === null ? null : r3(dur), gif, summary, timeOps, pending, files };
 }

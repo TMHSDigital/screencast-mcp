@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>screen_diff — Screencast MCP</title>
+  <meta name="description" content="Compare two screenshots or frames: SSIM score, changed share, and changed boxes in b's pixels, to check a UI change happened only where expected.">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/tools/screen_diff.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="screen_diff — Screencast MCP">
+  <meta property="og:description" content="Compare two screenshots or frames: SSIM score, changed share, and changed boxes in b's pixels, to check a UI change happened only where expected.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/tools/screen_diff.html">
+  <meta property="og:site_name" content="Screencast MCP">
+  <meta property="og:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Screencast MCP: give your agent eyes on the screen. A recorded window zooms in on a clicked Save button.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <link rel="preload" href="../fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../tools/" class="here">Tools</a>
+      <a href="../workflows/">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">TOOLS</a> / WATCH</p>
+      <h1>Screen Diff</h1>
+      <p class="tool-id"><code>screen_diff</code></p>
+      <p class="lede">Compare two screenshots or frames: SSIM score, changed share, and changed boxes in b's pixels, to check a UI change happened only where expected.</p>
+      <p class="chips"><span class="chip set">watch</span><span class="chip">read-only</span><span class="chip">idempotent</span><span class="chip">since v0.18.0</span></p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>PARAMETERS</span></div>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>a</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Before image (or video: first frame).</td></tr>
+          <tr><td><code>b</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>After image (or video); scaled to a's size.</td></tr>
+          <tr><td><code>pixelThreshold</code></td><td><code class="type">number</code></td><td>Mean 0-255 difference for a ~32x32 cell to count as changed (default 12). <span class="bounds">≥ 0, ≤ 255</span></td></tr>
+          <tr><td><code>returnImage</code></td><td><code class="type">boolean</code></td><td>Return b inline with changes outlined (default true).</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>A MINIMAL CALL</span></div>
+      <pre class="copyable"><code>screen_diff { &quot;a&quot;: &quot;before.png&quot;, &quot;b&quot;: &quot;after.png&quot; }</code></pre>
+      <p>The required arguments only, with placeholder values. Everything else takes its default.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:10</span><span>WHAT COMES BACK</span></div>
+      <p>Structured content (<code>structuredContent</code>), alongside a text summary:</p>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Field</th><th>Type</th></tr></thead>
+        <tbody>
+          <tr><td><code>identical</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr><td><code>ssim</code> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
+          <tr><td><code>meanDiff</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr><td><code>changedFraction</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr><td><code>regions</code> <span class="req">always</span></td><td><code class="type">any[]</code></td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:15</span><span>SEEN IN</span></div>
+      <ul class="recipes">
+        <li><a href="../workflows/verify-ui.html"><span class="tc">REC 03</span><span class="name">Agent UI verification loop</span><span class="chain">screenshot &rarr; wait_for_change &rarr; screen_diff &rarr; find_text</span></a></li>
+      </ul>
+    </section>
+      <nav class="pager" aria-label="More tools">
+        <span><a href="contact_sheet.html">&larr; contact_sheet</a></span>
+        <span><a href="wait_for_change.html">wait_for_change &rarr;</a></span>
+      </nav>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>License: <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/LICENSE">CC BY-NC-ND 4.0</a> &middot; free for non-commercial use</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>

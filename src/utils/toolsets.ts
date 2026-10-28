@@ -12,6 +12,8 @@ export const TOOLSETS = {
   capture: [
     "start_recording",
     "stop_recording",
+    "pause_recording",
+    "resume_recording",
     "save_replay",
     "list_sessions",
     "get_session",
@@ -20,6 +22,7 @@ export const TOOLSETS = {
     "screenshot",
     "list_targets",
     "list_audio_devices",
+    "list_video_devices",
   ],
   watch: [
     "sample_frames",
@@ -50,6 +53,7 @@ export const TOOLSETS = {
   produce: [
     "callout",
     "keystroke_overlay",
+    "cursor",
     "backdrop",
     "overlay",
     "zoom",
@@ -63,7 +67,7 @@ export const TOOLSETS = {
     "bug_report",
     "step_guide",
   ],
-  audio: ["extract_audio", "normalize_audio", "denoise", "transcribe", "music_bed"],
+  audio: ["extract_audio", "normalize_audio", "denoise", "transcribe", "music_bed", "narrate"],
 } as const satisfies Record<string, readonly string[]>;
 
 export type ToolsetName = keyof typeof TOOLSETS;
@@ -122,6 +126,7 @@ export function serverInstructions(selection: ToolsetSelection): string {
       "Capture: screenshot for a still; start_recording -> (do the task) -> stop_recording for video " +
         "(events: true also logs clicks for read_events and zoom). For flaky failures, start_recording " +
         "{ replayBufferSec } keeps a rolling buffer and save_replay writes the last seconds after the fact. " +
+        "pause_recording/resume_recording skip setup; backend ddagrab uses the GPU. " +
         "Never start a recording the user did not ask for.",
     );
   }
@@ -142,7 +147,7 @@ export function serverInstructions(selection: ToolsetSelection): string {
   }
   if (on.has("produce")) {
     lines.push(
-      "Produce: callout, zoom, keystroke_overlay, backdrop, overlay, title_card, xfade_transition, assemble_highlights, burn_subtitles, export_preset.",
+      "Produce: callout, zoom, keystroke_overlay, cursor, backdrop, overlay, title_card, xfade_transition, assemble_highlights, burn_subtitles, export_preset.",
     );
   }
   if (on.has("produce")) {
@@ -160,7 +165,7 @@ export function serverInstructions(selection: ToolsetSelection): string {
     lines.push(`Markers: ${marks.filter(Boolean).join(" ")}`);
   }
   if (on.has("audio")) {
-    lines.push("Audio: extract_audio, normalize_audio, denoise, music_bed; transcribe makes an SRT for burn_subtitles (words: true for word timing, then cut_by_transcript cuts by quoting it).");
+    lines.push("Audio: extract_audio, normalize_audio, denoise, music_bed, narrate (offline voiceover); transcribe makes an SRT for burn_subtitles (words: true for word timing, then cut_by_transcript cuts by quoting it).");
   }
   lines.push(
     "Outputs go under SCREENCAST_HOME unless a call names a path; times are seconds and positions video pixels. " +

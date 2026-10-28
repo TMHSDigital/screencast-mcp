@@ -16,6 +16,9 @@ import {
 import { register as registerStartRecording } from "./tools/startRecording.js";
 import { register as registerStopRecording } from "./tools/stopRecording.js";
 import { register as registerSaveReplay } from "./tools/saveReplay.js";
+import { register as registerPauseRecording } from "./tools/pauseRecording.js";
+import { register as registerResumeRecording } from "./tools/resumeRecording.js";
+import { register as registerListVideoDevices } from "./tools/listVideoDevices.js";
 import { register as registerListSessions } from "./tools/listSessions.js";
 import { register as registerGetSession } from "./tools/getSession.js";
 import { register as registerReadEvents } from "./tools/readEvents.js";
@@ -41,6 +44,7 @@ import { register as registerSpeed } from "./tools/speed.js";
 import { register as registerOverlay } from "./tools/overlay.js";
 import { register as registerCallout } from "./tools/callout.js";
 import { register as registerKeystrokeOverlay } from "./tools/keystrokeOverlay.js";
+import { register as registerCursor } from "./tools/cursor.js";
 import { register as registerBackdrop } from "./tools/backdrop.js";
 import { register as registerCompress } from "./tools/compress.js";
 import { register as registerExtractAudio } from "./tools/extractAudio.js";
@@ -59,6 +63,7 @@ import { register as registerXfadeTransition } from "./tools/xfadeTransition.js"
 import { register as registerAssembleHighlights } from "./tools/assembleHighlights.js";
 import { register as registerTitleCard } from "./tools/titleCard.js";
 import { register as registerMusicBed } from "./tools/musicBed.js";
+import { register as registerNarrate } from "./tools/narrate.js";
 import { register as registerReframe } from "./tools/reframe.js";
 import { register as registerZoom } from "./tools/zoom.js";
 import { register as registerPipeline } from "./tools/pipeline.js";
@@ -99,6 +104,8 @@ export function createServer(options: { toolsets?: string } = {}): McpServer {
 
   registerStartRecording(server);
   registerStopRecording(server);
+  registerPauseRecording(server);
+  registerResumeRecording(server);
   registerSaveReplay(server);
   registerListSessions(server);
   registerGetSession(server);
@@ -124,6 +131,7 @@ export function createServer(options: { toolsets?: string } = {}): McpServer {
   registerOverlay(server);
   registerCallout(server);
   registerKeystrokeOverlay(server);
+  registerCursor(server);
   registerBackdrop(server);
   registerCompress(server);
   registerExtractAudio(server);
@@ -137,12 +145,14 @@ export function createServer(options: { toolsets?: string } = {}): McpServer {
   registerCutByTranscript(server);
   registerRedactRegion(server);
   registerListAudioDevices(server);
+  registerListVideoDevices(server);
   registerListTargets(server);
   registerDoctor(server);
   registerXfadeTransition(server);
   registerAssembleHighlights(server);
   registerTitleCard(server);
   registerMusicBed(server);
+  registerNarrate(server);
   registerReframe(server);
   registerZoom(server);
   registerPipeline(server);

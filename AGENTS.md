@@ -10,7 +10,8 @@ This is the single source: `CLAUDE.md` and `.cursorrules` point here.
 A stdio MCP server (TypeScript, Node 22+) that records the Windows screen,
 returns frames the model can see, and edits media with ffmpeg.
 
-- **`src/index.ts`** -- entry point: connects the server over stdio
+- **`src/index.ts`** -- entry point: connects the server over stdio, or hands a subcommand (`record`, `call`) to `src/cli.ts`
+- **`src/cli.ts`** -- the headless CLI: drives the same tool handlers through an in-memory client (used by `action.yml`)
 - **`src/server.ts`** -- builds the `McpServer` and wires every tool, prompt, and resource (no transport, so tests connect it in memory)
 - **`src/tools/`** -- one MCP tool per file; each exports `register(server)`, which `src/server.ts` calls
 - **`src/utils/`** -- pure helpers: ffmpeg argument builders (input in, args out), target resolution, sessions, jobs, OCR, and so on. Keep logic here so it is unit-testable without ffmpeg
@@ -18,8 +19,10 @@ returns frames the model can see, and edits media with ffmpeg.
 - **`src/wgcRecorder.ts`** -- the recorder process `start_recording` spawns for `backend: "wgc"` (Windows Graphics Capture)
 - **`src/__tests__/`** -- vitest unit tests; `src/__tests__/integration/` runs real ffmpeg; `server.test.ts` drives the tool handlers through an in-memory MCP client
 - **`assets/`** -- shipped with the package: bundled fonts, the review player UI (`assets/ui/`), and the bundle icon
-- **`scripts/`** -- the Claude Desktop bundle (`build-mcpb.mjs`, `mcpb-manifest.mjs`) and the docs page builder
-- **`mcp-tools.json`** -- the registered tools; a test checks it matches `src/server.ts`
+- **`scripts/`** -- the Claude Desktop bundle (`build-mcpb.mjs`, `mcpb-manifest.mjs`) and the docs generators: `build-tool-docs.mjs` (`npm run docs`) renders `tool-docs.mjs` (tool reference, README/home tables, `mcp-tools.json`, llms.txt, sitemap) and `build-docs-pages.mjs` (workflow, connect, and CI pages)
+- **`mcp-tools.json`** -- the registered tools, generated from the live registry by `npm run docs`
+- **`plugin/`**, **`.claude-plugin/marketplace.json`** -- the Claude Code plugin (the server plus workflow skills) and its marketplace entry
+- **`action.yml`** -- the composite GitHub Action that records a test run with the CLI
 - **`server.json`** -- the MCP Registry listing
 - **`docs/`** -- the GitHub Pages site (hand-written HTML/CSS/JS, no build step for most pages)
 - **`package.json`** -- version source of truth; **`CHANGELOG.md`** -- release history
@@ -32,7 +35,7 @@ watch, and produce tools run anywhere ffmpeg runs.
 
 1. Add `src/tools/<camelName>.ts` exporting `register(server)`; keep ffmpeg argument building in a pure helper under `src/utils/`
 2. Wire it up in `src/server.ts`
-3. Add it to `mcp-tools.json`, the README tools table, and the tools table in `docs/index.html` (tests check all three)
+3. Run `npm run docs`: it regenerates `mcp-tools.json`, the README and `docs/index.html` tool tables, and `docs/tools/<name>.html` from the registry (the docs test fails on a stale copy). Never edit between the `<!-- tools:... -->` markers by hand
 4. Add vitest tests: unit tests for the builder, plus a case in `src/__tests__/integration/` for anything that produces media
 5. Add a `CHANGELOG.md` entry under `## Unreleased`
 
@@ -64,7 +67,7 @@ the MCP Registry; `pages.yml` deploys `docs/`.
 ## Code conventions
 
 - No hardcoded credentials; never commit captured media (`.gitignore` blocks it).
-- Keep `mcp-tools.json`, the README tools table, and `docs/index.html` in sync with the registered tools.
+- `mcp-tools.json`, the tool tables, `docs/tools/`, `docs/llms*.txt`, `docs/sitemap.xml`, and the workflow pages are generated: change the tool or `scripts/`, then `npm run docs`.
 - Every environment variable in the README's Configuration table must also be in `server.json` and `scripts/mcpb-manifest.mjs` (tests check this).
 - Machine-local agent instructions go in `CLAUDE.local.md` (gitignored), not in checked-in files.
 

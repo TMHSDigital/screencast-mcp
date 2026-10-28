@@ -9,6 +9,7 @@
 | `drift-check.yml` | push and PR to `main` | Ecosystem standards check. |
 | `labeler.yml` (Label PRs) | `pull_request_target` | Path labels from `.github/labeler.yml`; never checks out PR code. |
 | `pages.yml` | push to `main` touching `docs/` or `assets/` | Deploys the docs site. |
+| `screencast-action.yml` (Screencast action) | PR touching `action.yml` or the CLI, dispatch | Runs the composite action in `action.yml` on `windows-latest` with this checkout's CLI: records the capture smoke test and uploads the GIF, contact sheet, and video. |
 | `stale.yml` | weekly | Labels inactive issues (never closes them) and closes stale PRs. |
 
 Every `uses:` is pinned to a commit SHA with its version in a comment; Dependabot keeps them current. Each workflow sets `permissions: {}` and grants what a job needs on that job.

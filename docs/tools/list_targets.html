@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>list_targets — Screencast MCP</title>
+  <meta name="description" content="List the desktop, monitors, and visible windows (topmost first, with capturability per backend).">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/tools/list_targets.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="list_targets — Screencast MCP">
+  <meta property="og:description" content="List the desktop, monitors, and visible windows (topmost first, with capturability per backend).">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/tools/list_targets.html">
+  <meta property="og:site_name" content="Screencast MCP">
+  <meta property="og:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Screencast MCP: give your agent eyes on the screen. A recorded window zooms in on a clicked Save button.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <link rel="preload" href="../fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../tools/" class="here">Tools</a>
+      <a href="../workflows/">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">TOOLS</a> / CAPTURE</p>
+      <h1>List Capture Targets</h1>
+      <p class="tool-id"><code>list_targets</code></p>
+      <p class="lede">List the desktop, monitors, and visible windows (topmost first, with capturability per backend). Each entry has a <code>target</code> string to pass as-is to capture tools; use it instead of guessing a title.</p>
+      <p class="chips"><span class="chip set">capture</span><span class="chip">read-only</span><span class="chip">idempotent</span><span class="chip">since v0.43.0</span></p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>PARAMETERS</span></div>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>exe</code></td><td><code class="type">string</code></td><td>Only list windows of this executable, e.g. 'Code.exe' or 'code'.</td></tr>
+          <tr><td><code>titleContains</code></td><td><code class="type">string</code></td><td>Only list windows whose title contains this text (case-insensitive).</td></tr>
+          <tr><td><code>capturableOnly</code></td><td><code class="type">boolean</code></td><td>Leave out windows neither backend can capture (minimized, off screen). Default false.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>A MINIMAL CALL</span></div>
+      <pre class="copyable"><code>list_targets {}</code></pre>
+      <p>The required arguments only, with placeholder values. Everything else takes its default.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:10</span><span>WHAT COMES BACK</span></div>
+      <p>Structured content (<code>structuredContent</code>), alongside a text summary:</p>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Field</th><th>Type</th></tr></thead>
+        <tbody>
+          <tr><td><code>full</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr class="nested d1"><td><code>full.target</code> <span class="req">always</span></td><td><code class="type">&quot;full&quot;</code></td></tr>
+          <tr class="nested d1"><td><code>full.bounds</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr><td><code>monitors</code> <span class="req">always</span></td><td><code class="type">object[]</code></td></tr>
+          <tr class="nested d1"><td><code>monitors[].target</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr class="nested d1"><td><code>monitors[].index</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr class="nested d1"><td><code>monitors[].primary</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr class="nested d1"><td><code>monitors[].bounds</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr class="nested d1"><td><code>monitors[].dpi</code> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
+          <tr class="nested d1"><td><code>monitors[].scale</code> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
+          <tr><td><code>windows</code> <span class="req">always</span></td><td><code class="type">object[]</code></td></tr>
+          <tr class="nested d1"><td><code>windows[].target</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr class="nested d1"><td><code>windows[].title</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr class="nested d1"><td><code>windows[].exe</code> <span class="req">always</span></td><td><code class="type">string | null</code></td></tr>
+          <tr class="nested d1"><td><code>windows[].pid</code> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
+          <tr class="nested d1"><td><code>windows[].hwnd</code> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
+          <tr class="nested d1"><td><code>windows[].bounds</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr class="nested d1"><td><code>windows[].minimized</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr class="nested d1"><td><code>windows[].cloaked</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr class="nested d1"><td><code>windows[].capturable</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr class="nested d1"><td><code>windows[].wgcCapturable</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr><td><code>wgcAvailable</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr><td><code>note</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+      <nav class="pager" aria-label="More tools">
+        <span><a href="list_video_devices.html">&larr; list_video_devices</a></span>
+        <span><a href="doctor.html">doctor &rarr;</a></span>
+      </nav>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>License: <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/LICENSE">CC BY-NC-ND 4.0</a> &middot; free for non-commercial use</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>

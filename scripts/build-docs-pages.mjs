@@ -1,72 +1,17 @@
 // Generate the workflow recipe pages and the Connect page under docs/.
 // The pages are committed static HTML; edit the data below and run
-//   node scripts/build-docs-pages.mjs docs
-// docs/index.html and docs/404.html are written by hand.
+//   npm run docs
+// (or node scripts/build-docs-pages.mjs docs). `npm run docs:check` and the
+// docs test fail when a committed page differs from what this produces.
+// docs/index.html and docs/404.html are written by hand; the page shell is
+// shared with the tool reference in site-shell.mjs.
 import { writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { page } from "./site-shell.mjs";
 
-const docs = process.argv[2] ?? "docs";
-mkdirSync(join(docs, "workflows"), { recursive: true });
-const SITE = "https://tmhsdigital.github.io/screencast-mcp/";
-
-function page({ path, title, description, root, crumbs, body }) {
-  const url = SITE + path.replace(/index\.html$/, "");
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${title} — Screencast MCP</title>
-  <meta name="description" content="${description}">
-  <link rel="canonical" href="${url}">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
-  <meta property="og:title" content="${title} — Screencast MCP">
-  <meta property="og:description" content="${description}">
-  <meta property="og:type" content="article">
-  <meta property="og:url" content="${url}">
-  <meta property="og:site_name" content="Screencast MCP">
-  <meta property="og:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Screencast MCP: give your agent eyes on the screen. A recorded window zooms in on a clicked Save button.">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
-  <link rel="preload" href="${root}fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="${root}fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <script>document.documentElement.classList.add("js")</script>
-  <link rel="stylesheet" href="${root}site.css">
-</head>
-<body>
-  <header class="hud" aria-label="Recording status bar">
-    <div class="hud-left">
-      <span class="rec-dot" aria-hidden="true"></span>
-      <span class="rec-label">REC</span>
-      <span id="tc">00:00:00;00</span>
-    </div>
-    <div class="hud-right">
-      <a class="home" href="${root}">screencast-mcp</a>
-      <a href="${root}workflows/"${path.startsWith("workflows") ? ' class="here"' : ""}>Workflows</a>
-      <a href="${root}connect.html"${path === "connect.html" ? ' class="here"' : ""}>Connect</a>
-      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
-    </div>
-  </header>
-
-  <main class="wrap">
-    <section class="page-head">
-      <p class="crumbs">${crumbs}</p>
-${body}
-    <footer>
-      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
-      <span>License: <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/LICENSE">CC BY-NC-ND 4.0</a> &middot; free for non-commercial use</span>
-    </footer>
-  </main>
-
-  <script src="${root}site.js"></script>
-</body>
-</html>
-`;
-}
-
+/** Every page this script owns: path under docs/ -> HTML. */
+export const PAGES = new Map();
 const take = (call, why, ret) =>
   `        <li><span class="call">${call}</span>${why ? `<span class="why">${why}</span>` : ""}${ret ? `<span class="ret">${ret}</span>` : ""}</li>`;
 const b = (name) => `<b>${name}</b>`;
@@ -187,6 +132,22 @@ const RECIPES = [
       take(`${b("pipeline")} { "input": "rec-….mp4", "dryRun": true, "steps": [<br>&nbsp;&nbsp;{ "op": "redact", "regions": [{ "x": 152, "y": 121, "width": 196, "height": 22 }] },<br>&nbsp;&nbsp;{ "op": "trim", "start": 0.5, "end": 5 },<br>&nbsp;&nbsp;{ "op": "callout", "items": [ { "type": "box", … }, { "type": "text", "text": "Save hangs for 2.5 s", … } ] },<br>&nbsp;&nbsp;{ "op": "export_gif", "width": 480, "fps": 10, "maxBytes": 2000000 } ] }`, "The plan: what each step became, and the fused ffmpeg command. Redact runs first, so it covers the whole clip; callout times are on the trimmed timeline.", `{ "steps": ["redact 1 region(s), box", "trim 0.5-5s: trim filter", "callout 2 item(s)", "export_gif (gif): second stage, size-budget ladder"], "processes": 2, "width": 602, "height": 352, "durationSec": 4.5 }`),
       take(`${b("pipeline")} { …the same steps, without dryRun }`, "One fused encode, then the GIF size ladder. 368 ms here, against six tool calls for REC 01.", `{ "outputPath": "pipeline-….gif", "animation": { "sizeBytes": 47020, "withinBudget": true } }`),
     ],
+    // A chapter between the calls and the output.
+    extra: `    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:20</span><span>OR NAME A RECIPE</span></div>
+      <p>For the usual polish, name a <code>recipe</code> instead of writing steps. It expands to ordinary steps, so <code>dryRun</code> shows exactly what will run, and any step you pass replaces the recipe's step with the same op (an export replaces its export); a <code>trim</code> you add runs first, on the source's timeline, and other steps go just before the export.</p>
+      <ul>
+        <li><code>pr_demo</code>: <code>cut_idle</code> &rarr; <code>zoom</code> toward logged clicks &rarr; GIF under 10 MB.</li>
+        <li><code>tutorial</code>: <code>cut_idle</code> &rarr; click zoom &rarr; <code>audio</code> (light denoise, normalize to -14 LUFS) &rarr; captions transcribed with whisper &rarr; 1080p YouTube mp4.</li>
+        <li><code>social_reel</code>: <code>cut_idle</code> &rarr; click zoom &rarr; normalize &rarr; 9:16 &rarr; big captions &rarr; Reels/TikTok mp4.</li>
+      </ul>
+      <ol class="takes">
+        <li><span class="call"><b>pipeline</b> { "input": "rec-….mp4", "recipe": "tutorial", "chapters": true, "dryRun": true }</span><span class="why">A 10 s recording with a 4 s pause and one logged click. No whisper model is set, so captions are left out with a note instead of failing; the loudness is measured when it runs.</span><span class="ret">{ "expandedSteps": [{ "op": "cut_idle" }, { "op": "zoom", "follow": "clicks" }, { "op": "audio", "denoise": "light", "normalize": "youtube" }, { "op": "export_preset", "platform": "youtube" }], "steps": ["cut_idle 1 stretch(es), 3.2s removed", "zoom 2 keyframe(s) from 1 click(s)", "audio: denoise light, normalize to -14 LUFS", "export_preset youtube"], "measuredOnRun": ["step 3: noisefloor", "step 3: loudness"], "warnings": ["captions left out: no whisper model (set SCREENCAST_WHISPER_MODEL)."] }</span></li>
+      </ol>
+      <p>Everything recorded on the source's clock (clicks, markers, keystroke badges, a subtitle file) is moved through the cut, so chapters and captions still land on the right moment. Idle stretches are found on the source, so put <code>cut_idle</code> before steps that animate the picture.</p>
+    </section>
+
+`,
     output: { src: "../media/pipeline.gif", w: 480, h: 281, alt: "The same bug-repro GIF as REC 01: the API key covered by a black box, a red box and label on the Save button, then the Saved banner.", cap: `<span class="tc">pipeline.gif</span> · 480 × 281 · 46 KB · one pipeline call` },
     after: `<p>Steps run in order, and each sees the frame and timeline left by the steps before it: crop then redact means redact coordinates are in the cropped frame. <code>export_preset</code> or <code>export_gif</code> can only come last. Without one, the result is an mp4 at <code>quality</code> (default standard).</p>`,
   },
@@ -236,7 +197,7 @@ ${r.takes.join("\n")}
       </ol>
     </section>
 
-    <section class="chapter">
+${r.extra ?? ""}    <section class="chapter">
       <div class="tc-mark"><span class="tc">00:30</span><span>THE OUTPUT</span></div>
 ${(r.outputs ?? [r.output]).map((o) => `      <figure class="output">
         <div class="frame">${media(o)}</div>
@@ -249,13 +210,13 @@ ${(r.outputs ?? [r.output]).map((o) => `      <figure class="output">
       </nav>
     </section>
 `;
-  writeFileSync(join(docs, "workflows", `${r.slug}.html`), page({
+  PAGES.set(`workflows/${r.slug}.html`, page({
     path: `workflows/${r.slug}.html`, title: r.name, description: r.description, root: "../",
     crumbs: `<a href="../">SCREENCAST-MCP</a> / <a href="./">WORKFLOWS</a> / REC ${r.n}`, body,
   }));
 });
 
-writeFileSync(join(docs, "workflows", "index.html"), page({
+PAGES.set("workflows/index.html", page({
   path: "workflows/index.html", title: "Workflows",
   description: "Copy-paste recipes for screencast-mcp: bug-repro clips, README GIFs, UI verification, social clips, and reviewing long recordings.",
   root: "../", crumbs: `<a href="../">SCREENCAST-MCP</a> / WORKFLOWS`,
@@ -287,7 +248,10 @@ const VSCODE_INSTALL = "https://insiders.vscode.dev/redirect/mcp/install?name=sc
 const CLIENTS = [
   { id: "claude-code", name: "Claude Code", body: `      <p>One command. On native Windows, <code>npx</code> needs the <code>cmd /c</code> wrapper:</p>
 ${pre("claude mcp add screencast -- cmd /c npx -y @tmhs/screencast-mcp")}
-      <p>Add <code>--scope user</code> to make it available in every project, or <code>--scope project</code> to share it through a checked-in <code>.mcp.json</code>. Check it with <code>claude mcp list</code>, or <code>/mcp</code> inside a session.</p>` },
+      <p>Add <code>--scope user</code> to make it available in every project, or <code>--scope project</code> to share it through a checked-in <code>.mcp.json</code>. Check it with <code>claude mcp list</code>, or <code>/mcp</code> inside a session.</p>
+      <p><strong>Or install the plugin:</strong> the same server plus skills that load when you ask for a bug-repro GIF, a README demo, or a check of a UI change on screen.</p>
+${pre("/plugin install screencast --marketplace TMHSDigital/screencast-mcp")}
+      <p>On an older Claude Code, add the marketplace first: <code>/plugin marketplace add TMHSDigital/screencast-mcp</code>, then <code>/plugin install screencast@screencast-mcp</code>.</p>` },
   { id: "claude-desktop", name: "Claude Desktop", body: `      <p><strong>One click:</strong> download <a href="${BUNDLE}"><code>screencast-mcp.mcpb</code></a> (always the <a href="https://github.com/TMHSDigital/screencast-mcp/releases/latest">latest release</a>) and open it, or drag it into <strong>Settings &rsaquo; Extensions</strong>. Claude Desktop runs it with its own Node and lets you set every option without editing JSON: the output folder, <code>ffmpeg.exe</code> and <code>ffprobe.exe</code> if they are not on <code>PATH</code>, a Whisper model for <code>transcribe</code>, the default recording cap, the edit job timeout, capture retention, and the PowerShell helper timeout.</p>
       <p>Or by hand: <strong>Settings &rsaquo; Developer &rsaquo; Edit Config</strong> opens <code>%APPDATA%\\Claude\\claude_desktop_config.json</code>. Add:</p>
 ${pre(json({ mcpServers: { screencast: NPX } }))}
@@ -305,7 +269,7 @@ ${pre(`code --add-mcp ${cmdQuote(ADD_MCP)}`)}
 ${pre(json({ servers: { screencast: { type: "stdio", ...NPX } } }))}
       <p>Use it from Copilot Chat in agent mode. The server's prompts appear as <code>/mcp.screencast.*</code> slash commands.</p>` },
 ];
-writeFileSync(join(docs, "connect.html"), page({
+PAGES.set("connect.html", page({
   path: "connect.html", title: "Connect your client",
   description: "Set up screencast-mcp in Claude Code, Claude Desktop, Cursor, or VS Code.",
   root: "./", crumbs: `<a href="./">SCREENCAST-MCP</a> / CONNECT`,
@@ -332,4 +296,72 @@ ${c.body}
     </section>
 `,
 }));
-console.log("wrote", RECIPES.length + 2, "pages");
+// The headless CLI and the GitHub Action (#179).
+const WORKFLOW_YAML = `jobs:
+  ui-tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 22
+      - run: npm ci
+      - uses: TMHSDigital/screencast-mcp@main # pin a release tag or SHA
+        with:
+          command: npm run test:e2e
+          target: full          # or window:exe=MyApp.exe
+          artifacts: failure    # GIF and contact sheet only when it fails`;
+PAGES.set("ci.html", page({
+  path: "ci.html", title: "Record test runs in CI",
+  description: "Record the Windows desktop while a desktop-app test suite runs on windows-latest, and keep a GIF, contact sheet, and video of every failure.",
+  root: "./", crumbs: `<a href="./">SCREENCAST-MCP</a> / CI`,
+  body: `      <h1>Record test runs in CI</h1>
+      <p class="lede">Browser tests get a video of every failure for free. Desktop apps on Windows (Electron, WPF, WinUI, WinForms, games) don't. <code>screencast-mcp record</code> runs your test command while it records the runner's desktop, then turns a failure into a GIF and a contact sheet you can open from the run.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>THE COMMAND LINE</span></div>
+      <p>The same tools the MCP server exposes, without an MCP client. The command's exit code passes straight through.</p>
+${pre("npx -y @tmhs/screencast-mcp record --target full -- npm run test:e2e")}
+      <ul>
+        <li><code>--target</code>: <code>full</code> (default), <code>monitor:0</code>, <code>window:exe=MyApp.exe</code>, or <code>region:x,y,w,h</code>.</li>
+        <li><code>--artifacts failure|always|never</code>: when to make <code>evidence.gif</code> and <code>contact-sheet.png</code> (default <code>failure</code>).</li>
+        <li><code>--last 30</code>: the GIF covers the last 30 s, where the failure usually is; <code>0</code> keeps it all.</li>
+        <li><code>--out</code>, <code>--fps</code>, <code>--no-gif</code>, <code>--no-contact-sheet</code>, <code>--discard-on-success</code>, <code>--max-duration</code>.</li>
+      </ul>
+      <p>Everything lands in <code>screencast-evidence/</code> with an <code>evidence.json</code> summary. Any single tool works the same way: <code>npx -y @tmhs/screencast-mcp call doctor</code>, or <code>call pipeline @recipe.json</code>.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:10</span><span>THE ACTION</span></div>
+      <p>A composite action wraps it for <code>windows-latest</code>: it checks Node, installs ffmpeg if it is missing, records the command, uploads the evidence folder as an artifact, writes a job summary, and then fails the step with the command's exit code.</p>
+${pre(WORKFLOW_YAML)}
+      <p>Outputs: <code>exit-code</code>, <code>gif</code>, <code>contact-sheet</code>, <code>recording</code>, and <code>evidence-dir</code>, for a later step that comments on the PR. All inputs are in <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/action.yml"><code>action.yml</code></a>.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:20</span><span>WHAT TO KNOW</span></div>
+      <ul>
+        <li>Hosted Windows runners have an interactive desktop, so <code>gdigrab</code> records what your app draws. This repo records its own capture smoke test with the action on every change to it.</li>
+        <li>A recording holds whatever is on screen. Keep secrets off the runner's desktop, and remember artifacts are visible to anyone who can read the run.</li>
+        <li>For a longer suite, keep the default <code>discard-on-success</code> so green runs upload only <code>evidence.json</code>.</li>
+      </ul>
+      <nav class="pager" aria-label="More">
+        <span><a href="workflows/">&larr; Workflows</a></span>
+        <span><a href="tools/">Tool reference &rarr;</a></span>
+      </nav>
+    </section>
+`,
+}));
+
+/** The recipes, for the tool reference's "seen in" links. */
+export const WORKFLOWS = RECIPES.map((r) => ({ slug: r.slug, n: r.n, name: r.name, description: r.description, chain: r.chain }));
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const docs = process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), "..", "docs");
+  for (const [path, html] of PAGES) {
+    mkdirSync(dirname(join(docs, path)), { recursive: true });
+    writeFileSync(join(docs, path), html);
+  }
+  console.log("wrote", PAGES.size, "pages");
+}

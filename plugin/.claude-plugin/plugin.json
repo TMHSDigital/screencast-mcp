@@ -1,0 +1,21 @@
+{
+  "name": "screencast",
+  "displayName": "Screencast",
+  "description": "Let Claude record the Windows screen, watch it as frames, and edit it with ffmpeg: bug-repro GIFs for PRs, README demos, and checking its own UI changes.",
+  "author": {
+    "name": "TMHSDigital",
+    "url": "https://github.com/TMHSDigital"
+  },
+  "homepage": "https://tmhsdigital.github.io/screencast-mcp/",
+  "repository": "https://github.com/TMHSDigital/screencast-mcp",
+  "license": "CC-BY-NC-ND-4.0",
+  "keywords": ["screen-recording", "screenshot", "gif", "ffmpeg", "ocr", "ui-testing", "bug-report", "windows"],
+  "documentationUrl": "https://tmhsdigital.github.io/screencast-mcp/tools/",
+  "supportUrl": "https://github.com/TMHSDigital/screencast-mcp/issues",
+  "mcpServers": {
+    "screencast": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@tmhs/screencast-mcp"]
+    }
+  }
+}

@@ -16,6 +16,7 @@ import {
   type Marker,
 } from "../utils/chapters.js";
 import { getStore } from "../context.js";
+import { recordedSec } from "../utils/pause.js";
 
 /** Adds one marker to the session record and its sidecar: never replaces
  * anything, and each call adds another. */
@@ -57,7 +58,10 @@ export function register(server: McpServer): void {
           const record = store.get(args.sessionId);
           if (!record) throw new ScreencastError(`No session with id "${args.sessionId}".`);
           let t = args.at;
-          if (t === undefined) {
+          if (t === undefined && record.status === "paused") {
+            // While paused, "now" is the pause point on the video clock (#200).
+            t = recordedSec(record.segments?.parts ?? []);
+          } else if (t === undefined) {
             if (record.status !== "recording") {
               throw new ScreencastError(
                 `Session "${args.sessionId}" is ${record.status}, so there is no "now" to mark.`,
@@ -85,7 +89,7 @@ export function register(server: McpServer): void {
             marker: { t: Math.round(t * 1000) / 1000, label: cleanLabel(args.label) },
             count: markers.length,
             markersPath: sidecar,
-            ...(record.status === "recording" ? { live: true } : {}),
+            ...(record.status === "recording" || record.status === "paused" ? { live: true } : {}),
             ...(warning ? { warning } : {}),
           });
         }

@@ -28,7 +28,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 
 - One tool per file in `src/tools/`, exporting `register(server)`; wire it up in `src/server.ts`
 - Keep ffmpeg argument building in pure helpers under `src/utils/` (string in, args out) so it is unit-testable without ffmpeg
-- Add it to `mcp-tools.json` (a test checks the manifest matches the registered tools)
+- Run `npm run docs` to regenerate `mcp-tools.json`, the tool tables, and the tool's reference page (a test fails when they are stale)
 - Add vitest tests: unit tests for the builder, plus an ffmpeg-backed case in `src/__tests__/integration/` for anything that produces media
 
 Capture is Windows-only (gdigrab, plus Windows Graphics Capture for `backend: "wgc"`; see `src/utils/targets.ts`), and cross-platform capture is not planned (see the [roadmap](ROADMAP.md#not-planned)). The watch, edit, and produce tools run anywhere ffmpeg runs.

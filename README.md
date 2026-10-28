@@ -4,7 +4,7 @@
 
 **An MCP server that lets an agent record the screen, _watch_ the footage, and make minimal ffmpeg edits — over stdio, on Windows.**
 
-Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, redact, annotate, zoom toward clicks, and export for GitHub or social. No cloud service, no telemetry: ffmpeg and ffprobe behind 53 typed tools.
+Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, redact, annotate, zoom toward clicks, and export for GitHub or social. No cloud service, no telemetry: ffmpeg and ffprobe behind <!--tool-count-->58<!--/tool-count--> typed tools.
 
 **For developers who want their coding agent to see and prove UI changes on Windows**: bug repros, UI verification, and demo clips the agent records, checks, and edits itself. Capture is Windows-only; the watch and edit tools work on any OS with ffmpeg. Free for non-commercial use ([CC BY-NC-ND 4.0](#license)); [why not OBS, Playwright, or a screenshot MCP?](#why-not-just)
 
@@ -44,7 +44,7 @@ Capture the desktop, a monitor, a window, or a region; sample a recording into f
 
 | Client | How |
 | --- | --- |
-| Claude Code | `claude mcp add screencast -- cmd /c npx -y @tmhs/screencast-mcp` |
+| Claude Code | `claude mcp add screencast -- cmd /c npx -y @tmhs/screencast-mcp`, or the plugin (the server plus bug-repro, README-demo, and UI-verify skills): `/plugin install screencast --marketplace TMHSDigital/screencast-mcp` (older Claude Code: `/plugin marketplace add TMHSDigital/screencast-mcp`, then `/plugin install screencast@screencast-mcp`) |
 | Claude Desktop | Download [`screencast-mcp.mcpb`](https://github.com/TMHSDigital/screencast-mcp/releases/latest/download/screencast-mcp.mcpb) from the latest release and open it (one click) |
 | Cursor, VS Code, others | The JSON config below, or step-by-step on [Connect your client](https://tmhsdigital.github.io/screencast-mcp/connect.html) |
 
@@ -92,97 +92,112 @@ What it can do beyond record-and-look:
 
 ## Tools
 
-53 tools in six groups. The manifest in [`mcp-tools.json`](mcp-tools.json) is the canonical surface; tests keep it, this README, and the docs site in sync with `src/tools/`.
+<!-- tools:start -->
+58 tools in 6 toolsets, generated from the server's own schemas by `npm run docs` (do not edit between the markers). Each name links to its reference page with every parameter, an example call, and what it returns; [`mcp-tools.json`](mcp-tools.json) is the same list as JSON, and [`llms-full.txt`](https://tmhsdigital.github.io/screencast-mcp/llms-full.txt) all of it in one file.
+
+### Core
+
+Always loaded, whatever `SCREENCAST_TOOLSETS` selects.
+
+| Tool | What it does |
+| --- | --- |
+| [`get_media_info`](https://tmhsdigital.github.io/screencast-mcp/tools/get_media_info.html) | Probe a media file with ffprobe and return duration, resolution, frame rate, codecs, container format, and size. |
+| [`doctor`](https://tmhsdigital.github.io/screencast-mcp/tools/doctor.html) | Check the setup: ffmpeg/ffprobe (FFmpeg 8+?), optional filters, capture devices, Windows OCR, settings, and enabled toolsets; `problems` says what is missing and how to fix it. Call on first use or when a tool reports a missing feature. |
 
 ### Capture
 
-| Tool | Purpose |
+Record or screenshot the desktop, a monitor, a window, or a region. Every capture is an explicit tool call: nothing records on its own.
+
+| Tool | What it does |
 | --- | --- |
-| `start_recording` | Start a background recording. `target` = `full` \| `monitor:<index>` \| `window:<title>` \| `region:<x>,<y>,<w>,<h>`; optional `fps`, `quality`, `audio` (set `audio.source` = `system` to also capture loopback audio), `maxDurationSec` (auto-stop cap, default 3600; `0` = none), and `events` (log clicks, scroll, cursor, and key presses to `<recording>.events.jsonl`; `keys` = `masked` by default or `shortcuts`), and `replayBufferSec` (instant replay: keep only the last N seconds, see `save_replay`). Returns a session id and output path. |
-| `stop_recording` | Stop a session by id. Sends ffmpeg a graceful quit so the file is **finalized, not truncated**. Returns the final path and duration. On a replay buffer, `save: true` writes the whole buffer to the output path; otherwise the buffer is discarded. |
-| `save_replay` | Instant replay: write the last `lastSec` seconds of a buffer started with `start_recording { "replayBufferSec": 60 }` to an mp4, without stopping it. A stream copy, so it returns in about a second; `reencode: true` for a frame-exact file. With `events: true` the event log is sliced to match. |
-| `list_sessions` | List active and finished sessions. |
-| `get_session` | Inspect a single session by id. |
-| `review_recording` | **Review player** in clients that support MCP Apps: an inline player where a person scrubs the recording, drags trim handles, and draws redaction boxes, then exports a trimmed, redacted copy (one `pipeline` call). Pass it a stopped recording's `sessionId`. Elsewhere it returns the video's details. |
-| `player_frames` | Preview JPEG frames for the review player (an even grid plus scene changes, labelled with their real times); called by the player (app-only), not by agents. |
-| `read_events` | Read a recording's input event log (clicks, scroll, cursor, shortcuts, typing bursts) on the video's clock. Opt in with `start_recording` `events: true`. |
-| `add_marker` | Stamp a labelled moment ("bug appears", "step 3") on a running recording's video clock, or at a given second of a stopped one or any file. Markers are kept in the session (survive `stop_recording`, shown by `get_session`) and in a `<video>.markers.json` sidecar; the review player shows them as ticks, and `chapters` / `pipeline` turn them into chapters. |
-| `screenshot` | Capture a single PNG of a `target`, and return it inline as an image the model can view. |
-| `list_audio_devices` | List the DirectShow audio devices ffmpeg can see and flag a likely system-audio loopback device for `start_recording`. |
-| `list_targets` | List what can be captured: the desktop, each monitor (bounds, DPI scale), and each window (title, exe, pid, hwnd, bounds, minimized, cloaked, and whether gdigrab and `wgc` can capture it). Every entry carries a `target` string (`window:hwnd=<handle>` for windows) to pass as-is to `screenshot` or `start_recording`; filter with `exe` / `titleContains`. |
-| `doctor` | Check the setup: ffmpeg/ffprobe path and version (FFmpeg 8+?), key filters (`whisper`, `gfxcapture`, `subtitles`, `drawtext`, ...), `gdigrab`/`dshow` devices, Windows OCR, `SCREENCAST_HOME`, and the env settings in effect, with a `problems` list naming each fix. |
+| [`start_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/start_recording.html) | Start a background screen recording. Returns a session id; finalize it with stop_recording. Never auto-starts. |
+| [`stop_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/stop_recording.html) | Stop a recording gracefully so the file is finalized; returns the path and duration. |
+| [`pause_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/pause_recording.html) | Pause a recording; until resume_recording nothing is captured, and the gap is left out of the file, events, and markers. |
+| [`resume_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/resume_recording.html) | Resume a paused recording (same target and settings). |
+| [`save_replay`](https://tmhsdigital.github.io/screencast-mcp/tools/save_replay.html) | Save the last N seconds of a replay buffer (start_recording replayBufferSec) to an mp4; the buffer keeps running. |
+| [`list_sessions`](https://tmhsdigital.github.io/screencast-mcp/tools/list_sessions.html) | List all recording sessions (active and finished) with their status, target, output path, and whether the process is still alive. |
+| [`get_session`](https://tmhsdigital.github.io/screencast-mcp/tools/get_session.html) | Inspect a single recording session by id, including live status and whether its output file exists on disk. |
+| [`read_events`](https://tmhsdigital.github.io/screencast-mcp/tools/read_events.html) | Read the input events (clicks, scroll, cursor, shortcuts, typing bursts) of a recording made with events: true, in video seconds and pixels; e.g. types: ['down'], then sample_frames there. |
+| [`add_marker`](https://tmhsdigital.github.io/screencast-mcp/tools/add_marker.html) | Mark a labelled moment on a recording, live or at a second. Kept in the session and a sidecar; chapters and pipeline turn markers into chapters. |
+| [`screenshot`](https://tmhsdigital.github.io/screencast-mcp/tools/screenshot.html) | Capture one PNG of the screen, a monitor, a window, or a region, returned inline and by path. |
+| [`list_audio_devices`](https://tmhsdigital.github.io/screencast-mcp/tools/list_audio_devices.html) | List DirectShow audio devices and flag a likely loopback (Stereo Mix or a virtual-audio driver), for start_recording's audio.device. |
+| [`list_video_devices`](https://tmhsdigital.github.io/screencast-mcp/tools/list_video_devices.html) | List DirectShow cameras for start_recording's webcam.device. |
+| [`list_targets`](https://tmhsdigital.github.io/screencast-mcp/tools/list_targets.html) | List the desktop, monitors, and visible windows (topmost first, with capturability per backend). Each entry has a `target` string to pass as-is to capture tools; use it instead of guessing a title. |
 
 ### Watch
 
-| Tool | Purpose |
+Turn footage into something a model can read: frames, contact sheets, diffs, OCR, and a searchable text timeline.
+
+| Tool | What it does |
 | --- | --- |
-| `sample_frames` | Extract frames from a video — at a fixed `fps`, at explicit `timestamps`, or only where the screen changed (`mode: "scenes"`) — so the agent can view what happened. Returns the frame paths, with the first few frames inline as images. |
-| `contact_sheet` | Tile timestamped frames into **one** image (evenly spaced, or at the scene changes) so the agent sees a whole recording in a single look; returned inline. `poster: true` writes one representative frame instead. |
-| `screen_diff` | Compare two screenshots/frames: SSIM score, share changed, and **bounding boxes of what changed**, with the changes outlined in an inline image. Verify a UI change happened, and only where expected. |
-| `wait_for_change` | Watch a target and return when it **changes** (a dialog opened) or **settles** (a build or page finished), instead of guessing a sleep. Reports elapsed time, changed regions, and the final state inline. |
-| `find_text` | **Read text** on screen or in a frame with the OCR engine built into Windows (no install): every line and match with its bounding box. Locate a button by its label, check what the screen says, or find secrets (`regex: "sk-|ghp_"`) and get `redact_region` rectangles with `redact: true`; `scanEverySec` checks a whole video, with a time window per match. Best-effort; review before relying on it. |
-| `index_recording` | **Text timeline** of a recording (path or `sessionId`): cuts it at scene changes (with fill keyframes so no stretch over 10 s goes unread), OCRs one keyframe per segment, and attaches input events, markers, and transcript cues (an `.srt`, the `<video>.srt` sidecar, or `transcript: "whisper"`). Writes `<video>.index.json` next to the video (or under `SCREENCAST_HOME/edits/indexes` when that folder is outside the allowed output dirs); a re-run on an unchanged file reuses the OCR. The index holds the raw screen text, so treat it like the video. |
-| `search_recording` | **Find a moment as text** in an indexed recording: "when did Save failed appear?" returns timecoded hits (segment `start`/`end` plus the exact time of a matching cue, marker, or event), best first, with secrets masked in the snippets. Plain queries tolerate OCR misreads; `regex: true` for patterns. No images unless `images: N` asks for small thumbnails of the top hits. |
-| `get_media_info` | ffprobe wrapper: duration, resolution, fps, codecs, container format, and size. |
+| [`review_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/review_recording.html) | Open a recording for a person to review: in MCP Apps clients an inline player to scrub, trim, and redact, then export; elsewhere just the video's details. |
+| [`player_frames`](https://tmhsdigital.github.io/screencast-mcp/tools/player_frames.html) | Preview frames for the review player: JPEGs on an even grid over the video plus frames at scene changes, with their real times. Used by the inline player; agents should use sample_frames or contact_sheet instead. *(app-only: called by the review player, not the agent)* |
+| [`sample_frames`](https://tmhsdigital.github.io/screencast-mcp/tools/sample_frames.html) | Sample PNG frames from a video (by fps, timestamps, or scene changes) and return the first few inline so the model can see what happened. |
+| [`contact_sheet`](https://tmhsdigital.github.io/screencast-mcp/tools/contact_sheet.html) | Tile timestamped frames of a video into one image to see a whole recording at a glance (the cheapest first look). |
+| [`screen_diff`](https://tmhsdigital.github.io/screencast-mcp/tools/screen_diff.html) | Compare two screenshots or frames: SSIM score, changed share, and changed boxes in b's pixels, to check a UI change happened only where expected. |
+| [`wait_for_change`](https://tmhsdigital.github.io/screencast-mcp/tools/wait_for_change.html) | Wait until part of the screen changes or settles, instead of guessing a sleep. Returns the elapsed time, changed regions (screenshot pixels; add `origin` for desktop), and the final state. |
+| [`find_text`](https://tmhsdigital.github.io/screencast-mcp/tools/find_text.html) | OCR (built into Windows) on the screen, an image, or video frames, with line and match boxes in image pixels (add `origin` for desktop coordinates). Locate UI text or secrets (e.g. regex 'sk-\|ghp_\|api.?key') to redact. Best-effort: review results. |
+| [`index_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/index_recording.html) | Build a recording's text timeline (<video>.index.json: OCR per scene, events, markers, transcript) for search_recording. |
+| [`search_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/search_recording.html) | Search an index_recording timeline (screen text, events, markers, transcript): timecoded hits, best first, secrets masked. No frames unless asked. |
 
-### Minimal edit
+### Edit
 
-| Tool | Purpose |
+Cut, convert, compress, and redact. A tool that writes a file refuses to replace an existing `output` unless `overwrite: true`; default output paths are always unique.
+
+| Tool | What it does |
 | --- | --- |
-| `trim` | Cut a sub-clip by `start` + (`end` or `duration`). Re-encodes by default so nothing before `start` stays in the file; `exact: false` stream-copies for speed. |
-| `concat` | Join two or more videos into one. |
-| `convert` | Convert between `mp4`, `gif`, and `webm`. |
-| `export_gif` | Animated **GIF or WebP that fits a size budget** (default: GitHub's 10 MB image limit) for PRs, issues, and READMEs. Two-stage palette for GIF; steps fps, width, and palette/quality down until it fits, and reports the settings used. |
-
-### Edit surface
-
-These tools re-encode (a filter rewrites pixels, so stream copy does not apply). They reuse the same `draft`/`standard`/`high` presets as capture.
-
-| Tool | Purpose |
-| --- | --- |
-| `crop` | Crop to a pixel rectangle (`x`, `y`, `width`, `height`). A rectangle that runs off the frame is rejected, not silently clamped. |
-| `scale` | Resize to a `width` and/or `height`. One side keeps the aspect ratio; both set an exact size. |
-| `speed` | Change playback speed by a `factor` (>1 faster, <1 slower). Audio is retempo'd when present. |
-| `overlay` | Composite a logo, watermark, or picture-in-picture onto a base video at a position, optionally scaled and time-limited. |
-| `callout` | **Timed annotations**: boxes, text labels, and arrows at any angle, each shown between two timestamps. Mark the bug, point at the button, caption a step. Text Inter can't draw (CJK, emoji, Arabic, Indic, ...) falls back to a Windows system font that covers it; `fontFile` picks one explicitly, and anything no font covers comes back in `warnings` instead of as silent boxes. |
-| `compress` | Re-encode smaller with a `light`/`medium`/`heavy` CRF ladder and an optional `maxWidth` that only downscales. |
-| `extract_audio` | Write the audio track to its own file (`mp3`, `aac`, `wav`, or `copy`). |
-| `normalize_audio` | **Loudness to a delivery target** (two-pass EBU R128 `loudnorm`): `youtube` −14 LUFS, `podcast` −16, `broadcast` −23, or any LUFS value. Video is copied; reports loudness before and after. |
-| `denoise` | Reduce **steady** background noise (fan, hum, hiss) with `afftdn`, tuned to the file's measured noise floor. Video is copied. |
-| `transcribe` | **Speech to an SRT file, locally**, with FFmpeg 8's `whisper` filter (needs a whisper.cpp model: pass `model` or set `SCREENCAST_WHISPER_MODEL`). Cues are renumbered and de-overlapped; `words: true` gives one word per cue (whisper `max_len=1`) for `cut_by_transcript`. |
-| `burn_subtitles` | Burn an SRT/ASS into the video in the bundled font: `clean` (outlined line) or `social` (big bold text on a dark box, for muted autoplay). |
-| `chapters` | **Chapters without a re-encode**: from markers (the default), the strongest scene changes, transcript sections (an SRT split at pauses), or an explicit list, written into an mp4/mkv/mov copy as real chapters (FFMETADATA, stream copy; they show in VLC and MPC) and returned as YouTube chapter text, with any YouTube rule it breaks (first at 0:00, three or more, 10 s each). `subtitles` muxes an SRT as a soft, toggleable track (`mov_text` in mp4) instead of burning it in; `textOnly` writes nothing. |
-| `clip` | Extract one or more frame-accurate sub-segments, each to its own file. For a single segment, `trim` (default `exact: true`) does the same. |
-| `cut_idle` | **Remove dead air**: cut stretches where the screen is frozen and (when there is audio) silent, keeping a short pad at each edge. `dryRun` reports first; speech over a still screen is kept unless `useAudio: false`. |
-| `cut_by_transcript` | **Edit by the transcript**: cut the lines you quote (`remove: ["exact words"]`, or cue numbers) and, with `fillers: true`, um/uh/erm, in one select/aselect pass that keeps audio and video in sync. Writes a re-timed `.srt` next to the video so `burn_subtitles` still lines up. Timing is as fine as the SRT: `transcribe { words: true }` gives one word per cue; with sentence cues a partial quote is placed by estimate (`exact: false`) and fillers inside a sentence are left in. `dryRun` returns the edited text first. |
-
-### Redact
-
-| Tool | Purpose |
-| --- | --- |
-| `redact_region` | Cover declared rectangles in a video. `style` is `box` (default, a solid irreversible fill), `blur`, or `pixelate`; each region may be limited to a `start`/`end` window and expanded with `pad`. |
-
-> [!IMPORTANT]
-> `redact_region` covers the regions **you** declare. It is not automatic secret detection, so it cannot find a secret you did not point it at. The default `box` style is a solid fill, which is irreversible; `blur` and `pixelate` are softer but can be partially recovered, so prefer `box` for real secrets. They have minimum strengths: blur uses a radius of at least 8 px (or half the region's smaller side) applied three times, and pixelate uses blocks of at least 16 px. Coordinates are in the displayed frame, after any rotation the file carries, and `pipeline` refuses a `redact` placed after `zoom`. A region that falls outside the frame is rejected rather than silently doing nothing.
+| [`trim`](https://tmhsdigital.github.io/screencast-mcp/tools/trim.html) | Cut a video down to one sub-clip by start + (end or duration). For several segments use clip; to combine with other edits use pipeline. |
+| [`concat`](https://tmhsdigital.github.io/screencast-mcp/tools/concat.html) | Join videos end to end with hard cuts: stream copy when they match, else a re-encode (`mode` says which). For transitions use xfade_transition or assemble_highlights. |
+| [`convert`](https://tmhsdigital.github.io/screencast-mcp/tools/convert.html) | Convert media to mp4, webm, or gif. For a size-bounded GIF/WebP prefer export_gif; for a smaller mp4, compress or export_preset. |
+| [`export_gif`](https://tmhsdigital.github.io/screencast-mcp/tools/export_gif.html) | Export an animated GIF or WebP that fits a size budget (for PRs, issues, READMEs), stepping fps, width, and quality down until it fits. |
+| [`crop`](https://tmhsdigital.github.io/screencast-mcp/tools/crop.html) | Crop a video to a pixel rectangle; one running off the frame is rejected. |
+| [`scale`](https://tmhsdigital.github.io/screencast-mcp/tools/scale.html) | Resize a video to a target width and/or height and re-encode. Provide one side to keep the aspect ratio, or both to set an exact size. |
+| [`speed`](https://tmhsdigital.github.io/screencast-mcp/tools/speed.html) | Change playback speed by a factor (>1 faster, <1 slower) and re-encode. Audio is retempo'd to match when the source has an audio track. |
+| [`compress`](https://tmhsdigital.github.io/screencast-mcp/tools/compress.html) | Re-encode a video smaller (H.264 CRF ladder, optional width cap). For a platform target use export_preset. |
+| [`clip`](https://tmhsdigital.github.io/screencast-mcp/tools/clip.html) | Extract several frame-exact segments, each to its own file. For one segment, trim does the same. |
+| [`cut_idle`](https://tmhsdigital.github.io/screencast-mcp/tools/cut_idle.html) | Remove dead air: cut stretches where the screen is frozen (and silent), keeping a short pad. Returns the time saved. |
+| [`cut_by_transcript`](https://tmhsdigital.github.io/screencast-mcp/tools/cut_by_transcript.html) | Edit a video by its transcript: cut quoted text, cue numbers, or fillers. Also writes the re-timed .srt. |
+| [`redact_region`](https://tmhsdigital.github.io/screencast-mcp/tools/redact_region.html) | Cover given rectangles in a video (e.g. secrets on screen). Not automatic detection: find them with find_text redact: true. Off-frame regions are rejected. |
+| [`pipeline`](https://tmhsdigital.github.io/screencast-mcp/tools/pipeline.html) | Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call. |
 
 ### Produce
 
-The production layer turns raw clips into a finished piece. Tools that combine clips auto-normalize each input to a common resolution, fps, and audio rate first, so heterogeneous sources compose cleanly.
+Annotate, frame, and assemble a finished piece. Tools that combine clips normalize each input to a common resolution, fps, and audio rate first.
 
-| Tool | Purpose |
+| Tool | What it does |
 | --- | --- |
-| `xfade_transition` | Crossfade two videos into one with an `xfade` transition (`fade`, `wipeleft`, `slideup`, ...). Audio is crossfaded when both clips have a track. |
-| `assemble_highlights` | Stitch two or more clips into one, with hard cuts (`transition: "cut"`) or an xfade transition between each. |
-| `title_card` | Generate a standalone title card (centered text on a solid background, with a silent track so it composes). Text uses the bundled Inter, so Latin, Greek and Cyrillic need no system font; other scripts and emoji fall back to a Windows system font (or pass `fontFile`), with `warnings` for anything no font covers. |
-| `music_bed` | Lay a music track under a video: looped/trimmed to length, faded in and out, leveled, and mixed with any existing audio (optionally ducked). |
-| `reframe` | Re-aspect to `16:9`, `9:16`, `1:1`, or `4:5` with `pad` (letterbox, no content lost) or `crop` (fill, trims overflow). |
-| `zoom` | **Smooth zoom-and-pan** (Screen Studio style) into where the action is and back out. Give keyframes (rectangles by time), or let it plan them from the clicks in the input event log (`start_recording` `events: true`; `highlightClicks` rings each click) or from where the screen changes; `dryRun` returns the plan to adjust. |
-| `keystroke_overlay` | **Keycast-style badges** ("Ctrl + Shift + P", "Double click", "Typing…") burned in from the input event log, one at a time, each lingering `lingerSec` (default 1.2). Repeats merge (`Ctrl + Z ×3`); `position`, `size`, `clicks`, `typing`. It can only show what the log holds: never typed text, and shortcuts only from `keys: "shortcuts"` recordings; `keys: "masked"` here shows a chord's modifiers only. |
-| `backdrop` | **Frame a clip or screenshot** (Screen Studio / CleanShot style): padding, a gradient, solid, or wallpaper `image` background, rounded corners, and a soft drop shadow, optionally on a `16:9`/`9:16`/`1:1`/`4:5` canvas. Presets in the project palette: `desktop` (default, dark slate), `rec` (record red), `amber` (amber to red), `light`. A PNG/JPG input writes a framed still. |
-| `export_preset` | Encode a platform-ready file (`youtube`, `instagram_reel`, `tiktok`, `x`, `square`, `steam_trailer`, `vertical_reel`): reframes, caps fps, and encodes H.264 at the platform bitrate with faststart. `steam_trailer` is 1080p H.264 High at a padded 5.5 Mbps CBR (above Steam's 5 Mbps floor) with 48 kHz audio at -14 LUFS; `vertical_reel` centres the footage over a blurred copy of itself with audio at -14 LUFS. |
-| `pipeline` | **Several edits in one ffmpeg process**: `steps` of `trim`, `crop`, `scale`, `speed`, `cut_idle`, `redact`, `callout`, `keystroke_overlay`, `reframe`, `zoom` (keyframes, or `follow: "clicks"` from the event log), `backdrop`, `audio` (`normalize`, `denoise`), `burn_subtitles` (a file, or `transcribe: true`), ending optionally in `export_preset` or `export_gif`, each with its tool's options. Or name a `recipe`: `pr_demo` (cut idle, click zoom, GIF under 10 MB), `tutorial` (plus denoise/normalize and captions, 1080p mp4) or `social_reel` (9:16, big captions); it expands to steps that `dryRun` shows and your own `steps` override. One re-encode, no intermediate files, and a recipe you can save and re-run on the next recording; `dryRun` returns the planned command; `chapters: true` keeps the input's markers as chapters, re-timed through trims and speed changes. |
-| `bug_report` | **A paste-ready repro package in one call**: from a recording path or `sessionId`, writes a folder with a trimmed clip (the last 30 s by default) and a GIF under 10 MB, a timecoded contact sheet, numbered steps rebuilt from the input event log, OCR'd error and dialog text, environment details (OS, displays and DPI, window, ffmpeg), and a `report.md` for `gh issue create --body-file` (plus `report.json`). Before anything is encoded, a whole-clip OCR secret scan boxes out API keys, tokens, and `password:` values in every output and masks them in the quoted text; it needs Windows OCR (`redact: false` skips it). |
-| `step_guide` | **A step-by-step how-to from a recording** (Steps Recorder for the agent era): from a path or `sessionId` with an input event log, writes `guide.md` with an `images/` folder and/or one self-contained `guide.html`. Each click, shortcut, typing burst, and scroll becomes a numbered step with the frame just before it, the click ringed, and a caption ("Click **Save**") from OCR of the text under the click; markers become section headings. OCR also boxes secrets out of the screenshots and masks them in captions (`ocr: false` skips both; it needs Windows OCR). Typed text is never logged, so it never appears. Returns the steps so the agent can rewrite captions. |
+| [`overlay`](https://tmhsdigital.github.io/screencast-mcp/tools/overlay.html) | Composite an image or video (logo, watermark, picture-in-picture) onto a video at a pixel position, optionally scaled and time-limited; keeps the base's audio and length. |
+| [`callout`](https://tmhsdigital.github.io/screencast-mcp/tools/callout.html) | Annotate a video with timed boxes, text labels, and arrows. Fallback fonts used are listed in fallbackFonts; characters no font covers are reported in warnings. |
+| [`keystroke_overlay`](https://tmhsdigital.github.io/screencast-mcp/tools/keystroke_overlay.html) | Burn keycast-style badges for shortcuts, clicks, and typing from the recording's input event log (start_recording events: true). Never shows typed text: the log has none. |
+| [`cursor`](https://tmhsdigital.github.io/screencast-mcp/tools/cursor.html) | Draw a smoothed, scaled cursor that hides when idle from the event log of a start_recording cursor: "events" recording (no OS cursor in the video), with click ripples and an optional spotlight. |
+| [`backdrop`](https://tmhsdigital.github.io/screencast-mcp/tools/backdrop.html) | Frame a video or screenshot on a gradient, color, or wallpaper with padding, rounded corners, and a drop shadow, optionally on a 16:9/1:1/9:16/4:5 canvas. |
+| [`burn_subtitles`](https://tmhsdigital.github.io/screencast-mcp/tools/burn_subtitles.html) | Burn SRT/ASS subtitles (e.g. from transcribe) into a video in the bundled font. |
+| [`chapters`](https://tmhsdigital.github.io/screencast-mcp/tools/chapters.html) | Write chapters (markers, scene changes, transcript, or a list) into an mp4/mkv/mov copy without re-encoding; returns YouTube chapter text. Can mux an SRT as soft subtitles. |
+| [`xfade_transition`](https://tmhsdigital.github.io/screencast-mcp/tools/xfade_transition.html) | Join two videos with an xfade transition (audio crossfaded); they need not match in size, fps, or audio. For more clips use assemble_highlights. |
+| [`assemble_highlights`](https://tmhsdigital.github.io/screencast-mcp/tools/assemble_highlights.html) | Stitch clips (including title cards) into one video with cuts or xfade transitions; they need not match in size, fps, or audio. |
+| [`title_card`](https://tmhsdigital.github.io/screencast-mcp/tools/title_card.html) | Generate a title card clip (centered text on a solid background, silent audio track) to stitch in with assemble_highlights. Uncoverable characters are reported in warnings. |
+| [`reframe`](https://tmhsdigital.github.io/screencast-mcp/tools/reframe.html) | Re-aspect a video to 16:9, 9:16, 1:1, or 4:5 by padding or cropping. |
+| [`zoom`](https://tmhsdigital.github.io/screencast-mcp/tools/zoom.html) | Smooth animated zoom-and-pan into the action and back out, from keyframes or planned from logged clicks or screen changes. |
+| [`export_preset`](https://tmhsdigital.github.io/screencast-mcp/tools/export_preset.html) | Encode a platform-ready H.264 file (aspect, fps, bitrate, faststart) for a named platform. |
+| [`bug_report`](https://tmhsdigital.github.io/screencast-mcp/tools/bug_report.html) | Package a recording as a paste-ready repro folder: secret-scanned, redacted clip and GIF, contact sheet, steps from the event log, OCR'd errors, environment, report.md for gh issue create --body-file. |
+| [`step_guide`](https://tmhsdigital.github.io/screencast-mcp/tools/step_guide.html) | Turn a recording's event log into a numbered how-to: a ringed screenshot and caption per step, marker headings; Markdown and/or one HTML file. Never includes typed text. |
+
+### Audio
+
+Extract, clean up, level, transcribe, and score the soundtrack.
+
+| Tool | What it does |
+| --- | --- |
+| [`extract_audio`](https://tmhsdigital.github.io/screencast-mcp/tools/extract_audio.html) | Extract the audio track of a media file to its own file (mp3, aac, wav, or copy). Returns the output path. |
+| [`normalize_audio`](https://tmhsdigital.github.io/screencast-mcp/tools/normalize_audio.html) | Normalize loudness to a delivery target (two-pass EBU R128 loudnorm); video is copied. Reports loudness before and after. |
+| [`denoise`](https://tmhsdigital.github.io/screencast-mcp/tools/denoise.html) | Reduce steady background noise (fan, hum, hiss) in a recording's audio with an adaptive FFT denoiser. Video is copied untouched. Returns the output path. |
+| [`transcribe`](https://tmhsdigital.github.io/screencast-mcp/tools/transcribe.html) | Transcribe a recording's speech to an SRT subtitle file, locally, with FFmpeg 8's whisper filter (needs a whisper.cpp model file). Returns the SRT path and the text. Pair with burn_subtitles to caption the video. |
+| [`music_bed`](https://tmhsdigital.github.io/screencast-mcp/tools/music_bed.html) | Lay music under a video: looped or trimmed to length, faded, leveled, and mixed with any existing audio. Video is stream-copied. |
+| [`narrate`](https://tmhsdigital.github.io/screencast-mcp/tools/narrate.html) | Offline voiceover with the built-in Windows voices: speaks each line at its time or marker over the audio, plus an SRT. |
+<!-- tools:end -->
+
+> [!IMPORTANT]
+> `redact_region` covers the regions **you** declare. It is not automatic secret detection, so it cannot find a secret you did not point it at. The default `box` style is a solid fill, which is irreversible; `blur` and `pixelate` are softer but can be partially recovered, so prefer `box` for real secrets. They have minimum strengths: blur uses a radius of at least 8 px (or half the region's smaller side) applied three times, and pixelate uses blocks of at least 16 px. Coordinates are in the displayed frame, after any rotation the file carries, and `pipeline` refuses a `redact` placed after `zoom`. A region that falls outside the frame is rejected rather than silently doing nothing.
 
 ### Targets
 
@@ -224,14 +239,16 @@ Edit and produce tools write to a `<name>.partial.<ext>` file next to the output
 
 **Toolsets.** The full tool list (`tools/list`) is about 70 KB, roughly 17k tokens of context; `capture` alone is about 16 KB. Set `SCREENCAST_TOOLSETS` to load only the groups an agent needs, for example `capture,watch` for a QA agent that records and looks but never edits. `core` (`doctor`, `get_media_info`) is always on; unset, empty, `all`, or a value naming no known toolset loads everything, and unknown names are ignored with a warning (and listed by `doctor`).
 
+<!-- toolsets:start -->
 | Toolset | Tools |
 | --- | --- |
-| `capture` | `start_recording`, `stop_recording`, `save_replay`, `list_sessions`, `get_session`, `read_events`, `add_marker`, `screenshot`, `list_targets`, `list_audio_devices` |
-| `watch` | `sample_frames`, `contact_sheet`, `screen_diff`, `wait_for_change`, `find_text`, `index_recording`, `search_recording`, `review_recording`, `player_frames` |
-| `edit` | `pipeline`, `trim`, `clip`, `concat`, `convert`, `export_gif`, `crop`, `scale`, `speed`, `compress`, `redact_region`, `cut_idle`, `cut_by_transcript` |
-| `produce` | `callout`, `keystroke_overlay`, `backdrop`, `overlay`, `zoom`, `reframe`, `title_card`, `xfade_transition`, `assemble_highlights`, `export_preset`, `burn_subtitles`, `chapters`, `bug_report`, `step_guide` |
-| `audio` | `extract_audio`, `normalize_audio`, `denoise`, `transcribe`, `music_bed` |
-| `core` (always) | `doctor`, `get_media_info` |
+| `capture` | `start_recording`, `stop_recording`, `pause_recording`, `resume_recording`, `save_replay`, `list_sessions`, `get_session`, `read_events`, `add_marker`, `screenshot`, `list_audio_devices`, `list_video_devices`, `list_targets` |
+| `watch` | `review_recording`, `player_frames`, `sample_frames`, `contact_sheet`, `screen_diff`, `wait_for_change`, `find_text`, `index_recording`, `search_recording` |
+| `edit` | `trim`, `concat`, `convert`, `export_gif`, `crop`, `scale`, `speed`, `compress`, `clip`, `cut_idle`, `cut_by_transcript`, `redact_region`, `pipeline` |
+| `produce` | `overlay`, `callout`, `keystroke_overlay`, `cursor`, `backdrop`, `burn_subtitles`, `chapters`, `xfade_transition`, `assemble_highlights`, `title_card`, `reframe`, `zoom`, `export_preset`, `bug_report`, `step_guide` |
+| `audio` | `extract_audio`, `normalize_audio`, `denoise`, `transcribe`, `music_bed`, `narrate` |
+| `core` (always) | `get_media_info`, `doctor` |
+<!-- toolsets:end -->
 
 The server also sends MCP `instructions` at initialize: the record, look, edit workflow, which tool to reach for when, and the toolsets in effect, so each tool's own description stays short.
 
@@ -303,6 +320,26 @@ Inline images are downscaled JPEGs (`maxImageWidth`, default 1280) and capped pe
 
 `sample_frames` writes at most `maxFrames` frames per call (default 100, max 1000). In `fps` mode it probes the video first; if the rate would exceed the cap, it samples at a lower rate so the frames still span the whole video, and the result's `capNote` says what it did.
 
+### Command line and CI
+
+The same binary is a headless CLI when the first argument is a subcommand (no arguments still starts the MCP server). `record` records the screen while a command runs, exits with that command's code, and on failure writes a GIF of the last 30 s and a contact sheet:
+
+```bash
+npx -y @tmhs/screencast-mcp record --target full -- npm run test:e2e
+npx -y @tmhs/screencast-mcp call doctor                # any tool, JSON args inline or @file.json
+```
+
+`record` options: `--target`, `--fps`, `--out` (default `screencast-evidence`), `--artifacts failure|always|never`, `--last <sec>`, `--no-gif`, `--no-contact-sheet`, `--discard-on-success`, `--max-duration`; it writes `evidence.json` alongside. For GitHub Actions on `windows-latest`, the composite action in [`action.yml`](action.yml) wraps it and uploads the evidence as an artifact:
+
+```yaml
+- uses: TMHSDigital/screencast-mcp@main # pin a release tag or SHA
+  with:
+    command: npm run test:e2e
+    target: window:exe=MyApp.exe
+```
+
+More on the [CI page](https://tmhsdigital.github.io/screencast-mcp/ci.html).
+
 ## Prompts and resources
 
 Beyond tools, the server offers **prompts**: ready-made workflows that clients such as Claude Code and VS Code show as slash commands.
@@ -329,7 +366,7 @@ It also offers **resources**, so a client can list and attach recordings without
 
 ## Privacy
 
-- **The server makes no network requests and has no telemetry.** It runs ffmpeg, ffprobe, and PowerShell on your machine and talks to your MCP client over stdio.
+- **The server makes no network requests and has no telemetry.** It runs ffmpeg, ffprobe, and PowerShell on your machine and talks to your MCP client over stdio. OCR (`find_text`) and speech (`narrate`) use the engines built into Windows, so screen text and narration scripts are processed locally and never sent anywhere.
 - **What a tool returns goes to your model provider.** Inline screenshots and frames, OCR text, event summaries, and every other tool result reach your agent, and your client sends them to the model like any other tool result. Files on disk stay on disk unless a tool returns them or you share them.
 - **What is stored, and where.** Everything goes under `SCREENCAST_HOME` (default `<homedir>/.screencast-mcp`) unless a call names another path:
   - `recordings/`: recordings, plus each one's `.events.jsonl` when the event log is on
@@ -339,7 +376,7 @@ It also offers **resources**, so a client can list and attach recordings without
   - `sessions.json`: the session registry (ids, targets, paths, times)
 
   `find_text`, `wait_for_change`, and `screen_diff` delete their captures after the call by default, since a secret scan's screenshot shows the secret.
-- **What the event log records.** Only with `start_recording` `events: true`, and only while that recording runs. Mouse input is recorded system-wide, not only over the recorded window: clicks, scrolls, and the cursor position (sampled about 30 times a second), each with its time. Typing is recorded only as bursts, a start time and a length on a 0.5 s grid, with no key names and no per-key times: `masked` (default) records nothing more. `shortcuts` also records chords made with Ctrl, Alt, or Win by name (`Ctrl+S`), with their times; Ctrl+Alt+key that types a character on AltGr layouts stays typing. No mode records typed text. If the log has gaps (Windows removed the hook, input went to an elevated window or the lock screen, or the helper stopped), `read_events` reports `truncated: true` and lists them.
+- **What the event log records.** Only with `start_recording` `events: true` (or `cursor: "events"`, which also leaves the OS cursor out of the video for the `cursor` tool to redraw), and only while that recording runs. Mouse input is recorded system-wide, not only over the recorded window: clicks, scrolls, and the cursor position (sampled about 30 times a second), each with its time. Typing is recorded only as bursts, a start time and a length on a 0.5 s grid, with no key names and no per-key times: `masked` (default) records nothing more. `shortcuts` also records chords made with Ctrl, Alt, or Win by name (`Ctrl+S`), with their times; Ctrl+Alt+key that types a character on AltGr layouts stays typing. No mode records typed text. If the log has gaps (Windows removed the hook, input went to an elevated window or the lock screen, or the helper stopped), `read_events` reports `truncated: true` and lists them.
 - **Microphone capture is not supported.** System audio is recorded only with `audio.source` = `system`.
 - **Deleting stored data.** Delete files under `SCREENCAST_HOME`, or the whole folder while nothing is recording. Set `SCREENCAST_RETENTION_DAYS` to delete screenshots, frames, and leftover raw event logs older than that each time the server starts. Recordings and edits are never deleted automatically.
 
@@ -362,6 +399,7 @@ It also offers **resources**, so a client can list and attach recordings without
 .
 ├── src/
 │   ├── index.ts          # MCP server entry (stdio); registers every tool, reaps orphans
+│   ├── cli.ts            # headless CLI: record -- <command>, call <tool>
 │   ├── prompts.ts        # MCP prompts (workflows as slash commands)
 │   ├── resources.ts      # MCP resources (sessions, posters)
 │   ├── wgcRecorder.ts    # recorder process for backend: "wgc"
@@ -369,9 +407,11 @@ It also offers **resources**, so a client can list and attach recordings without
 │   ├── utils/            # pure builders and helpers (ffmpeg args, targets, sessions, ...)
 │   └── __tests__/        # vitest: unit, ffmpeg integration, guarded local-capture harness
 ├── assets/               # bundled fonts and the review player (assets/ui)
-├── docs/                 # GitHub Pages site (scripts/build-docs-pages.mjs writes the recipe pages)
-├── scripts/              # Claude Desktop bundle (.mcpb) and docs page builders
-├── mcp-tools.json        # canonical tool manifest (kept in sync with src/tools)
+├── docs/                 # GitHub Pages site; tools/, llms.txt, and the recipe pages are generated
+├── scripts/              # Claude Desktop bundle (.mcpb) and the docs generators (npm run docs)
+├── plugin/               # Claude Code plugin: the server plus workflow skills
+├── action.yml            # GitHub Action: record a test run on windows-latest
+├── mcp-tools.json        # tool manifest, generated from the registry by npm run docs
 ├── server.json           # MCP Registry listing (name matches package.json mcpName)
 ├── .github/workflows/    # CI, release, npm publish, Pages, ecosystem drift check
 ├── ROADMAP.md · CONTRIBUTING.md · SECURITY.md · LICENSE
@@ -387,7 +427,10 @@ npm install
 npm run build      # tsc -> dist/
 npm test           # vitest: unit tests, plus the ffmpeg integration suite when ffmpeg is on PATH
 npm run dev        # tsx watch
+npm run docs       # regenerate mcp-tools.json, the tool tables, docs/tools/, llms.txt
 ```
+
+The tool tables in this README and on the site, `mcp-tools.json`, and the per-tool pages are generated from the registered tools' schemas; after adding or changing a tool, run `npm run docs` (the docs test fails on a stale copy; `npm run docs:check` checks without writing).
 
 To run your build from a client, point it at `dist/index.js`: `"command": "node"`, `"args": ["C:/path/to/screencast-mcp/dist/index.js"]`.
 

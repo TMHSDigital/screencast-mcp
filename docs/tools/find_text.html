@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>find_text — Screencast MCP</title>
+  <meta name="description" content="OCR (built into Windows) on the screen, an image, or video frames, with line and match boxes in image pixels (add `origin` for desktop coordinates).">
+  <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/tools/find_text.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
+  <meta property="og:title" content="find_text — Screencast MCP">
+  <meta property="og:description" content="OCR (built into Windows) on the screen, an image, or video frames, with line and match boxes in image pixels (add `origin` for desktop coordinates).">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/tools/find_text.html">
+  <meta property="og:site_name" content="Screencast MCP">
+  <meta property="og:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Screencast MCP: give your agent eyes on the screen. A recorded window zooms in on a clicked Save button.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://tmhsdigital.github.io/screencast-mcp/media/og.png">
+  <link rel="preload" href="../fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <header class="hud" aria-label="Recording status bar">
+    <div class="hud-left">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-label">REC</span>
+      <span id="tc">00:00:00;00</span>
+    </div>
+    <div class="hud-right">
+      <a class="home" href="../">screencast-mcp</a>
+      <a href="../tools/" class="here">Tools</a>
+      <a href="../workflows/">Workflows</a>
+      <a href="../connect.html">Connect</a>
+      <a class="gh" href="https://github.com/TMHSDigital/screencast-mcp">GitHub &nearr;</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="page-head">
+      <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">TOOLS</a> / WATCH</p>
+      <h1>Find Text (OCR)</h1>
+      <p class="tool-id"><code>find_text</code></p>
+      <p class="lede">OCR (built into Windows) on the screen, an image, or video frames, with line and match boxes in image pixels (add <code>origin</code> for desktop coordinates). Locate UI text or secrets (e.g. regex 'sk-|ghp_|api.?key') to redact. Best-effort: review results.</p>
+      <p class="chips"><span class="chip set">watch</span><span class="chip">read-only</span><span class="chip">idempotent</span><span class="chip">since v0.19.0</span></p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:00</span><span>PARAMETERS</span></div>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>target</code></td><td><code class="type">string</code></td><td>Live screen target (full | monitor:&lt;i&gt; | window:... | region:...), or pass input.</td></tr>
+          <tr><td><code>input</code></td><td><code class="type">string</code></td><td>Image or video file to read instead of a live target.</td></tr>
+          <tr><td><code>timestamp</code></td><td><code class="type">number</code></td><td>Video input: second to read (default 0). <span class="bounds">≥ 0</span></td></tr>
+          <tr><td><code>scanEverySec</code></td><td><code class="type">number</code></td><td>Video input: scan a frame every N s across the clip (e.g. for secrets before sharing); matches and redactRegions get times. Widens to stay within maxFrames. <span class="bounds">&gt; 0</span></td></tr>
+          <tr><td><code>maxFrames</code></td><td><code class="type">integer</code></td><td>scanEverySec frame cap (default 30; ~1 s each). <span class="bounds">≥ 1, ≤ 120</span></td></tr>
+          <tr><td><code>exactTitle</code></td><td><code class="type">boolean</code></td><td>window: targets match the whole title only (default false).</td></tr>
+          <tr><td><code>backend</code></td><td><code class="type">&quot;gdigrab&quot; | &quot;wgc&quot;</code></td><td>Live target: gdigrab (default) = what is visible; wgc (window:, FFmpeg 8+) = the window even if covered.</td></tr>
+          <tr><td><code>query</code></td><td><code class="type">string</code></td><td>Text to find (case-insensitive, tolerates OCR misreads like I/l, O/0, _/-). Omit to return all text.</td></tr>
+          <tr><td><code>regex</code></td><td><code class="type">boolean</code></td><td>Treat query as a regular expression (case-insensitive).</td></tr>
+          <tr><td><code>redact</code></td><td><code class="type">boolean</code></td><td>Also return padded match rectangles ready for redact_region's regions.</td></tr>
+          <tr><td><code>keep</code></td><td><code class="type">boolean</code></td><td>Live target: keep the capture and return its path (default false: deleted after reading).</td></tr>
+          <tr><td><code>returnImage</code></td><td><code class="type">boolean</code></td><td>Return the image with matches outlined (default: true with a query).</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:05</span><span>A MINIMAL CALL</span></div>
+      <pre class="copyable"><code>find_text {}</code></pre>
+      <p>The required arguments only, with placeholder values. Everything else takes its default.</p>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:10</span><span>WHAT COMES BACK</span></div>
+      <p>Structured content (<code>structuredContent</code>), alongside a text summary and any inline images:</p>
+      <div class="table-scroll">
+      <table class="params">
+        <thead><tr><th>Field</th><th>Type</th></tr></thead>
+        <tbody>
+          <tr><td><code>imageSize</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr class="nested d1"><td><code>imageSize.width</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr class="nested d1"><td><code>imageSize.height</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="tc-mark"><span class="tc">00:15</span><span>SEEN IN</span></div>
+      <ul class="recipes">
+        <li><a href="../workflows/bug-repro.html"><span class="tc">REC 01</span><span class="name">Bug-repro clip for a PR</span><span class="chain">start_recording &rarr; find_text &rarr; redact_region &rarr; trim &rarr; callout &rarr; export_gif</span></a></li>
+        <li><a href="../workflows/verify-ui.html"><span class="tc">REC 03</span><span class="name">Agent UI verification loop</span><span class="chain">screenshot &rarr; wait_for_change &rarr; screen_diff &rarr; find_text</span></a></li>
+        <li><a href="../workflows/pipeline.html"><span class="tc">REC 07</span><span class="name">The whole edit in one call</span><span class="chain">start_recording &rarr; find_text &rarr; pipeline (redact &rarr; trim &rarr; callout &rarr; export_gif)</span></a></li>
+      </ul>
+    </section>
+      <nav class="pager" aria-label="More tools">
+        <span><a href="wait_for_change.html">&larr; wait_for_change</a></span>
+        <span><a href="index_recording.html">index_recording &rarr;</a></span>
+      </nav>
+
+    <footer>
+      <span>Built by <a href="https://github.com/TMHSDigital">TMHSDigital</a></span>
+      <span>License: <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/LICENSE">CC BY-NC-ND 4.0</a> &middot; free for non-commercial use</span>
+    </footer>
+  </main>
+
+  <script src="../site.js"></script>
+</body>
+</html>

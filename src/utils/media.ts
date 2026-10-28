@@ -575,7 +575,16 @@ export interface OverlayOptions {
   scale?: { width?: number; height?: number };
   /** The main input's length: the output never runs longer (#188). */
   durationSec?: number | null;
+  /** circle: crop the overlay to its centre square and mask a circle (a
+   * webcam bubble, #200). */
+  shape?: "rect" | "circle";
 }
+
+/** Crop to the centre square and make everything outside the inscribed
+ * circle transparent. Pure. */
+export const CIRCLE_MASK =
+  "crop='min(iw,ih)':'min(iw,ih)',format=yuva420p," +
+  "geq=lum='p(X,Y)':cb='p(X,Y)':cr='p(X,Y)':a='if(lte(hypot(X-W/2,Y-H/2),W/2),255,0)'";
 
 /** Composite an overlay image or video onto the input at (x, y), optionally
  * scaled and optionally limited to a time window. The overlay's clock is
@@ -602,6 +611,7 @@ export function buildOverlayArgs(
     const sh = opts.scale.height ?? -1;
     ovl += `,scale=${sw}:${sh}`;
   }
+  if (opts.shape === "circle") ovl += `,${CIRCLE_MASK}`;
   const filter = `${ovl}[ovl];[0:v][ovl]overlay=${x}:${y}${enable}[v]`;
   const dur = opts.durationSec;
   return [

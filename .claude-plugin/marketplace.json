@@ -1,0 +1,20 @@
+{
+  "name": "screencast-mcp",
+  "owner": {
+    "name": "TMHSDigital",
+    "url": "https://github.com/TMHSDigital"
+  },
+  "metadata": {
+    "description": "Screen recording, frame sampling, and ffmpeg edits for coding agents on Windows."
+  },
+  "plugins": [
+    {
+      "name": "screencast",
+      "source": "./plugin",
+      "description": "Installs the screencast-mcp server plus skills for bug-repro GIFs, README demos, and verifying UI changes on screen.",
+      "category": "development",
+      "homepage": "https://tmhsdigital.github.io/screencast-mcp/",
+      "keywords": ["screen-recording", "gif", "ui-testing", "bug-report", "windows", "mcp"]
+    }
+  ]
+}

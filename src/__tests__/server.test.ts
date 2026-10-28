@@ -134,7 +134,8 @@ describe("MCP tool layer (#192)", () => {
       if (!res.isError || !/invalid|required|expected/i.test(res.text)) failures.push(`${tool.name}: ${res.text.slice(0, 120)}`);
     }
     expect(failures).toEqual([]);
-    expect(checked).toBeGreaterThan(tools.length - 4); // list_sessions, list_audio_devices, doctor take no arguments
+    // list_sessions, list_audio_devices, list_video_devices, doctor take no arguments
+    expect(checked).toBeGreaterThan(tools.length - 5);
   });
 
   describe("target resolution", () => {
