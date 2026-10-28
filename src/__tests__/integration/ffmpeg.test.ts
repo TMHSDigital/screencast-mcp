@@ -702,7 +702,8 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     const shadowed = p("backdrop-shadow.mp4");
     await runFfmpeg(buildBackdropArgs(vOnly, shadowed, { colors: ["white"], padding: 40, radius: 0, shadow: 16, shadowOpacity: 0.8 }, { width: 320, height: 240 }).args);
     expect(regionLuma(shadowed, 1, 100, 283, 120, 6)).toBeLessThan(200);
-    expect(regionLuma(shadowed, 1, 0, 0, 20, 20)).toBeGreaterThan(240);
+    // White is ~225 on older ffmpeg (limited range), 255 on FFmpeg 8; either is well clear of the shadow.
+    expect(regionLuma(shadowed, 1, 0, 0, 20, 20)).toBeGreaterThan(215);
   });
 
   it("backdrop frames a PNG still on an aspect canvas with a gradient preset (#171)", async () => {
