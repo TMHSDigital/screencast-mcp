@@ -1,3 +1,5 @@
+<!-- standards-version: 1.10.0 -->
+
 # CLAUDE.md
 
 Guidance for Claude Code in this repository. The full contributor and agent

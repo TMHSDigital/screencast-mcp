@@ -193,9 +193,41 @@ const SCRIPTABLE_OPTS = new Set(["-vf", "-af", "-filter_complex", "-lavfi", "-fi
  * line at 32,767 characters, so a long zoom or cut graph cannot go inline (#225). */
 export const MAX_INLINE_FILTER = 8_000;
 
+/** Pre-FFmpeg 7 spellings of the file-reading filter options. 7.0 added the
+ * generic `-/option file` form, and these are deprecated in it. */
+const LEGACY_SCRIPT_OPTS: Record<string, string> = {
+  "-vf": "-filter_script:v",
+  "-filter:v": "-filter_script:v",
+  "-af": "-filter_script:a",
+  "-filter:a": "-filter_script:a",
+  "-filter_complex": "-filter_complex_script",
+  "-lavfi": "-filter_complex_script",
+};
+
+let modernScripts: boolean | null = null;
+
+/** True when ffmpeg reads `-/option file` (FFmpeg 7+, libavutil 59+). Older
+ * builds, like the apt ffmpeg on Ubuntu, need the legacy options. Probed once. */
+function supportsOptionFiles(): boolean {
+  if (modernScripts !== null) return modernScripts;
+  try {
+    const res = spawnSync(requireFfmpeg().ffmpeg, ["-hide_banner", "-version"], {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 10_000,
+    });
+    const avutil = /^\s*libavutil\s+(\d+)\./m.exec(res.stdout ?? "");
+    modernScripts = avutil?.[1] === undefined || Number(avutil[1]) >= 59;
+  } catch {
+    modernScripts = true;
+  }
+  return modernScripts;
+}
+
 /** Move long filter values into temp files read with ffmpeg's `-/option file`
- * syntax (FFmpeg 7+). Returns the new args and a cleanup that deletes the files. */
-export function scriptLongFilters(args: string[]): { args: string[]; cleanup: () => void } {
+ * syntax (FFmpeg 7+; the legacy `-filter_script` options on older builds).
+ * Returns the new args and a cleanup that deletes the files. */
+export function scriptLongFilters(args: string[], modern?: boolean): { args: string[]; cleanup: () => void } {
   let dir: string | null = null;
   const out = [...args];
   for (const [i, a] of args.entries()) {
@@ -204,7 +236,8 @@ export function scriptLongFilters(args: string[]): { args: string[]; cleanup: ()
     dir ??= mkdtempSync(join(tmpdir(), "screencast-filter-"));
     const file = join(dir, `filter${i}.txt`);
     writeFileSync(file, a);
-    out[i - 1] = `-/${opt.slice(1)}`;
+    modern ??= supportsOptionFiles();
+    out[i - 1] = modern ? `-/${opt.slice(1)}` : (LEGACY_SCRIPT_OPTS[opt] ?? opt);
     out[i] = file;
   }
   const d = dir;

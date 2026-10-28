@@ -22,7 +22,7 @@ describe("sumExpr (#225)", () => {
 describe("scriptLongFilters (#225)", () => {
   it("moves only long filter values to files and cleans them up", () => {
     const long = "null," .repeat(MAX_INLINE_FILTER / 4) + "null";
-    const { args, cleanup } = scriptLongFilters(["-i", "in.mp4", "-vf", "scale=2:2", "-filter_complex", long, "o.mp4"]);
+    const { args, cleanup } = scriptLongFilters(["-i", "in.mp4", "-vf", "scale=2:2", "-filter_complex", long, "o.mp4"], true);
     expect(args.slice(0, 4)).toEqual(["-i", "in.mp4", "-vf", "scale=2:2"]);
     expect(args[4]).toBe("-/filter_complex");
     const script = defined(args[5]);
@@ -30,6 +30,13 @@ describe("scriptLongFilters (#225)", () => {
     expect(args[6]).toBe("o.mp4");
     cleanup();
     expect(existsSync(script)).toBe(false);
+  });
+
+  it("uses the legacy -filter_script options before FFmpeg 7", () => {
+    const long = "null,".repeat(MAX_INLINE_FILTER / 4) + "null";
+    const { args, cleanup } = scriptLongFilters(["-vf", long, "-af", long, "-filter_complex", long], false);
+    expect([args[0], args[2], args[4]]).toEqual(["-filter_script:v", "-filter_script:a", "-filter_complex_script"]);
+    cleanup();
   });
 
   it("leaves short args untouched", () => {

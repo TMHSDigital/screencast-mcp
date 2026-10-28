@@ -7,6 +7,13 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.44.2]
+
+### Fixed
+
+- Long filter graphs (many zoom keyframes, rings, or idle cuts) work with ffmpeg builds older than 7.0, such as Ubuntu's apt ffmpeg: those builds get the legacy `-filter_script` / `-filter_complex_script` options instead of the `-/vf file` form they cannot parse. This had failed the Linux CI legs since 0.40.0, so 0.40.0 to 0.44.1 were never released (#225).
+- CLAUDE.md carries its `standards-version` marker again, which the ecosystem drift check requires (#193).
+
 ## [0.44.1]
 
 ### Added
