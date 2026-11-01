@@ -62,6 +62,9 @@ export interface Cue {
   start: number;
   end: number;
   text: string;
+  /** The cue's own number in the file it was read from, when parseSrt was
+   * asked to keep it (cut_by_transcript matches cue numbers against it, #259). */
+  index?: number;
 }
 
 const TIME = /(\d+):(\d{2}):(\d{2})[,.](\d{3})/;
@@ -75,8 +78,10 @@ function fmt(sec: number): string {
   return `${pad(h)}:${pad(m)}:${pad(s)},${pad(ms % 1000, 3)}`;
 }
 
-/** Parse SRT into cues (tolerant of CRLF, 0-based numbering, blank lines). */
-export function parseSrt(srt: string): Cue[] {
+/** Parse SRT into cues (tolerant of CRLF, 0-based numbering, blank lines).
+ * With `index: true`, each cue keeps the number written above its timing
+ * line, if any, so a cue can be named as the file numbers it (#259). */
+export function parseSrt(srt: string, opts: { index?: boolean } = {}): Cue[] {
   const cues: Cue[] = [];
   for (const block of srt.replace(/\r\n/g, "\n").split(/\n\s*\n/)) {
     const lines = block.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
@@ -88,13 +93,16 @@ export function parseSrt(srt: string): Cue[] {
     const sb = b?.match(TIME);
     if (!sa || !sb) continue;
     const text = lines.slice(i + 1).join("\n");
-    if (text) cues.push({ start: toSec(sa), end: toSec(sb), text });
+    if (!text) continue;
+    const n = opts.index && i > 0 && /^\d+$/.test(lines[i - 1]!) ? Number(lines[i - 1]) : undefined;
+    cues.push({ start: toSec(sa), end: toSec(sb), text, ...(n !== undefined && { index: n }) });
   }
   return cues;
 }
 
-/** Renumber from 1, sort by start, and end each cue no later than the next
- * one starts, so cues never overlap. Pure. */
+/** Sort by start, end each cue no later than the next one starts (so cues
+ * never overlap), and drop cues left with no duration. A kept `index` is
+ * carried along; formatSrt renumbers from 1. Pure. */
 export function normalizeCues(cues: Cue[]): Cue[] {
   const sorted = [...cues].sort((p, q) => p.start - q.start);
   return sorted

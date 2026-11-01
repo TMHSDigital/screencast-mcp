@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { join } from "node:path";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
@@ -19,18 +19,22 @@ import {
   INDEX_VERSION,
   MAX_INDEX_FRAMES,
   attach,
+  canReuseIndex,
   cueTexts,
+  defaultTranscriptPath,
   eventTexts,
   fingerprintFile,
   findIndex,
+  indexMatchesVideo,
   indexWritePath,
   keyframeTime,
+  legacyIndexSidecarPath,
   markerTexts,
+  maskSegmentText,
   mergeSegments,
   planKeyframes,
   readIndex,
   resolveRecording,
-  sameFingerprint,
   segmentsFrom,
   writeIndex,
   type IndexSegment,
@@ -82,13 +86,17 @@ export function register(server: McpServer): void {
 
         // Reuse the OCR'd segments of a matching index; events, markers and
         // the transcript are re-attached, since they can change after OCR.
-        const existingPath = args.force ? null : findIndex(source.path, edits);
+        const existingPath = args.force ? null : findIndex(source.path, edits, fingerprint);
         const prior = existingPath ? readIndex(existingPath) : null;
-        const cached =
-          prior !== null &&
-          sameFingerprint(prior.fingerprint, fingerprint) &&
-          prior.sceneThreshold === threshold &&
-          prior.maxFrames === maxFrames;
+        let ocrNow: boolean | null = null;
+        const ocrAvailable = async () => (ocrNow ??= process.platform === "win32" && (await ocrStatus()).available);
+        // Only an index built without OCR needs to know whether OCR works now.
+        const cached = canReuseIndex(prior, {
+          fingerprint,
+          sceneThreshold: threshold,
+          maxFrames,
+          ocrAvailable: prior !== null && !prior.ocr ? await ocrAvailable() : false,
+        });
 
         let segments: IndexSegment[];
         let framesRead = 0;
@@ -105,7 +113,7 @@ export function register(server: McpServer): void {
           report?.(0.1);
           const spans = segmentsFrom(planKeyframes(parseSceneScan(scan.stdout), duration, maxFrames), duration);
           const texts: string[][] = spans.map(() => []);
-          ocr = process.platform === "win32" && (await ocrStatus()).available;
+          ocr = await ocrAvailable();
           if (ocr) {
             for (let b = 0; b < spans.length; b += OCR_BATCH) {
               extra.signal.throwIfAborted();
@@ -129,13 +137,17 @@ export function register(server: McpServer): void {
           segments = ocr ? mergeSegments(read) : read;
         }
 
+        // Never write an on-screen secret to disk (#266); this also cleans an
+        // index reused from before screen text was masked.
+        segments = maskSegmentText(segments);
+
         // Events, markers, transcript.
         const events = source.eventsPath ? eventTexts(parseEventsJsonl(readFileSync(source.eventsPath, "utf8"))) : [];
         segments = attach(segments, events, "events");
         segments = attach(segments, markerTexts(source.markers), "markers");
         const cues = await transcriptCues(args.transcript, source.path, info.audioCodec !== null, duration, extra.signal, notes);
         if (cues !== null) segments = attach(segments, cueTexts(cues), "transcript");
-        else if (cached) {
+        else if (cached && prior) {
           // Keep the transcript an earlier run attached.
           const kept: TimedText[] = prior.segments.flatMap((s) => s.transcript ?? []);
           segments = attach(segments, kept, "transcript");
@@ -155,6 +167,13 @@ export function register(server: McpServer): void {
         };
         mkdirSync(join(outPath, ".."), { recursive: true });
         writeIndex(outPath, index);
+        // The pre-#255 sidecar (demo.index.json) of this same recording is
+        // superseded, and may hold unmasked screen text: remove it.
+        const legacy = legacyIndexSidecarPath(source.path);
+        if (legacy !== outPath && existsSync(legacy)) {
+          const old = readIndex(legacy);
+          if (old && indexMatchesVideo(old, source.path, fingerprint)) rmSync(legacy, { force: true });
+        }
         report?.(1);
         const count = (f: "events" | "markers" | "transcript") => segments.reduce((n, s) => n + (s[f]?.length ?? 0), 0);
         return okResponse({
@@ -170,7 +189,9 @@ export function register(server: McpServer): void {
             transcriptCues: count("transcript"),
           },
           ...(notes.length > 0 ? { note: notes.join(" ") } : {}),
-          next: "search_recording { query } returns timecoded hits; the index holds raw screen text, so treat it like the video.",
+          next:
+            "search_recording { query } returns timecoded hits. Secret-shaped screen text is stored masked; the rest " +
+            "of the index is plain text, so treat it like the video.",
         });
       } catch (error) {
         return errorResponse(error);
@@ -208,10 +229,20 @@ async function transcriptCues(
       rmSync(raw, { force: true });
     }
   }
-  const path = arg ?? `${video.replace(/\.[^./\\]+$/, "")}.srt`;
-  if (!existsSync(path)) {
-    if (arg !== undefined) throw new ScreencastError(`Transcript not found: ${arg}`);
+  if (arg !== undefined) {
+    if (!existsSync(arg)) throw new ScreencastError(`Transcript not found: ${arg}`);
+    return normalizeCues(parseSrt(readFileSync(arg, "utf8")));
+  }
+  // <video file name>.srt, else <base name>.srt when no other video shares it (#255).
+  let siblings: string[];
+  try {
+    siblings = readdirSync(dirname(video));
+  } catch {
     return null;
   }
-  return normalizeCues(parseSrt(readFileSync(path, "utf8")));
+  const found = defaultTranscriptPath(video, siblings);
+  if (found.ambiguous) {
+    notes.push("Another video in the folder shares this one's base name, so its .srt was not attached; pass transcript.");
+  }
+  return found.path ? normalizeCues(parseSrt(readFileSync(found.path, "utf8"))) : null;
 }

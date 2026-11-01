@@ -15,9 +15,9 @@ const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
   srt: z.string().min(1).describe("Its .srt (transcribe; words: true for word timing)."),
   remove: z
-    .array(z.union([z.number().int().min(1).max(99999), z.string().min(1)]))
+    .array(z.union([z.number().int().min(0).max(99999), z.string().min(1)]))
     .optional()
-    .describe("Cue numbers, or transcript text quoted exactly (must occur once)."),
+    .describe("Cue numbers as the .srt numbers them, or transcript text quoted exactly (must occur once)."),
   fillers: z.boolean().optional().describe("Also cut fillers (um, uh...) that have their own cue."),
   dryRun: z.boolean().optional().describe("Only report the cuts."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
@@ -43,7 +43,7 @@ export function register(server: McpServer): void {
         const info = await probeMedia(args.input);
         const duration = info.durationSec;
         if (duration === null || !info.videoCodec) throw new ScreencastError(`Not a readable video: ${args.input}`);
-        const cues = normalizeCues(parseSrt(readFileSync(args.srt, "utf8")));
+        const cues = normalizeCues(parseSrt(readFileSync(args.srt, "utf8"), { index: true }));
         if (cues.length === 0) throw new ScreencastError(`No cues in ${args.srt}.`);
 
         const { cuts, skippedFillers } = planTranscriptCuts(cues, { remove: args.remove, fillers: args.fillers });

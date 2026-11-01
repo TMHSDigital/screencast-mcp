@@ -12,6 +12,59 @@ the integration suite, `ffmpeg` and `ffprobe` on `PATH`.
 3. Make your changes following the conventions below
 4. Submit a pull request
 
+## Development
+
+```bash
+git clone https://github.com/TMHSDigital/screencast-mcp.git
+cd screencast-mcp
+npm install
+npm run build      # tsc -> dist/
+npm test           # vitest: unit tests, plus the ffmpeg integration suite when ffmpeg is on PATH
+npm run dev        # tsx watch
+npm run docs       # regenerate mcp-tools.json, the tool tables, docs/tools/, llms.txt
+```
+
+The tool tables in the README and on the site, `mcp-tools.json`, and the per-tool pages are generated from the registered tools' schemas; after adding or changing a tool, run `npm run docs` (the docs test fails on a stale copy; `npm run docs:check` checks without writing).
+
+To run your build from a client, point it at `dist/index.js`: `"command": "node"`, `"args": ["C:/path/to/screencast-mcp/dist/index.js"]`.
+
+Agent evals (`evals/`) score tool selection, argument validity and outcomes on scripted tasks against lavfi-generated fixtures, through the built server over MCP. The default oracle mode replays known-good calls and needs no model or network; `--agent anthropic` runs a real model (install the SDK ad hoc with `npm install --no-save @anthropic-ai/sdk`; `EVAL_MODEL` defaults to `claude-sonnet-5-5`). Live-capture tools are always blocked.
+
+```bash
+npm run build && npm run eval                  # oracle mode
+npm run eval -- --agent anthropic --json evals/results/baseline.json
+```
+
+## Project structure
+
+```
+.
+├── src/
+│   ├── index.ts          # entry: connects the server over stdio, or hands a subcommand to cli.ts
+│   ├── server.ts         # builds the McpServer and wires every tool, prompt, and resource
+│   ├── context.ts        # process-wide singletons (the session store)
+│   ├── cli.ts            # headless CLI: record -- <command>, call <tool>
+│   ├── prompts.ts        # MCP prompts (workflows as slash commands)
+│   ├── resources.ts      # MCP resources (sessions, posters)
+│   ├── wgcRecorder.ts    # recorder process for backend: "wgc"
+│   ├── tools/            # one file per tool, each exporting register(server)
+│   ├── utils/            # pure builders and helpers (ffmpeg args, targets, sessions, ...)
+│   └── __tests__/        # vitest: unit, ffmpeg integration, capture smoke, guarded local-capture harness
+├── evals/                # agent evals: scripted tasks, oracle and live-model runners
+├── assets/               # bundled fonts, the review player (assets/ui), the bundle icon
+├── docs/                 # GitHub Pages site; tools/, llms.txt, and the workflow pages are generated
+├── scripts/              # Claude Desktop bundle (.mcpb) and the docs generators (npm run docs)
+├── plugin/               # Claude Code plugin: the server plus workflow skills
+├── action.yml            # GitHub Action: record a test run on windows-latest
+├── mcp-tools.json        # tool manifest, generated from the registry by npm run docs
+├── server.json           # MCP Registry listing (name matches package.json mcpName)
+├── .github/workflows/    # CI, release, npm publish, Pages, ecosystem drift check
+├── CHANGELOG.md · ROADMAP.md · CONTRIBUTING.md · SECURITY.md · LICENSE
+└── package.json
+```
+
+[AGENTS.md](AGENTS.md) describes the same layout in more detail.
+
 ## Conventions
 
 ### Commits

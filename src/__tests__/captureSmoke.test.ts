@@ -8,6 +8,7 @@
  * `npm test` never captures a developer's screen.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,8 +17,28 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
 const RUN = process.platform === "win32" && !!process.env.RUN_CAPTURE_SMOKE;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// A hosted runner's desktop session is shared and often loaded; one retry
+// there absorbs a stalled capture without hiding a real break, which fails
+// both attempts. Local runs get no retry (#260).
+const RETRY = process.env.GITHUB_ACTIONS === "true" ? 1 : 0;
 
-describe.skipIf(!RUN)("capture smoke (RUN_CAPTURE_SMOKE)", () => {
+/** Video packet timestamps (seconds, presentation order) and the container
+ * duration, from ffprobe: what the file holds, independent of wall time. */
+function videoTimeline(ffprobe: string, path: string): { pts: number[]; frameSec: number; durationSec: number } {
+  const res = spawnSync(
+    ffprobe,
+    ["-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time,duration_time:format=duration", "-of", "json", path],
+    { encoding: "utf8" },
+  );
+  if (res.status !== 0) throw new Error(`ffprobe failed on ${path}: ${res.stderr}`);
+  const data = JSON.parse(res.stdout) as { packets?: Array<{ pts_time?: string; duration_time?: string }>; format?: { duration?: string } };
+  const packets = (data.packets ?? []).filter((p) => p.pts_time !== undefined);
+  const pts = packets.map((p) => Number(p.pts_time)).sort((a, b) => a - b);
+  const frameSec = Number(packets[0]?.duration_time ?? 0);
+  return { pts, frameSec, durationSec: Number(data.format?.duration ?? 0) };
+}
+
+describe.skipIf(!RUN)("capture smoke (RUN_CAPTURE_SMOKE)", { retry: RETRY }, () => {
   let home: string;
   let client: Client;
 
@@ -70,16 +91,19 @@ describe.skipIf(!RUN)("capture smoke (RUN_CAPTURE_SMOKE)", () => {
   }, 60_000);
 
   it("leaves a paused stretch out of the file and the markers (#200)", async () => {
-    const { probeMedia } = await import("../utils/ffmpeg.js");
-    const t0 = Date.now();
+    const { requireFfmpeg } = await import("../utils/ffmpeg.js");
     const start = await call("start_recording", { target: "region:0,0,640,480", quality: "draft", fps: 15 });
     expect(start.isError, start.text).toBe(false);
     const id = start.json.sessionId;
+    const output = start.json.outputPath as string;
     await sleep(2000);
     const pause = await call("pause_recording", { sessionId: id });
     expect(pause.isError, pause.text).toBe(false);
     expect(pause.json.status).toBe("paused");
+    // ffprobe's length of the first segment, which is the output file until
+    // stop joins the parts.
     const recorded = pause.json.recordedSec as number;
+    expect(recorded).toBeGreaterThan(1);
     await sleep(3000);
     const mark = await call("add_marker", { sessionId: id, label: "at the pause" });
     expect((mark.json.marker as { t: number }).t).toBeCloseTo(recorded, 1);
@@ -87,16 +111,27 @@ describe.skipIf(!RUN)("capture smoke (RUN_CAPTURE_SMOKE)", () => {
     expect(resume.isError, resume.text).toBe(false);
     await sleep(2000);
     const stop = await call("stop_recording", { sessionId: id });
-    const wallSec = (Date.now() - t0) / 1000;
     expect(stop.isError, stop.text).toBe(false);
     expect(stop.json.segmentsJoined).toBe(2);
-    const info = await probeMedia(start.json.outputPath as string);
-    // About 4 s recorded over about 7 s of wall time. A loaded runner stretches
-    // each segment by its start/stop latency, so rather than an absolute bound,
-    // check that the 3 s pause is missing from the wall-clock span.
-    expect(info.durationSec!).toBeGreaterThan(recorded + 1);
-    expect(info.durationSec!, `file ${info.durationSec}s, wall ${wallSec}s`).toBeLessThan(wallSec - 2.5);
-    expect(existsSync(`${start.json.outputPath as string}.parts`)).toBe(false);
+    expect(existsSync(`${output}.parts`)).toBe(false);
+
+    // Judge the file by its own timestamps, not by wall time: a loaded runner
+    // stretches each segment by its start/stop latency (#260). If the pause
+    // were kept, as a frozen stretch or a timestamp hole, the timeline would
+    // jump by about 3 s where the first segment ends.
+    const { pts, frameSec, durationSec } = videoTimeline(requireFfmpeg().ffprobe, output);
+    const summary = `${pts.length} frames over ${durationSec}s, first segment ${recorded}s`;
+    expect(pts.length, summary).toBeGreaterThan(15);
+    expect(pts[0]!, summary).toBeLessThan(0.5);
+    const gaps = pts.slice(1).map((t, i) => t - pts[i]!);
+    const widest = Math.max(...gaps);
+    expect(widest, `widest gap ${widest}s; ${summary}`).toBeLessThan(1);
+    // The container ends with the last frame: no padding where the pause was.
+    expect(Math.abs(pts[pts.length - 1]! + frameSec - durationSec), summary).toBeLessThan(0.5);
+    // Both segments are in it: the first, then at least 1 s of the second.
+    expect(durationSec, summary).toBeGreaterThan(recorded + 1);
+    // Wide sanity bound only: two ~2 s segments plus generous latency each.
+    expect(durationSec, summary).toBeLessThan(recorded + 10);
   }, 90_000);
 
   it("records with ddagrab and the auto encoder (#199)", async () => {

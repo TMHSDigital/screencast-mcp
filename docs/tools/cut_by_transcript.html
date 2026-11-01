@@ -56,7 +56,7 @@
         <tbody>
           <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video.</td></tr>
           <tr><td><code>srt</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Its .srt (transcribe; words: true for word timing).</td></tr>
-          <tr><td><code>remove</code></td><td><code class="type">(integer | string)[]</code></td><td>Cue numbers, or transcript text quoted exactly (must occur once).</td></tr>
+          <tr><td><code>remove</code></td><td><code class="type">(integer | string)[]</code></td><td>Cue numbers as the .srt numbers them, or transcript text quoted exactly (must occur once).</td></tr>
           <tr><td><code>fillers</code></td><td><code class="type">boolean</code></td><td>Also cut fillers (um, uh...) that have their own cue.</td></tr>
           <tr><td><code>dryRun</code></td><td><code class="type">boolean</code></td><td>Only report the cuts.</td></tr>
           <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>

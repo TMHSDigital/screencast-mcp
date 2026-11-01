@@ -144,7 +144,7 @@
           }
         },
         "replayBufferSec": {
-          "description": "Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab only.",
+          "description": "Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab or ddagrab, not wgc.",
           "type": "integer",
           "minimum": 4,
           "maximum": 3600
@@ -2371,13 +2371,13 @@
           "description": "Its .srt (transcribe; words: true for word timing)."
         },
         "remove": {
-          "description": "Cue numbers, or transcript text quoted exactly (must occur once).",
+          "description": "Cue numbers as the .srt numbers them, or transcript text quoted exactly (must occur once).",
           "type": "array",
           "items": {
             "anyOf": [
               {
                 "type": "integer",
-                "minimum": 1,
+                "minimum": 0,
                 "maximum": 99999
               },
               {
@@ -3834,7 +3834,7 @@
           }
         },
         "recipe": {
-          "description": "Polish preset expanded to steps (see dryRun): pr_demo = cut_idle, click zoom, GIF <=10 MB; tutorial = + audio, captions, 1080p mp4; social_reel = 9:16, big captions. Given steps replace its same-op step.",
+          "description": "Polish preset expanded to steps (see dryRun): pr_demo = cut_idle, click zoom, GIF <=10 MB; tutorial = + audio, captions, 1080p mp4; social_reel = 9:16, big captions. Given steps replace its same-op step; trim, redact, crop and cursor go first (source pixels and time).",
           "type": "string",
           "enum": [
             "pr_demo",

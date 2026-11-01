@@ -5,7 +5,7 @@
  * step and whose chapters and subtitles land on the cut timeline.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -119,6 +119,39 @@ describe.skipIf(!AVAILABLE)("pipeline polish ops and recipes against real ffmpeg
     expect(Math.abs(d.video - d.audio)).toBeLessThan(0.06);
     const loud = parseLoudnorm((await runCapture(FFMPEG, buildLoudnessMeasureArgs(out, loudnessTarget("podcast")))).stderr);
     expect(Math.abs(loud.input_i - -16)).toBeLessThan(1.5);
+  });
+
+  it("social_reel with a source-coordinate redact boxes the region in the 9:16 output, on the cut timeline (#251)", async () => {
+    // A copy with no event log, so the recipe leaves zoom out and the geometry is fixed.
+    const reel = p("reel.mp4");
+    copyFileSync(raw, reel);
+    const out = p("reel-redacted.mp4");
+    const r = await call({
+      input: reel,
+      recipe: "social_reel",
+      steps: [{ op: "redact", regions: [{ x: 100, y: 100, width: 60, height: 30, start: 8, end: 10 }] }],
+      quality: "draft",
+      output: out,
+    });
+    expect((r.expandedSteps as Array<{ op: string }>).map((s) => s.op)).toEqual(["redact", "cut_idle", "audio", "reframe", "export_preset"]);
+    // 320x240 fits 1080x810 at y=555 on the 1080x1920 canvas (x3.375): the
+    // box's middle, source (130,115), lands at about (439,943).
+    const box = (t: number) =>
+      runFfmpegBuffer(["-v", "error", "-ss", String(t), "-i", out, "-frames:v", "1", "-vf", "crop=60:30:409:928,format=gray", "-f", "rawvideo", "-"]);
+    const mean = (b: Buffer) => b.reduce((s, v) => s + v, 0) / b.length;
+    // Source 9 s is 5.8 s after the 3.2 s idle cut: boxed. Source 1 s is not.
+    expect(Math.max(...(await box(5.8)))).toBeLessThan(40);
+    expect(mean(await box(1))).toBeGreaterThan(40);
+  });
+
+  it("keeps an existing .srt beside the output when captions would be transcribed (#256)", async () => {
+    const out = p("captioned.mp4");
+    const sidecar = p("captioned.srt");
+    writeFileSync(sidecar, "1\n00:00:00,000 --> 00:00:01,000\nhand-edited\n");
+    // Refused before any work (and before the whisper checks), so this runs without a model.
+    await expect(call({ input: raw, steps: [{ op: "burn_subtitles", transcribe: true }], output: out })).rejects.toThrow(/captioned\.srt.*overwrite: true/);
+    expect(readFileSync(sidecar, "utf8")).toContain("hand-edited");
+    expect(existsSync(out)).toBe(false);
   });
 
   it("pr_demo writes a GIF within the 10 MB budget", async () => {

@@ -18,7 +18,7 @@ Use the screencast MCP tools. Tell the user before you start recording.
 
 ## 3. Polish in one call
 
-The `pr_demo` recipe cuts dead air, zooms toward each logged click, and exports a GIF under 10 MB:
+`pr_demo` is a `pipeline` recipe name (the value of its `recipe` argument), not a tool: it cuts dead air, zooms toward each logged click, and exports a GIF under 10 MB:
 
 ```
 pipeline { "input": "<recording>", "recipe": "pr_demo", "dryRun": true }
@@ -33,7 +33,7 @@ pipeline { "input": "<recording>", "recipe": "pr_demo", "steps": [
   { "op": "export_gif", "format": "webp", "width": 720, "maxBytes": 3000000 } ] }
 ```
 
-WebP is usually several times smaller than GIF and GitHub renders both. Other recipes: `tutorial` (adds audio cleanup and captions, 1080p mp4) and `social_reel` (9:16 with big captions).
+WebP is usually several times smaller than GIF and GitHub renders both. Other `pipeline` recipes (pass them as `recipe`; they are not tools): `tutorial` (adds audio cleanup and captions, 1080p mp4) and `social_reel` (9:16 with big captions).
 
 ## 4. Hand it over
 

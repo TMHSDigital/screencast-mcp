@@ -48,13 +48,19 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         const source = await resolveRecording(args);
-        const indexPath = findIndex(source.path, subdir("edits"));
+        const fingerprint = fingerprintFile(source.path);
+        const indexPath = findIndex(source.path, subdir("edits"), fingerprint);
         const index = indexPath ? readIndex(indexPath) : null;
         if (!indexPath || !index) {
           throw new ScreencastError(`No index for ${source.path}.`, "Run index_recording on it first.");
         }
-        const stale = !sameFingerprint(index.fingerprint, fingerprintFile(source.path));
-        const { hits, total } = searchIndex(index, args.query, { regex: args.regex === true, limit: args.limit });
+        const stale = !sameFingerprint(index.fingerprint, fingerprint);
+        const { hits, total } = searchIndex(index, args.query, {
+          regex: args.regex === true,
+          limit: args.limit,
+          video: source.path,
+          fingerprint,
+        });
 
         const want = Math.min(clampInlineCount(args.images ?? 0), hits.length);
         let images: Awaited<ReturnType<typeof encodeInlineImages>>["images"] = [];

@@ -108,7 +108,7 @@ function rangeCut(words: Word[], from: number, to: number): TranscriptCut {
 }
 
 export interface CutRequest {
-  /** 1-based cue numbers or quoted transcript text. */
+  /** Cue numbers (as the SRT numbers them; see cueByNumber) or quoted transcript text. */
   remove?: Array<number | string>;
   fillers?: boolean;
 }
@@ -126,14 +126,36 @@ export function mergeCuts(cuts: TranscriptCut[]): TranscriptCut[] {
   for (const c of sorted) {
     const prev = out[out.length - 1];
     if (prev && c.start <= prev.end + 0.01) {
-      if (c.end > prev.end) {
-        prev.end = c.end;
-        prev.text = `${prev.text} ${c.text}`;
-      }
+      // Every removed piece's text stays in the report, even one wholly inside another.
+      if (c.end > prev.end) prev.end = c.end;
+      if (!prev.text.includes(c.text)) prev.text = `${prev.text} ${c.text}`;
       prev.exact &&= c.exact;
     } else out.push({ ...c });
   }
   return out;
+}
+
+/** The cue a number names (#259). When the cues carry the file's own
+ * numbers (parseSrt with index: true), the number is matched against those,
+ * so a 0-based or unsorted SRT, or one with cues dropped as empty or
+ * overlapped, still cuts the cue the file shows under that number. Cues
+ * without numbers are named by 1-based position. */
+export function cueByNumber(cues: readonly Cue[], n: number): Cue {
+  const numbers = cues.flatMap((c) => (c.index === undefined ? [] : [c.index]));
+  if (numbers.length === 0) {
+    const c = Number.isInteger(n) ? cues[n - 1] : undefined;
+    if (!c) throw new ScreencastError(`No cue ${n}: the transcript has cues 1-${cues.length}.`);
+    return c;
+  }
+  const hits = cues.filter((c) => c.index === n);
+  if (hits.length > 1) throw new ScreencastError(`The transcript numbers ${hits.length} cues ${n}; quote the text to cut instead.`);
+  if (hits.length === 0) {
+    throw new ScreencastError(
+      `No cue ${n}: the transcript's cues are numbered ${Math.min(...numbers)}-${Math.max(...numbers)}` +
+        " (a cue with no duration, or wholly overlapped by the next, has no time to cut).",
+    );
+  }
+  return hits[0]!;
 }
 
 /** The spans to cut for a request. Unknown cue numbers, missing quotes and
@@ -143,8 +165,7 @@ export function planTranscriptCuts(cues: Cue[], req: CutRequest): CutPlan {
   const cuts: TranscriptCut[] = [];
   for (const r of req.remove ?? []) {
     if (typeof r === "number") {
-      const c = cues[r - 1];
-      if (!Number.isInteger(r) || !c) throw new ScreencastError(`No cue ${r}: the transcript has cues 1-${cues.length}.`);
+      const c = cueByNumber(cues, r);
       cuts.push({ start: r3(c.start), end: r3(c.end), text: c.text.replace(/\s+/g, " "), exact: true });
       continue;
     }

@@ -9,13 +9,19 @@ import { inputSteps, reconstructSteps } from "../utils/steps.js";
 import { reconstructSteps as fromBugReport } from "../utils/bugReport.js";
 import {
   assignSections,
+  base64Bytes,
   buildGuideHtml,
+  buildHtmlImageArgs,
   buildGuideMarkdown,
   buildStepFrameArgs,
   buildStepShotArgs,
   caption,
   guideSteps,
+  htmlImageName,
+  HTML_IMAGE_LADDER,
+  HTML_MAX_BYTES,
   labelAt,
+  nextHtmlRung,
   shotFilter,
   shotTime,
   SHOT_LEAD_SEC,
@@ -209,5 +215,30 @@ describe("guide writers", () => {
     expect(buildGuideMarkdown(empty)).toContain("_No clicks._");
     expect(buildGuideMarkdown(empty)).toContain("not scanned for secrets");
     expect(buildGuideHtml(empty, (f) => f)).toContain("No clicks.");
+  });
+});
+
+describe("guide.html byte budget (#259)", () => {
+  it("re-encodes each screenshot as a JPEG no wider than the rung", () => {
+    expect(htmlImageName("step-07.png")).toBe("step-07.jpg");
+    const args = buildHtmlImageArgs("a.png", { width: 640, q: 10 }, "a.jpg");
+    expect(args.join(" ")).toContain("scale=w='min(iw,640)':h=-2");
+    expect(args.slice(args.indexOf("-q:v"), args.indexOf("-q:v") + 2)).toEqual(["-q:v", "10"]);
+    expect(args.at(-1)).toBe("a.jpg");
+    expect(base64Bytes(3)).toBe(4);
+    expect(base64Bytes(4)).toBe(8);
+  });
+  it("goes down the ladder far enough for the page to fit, and stops at the bottom", () => {
+    const last = HTML_IMAGE_LADDER.length - 1;
+    // Slightly over: the next rung.
+    expect(nextHtmlRung(0, HTML_MAX_BYTES * 1.1)).toBe(1);
+    // Far over: skips rungs whose area cannot get it under the budget.
+    const k = nextHtmlRung(0, HTML_MAX_BYTES * 5)!;
+    const ratio = (HTML_IMAGE_LADDER[k]!.width / HTML_IMAGE_LADDER[0]!.width) ** 2;
+    expect(ratio * 5).toBeLessThanOrEqual(1);
+    expect(((HTML_IMAGE_LADDER[k - 1]!.width / HTML_IMAGE_LADDER[0]!.width) ** 2) * 5).toBeGreaterThan(1);
+    // Hopelessly over: the smallest rung, then nothing.
+    expect(nextHtmlRung(0, HTML_MAX_BYTES * 1000)).toBe(last);
+    expect(nextHtmlRung(last, HTML_MAX_BYTES * 2)).toBeNull();
   });
 });

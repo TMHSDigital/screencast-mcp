@@ -22,10 +22,16 @@ describe("resolveOutput overwrite guard", () => {
   it("refuses a caller-supplied path that already exists", () => {
     const existing = join(tmpdir(), `sc-out-${Date.now()}.mp4`);
     writeFileSync(existing, "x");
+    const saved = process.env.SCREENCAST_ALLOWED_DIRS;
+    // Unconfined, replacing a file outside SCREENCAST_HOME is refused even
+    // with overwrite; listing its folder allows it.
+    process.env.SCREENCAST_ALLOWED_DIRS = tmpdir();
     try {
       expect(() => resolveOutput(existing, tmpdir(), "d.mp4")).toThrow(/overwrite/);
       expect(resolveOutput(existing, tmpdir(), "d.mp4", true)).toBe(existing);
     } finally {
+      if (saved === undefined) delete process.env.SCREENCAST_ALLOWED_DIRS;
+      else process.env.SCREENCAST_ALLOWED_DIRS = saved;
       rmSync(existing, { force: true });
     }
   });

@@ -22,6 +22,7 @@ import {
   markPausing,
   pauseBlocker,
   recordedSec,
+  segmentDurationSec,
   webcamOutputPath,
   type SegmentPart,
 } from "./pause.js";
@@ -111,7 +112,10 @@ export async function finalParts(record: SessionRecord, ffprobe: string): Promis
   if (!seg) return [];
   const parts = [...seg.parts];
   if (seg.current) {
-    const durationSec = (await probeDuration(ffprobe, seg.current.path)) ?? 0;
+    // A failed probe does not drop footage: the span stands in (#252).
+    const probed = await probeDuration(ffprobe, seg.current.path);
+    const endMs = record.stoppedAt ? Date.parse(record.stoppedAt) : Date.now();
+    const durationSec = segmentDurationSec(seg.current.path, probed, seg.current.startMs, endMs) ?? 0;
     parts.push({ ...seg.current, durationSec });
   }
   return parts;
@@ -145,12 +149,83 @@ export async function joinSegments(
   };
 }
 
+/** What a session operation is doing. */
+export type SessionOpKind = "pause" | "resume" | "stop";
+
+/** Pause, resume and stop in flight, per store and session id (#252). One
+ * operation runs at a time per session: a second call of the same kind (an
+ * agent retry) joins the running one; a stop waits for a running pause or
+ * resume and then stops whatever state it left; a pause or resume that
+ * collides with a different operation is rejected. Without this, overlapping
+ * calls spawned a second capture over the first, or force-killed a segment
+ * that was still finalizing (#181, #252). */
+const sessionOps = new WeakMap<SessionStore, Map<string, { kind: SessionOpKind; promise: Promise<unknown> }>>();
+
+/** The operation running on a session, if any. */
+export function sessionOpInFlight(store: SessionStore, id: string): SessionOpKind | null {
+  return sessionOps.get(store)?.get(id)?.kind ?? null;
+}
+
+/**
+ * Run `fn` as the session's one operation. `queue` (stop) waits for a
+ * different operation in flight instead of rejecting; `fn` is told whether it
+ * waited, so it can re-read the record the other operation changed.
+ */
+export function withSessionOp<T>(
+  store: SessionStore,
+  id: string,
+  kind: SessionOpKind,
+  fn: (waited: boolean) => Promise<T>,
+  opts: { queue?: boolean } = {},
+): Promise<T> {
+  let ops = sessionOps.get(store);
+  if (!ops) sessionOps.set(store, (ops = new Map()));
+  const running = ops.get(id);
+  if (running?.kind === kind) return running.promise as Promise<T>;
+  if (running && !opts.queue) {
+    return Promise.reject(
+      new ScreencastError(
+        `Cannot ${kind} ${id}: a ${running.kind} of it is in progress.`,
+        "Retry once it finishes (get_recording shows the session's status).",
+      ),
+    );
+  }
+  let start: Promise<T>;
+  if (running) {
+    start = running.promise.then(
+      () => fn(true),
+      () => fn(true),
+    );
+  } else {
+    try {
+      start = fn(false);
+    } catch (err) {
+      start = Promise.reject(err);
+    }
+  }
+  const map = ops;
+  const op: Promise<T> = start.finally(() => {
+    if (map.get(id)?.promise === op) map.delete(id);
+  });
+  map.set(id, { kind, promise: op });
+  return op;
+}
+
 /**
  * Pause a recording (#200): quit the running segment gracefully, probe its
  * length, and park the session as "paused". The event logger keeps running;
- * the capture settings stay on the record for resume_recording.
+ * the capture settings stay on the record for resume_recording. A second pause
+ * while one runs joins it; one during a resume or stop is rejected (#252).
  */
-export async function pauseSession(
+export function pauseSession(
+  store: SessionStore,
+  record: SessionRecord,
+  opts: { probe: (path: string) => Promise<number | null>; gracefulMs?: number },
+): Promise<{ record: SessionRecord | undefined; recordedSec: number; segmentSec: number; graceful: boolean }> {
+  return withSessionOp(store, record.id, "pause", () => runPause(store, store.get(record.id) ?? record, opts));
+}
+
+async function runPause(
   store: SessionStore,
   record: SessionRecord,
   opts: { probe: (path: string) => Promise<number | null>; gracefulMs?: number },
@@ -161,10 +236,15 @@ export async function pauseSession(
   markPausing(record.id);
   store.markStopping(record.id);
   try {
+    const pausedAt = Date.now();
     const graceful = await quitChild(child!, record.pid, opts.gracefulMs ?? 8000);
-    store.detachChild(record.id);
+    store.detachChild(record.id, child);
     const cur = record.segments!.current!;
-    const segmentSec = (await opts.probe(cur.path)) ?? 0;
+    // Keep the segment unless it is missing or empty: when ffprobe fails or
+    // times out, its length is estimated from when it started and the pause
+    // (#252).
+    const probed = await opts.probe(cur.path);
+    const segmentSec = segmentDurationSec(cur.path, probed, cur.startMs, pausedAt) ?? 0;
     const parts = record.segments!.parts;
     const next = segmentSec > 0 ? [...parts, { ...cur, durationSec: segmentSec }] : parts;
     if (segmentSec <= 0 && cur.path !== record.outputPath) rmSync(cur.path, { force: true });
@@ -208,25 +288,32 @@ export async function stopAll(
   return ids;
 }
 
-/** Stops in flight, per store and session id. A second stop of the same
- * session (an agent retry, or shutdown racing stop_recording) joins the first
- * instead of force-killing a recording that is still finalizing (#181). */
-const inFlight = new WeakMap<SessionStore, Map<string, Promise<StopResult>>>();
-
 /** Stop an active recording and record its final state. The caller has already
- * checked the record exists and is "recording". */
+ * checked the record exists and is "recording" or "paused". A second stop of
+ * the same session (an agent retry, or shutdown racing stop_recording) joins
+ * the first instead of force-killing a recording that is still finalizing
+ * (#181); a stop during a pause or resume waits for it, then stops the state
+ * it left (#252). */
 export function stopSession(
   store: SessionStore,
   record: SessionRecord,
   opts: StopOptions,
 ): Promise<StopResult> {
-  let stops = inFlight.get(store);
-  if (!stops) inFlight.set(store, (stops = new Map()));
-  const running = stops.get(record.id);
-  if (running) return running;
-  const stop = runStop(store, record, opts).finally(() => stops.delete(record.id));
-  stops.set(record.id, stop);
-  return stop;
+  return withSessionOp(
+    store,
+    record.id,
+    "stop",
+    async (waited) => {
+      if (!waited) return runStop(store, record, opts);
+      const cur = store.get(record.id) ?? record;
+      if (cur.status !== "recording" && cur.status !== "paused") {
+        // It ended while the other operation ran: report the final state.
+        return { record: cur, graceful: true, durationSec: cur.durationSec ?? null };
+      }
+      return runStop(store, cur, opts);
+    },
+    { queue: true },
+  );
 }
 
 async function runStop(
@@ -270,7 +357,7 @@ async function runStop(
         }
       }
     }
-    store.detachChild(record.id);
+    store.detachChild(record.id, child);
     // A paused session has nothing running: its last segment ended at the
     // pause, cleanly (#200).
     if (record.status === "paused") graceful = true;

@@ -468,7 +468,7 @@ export function renderLlms(tools) {
     "",
     `- [Full tool reference](${SITE}llms-full.txt): every tool and parameter in one file`,
     `- [mcp-tools.json](https://github.com/TMHSDigital/screencast-mcp/blob/main/mcp-tools.json): the tool list with JSON Schemas`,
-    `- [README](https://github.com/TMHSDigital/screencast-mcp#readme): configuration, safety, and the threat model`,
+    `- [README](https://github.com/TMHSDigital/screencast-mcp#readme): quick start, configuration, and privacy; the threat model is on the site`,
     "",
   ];
   return lines.join("\n");

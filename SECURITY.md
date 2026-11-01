@@ -35,3 +35,22 @@ detect secrets on its own, so it cannot redact a secret nobody pointed it at.
 - Redaction re-encodes to a new file. Always review the output (for example with
   `sample_frames`) before sharing, and delete the unredacted original if it is no
   longer needed.
+
+## File access
+
+Tool arguments come from the model, so a prompt injection (text on screen, a
+web page, a file) can try to steer them. The server limits what a call can touch:
+
+- **Network and device paths are always refused.** A UNC (`\\host\share`),
+  `//host/share`, WebDAV (`\\host@SSL@443\...`), `\\?\UNC\` or `\\.\` path in
+  any input or output argument is rejected before anything opens it, because
+  opening one makes Windows send the user's NTLM credentials to that host.
+  Copy remote files to a local folder first.
+- **Confinement.** When the client sends workspace roots, or
+  `SCREENCAST_ALLOWED_DIRS` is set, both inputs and outputs must sit inside
+  `SCREENCAST_HOME`, the roots, or those folders. A client whose roots request
+  fails gets `SCREENCAST_HOME` and `SCREENCAST_ALLOWED_DIRS` only (fail closed).
+- **No confinement configured.** With no roots and no `SCREENCAST_ALLOWED_DIRS`,
+  reads and new files may go anywhere the user can reach, but replacing an
+  existing file outside `SCREENCAST_HOME` is refused even with
+  `overwrite: true`. Set `SCREENCAST_ALLOWED_DIRS` to allow it in specific folders.

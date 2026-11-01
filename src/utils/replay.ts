@@ -30,6 +30,7 @@ import {
   convertEvents,
   eventPaths,
   formatEventsJsonl,
+  readRawEventLog,
   selectEvents,
   summarizeEvents,
   type CaptureFrame,
@@ -63,6 +64,17 @@ export interface ReplayBuffer {
   wrap: number;
   /** The live input event log, when the session was started with events. */
   events?: { raw: string; keys: KeyMode; startMs: number; frame: CaptureFrame };
+}
+
+/** Extra seconds of input events kept beyond the buffer (#258): the segment
+ * slack, the live segment, and typing bursts stamped at their start. */
+export const REPLAY_EVENT_SLACK_SEC = 60;
+
+/** How often a replay session's event log rotates (#258). The log keeps the
+ * current period and the one before, so it always covers the last
+ * `bufferSec + slack` seconds and never holds much more than twice that. Pure. */
+export function replayEventRotateSec(bufferSec: number): number {
+  return bufferSec + REPLAY_EVENT_SLACK_SEC;
 }
 
 /** Where replay buffers live: SCREENCAST_HOME/replay. */
@@ -345,7 +357,10 @@ export async function saveReplay(buf: ReplayBuffer, opts: SaveReplayOptions): Pr
       includesLive,
     };
     if (buf.events) {
-      const raw = existsSync(buf.events.raw) ? readFileSync(buf.events.raw, "utf8") : "";
+      // Only the clip's window (and a margin) is read and converted, and the
+      // log rotates, so this does not grow with the session's length (#258).
+      const sinceMs = buf.events.startMs + fromSec * 1000 - REPLAY_EVENT_SLACK_SEC * 1000;
+      const raw = readRawEventLog(buf.events.raw, sinceMs);
       const events = sliceEvents(
         convertEvents(raw, { startMs: buf.events.startMs, frame: buf.events.frame }),
         fromSec,
@@ -365,6 +380,20 @@ export async function saveReplay(buf: ReplayBuffer, opts: SaveReplayOptions): Pr
 /** Create a buffer's directory (fresh). */
 export function prepareReplayDir(buf: ReplayBuffer): void {
   mkdirSync(buf.dir, { recursive: true });
+}
+
+/** Empty the segment ring (the files and their list) but keep the directory,
+ * which also holds the live event log: for a capture restarted in it (#253). */
+export function resetReplaySegments(buf: Pick<ReplayBuffer, "dir">): void {
+  let names: string[];
+  try {
+    names = readdirSync(buf.dir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (SEGMENT_NAME.test(name) || name === LIST_NAME) rmSync(join(buf.dir, name), { force: true });
+  }
 }
 
 /** Delete a buffer's segments. Never throws. */

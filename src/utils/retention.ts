@@ -5,8 +5,12 @@
  * and contact_sheet call writes files, and they can show whatever was on
  * screen. With SCREENCAST_RETENTION_DAYS set, files in screenshots/ and
  * frames/ older than that are deleted when the server starts, along with
- * leftover raw event logs in recordings/. Recordings and edits are never
- * touched: they are the user's work. Off by default.
+ * leftover raw event logs in recordings/ and index_recording's text
+ * timelines (`*.index.json`, which hold the recording's screen text, #266) in
+ * recordings/, edits/, and edits/indexes/. An index is derived data:
+ * index_recording rebuilds it. Recordings and edits themselves are never
+ * touched: they are the user's work. Sidecars next to recordings outside
+ * SCREENCAST_HOME are not touched either. Off by default.
  */
 import { readdirSync, rmdirSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
@@ -19,6 +23,9 @@ export function retentionDays(env: NodeJS.ProcessEnv = process.env): number | nu
   const n = Number(env[RETENTION_ENV]);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
+
+/** index_recording's sidecars, and a temp file a crash left mid-write. */
+const INDEX_FILE = /\.index\.json(\.\d+\.tmp)?$/;
 
 export interface PruneResult {
   removed: number;
@@ -56,6 +63,8 @@ export function pruneCaptures(days: number, now: number = Date.now(), root: stri
   };
   prune(join(root, "screenshots"), () => false, true);
   prune(join(root, "frames"), () => false, true);
-  prune(join(root, "recordings"), (name) => !/\.events\.raw(\.stop)?$/.test(name), false);
+  prune(join(root, "recordings"), (name) => !/\.events\.raw(\.stop)?$/.test(name) && !INDEX_FILE.test(name), false);
+  prune(join(root, "edits"), (name) => !INDEX_FILE.test(name), false);
+  prune(join(root, "edits", "indexes"), (name) => !INDEX_FILE.test(name), false);
   return result;
 }

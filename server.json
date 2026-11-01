@@ -8,12 +8,12 @@
     "source": "github"
   },
   "websiteUrl": "https://tmhsdigital.github.io/screencast-mcp/",
-  "version": "0.47.0",
+  "version": "0.48.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@tmhs/screencast-mcp",
-      "version": "0.47.0",
+      "version": "0.48.0",
       "transport": {
         "type": "stdio"
       },
@@ -26,7 +26,7 @@
         },
         {
           "name": "SCREENCAST_ALLOWED_DIRS",
-          "description": "Semicolon-separated folders outputs may be written to besides SCREENCAST_HOME; when set (or when the client sends roots), outputs elsewhere are refused",
+          "description": "Semicolon-separated folders tools may read from and write to besides SCREENCAST_HOME; when set (or when the client sends roots), files elsewhere are refused. Also allows overwriting files in these folders",
           "isRequired": false,
           "isSecret": false
         },

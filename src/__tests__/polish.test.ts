@@ -4,7 +4,7 @@
  * a cut, and recipe expansion.
  */
 import { describe, it, expect } from "vitest";
-import { planPipeline, probeArgs, type PipelineStep } from "../utils/pipeline.js";
+import { planPipeline, probeArgs, sidecarCues, type PipelineStep } from "../utils/pipeline.js";
 import { cutShift, mapTime, mapWindow, mapSpans, retimeCues, retimeAss } from "../utils/timeline.js";
 import { retimeMarkers, type TimeOp } from "../utils/chapters.js";
 import { retimeBadges } from "../utils/keystrokes.js";
@@ -119,6 +119,24 @@ describe("pipeline audio and burn_subtitles (#244)", () => {
   });
 });
 
+describe("pipeline transcript sidecar (#256)", () => {
+  const cues = [{ start: 2, end: 4, text: "first" }, { start: 10, end: 12, text: "second" }];
+  const subtitles = { 1: "s1.srt" };
+  it("moves a transcript made at burn_subtitles through a later speed step onto the output's timeline", () => {
+    const steps: PipelineStep[] = [{ op: "trim", start: 0, end: 20 }, { op: "burn_subtitles", transcribe: true }, { op: "speed", factor: 2 }];
+    const plan = planPipeline("in.mp4", "o.mp4", steps, SRC, {}, "standard", { subtitles });
+    expect(plan.durationSec).toBe(10);
+    // One timing change (the trim) came before the burn step; the speed after it halves the cues.
+    expect(sidecarCues(cues, plan.timeOps, 1)).toEqual([{ start: 1, end: 2, text: "first" }, { start: 5, end: 6, text: "second" }]);
+  });
+  it("closes up a later cut_idle, and leaves the cues alone with nothing after the step", () => {
+    const steps: PipelineStep[] = [{ op: "speed", factor: 1 }, { op: "burn_subtitles", transcribe: true }, { op: "cut_idle", keepSec: 0 }];
+    const plan = planPipeline("in.mp4", "o.mp4", steps, SRC, {}, "standard", { subtitles, idle: [{ start: 5, end: 8 }] });
+    expect(sidecarCues(cues, plan.timeOps, 1)).toEqual([{ start: 2, end: 4, text: "first" }, { start: 7, end: 9, text: "second" }]);
+    expect(sidecarCues(cues, plan.timeOps, plan.timeOps.length)).toEqual(cues);
+  });
+});
+
 describe("pipeline zoom follow clicks (#244)", () => {
   const clicks = { 2: [{ t: 10, x: 200, y: 100 }, { t: 1, x: 5, y: 5 }] };
   it("moves logged clicks through earlier crops, scales and cuts before planning", () => {
@@ -167,5 +185,48 @@ describe("recipes (#244)", () => {
     expect(out.at(-1)).toEqual({ op: "export_gif", maxBytes: 5_000_000 });
     expect(applyOverrides(base, [{ op: "scale", width: 640 }]).at(-2)).toEqual({ op: "scale", width: 640 });
     expect(out).toHaveLength(base.length + 1);
+  });
+
+  // #251: redact, crop and cursor are in source pixels and time, so they go
+  // ahead of the recipe's cut_idle, zoom and reframe (after any trim).
+  const redact: PipelineStep = { op: "redact", regions: [{ x: 100, y: 100, width: 60, height: 30, start: 12, end: 16 }] };
+  const cursorPlan = { path: [{ t: 0, x: 10, y: 10 }, { t: 15, x: 200, y: 150 }], visible: [[0, Infinity]] as Array<[number, number]>, clicks: [{ t: 9, x: 120, y: 80 }] };
+  const plan = (steps: PipelineStep[]) => {
+    const at = (op: PipelineStep["op"]) => steps.findIndex((s) => s.op === op);
+    const clickAt = steps.findIndex((s) => s.op === "zoom" && s.follow === "clicks");
+    const cursorAt = at("cursor");
+    return planPipeline("in.mp4", "o.mp4", steps, SRC, {}, "standard", {
+      idle: [{ start: 3, end: 8 }],
+      ...(clickAt !== -1 && { clicks: { [clickAt]: [{ t: 10, x: 200, y: 100 }] } }),
+      ...(cursorAt !== -1 && { cursor: { [cursorAt]: { plan: cursorPlan, sprite: "arrow.png", commandsFile: "c.cmd" } } }),
+    });
+  };
+  for (const recipe of ["pr_demo", "tutorial", "social_reel"] as const) {
+    for (const hasClicks of [true, false]) {
+      it(`${recipe} ${hasClicks ? "with" : "without"} clicks plans with a redact and a cursor override (#251)`, () => {
+        const base = recipeSteps(recipe, { ...full, hasClicks }).steps;
+        for (const extra of [redact, { op: "cursor" } as PipelineStep]) {
+          const steps = applyOverrides(base, [extra]);
+          expect(steps[0]).toEqual(extra);
+          expect(steps.slice(1)).toEqual(base);
+          expect(() => plan(steps)).not.toThrow();
+        }
+        // Both at once, after a trim, in the caller's order.
+        const trim: PipelineStep = { op: "trim", start: 1, end: 18 };
+        const both = applyOverrides(base, [{ op: "cursor" }, redact, trim, { op: "crop", x: 0, y: 0, width: 300, height: 220 }]);
+        expect(both.slice(0, 4).map((s) => s.op)).toEqual(["trim", "cursor", "redact", "crop"]);
+        expect(() => plan(both)).not.toThrow();
+      });
+    }
+  }
+  it("a social_reel redact covers the source region before the 9:16 reframe and the idle cut (#251)", () => {
+    const steps = applyOverrides(recipeSteps("social_reel", { ...full, hasAudio: false, hasClicks: false }).steps, [redact]);
+    expect(steps.map((s) => s.op)).toEqual(["redact", "cut_idle", "reframe", "export_preset"]);
+    const f = fc(plan(steps).args);
+    // The box is drawn on the 320x240 source at (100,100), 12-16 s, before any cut or reframe.
+    expect(f.indexOf("drawbox")).toBeGreaterThan(-1);
+    expect(f).toMatch(/drawbox=x=\d+:y=\d+/);
+    expect(f.indexOf("drawbox")).toBeLessThan(f.indexOf("select"));
+    expect(f).toMatch(/between\(t,12,16\)/);
   });
 });

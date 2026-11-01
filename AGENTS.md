@@ -10,7 +10,7 @@ This is the single source: `CLAUDE.md` and `.cursorrules` point here.
 A stdio MCP server (TypeScript, Node 22+) that records the Windows screen,
 returns frames the model can see, and edits media with ffmpeg.
 
-- **`src/index.ts`** -- entry point: connects the server over stdio, or hands a subcommand (`record`, `call`) to `src/cli.ts`
+- **`src/index.ts`** -- entry point: connects the server over stdio, or hands a subcommand (`setup`, `record`, `call`) to `src/cli.ts` (`setup` lives in `src/setup.ts`)
 - **`src/cli.ts`** -- the headless CLI: drives the same tool handlers through an in-memory client (used by `action.yml`)
 - **`src/server.ts`** -- builds the `McpServer` and wires every tool, prompt, and resource (no transport, so tests connect it in memory)
 - **`src/tools/`** -- one MCP tool per file; each exports `register(server)`, which `src/server.ts` calls

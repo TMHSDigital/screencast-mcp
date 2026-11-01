@@ -7,7 +7,7 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia, hasFilter, runCapture, runFfmpeg, scriptLongFilters } from "../utils/ffmpeg.js";
 import { jobTimeoutMs, runEditJob } from "../utils/jobs.js";
-import { planPipeline, probeArgs, MAX_PIPELINE_STEPS, type AudioMeasurements, type PipelinePending, type PipelineStep } from "../utils/pipeline.js";
+import { planPipeline, probeArgs, sidecarCues, MAX_PIPELINE_STEPS, type AudioMeasurements, type PipelinePending, type PipelineStep } from "../utils/pipeline.js";
 import { calloutFonts, prepareCalloutAssets } from "../utils/calloutAssets.js";
 import { exportAnimation } from "../utils/animExport.js";
 import type { CalloutAssets } from "../utils/callout.js";
@@ -25,7 +25,7 @@ import { keystrokeOptionsSchema, loadBadges, prepareKeystrokeAssets } from "./ke
 import { MAX_ZOOM, type ClickPoint } from "../utils/zoom.js";
 import { buildIdleScanArgs, intersect, parseFreezes, parseSilences, DEFAULT_MIN_IDLE_SEC } from "../utils/idle.js";
 import { buildLoudnessMeasureArgs, buildNoiseFloorArgs, loudnessTarget, parseLoudnorm, parseNoiseFloor } from "../utils/audio.js";
-import { buildTranscribeArgs, formatSrt, normalizeCues, parseSrt, resolveWhisperModel } from "../utils/captions.js";
+import { buildTranscribeArgs, formatSrt, normalizeCues, parseSrt, resolveWhisperModel, type Cue } from "../utils/captions.js";
 import { eventPaths } from "../utils/events.js";
 import { bundledFontPath } from "../utils/fonts.js";
 import { retimeAss, retimeCues, type Span } from "../utils/timeline.js";
@@ -119,7 +119,8 @@ const inputSchema = {
     .optional()
     .describe(
       "Polish preset expanded to steps (see dryRun): pr_demo = cut_idle, click zoom, GIF <=10 MB; tutorial = " +
-        "+ audio, captions, 1080p mp4; social_reel = 9:16, big captions. Given steps replace its same-op step.",
+        "+ audio, captions, 1080p mp4; social_reel = 9:16, big captions. Given steps replace its same-op step; " +
+        "trim, redact, crop and cursor go first (source pixels and time).",
     ),
   quality: z.enum(["draft", "standard", "high"]).optional().describe("Encoder preset for an mp4 result (default standard)."),
   dryRun: z.boolean().optional().describe("Return the plan (ffmpeg command, output size) without running it."),
@@ -174,6 +175,17 @@ export function register(server: McpServer): void {
           hasAudio,
         };
         const timeout = jobTimeoutMs(info.durationSec);
+        const last = steps.at(-1);
+        if (!last) throw new ScreencastError("Provide at least one step.");
+        const ext = last.op === "export_gif" ? `.${last.format ?? "gif"}` : ".mp4";
+        const output = resolveOutput(args.output, subdir("edits"), `pipeline-${stamp()}-${rand()}${ext}`, args.overwrite);
+        // A transcript made for captions goes next to an mp4 result; like the
+        // output, an existing file there is only replaced with overwrite (#256).
+        const transcribes = last.op !== "export_gif" && steps.some((s) => s.op === "burn_subtitles" && s.transcribe);
+        const sidecar = output.replace(/\.[^./\\]+$/, "") + ".srt";
+        if (transcribes && !args.overwrite && existsSync(sidecar)) {
+          throw new ScreencastError(`Output already exists: ${sidecar}. Pass overwrite: true to replace it.`);
+        }
         // Polish steps (#244): files and tools they need, checked before any work.
         for (const [i, s] of steps.entries()) {
           if (s.op !== "burn_subtitles") continue;
@@ -213,10 +225,6 @@ export function register(server: McpServer): void {
           const freezes = parseFreezes(scan.stderr, total);
           idle = useAudio ? intersect(freezes, parseSilences(scan.stderr, total)) : freezes;
         }
-        const last = steps.at(-1);
-        if (!last) throw new ScreencastError("Provide at least one step.");
-        const ext = last.op === "export_gif" ? `.${last.format ?? "gif"}` : ".mp4";
-        const output = resolveOutput(args.output, subdir("edits"), `pipeline-${stamp()}-${rand()}${ext}`, args.overwrite);
 
         const work = mkdtempSync(join(tmpdir(), "screencast-pipeline-"));
         try {
@@ -270,7 +278,9 @@ export function register(server: McpServer): void {
           let plan = planWith();
           // Probes run in step order with a re-plan after each, since each one
           // hears the audio as the earlier steps leave it. A dry run skips them.
-          let transcript: string | undefined;
+          // The transcript's cues, on its burn_subtitles step's timeline, and
+          // how many timing changes came before that step.
+          let transcript: { cues: Cue[]; opsBefore: number } | undefined;
           for (let n = 0; !args.dryRun && plan.pending.length > 0; n++) {
             const p = plan.pending[0] as PipelinePending;
             if (n > steps.length * 3) throw new ScreencastError(`Internal: step ${p.step + 1} ${p.kind} did not resolve.`);
@@ -303,8 +313,8 @@ export function register(server: McpServer): void {
               const cues = existsSync(raw) ? normalizeCues(parseSrt(readFileSync(raw, "utf8"))) : [];
               subtitles[p.step] = cues.length > 0 ? join(work, `s${p.step}.srt`) : "";
               if (cues.length > 0) {
-                transcript = formatSrt(cues);
-                writeFileSync(subtitles[p.step]!, transcript);
+                transcript = { cues, opsBefore: p.ops.length };
+                writeFileSync(subtitles[p.step]!, formatSrt(cues));
               } else warnings.push(`Step ${p.step + 1}: no speech was recognised; no captions.`);
             } else if (p.kind === "subtitles" && s.op === "burn_subtitles" && s.subtitles) {
               // The file is on the source's clock; move it past earlier trims, speed and cuts.
@@ -362,12 +372,16 @@ export function register(server: McpServer): void {
             const anim = await exportAnimation(target, output, plan.gif, extra);
             return okResponse({ outputPath: output, ...result, animation: anim });
           }
-          // A transcript made for captions goes next to the result.
+          // A transcript made for captions goes next to the result, moved
+          // through any speed, cut or trim after its step onto the output's timeline.
           let subtitlesPath: string | undefined;
           if (transcript) {
             try {
-              subtitlesPath = output.replace(/\.[^./\\]+$/, "") + ".srt";
-              writeFileSync(subtitlesPath, transcript);
+              const cues = sidecarCues(transcript.cues, plan.timeOps, transcript.opsBefore);
+              if (cues.length > 0) {
+                writeFileSync(sidecar, formatSrt(cues));
+                subtitlesPath = sidecar;
+              }
             } catch {
               subtitlesPath = undefined;
             }

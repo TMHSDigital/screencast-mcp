@@ -131,8 +131,51 @@ export function isWithin(path: string, dir: string): boolean {
   return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }
 
+/** True for a path Windows would open over the network or as a raw device:
+ * UNC (\\host\share, //host/share), WebDAV (\\host@SSL@443\x), \\?\UNC\,
+ * and \\.\ device paths. Opening one makes Windows authenticate to the host,
+ * which leaks the user's NTLM credentials. A \\?\C:\ long local path is fine.
+ * Pure. */
+export function isNetworkPath(path: string): boolean {
+  const p = path.trim();
+  if (!/^[\\/]{2}/.test(p)) return false;
+  return !/^[\\/]{2}\?[\\/][A-Za-z]:[\\/]/.test(p);
+}
+
+/** Refuse a network (UNC/WebDAV) or device path before anything touches it. */
+export function assertLocalPath(path: string, label = "Path"): void {
+  if (isNetworkPath(path)) {
+    throw new ScreencastError(
+      `${label} ${path} is a network or device path; only local files are allowed. ` +
+        "Copy the file to a local folder first.",
+    );
+  }
+}
+
+/** Refuse a read from outside the allowed dirs, when they are known. With no
+ * client roots and no SCREENCAST_ALLOWED_DIRS, inputs are unconfined (as
+ * outputs are); once either is set, a prompt-injected call cannot pull an
+ * arbitrary file into a video or a tool result. */
+export function assertInputAllowed(path: string, label = "Input"): void {
+  assertLocalPath(path, label);
+  const full = resolve(path);
+  if (clientRoots === "pending" && envAllowedDirs().length === 0 && !isWithin(full, homeRoot())) {
+    throw new ScreencastError(
+      `${label} ${full} is outside SCREENCAST_HOME and the client's workspace roots have not loaded yet. ` +
+        "Retry the call in a moment.",
+    );
+  }
+  const allowed = allowedOutputDirs();
+  if (allowed === null || allowed.some((dir) => isWithin(full, dir))) return;
+  throw new ScreencastError(
+    `${label} ${full} is outside the allowed directories: ${allowed.join(", ")}. ` +
+      `Move it under one of them, or add its folder to ${ALLOWED_DIRS_ENV} or the client's workspace roots.`,
+  );
+}
+
 /** Refuse a write target outside the allowed dirs, when they are known. */
 export function assertOutputAllowed(path: string): void {
+  assertLocalPath(path, "Output");
   if (clientRoots === "pending" && envAllowedDirs().length === 0 && !isWithin(path, homeRoot())) {
     throw new ScreencastError(
       `Output ${path} is outside SCREENCAST_HOME and the client's workspace roots have not loaded yet. ` +
@@ -145,6 +188,20 @@ export function assertOutputAllowed(path: string): void {
     `Output ${path} is outside the allowed directories: ${allowed.join(", ")}. ` +
       `Write under one of them (a relative path lands in SCREENCAST_HOME), or add the folder to ` +
       `${ALLOWED_DIRS_ENV} or the client's workspace roots.`,
+  );
+}
+
+/** With no confinement configured, outputs may go anywhere, but replacing an
+ * existing file outside SCREENCAST_HOME is refused: `overwrite` is a
+ * model-supplied argument, so a prompt-injected call could otherwise clobber
+ * any file the user can write. Listing the folder in SCREENCAST_ALLOWED_DIRS
+ * (or as a client root) allows it. */
+export function assertOverwriteAllowed(path: string): void {
+  if (allowedOutputDirs() !== null || isWithin(path, homeRoot())) return;
+  throw new ScreencastError(
+    `Refusing to replace ${path}: it is outside SCREENCAST_HOME and no allowed directories are set. ` +
+      `Add its folder to ${ALLOWED_DIRS_ENV} (or the client's workspace roots) to allow overwriting there, ` +
+      "or write to a new path.",
   );
 }
 
@@ -165,13 +222,17 @@ export function resolveOutput(
   overwrite = false,
 ): string {
   if (provided && provided.trim().length > 0) {
+    assertLocalPath(provided, "Output");
     const path = resolve(defaultDir, provided);
     assertOutputAllowed(path);
-    if (!overwrite && existsSync(path)) {
-      throw new ScreencastError(
-        `Output already exists: ${path}. Pass overwrite: true to replace it, ` +
-          `or choose a different path.`,
-      );
+    if (existsSync(path)) {
+      if (!overwrite) {
+        throw new ScreencastError(
+          `Output already exists: ${path}. Pass overwrite: true to replace it, ` +
+            `or choose a different path.`,
+        );
+      }
+      assertOverwriteAllowed(path);
     }
     return path;
   }
@@ -182,6 +243,7 @@ export function resolveOutput(
  * and check it against the allowed dirs; undefined when none was given. */
 export function resolveOutputDir(provided: string | undefined, defaultParent: string): string | undefined {
   if (!provided || provided.trim().length === 0) return undefined;
+  assertLocalPath(provided, "Output directory");
   const dir = resolve(defaultParent, provided);
   assertOutputAllowed(dir);
   return dir;

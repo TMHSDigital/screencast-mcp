@@ -22,7 +22,7 @@
  *
  * Everything except finishSegments is pure or in-memory bookkeeping.
  */
-import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 import { ScreencastError } from "./errors.js";
 import { runCapture } from "./ffmpeg.js";
@@ -93,6 +93,22 @@ export function webcamPartPath(output: string, index: number): string {
 export function webcamOutputPath(output: string): string {
   const ext = extname(output);
   return join(dirname(output), `${basename(output, ext)}.webcam.mp4`);
+}
+
+/** A finished segment's length: the probed duration, else (ffprobe failed or
+ * timed out) an estimate from the wall-clock span, as long as the file holds
+ * data. Null only when the file is missing or empty, the one case with nothing
+ * to keep (#252). */
+export function segmentDurationSec(path: string, probed: number | null, startMs: number, endMs: number): number | null {
+  if (probed !== null && probed > 0) return probed;
+  let size: number;
+  try {
+    size = statSync(path).size;
+  } catch {
+    return null;
+  }
+  if (size <= 0) return null;
+  return Math.max(0.001, Math.round(endMs - startMs) / 1000);
 }
 
 /** Seconds recorded in finished segments. Pure. */

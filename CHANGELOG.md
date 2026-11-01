@@ -7,6 +7,40 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.48.0]
+
+### Security
+
+- Network and device paths are refused in every path argument: a UNC (`\\host\share`), `//host/share`, WebDAV (`\\host@SSL@443\...`), `\\?\UNC\` or `\\.\` path is rejected before anything opens it, because opening one sends the user's NTLM credentials to that host. The check runs once per tool call, before the handler, including paths nested in `pipeline` steps.
+- Input paths are confined like outputs: once the client sends workspace roots or `SCREENCAST_ALLOWED_DIRS` is set, files to read must sit inside `SCREENCAST_HOME`, the roots, or those folders (a whisper model and a font file are exempt).
+- A client whose `roots/list` request fails now gets `SCREENCAST_HOME` and `SCREENCAST_ALLOWED_DIRS` only, instead of no confinement.
+- With no confinement configured, replacing an existing file outside `SCREENCAST_HOME` is refused even with `overwrite: true`; list its folder in `SCREENCAST_ALLOWED_DIRS` to allow it.
+- `index_recording` masks secret-shaped screen text before writing the index, and `search_recording` matches the masked text, so hit counts cannot confirm a secret. Retention also removes old `*.index.json` sidecars under `SCREENCAST_HOME` (#266).
+
+### Added
+
+- `screencast-mcp setup` (#267): one command for first-run setup. It runs the `doctor` checks as a checklist, offers `winget install Gyan.FFmpeg` when FFmpeg 8 is missing, and merges the server into Claude Desktop, Cursor, and VS Code configs (each backed up first) and Claude Code (`claude mcp add`). `--dry-run` prints the changes, `--yes` skips prompts, `--test` records a 3 s GIF.
+- The GitHub Action (#268): `comment: true` keeps one sticky PR comment per job with the exit code, how the recording ended, OCR'd error lines, and a link to the evidence artifact. The CLI gains `--ocr-errors`.
+- The Action gains `max-duration`, `end-reason`, `artifact-name`, and `artifact-url`; the CLI gains `--command-env NAME` (#257).
+
+### Fixed
+
+- `pipeline` recipes: `redact`, `crop`, and `cursor` overrides now run first (after any trim), in source pixels and time. Before, a redact added to `social_reel` landed after the cut and the 9:16 reframe and missed the secret, and on the other recipes a redact or cursor override failed to plan (#251).
+- Overlapping `pause_recording`, `resume_recording`, and `stop_recording` calls on one session now run one at a time: a second resume no longer starts an untracked ffmpeg, a stop during a pause no longer force-kills the segment it is finalizing, and a segment ffprobe cannot read is kept with an estimated length instead of dropped (#252).
+- `encoder: "auto"` skips hardware encoders the frame is too large for (NVENC 4096 px, QSV/AMF 4096x2304), and a hardware encoder that fails at start is retried once with x264, with an `encoderNote` (#253).
+- `narrate` and OCR batches pass their data through a temp file instead of the command line, so long scripts no longer fail with ENAMETOOLONG (#254).
+- `index_recording` rebuilds an index made without OCR once OCR is available; sidecars are named after the full file name (`demo.mp4.index.json`, reading the old name only when it belongs to the same recording); `search_recording` refuses an index of another recording and queries with no letters or digits (#255).
+- `pipeline` and `narrate` no longer overwrite an existing `.srt` without `overwrite: true`, and the pipeline's sidecar is re-timed through speed and cut steps after the captions (#256).
+- The CLI and Action: `evidence.json` records `status` and `endReason` and the run warns when the recording ended before the command; `--max-duration` must be a whole number in range; commands with quotes and `&` survive cmd.exe; the default artifact name is unique per job and matrix leg; and the Action runs the npm version it was released with instead of `@latest` (#257).
+- The replay buffer's event log rotates, and `save_replay` reads only the window it needs, so a long-running buffer stays bounded; the `replayBufferSec` description now says ddagrab works too (#258).
+- `cut_by_transcript` `remove` numbers match the .srt's own cue numbers (0-based and unsorted files included) and every removed piece is reported; `step_guide` HTML embeds JPEGs within a 10 MB budget, and `overwrite` removes the other format's files (#259).
+
+### Changed
+
+- The bundled Inter fonts are subset (Latin, Greek, Cyrillic, symbols), cutting the npm package from 571 kB to 370 kB; characters outside the subset fall back to a system font as before (#265).
+- The README is shorter, with reference material moved to the docs site and CONTRIBUTING.md; the Action is documented as `@v0` (#263, #264). ROADMAP.md lists only open work (#262).
+- CI: Ubuntu legs use a SHA-pinned FFmpeg 8 build, capture smoke tests check ffprobe timestamps instead of wall time (with one retry on hosted runners), every tool is exercised through the MCP layer, and coverage is reported on the Windows leg (#260, #261).
+
 ## [0.47.0]
 
 ### Added

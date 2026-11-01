@@ -646,7 +646,11 @@ export class SessionStore {
     return this.children.get(id);
   }
 
-  detachChild(id: string): void {
+  /** Forget a session's child handle. With `child`, only while that child is
+   * still the attached one: a stale child's exit must not drop the handle of
+   * the capture that replaced it (#252). */
+  detachChild(id: string, child?: ChildProcess): void {
+    if (child && this.children.get(id) !== child) return;
     this.children.delete(id);
   }
 

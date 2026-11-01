@@ -74,6 +74,8 @@ import { registerResources } from "./resources.js";
 import { registerPrompts } from "./prompts.js";
 import { attachLogging } from "./utils/logging.js";
 import { trackClientRoots } from "./utils/roots.js";
+import { assertArgPaths } from "./utils/argPaths.js";
+import { errorResponse } from "./utils/errors.js";
 
 // Resolves from src/ in dev and dist/ in the published package alike; keeps
 // the advertised version from drifting from package.json (the hardcoded
@@ -169,11 +171,22 @@ export function createServer(options: { toolsets?: string } = {}): McpServer {
 }
 
 /** Records every tool registered from here on, by name, so toolsets can
- * remove the ones not selected (#214). */
+ * remove the ones not selected (#214), and checks every call's path
+ * arguments before its handler runs (network paths, input confinement). */
 function captureRegisteredTools(server: McpServer): Map<string, RegisteredTool> {
   const tools = new Map<string, RegisteredTool>();
   const register = server.registerTool.bind(server) as (...args: unknown[]) => RegisteredTool;
   server.registerTool = ((...args: unknown[]) => {
+    const last = args.length - 1;
+    const handler = args[last] as (input: unknown, extra: unknown) => unknown;
+    args[last] = (input: unknown, extra: unknown) => {
+      try {
+        assertArgPaths(input);
+      } catch (err) {
+        return errorResponse(err);
+      }
+      return handler(input, extra);
+    };
     const tool = register(...args);
     tools.set(args[0] as string, tool);
     return tool;

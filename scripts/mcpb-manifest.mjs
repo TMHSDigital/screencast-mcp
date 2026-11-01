@@ -53,8 +53,8 @@ export function buildManifest(p, toolList) {
         type: "string",
         title: "Allowed output folders",
         description:
-          "Semicolon-separated folders a call may write outside the output folder. When set (or when the client " +
-          "sends workspace roots), outputs anywhere else are refused.",
+          "Semicolon-separated folders a call may read from and write to outside the output folder. When set (or " +
+          "when the client sends workspace roots), files anywhere else are refused. Also allows overwriting files there.",
         required: false,
       },
       ffmpeg_path: {

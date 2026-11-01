@@ -16,12 +16,14 @@ import {
   allowedOutputDirs,
   envAllowedDirs,
   getClientRoots,
+  isNetworkPath,
   isWithin,
   resolveOutput,
   resolveOutputDir,
   setClientRoots,
 } from "../utils/paths.js";
 import { rootDirs } from "../utils/roots.js";
+import { assertArgPaths } from "../utils/argPaths.js";
 
 vi.mock("../utils/ffmpeg.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../utils/ffmpeg.js")>()),
@@ -146,5 +148,64 @@ describe("client roots over MCP", () => {
       await client.close();
       await server.close();
     }
+  });
+});
+
+describe("network and device paths", () => {
+  it("are recognised: UNC, forward-slash UNC, WebDAV, \\?\\UNC and \\.\\ forms", () => {
+    for (const p of [
+      String.raw`\\host\share\a.mp4`,
+      "//host/share/a.mp4",
+      String.raw`\\host@SSL@443\x\a.mp4`,
+      String.raw`\\?\UNC\host\share\a.mp4`,
+      String.raw`\\.\pipe\x`,
+      String.raw`\/host/x`,
+    ]) {
+      expect(isNetworkPath(p), p).toBe(true);
+    }
+    for (const p of [String.raw`C:\a\b.mp4`, String.raw`\\?\C:\long\b.mp4`, String.raw`rel\b.mp4`, "/tmp/b.mp4"]) {
+      expect(isNetworkPath(p), p).toBe(false);
+    }
+  });
+
+  it("are refused as outputs before anything touches them, even when unconfined", () => {
+    expect(() => resolveOutput(String.raw`\\host\share\o.mp4`, home, "x.mp4")).toThrow(/network or device path/);
+    expect(() => resolveOutputDir("//host/share", home)).toThrow(/network or device path/);
+  });
+
+  it("are refused in any path argument, including nested pipeline steps", () => {
+    expect(() => assertArgPaths({ input: String.raw`\\host\s\a.mp4` })).toThrow(/network or device path/);
+    expect(() => assertArgPaths({ inputs: [String.raw`C:\a.mp4`, "//host/s/b.mp4"] })).toThrow(/network/);
+    expect(() => assertArgPaths({ steps: [{ op: "overlay", overlay: String.raw`\\h\s\o.png` }] })).toThrow(/network/);
+    expect(() => assertArgPaths({ model: String.raw`\\h\s\ggml.bin` })).toThrow(/network/);
+    expect(() => assertArgPaths({ text: "// a code comment" })).not.toThrow();
+  });
+});
+
+describe("input confinement", () => {
+  it("is off with no roots and no SCREENCAST_ALLOWED_DIRS", () => {
+    expect(() => assertArgPaths({ input: join(elsewhere, "a.mp4") })).not.toThrow();
+  });
+
+  it("follows the allowed dirs once known; tool assets and keywords are exempt", () => {
+    setClientRoots([project]);
+    expect(() => assertArgPaths({ input: join(project, "a.mp4") })).not.toThrow();
+    expect(() => assertArgPaths({ input: join(home, "recordings", "a.mp4") })).not.toThrow();
+    expect(() => assertArgPaths({ subtitles: join(elsewhere, "a.srt") })).toThrow(/outside the allowed directories/);
+    expect(() => assertArgPaths({ clips: [join(project, "a.mp4"), join(elsewhere, "b.mp4")] })).toThrow(/outside/);
+    expect(() => assertArgPaths({ transcript: "whisper", fontFile: join(elsewhere, "f.ttf") })).not.toThrow();
+  });
+});
+
+describe("overwrite when unconfined", () => {
+  it("is refused outside SCREENCAST_HOME and allowed inside it or in an allowed dir", () => {
+    const outside = join(elsewhere, "exists.mp4");
+    const inside = join(home, "exists.mp4");
+    writeFileSync(outside, "x");
+    writeFileSync(inside, "x");
+    expect(() => resolveOutput(outside, home, "x.mp4", true)).toThrow(/Refusing to replace/);
+    expect(resolveOutput(inside, home, "x.mp4", true)).toBe(inside);
+    process.env.SCREENCAST_ALLOWED_DIRS = elsewhere;
+    expect(resolveOutput(outside, home, "x.mp4", true)).toBe(outside);
   });
 });

@@ -290,6 +290,7 @@ public static class ScEvents{
  [DllImport("user32.dll")] static extern int ToUnicodeEx(uint vk,uint scan,byte[] ks,[Out,MarshalAs(UnmanagedType.LPWStr)] StringBuilder b,int n,uint f,IntPtr hkl);
  struct LII{public uint cb;public uint t;}
  static Proc mp,kp;static StreamWriter w;static bool sc;static double lastMove;static int cx,cy;
+ static readonly object wl=new object();static string P;public static int Rot;static int lastRot;
  static HashSet<uint> held=new HashSet<uint>();
  static readonly object q=new object();static StringBuilder buf=new StringBuilder();
  static double typeStart=-1,typeLast;static int lastHook=Environment.TickCount;static bool missing;
@@ -305,15 +306,18 @@ public static class ScEvents{
  static void Typed(){double t=Now();lock(q){if(typeStart<0)typeStart=t;typeLast=t;}}
  static void EndTyping(bool force){double s,e;lock(q){if(typeStart<0||(!force&&Now()-typeLast<${TYPING_GAP_MS}))return;s=typeStart;e=typeLast;typeStart=-1;}
   double g=${TYPING_GRAIN_MS};double s2=Math.Floor(s/g)*g,e2=Math.Max(s2+g,Math.Ceiling(e/g)*g);Line(s2,"typing",cx,cy,(e2-s2).ToString("F0",Inv));}
- static void Drain(){lock(w){string s;lock(q){s=buf.ToString();buf.Clear();}if(s.Length>0){w.Write(s);w.Flush();}}}
- static void Quit(){EndTyping(true);Drain();w.Close();Process.GetCurrentProcess().Kill();}
+ static void Drain(){lock(wl){string s;lock(q){s=buf.ToString();buf.Clear();}if(s.Length>0){w.Write(s);w.Flush();}}}
+ static void Quit(){EndTyping(true);Drain();lock(wl){w.Close();}Process.GetCurrentProcess().Kill();}
+ // Replay buffers (#258): every Rot ms the log becomes path.1 (replacing the one before), so it never holds much more than two periods.
+ static void Rotate(){lock(wl){w.Close();try{string old=P+".1";if(File.Exists(old))File.Delete(old);File.Move(P,old);}catch{}w=new StreamWriter(P,true,new UTF8Encoding(false));}}
  static void Pump(string stop){int tick=0;while(true){Thread.Sleep(250);tick++;
   EndTyping(false);
   lock(held){foreach(uint vk in new List<uint>(held)){if(!Down((int)vk))held.Remove(vk);}}
   LII li=new LII();li.cb=8;if(!missing&&GetLastInputInfo(ref li)&&unchecked((int)li.t-lastHook)>${MISSED_INPUT_MS}){missing=true;Put("miss",cx,cy,"");}
   if(tick%4==0)Put("hb",0,0,"");
   if(File.Exists(stop))Quit();
-  Drain();}}
+  Drain();
+  if(Rot>0&&unchecked(Environment.TickCount-lastRot)>=Rot){lastRot=Environment.TickCount;Rotate();}}}
  static IntPtr Mouse(int n,IntPtr wp,IntPtr lp){
   if(n>=0){Seen();MS s=(MS)Marshal.PtrToStructure(lp,typeof(MS));int m=(int)wp;cx=s.x;cy=s.y;
    if(m==0x200){double t=Now();if(t-lastMove>=${MOVE_SAMPLE_MS}){lastMove=t;Put("move",s.x,s.y,"");}}
@@ -346,7 +350,7 @@ public static class ScEvents{
   return CallNextHookEx(IntPtr.Zero,n,wp,lp);}
  public static void Run(string path,bool shortcuts,int parent){
   try{SetProcessDpiAwarenessContext(new IntPtr(-4));}catch{}
-  sc=shortcuts;w=new StreamWriter(path,true,new UTF8Encoding(false));
+  sc=shortcuts;P=path;lastRot=Environment.TickCount;w=new StreamWriter(path,true,new UTF8Encoding(false));
   IntPtr mod=GetModuleHandle(null);mp=Mouse;kp=Key;
   if(SetWindowsHookEx(14,mp,mod,0)==IntPtr.Zero||SetWindowsHookEx(13,kp,mod,0)==IntPtr.Zero)throw new Exception("SetWindowsHookEx failed: "+Marshal.GetLastWin32Error());
   var watch=new Thread(()=>{while(true){Thread.Sleep(500);bool gone;try{gone=Process.GetProcessById(parent).HasExited;}catch{gone=true;}if(gone)Quit();}});
@@ -357,13 +361,53 @@ public static class ScEvents{
  }
 }
 "@
+[ScEvents]::Rot=__ROTATE__
 [ScEvents]::Run([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PATH__')), [bool]__MODE__, __PARENT__)
 `;
 
-export function buildHookScript(rawPath: string, mode: KeyMode, parentPid: number): string {
+/** `rotateSec` > 0 rotates the log (see rotatedLogPath); 0 never does. */
+export function buildHookScript(rawPath: string, mode: KeyMode, parentPid: number, rotateSec = 0): string {
+  const rotateMs = Math.max(0, Math.round(rotateSec * 1000));
   return PS_HOOK.replace("__PATH__", Buffer.from(rawPath, "utf8").toString("base64"))
     .replace("__MODE__", mode === "shortcuts" ? "1" : "0")
-    .replace("__PARENT__", String(parentPid));
+    .replace("__PARENT__", String(parentPid))
+    .replace("__ROTATE__", String(rotateMs));
+}
+
+/** Where a rotating log's previous period goes (#258): the helper renames the
+ * live file to this every `rotateSec`, replacing the one before. Pure. */
+export function rotatedLogPath(rawPath: string): string {
+  return `${rawPath}.1`;
+}
+
+/** Keep only raw lines stamped at or after `sinceMs` (epoch). Pure. */
+export function rawLinesSince(raw: string, sinceMs: number): string {
+  return raw
+    .split(/\r?\n/)
+    .filter((line) => {
+      const comma = line.indexOf(",");
+      const ms = comma > 0 ? Number(line.slice(0, comma)) : NaN;
+      return Number.isFinite(ms) && ms >= sinceMs;
+    })
+    .join("\n");
+}
+
+/**
+ * Read a (possibly rotating) raw event log: the previous period, then the
+ * live file, keeping lines from `sinceMs` on. With rotation both files are
+ * bounded, so the cost does not grow with the session's length (#258). A file
+ * missing or swapped mid-read counts as empty.
+ */
+export function readRawEventLog(rawPath: string, sinceMs = -Infinity): string {
+  const read = (p: string) => {
+    try {
+      return existsSync(p) ? readFileSync(p, "utf8") : "";
+    } catch {
+      return "";
+    }
+  };
+  const text = `${read(rotatedLogPath(rawPath))}\n${read(rawPath)}`;
+  return sinceMs === -Infinity ? text : rawLinesSince(text, sinceMs);
 }
 
 /** PowerShell reports errors on a redirected stderr as CLIXML; keep the text. */
@@ -382,13 +426,14 @@ export function cleanPsError(stderr: string): string {
 /** How long the helper gets to compile its hooks and report ready. */
 export const LOGGER_READY_TIMEOUT_MS = 20_000;
 
-/** Start the hook helper and resolve once its hooks are installed. */
-export async function startEventLogger(rawPath: string, mode: KeyMode): Promise<ChildProcess> {
+/** Start the hook helper and resolve once its hooks are installed. With
+ * `rotateSec`, the log rotates (replay buffers, #258). */
+export async function startEventLogger(rawPath: string, mode: KeyMode, opts: { rotateSec?: number } = {}): Promise<ChildProcess> {
   if (process.platform !== "win32") {
     throw new ScreencastError("The input event log is implemented for Windows only.");
   }
   rmSync(`${rawPath}.stop`, { force: true }); // a stale one would stop the helper at once
-  const encoded = Buffer.from(buildHookScript(rawPath, mode, process.pid), "utf16le").toString("base64");
+  const encoded = Buffer.from(buildHookScript(rawPath, mode, process.pid, opts.rotateSec), "utf16le").toString("base64");
   const child = spawn("powershell", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded], {
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,

@@ -4,12 +4,18 @@ name: Screencast action
 # capture smoke test on windows-latest with the CLI from this checkout, and
 # keeps the GIF, contact sheet, and video as an artifact (always, so a green
 # run still shows what the runner desktop looked like).
+#
+# A two-leg matrix with the default artifact-name checks that legs do not
+# collide on the artifact name, and the quoting leg runs a command with quotes
+# and & that must reach node intact (#257). The smoke leg keeps the sticky PR
+# comment (#268) exercised; it only appears if a run fails.
 on:
   pull_request:
     branches: [main]
     paths:
       - "action.yml"
       - "src/cli.ts"
+      - "src/setup.ts"
       - "src/index.ts"
       - ".github/workflows/screencast-action.yml"
   workflow_dispatch:
@@ -20,7 +26,18 @@ jobs:
   record-smoke-test:
     permissions:
       contents: read
+      pull-requests: write
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - leg: smoke
+            command: npx vitest run src/__tests__/captureSmoke.test.ts
+            comment: "true"
+          - leg: quoting
+            command: node -e "if (process.argv[1] !== 'a & \"b\"') process.exit(7)" "a & \"b\""
+            comment: "false"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -29,17 +46,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Record the capture smoke test
+      - name: Record the command
         id: screencast
         uses: ./
         env:
           RUN_CAPTURE_SMOKE: "1"
         with:
-          command: npx vitest run src/__tests__/captureSmoke.test.ts
+          command: ${{ matrix.command }}
           cli-path: dist/index.js
           artifacts: always
           discard-on-success: "false"
-          artifact-name: screencast-smoke-test
+          max-duration: "600"
+          comment: ${{ matrix.comment }}
           retention-days: "7"
       - name: Show the outputs
         shell: pwsh
@@ -47,8 +65,16 @@ jobs:
           EXIT_CODE: ${{ steps.screencast.outputs.exit-code }}
           GIF: ${{ steps.screencast.outputs.gif }}
           SHEET: ${{ steps.screencast.outputs.contact-sheet }}
+          END_REASON: ${{ steps.screencast.outputs.end-reason }}
+          ARTIFACT: ${{ steps.screencast.outputs.artifact-name }}
+          LEG: ${{ matrix.leg }}
         run: |
+          "leg: $env:LEG"
           "exit code: $env:EXIT_CODE"
           "gif: $env:GIF"
           "contact sheet: $env:SHEET"
+          "end reason: $env:END_REASON"
+          "artifact: $env:ARTIFACT"
           if (-not $env:GIF -or -not (Test-Path $env:GIF)) { throw "The action made no GIF." }
+          if ($env:END_REASON -ne 'stopped') { throw "The recording ended by '$env:END_REASON', not by the CLI stopping it." }
+          if ($env:ARTIFACT -notmatch '^screencast-evidence-record-smoke-test-\d+') { throw "Unexpected default artifact name '$env:ARTIFACT'." }

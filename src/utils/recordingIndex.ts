@@ -8,15 +8,18 @@
  * that search_recording scores in process: agents find "when did the error
  * appear" as text with timecodes instead of pulling frames as images.
  *
- * The sidecar keeps the raw OCR text (so a secret scan can run over the whole
- * timeline); search results mask secrets with bug_report's pattern before they
- * are returned. Everything here is pure except fingerprintFile, readIndex,
- * writeIndex, and resolveRecording. The segment/attach helpers are generic
+ * Screen text is stored with secret-pattern matches (bug_report's pattern,
+ * the one find_text's secret scans use) already replaced by [REDACTED], so the
+ * sidecar never holds an on-screen token or password in plain text (#266). The
+ * tradeoff: a regex search for a secret's shape no longer finds it in screen
+ * text. Search results are masked again on the way out (transcript, events,
+ * and markers are stored as they are). Everything here is pure except
+ * fingerprintFile, readIndex, findIndex, writeIndex, and resolveRecording. The segment/attach helpers are generic
  * enough to reuse for any other timeline built from the same sources.
  */
 import { createHash } from "node:crypto";
 import { closeSync, existsSync, openSync, readFileSync, readSync, renameSync, statSync, writeFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { ScreencastError } from "./errors.js";
 import { pickSceneFrames, type SceneChange } from "./media.js";
 import { normalizeForMatch, regexRanges, MAX_QUERY_LENGTH } from "./ocr.js";
@@ -100,9 +103,34 @@ export interface SearchHit {
   matches: SearchMatch[];
 }
 
-/** `<video minus extension>.index.json`, next to the recording. */
+/** `<video file name>.index.json` (demo.mp4.index.json), next to the
+ * recording: keyed on the full name, so demo.mp4 and demo.mkv in one folder
+ * get an index each (#255). */
 export function indexSidecarPath(video: string): string {
+  return `${video}.index.json`;
+}
+
+/** The name sidecars had before #255 (`demo.index.json`), shared by every
+ * recording with the same base name. Read only when its `video` field matches. */
+export function legacyIndexSidecarPath(video: string): string {
   return `${video.replace(/\.[^./\\]+$/, "")}.index.json`;
+}
+
+/** Same file path, the way Windows compares them (case-insensitive). */
+export function samePath(a: string, b: string): boolean {
+  const norm = (p: string) => (process.platform === "win32" ? resolve(p).toLowerCase() : resolve(p));
+  return norm(a) === norm(b);
+}
+
+/** Whether an index was built from this recording: its path matches, or (a
+ * recording moved along with its sidecar) its content fingerprint does. Pure. */
+export function indexMatchesVideo(
+  index: Pick<RecordingIndex, "video" | "fingerprint">,
+  video: string,
+  fingerprint?: Fingerprint,
+): boolean {
+  if (typeof index.video === "string" && samePath(index.video, video)) return true;
+  return fingerprint !== undefined && !!index.fingerprint && sameFingerprint(index.fingerprint, fingerprint);
 }
 
 /** Where the index goes when the recording's folder is outside the allowed
@@ -124,10 +152,61 @@ export function indexWritePath(video: string, editsDir: string): string {
   }
 }
 
-/** The existing index for a video (sidecar first), or null. */
-export function findIndex(video: string, editsDir: string): string | null {
+/** The existing index for a video: the sidecar, the fallback under
+ * edits/indexes, or a legacy `demo.index.json` that was built from this very
+ * recording (#255). Null when there is none. */
+export function findIndex(video: string, editsDir: string, fingerprint?: Fingerprint): string | null {
   for (const p of [indexSidecarPath(video), fallbackIndexPath(video, editsDir)]) if (existsSync(p)) return p;
+  const legacy = legacyIndexSidecarPath(video);
+  if (legacy !== indexSidecarPath(video) && existsSync(legacy)) {
+    const index = readIndex(legacy);
+    if (index && indexMatchesVideo(index, video, fingerprint)) return legacy;
+  }
   return null;
+}
+
+export interface IndexWanted {
+  fingerprint: Fingerprint;
+  sceneThreshold: number;
+  maxFrames: number;
+  /** Whether Windows OCR works now. */
+  ocrAvailable: boolean;
+}
+
+/** Whether index_recording may reuse `prior`'s OCR'd segments: the same
+ * recording content, the same settings, and not built without OCR when OCR
+ * now works (an index without screen text would otherwise stay that way
+ * after the user installs an OCR language, #255). Pure. */
+export function canReuseIndex(prior: RecordingIndex | null, want: IndexWanted): prior is RecordingIndex {
+  return (
+    prior !== null &&
+    sameFingerprint(prior.fingerprint, want.fingerprint) &&
+    prior.sceneThreshold === want.sceneThreshold &&
+    prior.maxFrames === want.maxFrames &&
+    (prior.ocr || !want.ocrAvailable)
+  );
+}
+
+/** Screen text with secret-pattern matches replaced by [REDACTED], for
+ * writing to the sidecar (#266). Masking twice changes nothing. Pure. */
+export function maskSegmentText(segments: IndexSegment[], pattern: string = DEFAULT_SECRET_PATTERN): IndexSegment[] {
+  return segments.map((s) => (s.ocr.length > 0 ? { ...s, ocr: maskSecrets(s.ocr, pattern) } : s));
+}
+
+const VIDEO_EXT = /\.(mp4|mkv|mov|webm|avi|m4v|wmv|flv|gif|ts|mpg|mpeg)$/i;
+const stemOf = (name: string) => name.replace(/\.[^.]+$/, "").toLowerCase();
+
+/** The transcript index_recording picks up by default: `demo.mp4.srt`, else
+ * `demo.srt` unless another video in the folder shares the base name (then it
+ * could be either one's, #255). `siblings` are the folder's file names. Pure. */
+export function defaultTranscriptPath(video: string, siblings: readonly string[]): { path: string | null; ambiguous: boolean } {
+  const names = new Set(siblings.map((n) => n.toLowerCase()));
+  const own = basename(video);
+  if (names.has(`${own}.srt`.toLowerCase())) return { path: `${video}.srt`, ambiguous: false };
+  const shortName = `${own.replace(/\.[^.]+$/, "")}.srt`;
+  if (!names.has(shortName.toLowerCase())) return { path: null, ambiguous: false };
+  const rival = siblings.some((n) => n.toLowerCase() !== own.toLowerCase() && VIDEO_EXT.test(n) && stemOf(n) === stemOf(own));
+  return rival ? { path: null, ambiguous: true } : { path: join(dirname(video), shortName), ambiguous: false };
 }
 
 /**
@@ -297,19 +376,35 @@ function itemsOf(index: RecordingIndex): Item[] {
  * Search the index. A plain query matches through OCR misreads
  * (normalizeForMatch); a segment whose items hold the whole phrase scores 2 per
  * matching item, and one that only holds every word of it (spread over lines)
- * scores 1. A regex query scores 2 per matching item. Hits come back best
- * first, then earliest, with secrets in the snippets masked. Pure.
+ * scores 1. A regex query scores 2 per matching item. Matching runs on the
+ * text with secret-pattern matches masked (unless secretPattern is null), so
+ * neither snippets nor hits reveal a secret. Hits come back best first, then
+ * earliest. Pure.
  */
 export function searchIndex(
   index: RecordingIndex,
   query: string,
-  opts: { regex?: boolean; limit?: number; secretPattern?: string | null } = {},
+  opts: { regex?: boolean; limit?: number; secretPattern?: string | null; video?: string; fingerprint?: Fingerprint } = {},
 ): { hits: SearchHit[]; total: number } {
   if (query.trim().length === 0) throw new ScreencastError("query must not be empty.");
   if (query.length > MAX_QUERY_LENGTH) {
     throw new ScreencastError(`The query is ${query.length} characters; at most ${MAX_QUERY_LENGTH} are allowed.`);
   }
-  const items = itemsOf(index);
+  if (opts.video !== undefined && !indexMatchesVideo(index, opts.video, opts.fingerprint)) {
+    throw new ScreencastError(`The index found is for ${index.video}, not ${opts.video}.`, "Run index_recording on this recording.");
+  }
+  // normalizeForMatch folds "-", "_" and spaces into "_", which is in nearly
+  // every item: a query of only punctuation would match everything (#255).
+  if (!opts.regex && !/[\p{L}\p{N}]/u.test(normalizeForMatch(query))) {
+    throw new ScreencastError("query needs at least one letter or digit.", "For punctuation, use regex: true.");
+  }
+  // Match against masked text, so a regex shaped like a secret cannot confirm
+  // one through hit counts and timecodes even in a sidecar written before
+  // screen text was masked on disk (#266).
+  const pattern = opts.secretPattern === undefined ? DEFAULT_SECRET_PATTERN : opts.secretPattern;
+  const raw = itemsOf(index);
+  const masked = pattern ? maskSecrets(raw.map((i) => i.text), pattern) : raw.map((i) => i.text);
+  const items = raw.map((item, i) => ({ ...item, text: masked[i] ?? "" }));
   const matched = new Map<number, { score: number; matches: Item[] }>();
   const add = (item: Item, score: number) => {
     const entry = matched.get(item.seg) ?? { score: 0, matches: [] };
@@ -344,13 +439,9 @@ export function searchIndex(
     .map(([seg, m]) => ({ seg, ...m }))
     .sort((a, b) => b.score - a.score || index.segments[a.seg]!.start - index.segments[b.seg]!.start);
   const chosen = ranked.slice(0, opts.limit ?? DEFAULT_SEARCH_LIMIT);
-  const pattern = opts.secretPattern === undefined ? DEFAULT_SECRET_PATTERN : opts.secretPattern;
-  const shown = chosen.flatMap((c) => c.matches.slice(0, MAX_MATCHES_PER_HIT));
-  const masked = pattern ? maskSecrets(shown.map((m) => m.text), pattern) : shown.map((m) => m.text);
-  let k = 0;
   const hits = chosen.map((c) => {
     const seg = index.segments[c.seg]!;
-    const matches = c.matches.slice(0, MAX_MATCHES_PER_HIT).map((m) => ({ source: m.source, t: m.t, text: snippet(masked[k++] ?? "") }));
+    const matches = c.matches.slice(0, MAX_MATCHES_PER_HIT).map((m) => ({ source: m.source, t: m.t, text: snippet(m.text) }));
     return { start: seg.start, end: seg.end, t: Math.min(...c.matches.map((m) => m.t)), score: c.score, matches };
   });
   return { hits, total: matched.size };

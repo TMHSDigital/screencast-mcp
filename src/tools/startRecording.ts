@@ -31,6 +31,8 @@ import {
   getDxgiOutputs,
   planDdaSource,
   resolveEncoder,
+  startWithEncoderFallback,
+  type EncoderPick,
 } from "../utils/gpu.js";
 import {
   attachExitHandler,
@@ -55,6 +57,8 @@ import {
   discardReplay,
   planReplayBuffer,
   prepareReplayDir,
+  replayEventRotateSec,
+  resetReplaySegments,
   segmentOutputArgs,
 } from "../utils/replay.js";
 import {
@@ -166,8 +170,19 @@ const inputSchema = {
     .min(MIN_REPLAY_SEC)
     .max(MAX_REPLAY_SEC)
     .optional()
-    .describe("Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab only."),
+    .describe("Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab or ddagrab, not wgc."),
 };
+
+/** The capture's frame size, for the encoder's limits (#253); undefined when
+ * it is not known up front. */
+function frameSize(target: Parameters<typeof captureFrame>[0], monitors: Parameters<typeof captureFrame>[1]): { width: number; height: number } | undefined {
+  try {
+    const f = captureFrame(target, monitors);
+    return { width: f.w, height: f.h };
+  } catch {
+    return undefined;
+  }
+}
 
 /** The camera's first-frame epoch from its banner (input 1, or 2 after audio). */
 function webcamStart(watch: CaptureWatch, audio: boolean): { webcamStartMs?: number } {
@@ -212,7 +227,7 @@ export function register(server: McpServer): void {
         }
         // Instant replay (#197): a segment ring instead of one mp4.
         if (args.replayBufferSec !== undefined && backend === "wgc") {
-          throw new ScreencastError('replayBufferSec is not supported with backend "wgc" yet; use gdigrab.');
+          throw new ScreencastError('replayBufferSec is not supported with backend "wgc" yet; use gdigrab or ddagrab.');
         }
         const replay = args.replayBufferSec !== undefined ? planReplayBuffer(args.replayBufferSec) : null;
         const fps = args.fps ?? DEFAULT_FPS;
@@ -250,43 +265,53 @@ export function register(server: McpServer): void {
           extra.signal,
         );
 
-        // GPU encode (#199): auto probes once per process, else libx264.
-        const pick = await resolveEncoder(
+        // GPU encode (#199): auto probes once per process, else libx264. The
+        // capture's size rules out a hardware encoder it is too big for (#253);
+        // a wgc window's size is only known once its recorder runs.
+        let pick = await resolveEncoder(
           args.encoder ?? (backend === "ddagrab" ? "auto" : "x264"),
           backend === "ddagrab" ? "ddagrab" : "gdigrab",
           ffmpeg,
+          undefined,
+          backend === "wgc" ? undefined : frameSize(target, monitors),
         );
-        if (dda && !pick.gpuFrames && !(await ddagrabWorks(ffmpeg))) {
+        const ddaUsable = async (p: EncoderPick) => !dda || p.gpuFrames || (await ddagrabWorks(ffmpeg));
+        if (!(await ddaUsable(pick))) {
           throw new ScreencastError(
             "Desktop Duplication (ddagrab) does not capture on this machine (a remote session, or no D3D11 GPU).",
             'Use backend "gdigrab".',
           );
         }
-        const hw = pick.encoder !== "x264";
-        const captureOpts = {
-          fps,
-          quality,
-          monitors,
-          audio,
-          drawMouse: !hideCursor,
-          ...(dda ? { videoInput: buildDdaInputArgs(dda, fps, { download: !pick.gpuFrames, drawMouse: !hideCursor }) } : {}),
-          ...(hw ? { videoCodec: encoderArgs(pick.encoder, quality, { gpuFrames: pick.gpuFrames }) } : {}),
-        };
-        const webcam = webcamDevice
-          ? { device: webcamDevice, ...(hw ? { codec: encoderArgs(pick.encoder, quality) } : {}) }
-          : undefined;
-        const webcamRaw = webcam ? webcamPartPath(output, 0) : undefined;
+        const webcamRaw = webcamDevice ? webcamPartPath(output, 0) : undefined;
         if (webcamRaw) mkdirSync(partsDir(output), { recursive: true });
-        const captureArgs = buildCaptureArgs(target, {
-          ...captureOpts,
-          output,
-          maxDurationSec,
-          ...(webcam && webcamRaw ? { webcam: { ...webcam, output: webcamRaw } } : {}),
-        });
-        const ffArgs = replay ? segmentOutputArgs(captureArgs, replay) : captureArgs;
+        // The capture settings and ffmpeg arguments for an encoder.
+        const plan = (p: EncoderPick) => {
+          const hw = p.encoder !== "x264";
+          const captureOpts = {
+            fps,
+            quality,
+            monitors,
+            audio,
+            drawMouse: !hideCursor,
+            ...(dda ? { videoInput: buildDdaInputArgs(dda, fps, { download: !p.gpuFrames, drawMouse: !hideCursor }) } : {}),
+            ...(hw ? { videoCodec: encoderArgs(p.encoder, quality, { gpuFrames: p.gpuFrames }) } : {}),
+          };
+          const webcam = webcamDevice
+            ? { device: webcamDevice, ...(hw ? { codec: encoderArgs(p.encoder, quality) } : {}) }
+            : undefined;
+          const captureArgs = buildCaptureArgs(target, {
+            ...captureOpts,
+            output,
+            maxDurationSec,
+            ...(webcam && webcamRaw ? { webcam: { ...webcam, output: webcamRaw } } : {}),
+          });
+          return { captureOpts, webcam, ffArgs: replay ? segmentOutputArgs(captureArgs, replay) : captureArgs };
+        };
         if (replay) prepareReplayDir(replay);
         // The event logger starts first so the first frames have events (#118).
-        // A replay session's raw log lives in its buffer; save_replay slices it.
+        // A replay session's raw log lives in its buffer; save_replay slices
+        // the window it needs, and the helper rotates it so it stays about the
+        // buffer's length however long the session runs (#258).
         const keyMode: KeyMode = args.keys ?? DEFAULT_KEY_MODE;
         const evPaths = args.events ? (replay ? { raw: join(replay.dir, "events.raw"), jsonl: "" } : eventPaths(output)) : null;
         if (evPaths && !replay) prepareEventPaths(evPaths, args.overwrite);
@@ -294,38 +319,56 @@ export function register(server: McpServer): void {
         let frame = args.events
           ? captureFrame(target, monitors)
           : null;
-        const logger = evPaths ? await startEventLogger(evPaths.raw, keyMode) : null;
+        const logger = evPaths
+          ? await startEventLogger(evPaths.raw, keyMode, replay ? { rotateSec: replayEventRotateSec(replay.bufferSec) } : {})
+          : null;
 
-        const spawnedAt = Date.now();
-        const child =
-          backend === "wgc"
-            ? spawn(
-                process.execPath,
-                [
-                  fileURLToPath(new URL("../wgcRecorder.js", import.meta.url)),
-                  JSON.stringify({ ffmpeg, hwnd: window!.hwnd, fps, encode: [...encoderArgs(pick.encoder, quality), ...captureKeyframeArgs(fps)], output, maxDurationSec, cursor: !hideCursor }),
-                ],
-                { stdio: ["pipe", "ignore", "pipe"], windowsHide: true },
-              )
-            : spawn(ffmpeg, ffArgs, {
-                stdio: ["pipe", "ignore", "pipe"],
-                windowsHide: true,
-              });
-
-        // Detect an immediate failure (bad window title, busy device, etc.).
-        // The head keeps the input banner, whose start: time aligns events.
-        // Warnings and dropped frames go to the client as log messages (#222).
         const id = `rec-${stamp()}-${rand(6)}`;
-        const watch = watchStderr(child, id);
-        const settled = await settleCapture(child, watch, backend);
+        const launch = async (p: EncoderPick) => {
+          const settings = plan(p);
+          const spawnedAt = Date.now();
+          const child =
+            backend === "wgc"
+              ? spawn(
+                  process.execPath,
+                  [
+                    fileURLToPath(new URL("../wgcRecorder.js", import.meta.url)),
+                    JSON.stringify({ ffmpeg, hwnd: window!.hwnd, fps, encode: [...encoderArgs(p.encoder, quality), ...captureKeyframeArgs(fps)], output, maxDurationSec, cursor: !hideCursor }),
+                  ],
+                  { stdio: ["pipe", "ignore", "pipe"], windowsHide: true },
+                )
+              : spawn(ffmpeg, settings.ffArgs, {
+                  stdio: ["pipe", "ignore", "pipe"],
+                  windowsHide: true,
+                });
+          // Detect an immediate failure (bad window title, busy device, etc.).
+          // The head keeps the input banner, whose start: time aligns events.
+          // Warnings and dropped frames go to the client as log messages (#222).
+          const watch = watchStderr(child, id);
+          const settled = await settleCapture(child, watch, backend);
+          return { ...settings, child, watch, spawnedAt, settled };
+        };
+        // A hardware encoder that exits during startup is retried once with
+        // libx264, and the result says so (#253).
+        const started = await startWithEncoderFallback(pick, launch, {
+          why: (r) => tailLines(r.watch, 3),
+          canFallback: () => ddaUsable({ encoder: "x264", gpuFrames: false }),
+          beforeRetry: () => {
+            if (replay) resetReplaySegments(replay);
+          },
+        });
+        const { run, failure: retried } = started;
+        pick = started.pick;
+        const { child, watch, spawnedAt, captureOpts, webcam } = run;
 
-        if (settled === "exited") {
+        if (run.settled === "exited") {
           if (logger) await stopEventLogger(logger);
           if (evPaths) rmSync(evPaths.raw, { force: true });
           if (replay) discardReplay(replay);
           if (webcamRaw) rmSync(partsDir(output), { recursive: true, force: true });
           throw new ScreencastError(
-            `Recording failed to start (${backend === "wgc" ? "window capture" : "ffmpeg"} exited immediately):\n${tailLines(watch)}`,
+            `Recording failed to start (${backend === "wgc" ? "window capture" : "ffmpeg"} exited immediately):\n${tailLines(watch)}` +
+              (retried ? `\n(Retried with libx264 after ${retried})` : ""),
           );
         }
         // The video clock's zero, for add_marker (#174) and the event log.

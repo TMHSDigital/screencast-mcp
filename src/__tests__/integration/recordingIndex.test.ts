@@ -105,8 +105,8 @@ describe.skipIf(!AVAILABLE)("index_recording + search_recording against real ffm
     const res = await call("index_recording", { input: video });
     expect(res.isError, res.text).toBe(false);
     const data = res.data!;
-    expect(data.indexPath).toBe(join(dir, "rec.index.json"));
-    expect(existsSync(join(dir, "rec.index.json"))).toBe(true);
+    expect(data.indexPath).toBe(join(dir, "rec.mp4.index.json"));
+    expect(existsSync(join(dir, "rec.mp4.index.json"))).toBe(true);
     expect(data.cached).toBe(false);
     expect(data.sources).toMatchObject({ events: 2, markers: 1, transcriptCues: 1 });
 
@@ -132,15 +132,14 @@ describe.skipIf(!AVAILABLE)("index_recording + search_recording against real ffm
     expect(screen, JSON.stringify(hits)).toBeDefined();
     expect(Math.abs(screen!.start - 21)).toBeLessThanOrEqual(1);
 
+    // Screen text is masked before it is stored or searched (#266): a
+    // secret-shaped query cannot confirm the secret, and the sidecar never
+    // holds it.
     const secret = await call("search_recording", { input: video, query: "ghp_", regex: true });
     const sHits = secret.data!.hits as Hit[];
-    expect(sHits.length).toBeGreaterThan(0);
-    expect(sHits[0]!.start).toBeGreaterThanOrEqual(4);
-    expect(sHits[0]!.start).toBeLessThanOrEqual(6);
+    expect(sHits.filter((h) => h.matches.some((m) => m.source === "screen"))).toHaveLength(0);
     expect(secret.text).not.toContain("Abc123");
-    expect(secret.text).toContain("[REDACTED]");
-    // The sidecar keeps the raw text, for a secret scan over the whole timeline.
-    expect(readFileSync(join(dir, "rec.index.json"), "utf8")).toMatch(/ghp.Abc123/);
+    expect(readFileSync(join(dir, "rec.mp4.index.json"), "utf8")).not.toMatch(/Abc123/);
 
     const shown = await call("search_recording", { input: video, query: "Save failed", images: 1 });
     expect(shown.images).toBe(1);
@@ -156,19 +155,16 @@ describe.skipIf(!AVAILABLE)("index_recording + search_recording against real ffm
     expect(((await call("search_recording", { input: video, query: "preferences" })).data!.hits as Hit[]).length).toBe(0);
   });
 
-  it("writes under SCREENCAST_HOME when the video's folder is outside the allowed dirs", async () => {
+  it("refuses a video outside the allowed dirs once they are set", async () => {
     const other = join(dir, "copy.mp4");
     copyFileSync(video, other);
     copyFileSync(join(dir, "rec.events.jsonl"), join(dir, "copy.events.jsonl"));
     process.env.SCREENCAST_ALLOWED_DIRS = home;
     try {
       const res = await call("index_recording", { input: other, maxFrames: 4 });
-      expect(res.isError, res.text).toBe(false);
-      const path = res.data!.indexPath as string;
-      expect(path.startsWith(join(home, "edits", "indexes"))).toBe(true);
-      expect(existsSync(join(dir, "copy.index.json"))).toBe(false);
-      const found = await call("search_recording", { input: other, query: "Ctrl+S" });
-      expect(found.data!.indexPath).toBe(path);
+      expect(res.isError).toBe(true);
+      expect(res.text).toMatch(/outside the allowed directories/);
+      expect(existsSync(join(dir, "copy.mp4.index.json"))).toBe(false);
     } finally {
       delete process.env.SCREENCAST_ALLOWED_DIRS;
     }

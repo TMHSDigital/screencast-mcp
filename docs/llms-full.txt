@@ -68,7 +68,7 @@ Parameters:
 - `webcam.corner` ("top_left" | "top_right" | "bottom_left" | "bottom_right")
 - `webcam.size` (number; ≥ 0.1, ≤ 0.5): Share of width (0.25).
 - `webcam.shape` ("rect" | "circle")
-- `replayBufferSec` (integer; ≥ 4, ≤ 3600): Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab only.
+- `replayBufferSec` (integer; ≥ 4, ≤ 3600): Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab or ddagrab, not wgc.
 
 Minimal call:
 
@@ -704,7 +704,7 @@ Parameters:
 
 - `input` (string; required): Path to the source video.
 - `srt` (string; required): Its .srt (transcribe; words: true for word timing).
-- `remove` ((integer | string)[]): Cue numbers, or transcript text quoted exactly (must occur once).
+- `remove` ((integer | string)[]): Cue numbers as the .srt numbers them, or transcript text quoted exactly (must occur once).
 - `fillers` (boolean): Also cut fillers (um, uh...) that have their own cue.
 - `dryRun` (boolean): Only report the cuts.
 - `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
@@ -850,7 +850,7 @@ Parameters:
 - `steps[export_gif].maxBytes` (integer; ≥ 10000, ≤ 9007199254740991)
 - `steps[export_gif].fps` (number; > 0, ≤ 30)
 - `steps[export_gif].width` (integer; ≥ 64, ≤ 1920)
-- `recipe` ("pr_demo" | "tutorial" | "social_reel"): Polish preset expanded to steps (see dryRun): pr_demo = cut_idle, click zoom, GIF <=10 MB; tutorial = + audio, captions, 1080p mp4; social_reel = 9:16, big captions. Given steps replace its same-op step.
+- `recipe` ("pr_demo" | "tutorial" | "social_reel"): Polish preset expanded to steps (see dryRun): pr_demo = cut_idle, click zoom, GIF <=10 MB; tutorial = + audio, captions, 1080p mp4; social_reel = 9:16, big captions. Given steps replace its same-op step; trim, redact, crop and cursor go first (source pixels and time).
 - `quality` ("draft" | "standard" | "high"): Encoder preset for an mp4 result (default standard).
 - `dryRun` (boolean): Return the plan (ffmpeg command, output size) without running it.
 - `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.

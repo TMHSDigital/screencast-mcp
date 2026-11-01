@@ -5,7 +5,7 @@
  * Skips off Windows or when no voice is installed.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -125,6 +125,18 @@ describe.skipIf(!TTS)("narrate against the Windows speech engine (#175)", { time
       return ws.reduce((s, w) => s + 10 ** (w.db / 10), 0) / ws.length;
     };
     expect(await mean(ducked.outputPath as string)).toBeLessThan(await mean(flat.outputPath as string));
+  });
+
+  it("keeps an existing .srt beside the output unless overwrite is given (#256)", async () => {
+    const out = p("kept.mp4");
+    const srt = p("kept.srt");
+    writeFileSync(srt, "1\n00:00:00,000 --> 00:00:01,000\nhand-edited\n");
+    await expect(call({ video: silent, lines: [{ t: 1, text: "Hi." }], output: out })).rejects.toThrow(/kept\.srt.*overwrite: true/);
+    expect(readFileSync(srt, "utf8")).toContain("hand-edited");
+    expect(existsSync(out)).toBe(false);
+    const res = await call({ video: silent, lines: [{ t: 1, text: "Hi." }], output: out, overwrite: true });
+    expect(res.srtPath).toBe(srt);
+    expect(readFileSync(srt, "utf8")).toContain("Hi.");
   });
 
   it("names the installed voices for an unknown voice", async () => {

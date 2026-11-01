@@ -60,16 +60,24 @@ export function recipeSteps(recipe: Recipe, ctx: RecipeContext): { steps: Pipeli
   return { steps, notes };
 }
 
+/** Caller steps whose pixels and times are the source's (#251): they go ahead
+ * of the recipe's steps (after any trim), before a cut_idle closes gaps or a
+ * zoom or reframe moves the content. A redact or cursor after a zoom is
+ * refused by planPipeline, and after a cut or reframe would miss its target. */
+const SOURCE_OPS = new Set<PipelineStep["op"]>(["redact", "crop", "cursor"]);
+
 /** Lay caller steps over a recipe's: a step replaces the recipe's step with
- * the same op (any export replaces the recipe's export); a trim goes first;
- * the rest go before the recipe's export, in order. Pure. */
+ * the same op (any export replaces the recipe's export); a trim goes first,
+ * then redact, crop and cursor (in source coordinates and time); the rest go
+ * before the recipe's export, in order. Pure. */
 export function applyOverrides(base: PipelineStep[], overrides: PipelineStep[]): PipelineStep[] {
   const out = [...base];
   const tail = out.at(-1) && EXPORTS.has(out.at(-1)!.op) ? out.pop()! : null;
   let exportStep = tail;
   const recipeLen = out.length;
   const replaced = new Set<number>();
-  const first: PipelineStep[] = [];
+  const trims: PipelineStep[] = [];
+  const front: PipelineStep[] = [];
   for (const o of overrides) {
     if (EXPORTS.has(o.op)) {
       exportStep = o;
@@ -77,12 +85,13 @@ export function applyOverrides(base: PipelineStep[], overrides: PipelineStep[]):
     }
     const i = out.findIndex((s, j) => j < recipeLen && !replaced.has(j) && s.op === o.op);
     // A trim goes first, so its times are the source's (as contact_sheet shows them).
-    if (i === -1 && o.op === "trim") first.push(o);
+    if (i === -1 && o.op === "trim") trims.push(o);
+    else if (i === -1 && SOURCE_OPS.has(o.op)) front.push(o);
     else if (i === -1) out.push(o);
     else {
       out[i] = o;
       replaced.add(i);
     }
   }
-  return [...first, ...out, ...(exportStep ? [exportStep] : [])];
+  return [...trims, ...front, ...out, ...(exportStep ? [exportStep] : [])];
 }

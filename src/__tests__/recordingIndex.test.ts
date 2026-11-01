@@ -1,22 +1,30 @@
 /**
  * Recording index and search (#245): keyframe planning, segment merging,
  * attaching events/markers/cues, the sidecar location, and search scoring
- * with secret masking. Pure, no ffmpeg.
+ * with secret masking. #255: cache reuse, per-file sidecars, punctuation
+ * queries. #266: masked screen text. Pure, no ffmpeg.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   INDEX_VERSION,
   MAX_MATCHES_PER_HIT,
   attach,
+  canReuseIndex,
   cueTexts,
+  defaultTranscriptPath,
   eventTexts,
   fallbackIndexPath,
+  findIndex,
   fingerprintFile,
+  indexMatchesVideo,
   indexSidecarPath,
   indexWritePath,
+  legacyIndexSidecarPath,
+  maskSegmentText,
+  writeIndex,
   keyframeTime,
   markerTexts,
   mergeSegments,
@@ -162,15 +170,29 @@ describe("searchIndex", () => {
     expect(searchIndex(index, "ctrl+s").hits[0]).toMatchObject({ t: 4.5, matches: [{ source: "event" }] });
   });
 
-  it("masks secrets in snippets but still finds them", () => {
-    const { hits } = searchIndex(index, "ghp_", { regex: true });
-    expect(hits).toHaveLength(1);
+  it("matches masked text, so neither snippets nor hit counts reveal a secret (#266)", () => {
+    expect(searchIndex(index, "ghp_", { regex: true }).total).toBe(0);
+    expect(searchIndex(index, "Abc123").total).toBe(0);
+    const { hits } = searchIndex(index, "export");
     expect(hits[0]!.matches[0]!.text).toBe("export [REDACTED]");
-    expect(JSON.stringify(searchIndex(index, "TOKEN").hits)).not.toContain("Abc123");
   });
 
   it("can skip masking when asked", () => {
     expect(searchIndex(index, "TOKEN", { secretPattern: null }).hits[0]!.matches[0]!.text).toContain("ghp_Abc123");
+    expect(searchIndex(index, "ghp_", { regex: true, secretPattern: null }).total).toBe(1);
+  });
+
+  it("rejects a query with no letters or digits, unless it is a regex (#255)", () => {
+    for (const q of ["-", "_", "--", " - ", "...", ":"]) expect(() => searchIndex(index, q)).toThrow(/letter or digit/);
+    expect(searchIndex(index, "ctrl+s").total).toBe(1);
+    expect(searchIndex(index, ":", { regex: true }).total).toBe(1);
+  });
+
+  it("refuses another recording's index (#255)", () => {
+    expect(() => searchIndex(index, "Saved", { video: "rec.mkv" })).toThrow(/is for rec\.mp4, not rec\.mkv/);
+    expect(searchIndex(index, "Saved", { video: "rec.mp4" }).total).toBe(1);
+    // A recording moved along with its sidecar still matches by content.
+    expect(searchIndex(index, "Saved", { video: join("moved", "x.mp4"), fingerprint: index.fingerprint }).total).toBe(1);
   });
 
   it("limits hits and matches per hit", () => {
@@ -194,17 +216,34 @@ describe("index files", () => {
   });
 
   it("sit next to the video, or under edits/indexes when that folder is not allowed", () => {
-    expect(indexSidecarPath(join("a", "rec.final.mp4"))).toBe(join("a", "rec.final.index.json"));
+    expect(indexSidecarPath(join("a", "rec.final.mp4"))).toBe(join("a", "rec.final.mp4.index.json"));
+    expect(indexSidecarPath("demo.mp4")).not.toBe(indexSidecarPath("demo.mkv"));
+    expect(legacyIndexSidecarPath(join("a", "rec.final.mp4"))).toBe(join("a", "rec.final.index.json"));
     const allowed = mkdtempSync(join(tmpdir(), "sc-idx-ok-"));
     const outside = mkdtempSync(join(tmpdir(), "sc-idx-out-"));
     dirs.push(allowed, outside);
     process.env.SCREENCAST_ALLOWED_DIRS = allowed;
     const edits = join(allowed, "edits");
-    expect(indexWritePath(join(allowed, "rec.mp4"), edits)).toBe(join(allowed, "rec.index.json"));
+    expect(indexWritePath(join(allowed, "rec.mp4"), edits)).toBe(join(allowed, "rec.mp4.index.json"));
     const fallback = indexWritePath(join(outside, "rec.mp4"), edits);
     expect(fallback).toBe(fallbackIndexPath(join(outside, "rec.mp4"), edits));
     expect(fallback.startsWith(join(edits, "indexes"))).toBe(true);
     expect(fallbackIndexPath(join(allowed, "rec.mp4"), edits)).not.toBe(fallback);
+  });
+
+  it("read a legacy demo.index.json only for the recording it was built from (#255)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "sc-idx-legacy-"));
+    dirs.push(dir);
+    const edits = join(dir, "edits");
+    const mp4 = join(dir, "demo.mp4");
+    const mkv = join(dir, "demo.mkv");
+    writeIndex(legacyIndexSidecarPath(mp4), { ...makeIndex([]), video: mp4 });
+    expect(findIndex(mp4, edits)).toBe(legacyIndexSidecarPath(mp4));
+    expect(findIndex(mkv, edits)).toBeNull();
+    // The full-name sidecar wins once it exists.
+    writeIndex(indexSidecarPath(mkv), { ...makeIndex([]), video: mkv });
+    expect(findIndex(mkv, edits)).toBe(indexSidecarPath(mkv));
+    expect(indexMatchesVideo({ video: mp4.toUpperCase(), fingerprint: makeIndex([]).fingerprint }, mp4)).toBe(process.platform === "win32");
   });
 
   it("parse only a current index", () => {
@@ -225,5 +264,73 @@ describe("index files", () => {
     writeFileSync(file, buf);
     utimesSync(file, new Date(a.mtimeMs), new Date(a.mtimeMs));
     expect(sameFingerprint(a, fingerprintFile(file))).toBe(false);
+  });
+});
+
+describe("canReuseIndex (#255)", () => {
+  const prior = makeIndex([{ start: 0, end: 1, ocr: [] }]);
+  const want = { fingerprint: prior.fingerprint, sceneThreshold: 0.03, maxFrames: 120, ocrAvailable: true };
+
+  it("reuses a matching index", () => {
+    expect(canReuseIndex(prior, want)).toBe(true);
+    expect(canReuseIndex(null, want)).toBe(false);
+  });
+
+  it("rebuilds when the file or the settings changed", () => {
+    expect(canReuseIndex(prior, { ...want, fingerprint: { ...want.fingerprint, size: 2 } })).toBe(false);
+    expect(canReuseIndex(prior, { ...want, sceneThreshold: 0.1 })).toBe(false);
+    expect(canReuseIndex(prior, { ...want, maxFrames: 60 })).toBe(false);
+  });
+
+  it("rebuilds an index made without OCR once OCR works", () => {
+    const noOcr = { ...prior, ocr: false, framesRead: 0 };
+    expect(canReuseIndex(noOcr, want)).toBe(false);
+    expect(canReuseIndex(noOcr, { ...want, ocrAvailable: false })).toBe(true);
+  });
+});
+
+describe("masked screen text (#266)", () => {
+  const segments: IndexSegment[] = [
+    { start: 0, end: 2, ocr: ["OPENAI_API_KEY=sk-proj-abcdefghijklmnop", "Settings"], transcript: [{ t: 1, text: "hi" }] },
+    { start: 2, end: 4, ocr: ["password: hunter2", "ghp-Abc123Def456Ghi789"] },
+    { start: 4, end: 5, ocr: [] },
+  ];
+
+  it("leaves no secret-pattern match in the sidecar", () => {
+    const dir = mkdtempSync(join(tmpdir(), "sc-idx-mask-"));
+    try {
+      const path = join(dir, "rec.mp4.index.json");
+      writeIndex(path, makeIndex(maskSegmentText(segments)));
+      const text = readFileSync(path, "utf8");
+      for (const secret of ["sk-proj-abcdef", "hunter2", "Abc123Def456"]) expect(text).not.toContain(secret);
+      expect(text).toContain("Settings");
+      expect(text).toContain("[REDACTED]");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps everything else, and masking twice changes nothing", () => {
+    const once = maskSegmentText(segments);
+    expect(once[0]!.transcript).toEqual(segments[0]!.transcript);
+    expect(once[2]).toEqual(segments[2]);
+    expect(maskSegmentText(once)).toEqual(once);
+  });
+});
+
+describe("defaultTranscriptPath (#255)", () => {
+  const video = join("rec", "demo.mp4");
+
+  it("prefers <file name>.srt, then <base name>.srt", () => {
+    expect(defaultTranscriptPath(video, ["demo.mp4", "demo.mp4.srt", "demo.srt"])).toEqual({ path: `${video}.srt`, ambiguous: false });
+    expect(defaultTranscriptPath(video, ["demo.mp4", "demo.srt"])).toEqual({ path: join("rec", "demo.srt"), ambiguous: false });
+    expect(defaultTranscriptPath(video, ["demo.mp4"])).toEqual({ path: null, ambiguous: false });
+  });
+
+  it("skips <base name>.srt when another video shares the base name", () => {
+    expect(defaultTranscriptPath(video, ["demo.mp4", "demo.mkv", "demo.srt"])).toEqual({ path: null, ambiguous: true });
+    expect(defaultTranscriptPath(video, ["demo.mp4", "demo.mkv", "demo.mp4.srt"]).path).toBe(`${video}.srt`);
+    // Other files with the base name are fine.
+    expect(defaultTranscriptPath(video, ["demo.mp4", "demo.mp4.index.json", "demo.srt"]).path).toBe(join("rec", "demo.srt"));
   });
 });

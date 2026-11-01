@@ -2,7 +2,7 @@
 
 | Workflow | Runs on | What it does |
 | --- | --- | --- |
-| `ci.yml` (CI) | push and PR to `main`, dispatch | Lint, build, typecheck, and test on Ubuntu and Windows, Node 22 and 24. Both legs run the ffmpeg integration suite; the Windows leg uses FFmpeg 8 with a whisper model and runs a real capture smoke test. |
+| `ci.yml` (CI) | push and PR to `main`, dispatch | Lint, build, typecheck, and test on Ubuntu and Windows, Node 22 and 24. Both legs run the ffmpeg integration suite on a SHA-pinned FFmpeg 8 build; the Windows leg adds a whisper model, runs a real capture smoke test, and reports v8 coverage (Node 22) to the job summary. |
 | `release.yml` (Release) | a successful CI run on `main` (push or dispatch), dispatch | Only when `package.json` holds a version with no tag yet: tags the commit CI tested, creates the GitHub Release with that version's `CHANGELOG.md` section as its notes (generated notes if the section is missing), attaches the `.mcpb` bundle plus an unversioned `screencast-mcp.mcpb`, and dispatches `publish.yml` on the new tag. A push that does not bump the version releases nothing. |
 | `publish.yml` (Publish to npm) | dispatch from `release.yml` | Builds the tag, publishes to npm with provenance, and lists the version in the MCP Registry. Idempotent. |
 | `codeql.yml` (CodeQL) | push and PR to `main`, weekly | JavaScript/TypeScript code scanning. |

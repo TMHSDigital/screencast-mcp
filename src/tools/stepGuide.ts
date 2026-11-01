@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, rmdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -16,15 +16,21 @@ import { DEFAULT_SECRET_PATTERN } from "../utils/bugReport.js";
 import { resolveOutputDir, subdir, stamp, rand } from "../utils/paths.js";
 import {
   GUIDE_FILES,
+  HTML_IMAGE_LADDER,
+  HTML_MAX_BYTES,
   MAX_GUIDE_STEPS,
   assignSections,
+  base64Bytes,
+  buildHtmlImageArgs,
   buildGuideHtml,
   buildGuideMarkdown,
   buildStepFrameArgs,
   buildStepShotArgs,
   caption,
   guideSteps,
+  htmlImageName,
   labelAt,
+  nextHtmlRung,
   shotFilter,
   type GuideData,
   type GuideFormat,
@@ -33,6 +39,8 @@ import { resolveSource } from "./bugReport.js";
 
 /** Frames OCR'd per PowerShell run, so a cancel lands between batches. */
 const OCR_BATCH = 10;
+/** Screenshots encoded per rung to pick where guide.html starts on the ladder. */
+const HTML_SAMPLE = 5;
 
 const inputSchema = {
   input: z.string().min(1).optional().describe("Recording path (uses its .events.jsonl)."),
@@ -187,9 +195,64 @@ export function register(server: McpServer): void {
             written.push(paths.markdown);
           }
           if (wantHtml) {
-            const src = (file: string) => `data:image/png;base64,${readFileSync(join(imageDir, file)).toString("base64")}`;
-            writeFileSync(paths.html, buildGuideHtml(data, src));
+            // The screenshots are inlined, so the page gets a byte budget
+            // (#259): JPEG renditions, smaller down the ladder until it fits.
+            const htmlDir = join(work, "html");
+            mkdirSync(htmlDir, { recursive: true });
+            const files = steps.flatMap((s) => (s.image ? [s.image] : []));
+            const src = (file: string) => `data:image/jpeg;base64,${readFileSync(join(htmlDir, htmlImageName(file))).toString("base64")}`;
+            const encode = async (file: string, rung: (typeof HTML_IMAGE_LADDER)[number]) => {
+              const out = join(htmlDir, htmlImageName(file));
+              await runFfmpeg(buildHtmlImageArgs(join(imageDir, file), rung, out), 60_000, { signal: extra.signal });
+              return base64Bytes(statSync(out).size);
+            };
+            // Start at the rung a few sample images say will fit (with a
+            // margin for the page around them), so a long guide is not
+            // re-encoded at every rung.
+            const sample = files.length > HTML_SAMPLE ? files.filter((_, k) => k % Math.ceil(files.length / HTML_SAMPLE) === 0) : [];
+            let start = 0;
+            for (; sample.length > 0 && start < HTML_IMAGE_LADDER.length - 1; start++) {
+              let bytes = 0;
+              for (const f of sample) bytes += await encode(f, HTML_IMAGE_LADDER[start]!);
+              if ((bytes / sample.length) * files.length <= HTML_MAX_BYTES * 0.9) break;
+            }
+            let page = "";
+            for (let r: number | null = start; r !== null; ) {
+              const rung = HTML_IMAGE_LADDER[r]!;
+              let images = 0;
+              for (const file of files) images += await encode(file, rung);
+              // Weigh the images before building the page from them.
+              page = images <= HTML_MAX_BYTES ? buildGuideHtml(data, src) : "";
+              const bytes = page ? Buffer.byteLength(page) : images;
+              if (bytes <= HTML_MAX_BYTES) break;
+              const next = nextHtmlRung(r, bytes);
+              if (next === null) {
+                page ||= buildGuideHtml(data, src);
+                warnings.push(
+                  `guide.html is ${(Buffer.byteLength(page) / 1e6).toFixed(1)} MB, over the ${HTML_MAX_BYTES / 1e6} MB budget even with ${rung.width} px JPEGs; ` +
+                    "use format: md for a guide this long.",
+                );
+              }
+              r = next;
+            }
+            writeFileSync(paths.html, page);
             written.push(paths.html);
+          }
+          // Replacing a guide in another format: the earlier one's files go too,
+          // so the folder never mixes two guides (#259).
+          if (args.overwrite) {
+            if (!wantHtml) rmSync(paths.html, { force: true });
+            if (!wantMd) {
+              rmSync(paths.markdown, { force: true });
+              if (existsSync(paths.images)) {
+                for (const f of readdirSync(paths.images)) if (/^step-\d+\.png$/.test(f)) rmSync(join(paths.images, f), { force: true });
+                try {
+                  rmdirSync(paths.images);
+                } catch {
+                  /* it holds files of the user's own: leave it */
+                }
+              }
+            }
           }
           if (data.stepsOmitted) warnings.push(`Only the first ${MAX_GUIDE_STEPS} steps were written; ${data.stepsOmitted} more were left out.`);
           if (stepsNote) warnings.push(stepsNote);

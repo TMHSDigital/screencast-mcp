@@ -5,7 +5,6 @@
 import { describe, it, expect } from "vitest";
 import {
   CliUsageError,
-  commandLine,
   isCliInvocation,
   parseCliArgs,
   parseToolArgs,
@@ -26,7 +25,7 @@ describe("isCliInvocation", () => {
     // Unknown arguments are not a CLI call either: clients may pass anything.
     expect(isCliInvocation(["--stdio"])).toBe(false);
   });
-  it.each(["record", "call", "help", "--help", "-h", "--version", "-v"])("treats %s as the CLI", (sub) => {
+  it.each(["record", "call", "setup", "help", "--help", "-h", "--version", "-v"])("treats %s as the CLI", (sub) => {
     expect(isCliInvocation([sub])).toBe(true);
   });
 });
@@ -42,6 +41,7 @@ describe("parseCliArgs record", () => {
       gif: true,
       contactSheet: true,
       discardOnSuccess: false,
+      ocrErrors: false,
       command: ["npm", "test"],
     });
   });
@@ -91,11 +91,6 @@ describe("parseCliArgs other commands", () => {
 });
 
 describe("helpers", () => {
-  it("commandLine keeps a single argument verbatim and quotes the rest", () => {
-    expect(commandLine(["npm test && npm run e2e"])).toBe("npm test && npm run e2e");
-    expect(commandLine(["node", "-e", "process.exit(3)"])).toBe('node -e "process.exit(3)"');
-    expect(commandLine(["app.exe", "C:\\Program Files\\x", 'say "hi"', ""])).toBe('app.exe "C:\\Program Files\\x" "say \\"hi\\"" ""');
-  });
   it("tailWindow covers the last N seconds, or everything", () => {
     expect(tailWindow(100, 30)).toEqual({ start: 70, duration: 30 });
     expect(tailWindow(20, 30)).toEqual({});

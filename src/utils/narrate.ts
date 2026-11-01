@@ -7,7 +7,7 @@
  * lines are summed (amix normalize=0) into a voice bus padded to the video's
  * length, which is mixed over the original audio, optionally ducking it with
  * sidechaincompress. Nothing leaves the machine: the text travels to a local
- * PowerShell process base64-encoded, and the voices are the installed ones.
+ * PowerShell process in a private temp file, and the voices are the installed ones.
  *
  * The PowerShell call is impure; line resolution, placement, the WAV header
  * parser, and the ffmpeg builder are pure.
@@ -224,12 +224,25 @@ export function parseVoices(raw: RawTts): Voice[] {
   return asArray(raw.voices).map((v) => ({ name: String(v.name ?? ""), language: String(v.language ?? ""), gender: String(v.gender ?? "") }));
 }
 
+/** The speech shim and its request. The request (every line's text and WAV
+ * path) travels in a temp file, not on the command line, which Windows caps
+ * at 32,767 characters: a 200-line script would not fit (#254). Pure. */
+export function ttsCall(request: object): { script: string; payload: string } {
+  return { script: PS_TTS, payload: JSON.stringify(request) };
+}
+
 async function runTts(request: object, timeoutMs: number, signal?: AbortSignal): Promise<RawTts> {
   if (process.platform !== "win32") {
     throw new ScreencastError("narrate uses the speech engine built into Windows and runs on Windows only.");
   }
-  const req = Buffer.from(JSON.stringify(request), "utf8").toString("base64");
-  const stdout = await runPowerShell(PS_TTS.replace("__REQ__", req), "speech voices", { timeoutMs, signal });
+  const { script, payload } = ttsCall(request);
+  const list = "list" in request;
+  const stdout = await runPowerShell(script, list ? "speech voices" : "the speech engine", {
+    timeoutMs,
+    signal,
+    payload,
+    failure: list ? "Could not list speech voices" : "Could not synthesize speech",
+  });
   try {
     return JSON.parse(stdout) as RawTts;
   } catch (err) {
@@ -290,14 +303,14 @@ export async function synthesize(
 }
 
 // Windows PowerShell 5.1 + WinRT. The request (voice, rate, texts, WAV paths)
-// arrives base64-encoded JSON, so no quoting is involved.
+// arrives as JSON in $Payload (read from a temp file), so no quoting is involved.
 const PS_TTS = `
 $ErrorActionPreference = 'Stop'
 function Out($o) { ConvertTo-Json -InputObject $o -Depth 5 -Compress }
 try {
   Add-Type -AssemblyName System.Runtime.WindowsRuntime
   $null = [Windows.Media.SpeechSynthesis.SpeechSynthesizer, Windows.Media, ContentType = WindowsRuntime]
-  $req = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__REQ__')) | ConvertFrom-Json
+  $req = $Payload | ConvertFrom-Json
   $all = @([Windows.Media.SpeechSynthesis.SpeechSynthesizer]::AllVoices)
   $voices = @($all | ForEach-Object { [pscustomobject]@{ name = $_.DisplayName; language = $_.Language; gender = [string]$_.Gender } })
   if ($req.list) { Out ([pscustomobject]@{ voices = $voices }); return }

@@ -39,9 +39,9 @@ export function trackClientRoots(server: McpServer): void {
       const { roots } = await low.listRoots();
       setClientRoots(rootDirs(roots));
     } catch (err) {
-      // A client that advertises roots but cannot list them is treated as
-      // having none, rather than locking every caller-chosen path out.
-      if (initial) setClientRoots(null);
+      // A client that advertises roots but cannot list them fails closed:
+      // SCREENCAST_HOME and SCREENCAST_ALLOWED_DIRS stay usable, nothing else.
+      if (initial) setClientRoots([]);
       process.stderr.write(`roots/list failed: ${err instanceof Error ? err.message : String(err)}\n`);
     }
   };

@@ -35,8 +35,8 @@ import { backdropSteps, type BackdropOptions } from "./backdrop.js";
 import { groupBadges, keystrokeSteps, retimeBadges, type Badge, type BadgePlanOptions, type BadgeStyle, type KeystrokeAssets } from "./keystrokes.js";
 import { cutFilters, cutsFor, DEFAULT_KEEP_SEC, DEFAULT_MIN_IDLE_SEC } from "./idle.js";
 import { denoiseFilter, loudnessTarget, loudnormFilter, type DenoiseStrength, type LoudnessMeasurement, type LoudnessPreset } from "./audio.js";
-import { subtitlesFilter, type CaptionStyle } from "./captions.js";
-import { mapSpans, mapTime, type Span } from "./timeline.js";
+import { subtitlesFilter, type CaptionStyle, type Cue } from "./captions.js";
+import { mapSpans, mapTime, retimeCues, type Span } from "./timeline.js";
 import { cursorSteps, transformCursor, type CursorPlan, type CursorPlanOptions, type CursorStyle } from "./cursor.js";
 
 /** What a cursor step needs (#170): the cursor planned from the event log on
@@ -160,6 +160,15 @@ export function probeArgs(args: string[], p: Pick<PipelinePending, "seek" | "aud
   if (af !== -1 && p.audio.length > 0) out[af + 1] = `${p.audio.join(",")},${out[af + 1]}`;
   out.splice(out.indexOf("-i"), 0, ...p.seek);
   return out;
+}
+
+/** A transcript made at a burn_subtitles step is on that step's timeline;
+ * the .srt beside the result must be on the output's (#256). Move the cues
+ * through the timing changes after the step: `opsBefore` is how many of the
+ * plan's timeOps came before it (its pending probe's `ops.length`). Pure. */
+export function sidecarCues(cues: readonly Cue[], timeOps: readonly TimeOp[], opsBefore: number): Cue[] {
+  const later = timeOps.slice(opsBefore);
+  return later.length > 0 ? retimeCues(cues, later) : [...cues];
 }
 
 /** Plan the fused command. `assets[i]` holds the files callout step i needs. */

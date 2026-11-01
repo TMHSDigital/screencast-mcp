@@ -40,4 +40,20 @@ describe("capture retention (#209)", () => {
     for (const gone of [oldShot, oldFrame, oldRaw]) expect(existsSync(gone)).toBe(false);
     for (const kept of [newShot, oldRec, oldEvents, oldEdit]) expect(existsSync(kept)).toBe(true);
   });
+
+  it("deletes old index_recording sidecars under SCREENCAST_HOME, never the recordings (#266)", () => {
+    const oldIdx = file("recordings/rec-2.mp4.index.json", 10);
+    const oldTmp = file("recordings/rec-2.mp4.index.json.123.tmp", 10);
+    const oldEditIdx = file("edits/clip.mp4.index.json", 10);
+    const oldFallback = file("edits/indexes/rec-abcdef123456.index.json", 10);
+    const newIdx = file("recordings/rec-3.mp4.index.json", 1);
+    const rec = file("recordings/rec-2.mp4", 10);
+    const edit = file("edits/clip.mp4", 10);
+    const nested = file("edits/project/old.index.json", 10);
+
+    const r = pruneCaptures(7, Date.now(), root);
+    expect(r.removed).toBe(4);
+    for (const gone of [oldIdx, oldTmp, oldEditIdx, oldFallback]) expect(existsSync(gone)).toBe(false);
+    for (const kept of [newIdx, rec, edit, nested]) expect(existsSync(kept)).toBe(true);
+  });
 });

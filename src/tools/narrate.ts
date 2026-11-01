@@ -65,6 +65,9 @@ export function register(server: McpServer): void {
         const lines = resolveLines(args.lines, markers);
         assertEditContainer(args.output);
         const output = resolveOutput(args.output, subdir("edits"), `narrated-${stamp()}-${rand()}${editOutputExt(args.video)}`, args.overwrite);
+        // The .srt beside the result is an output too: never clobber one without overwrite (#256).
+        const srtPath = output.replace(/\.[^./\\]+$/, "") + ".srt";
+        if (!args.overwrite && existsSync(srtPath)) throw new ScreencastError(`Output already exists: ${srtPath}. Pass overwrite: true to replace it.`);
 
         work = mkdtempSync(join(tmpdir(), "screencast-tts-"));
         const wavs = lines.map((_, i) => join(work!, `line-${i}.wav`));
@@ -82,7 +85,6 @@ export function register(server: McpServer): void {
         });
         await runEditJob(ffArgs, { output, durationSec: info.durationSec, extra });
 
-        const srtPath = output.replace(/\.[^./\\]+$/, "") + ".srt";
         writeFileSync(srtPath, formatSrt(narrationCues(placed, info.durationSec)));
         // Timing is unchanged, so the input's markers still hold.
         const inputMarkers = readMarkers(args.video);

@@ -10,7 +10,7 @@ branding:
 # uses gdigrab on the runner's interactive desktop.
 inputs:
   command:
-    description: The test command to run while recording (run by cmd.exe, so `npm test && npm run e2e` works).
+    description: The test command to run while recording, as one line for cmd.exe (so `npm test && npm run e2e` and `-g "a & b"` work as written).
     required: true
   target:
     description: "What to record: full | monitor:<i> | window:<title> | window:exe=<app.exe> | region:x,y,w,h."
@@ -24,6 +24,9 @@ inputs:
   last-seconds:
     description: The GIF covers the last this-many seconds of the run (0 = all of it).
     default: "30"
+  max-duration:
+    description: Stop recording after this many seconds, an integer up to 604800 (0 = no cap). Empty uses SCREENCAST_MAX_RECORDING_SEC, else 3600. A run longer than the cap gets a warning, since the GIF then shows the end of the recording, not of the run.
+    default: ""
   discard-on-success:
     description: Delete the recording when the command passes, so green runs upload nothing but evidence.json.
     default: "true"
@@ -34,20 +37,29 @@ inputs:
     description: Upload the output folder as a workflow artifact.
     default: "true"
   artifact-name:
-    description: Name of the uploaded artifact.
-    default: screencast-evidence
+    description: Name of the uploaded artifact. Empty means screencast-evidence-<job>, plus the matrix index in a matrix and the attempt on a rerun, so matrix legs never collide.
+    default: ""
   retention-days:
     description: Days to keep the artifact.
     default: "14"
   package:
-    description: The npm package (and version) to run with npx.
-    default: "@tmhs/screencast-mcp@latest"
+    description: The npm package (and version) to run with npx. Empty means the version of this action (from its package.json), so pinning the action pins the CLI; @latest only if that version is not on npm.
+    default: ""
   cli-path:
     description: Run a local build instead of the npm package, e.g. dist/index.js in a checkout of screencast-mcp.
     default: ""
   install-ffmpeg:
     description: Install ffmpeg with Chocolatey when it is not on PATH.
     default: "true"
+  ocr-errors:
+    description: "On failure, OCR the GIF's window for error lines (Windows OCR) into evidence.json: true, false, or empty to follow comment."
+    default: ""
+  comment:
+    description: "On pull_request events, keep one sticky PR comment per job with the exit code, how the recording ended, OCR'd errors, and a link to the evidence artifact. Created when the command fails, updated on later runs. Needs `permissions: pull-requests: write`."
+    default: "false"
+  github-token:
+    description: Token for the PR comment.
+    default: ${{ github.token }}
 
 outputs:
   exit-code:
@@ -65,6 +77,15 @@ outputs:
   evidence-dir:
     description: The output folder.
     value: ${{ steps.record.outputs.evidence-dir }}
+  end-reason:
+    description: Why the recording ended (stopped, max_duration, crashed, window_closed), or empty when none ran.
+    value: ${{ steps.record.outputs.end-reason }}
+  artifact-name:
+    description: The uploaded artifact's name.
+    value: ${{ steps.resolve.outputs.artifact-name }}
+  artifact-url:
+    description: The uploaded artifact's URL.
+    value: ${{ steps.upload.outputs.artifact-url }}
 
 runs:
   using: composite
@@ -84,6 +105,45 @@ runs:
       with:
         node-version: 22
 
+    - name: Resolve the package and artifact name
+      id: resolve
+      shell: pwsh
+      env:
+        SC_PACKAGE: ${{ inputs.package }}
+        SC_CLI_PATH: ${{ inputs.cli-path }}
+        SC_ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        SC_JOB: ${{ github.job }}
+        SC_JOB_INDEX: ${{ strategy.job-index }}
+        SC_JOB_TOTAL: ${{ strategy.job-total }}
+        SC_ATTEMPT: ${{ github.run_attempt }}
+      run: |
+        # The CLI version: the one this action was released with, so a pinned
+        # action ref runs the matching CLI instead of whatever @latest is (#257).
+        $pkg = $env:SC_PACKAGE
+        if (-not $pkg -and -not $env:SC_CLI_PATH) {
+          $manifest = Join-Path $env:GITHUB_ACTION_PATH 'package.json'
+          $pkg = '@tmhs/screencast-mcp@latest'
+          if (Test-Path -LiteralPath $manifest) {
+            $p = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
+            $candidate = "$($p.name)@$($p.version)"
+            $published = npm view $candidate version 2>$null
+            if ($LASTEXITCODE -eq 0 -and $published) { $pkg = $candidate }
+            else { Write-Host "::warning::$candidate is not on npm (yet); using $($p.name)@latest." ; $pkg = "$($p.name)@latest" }
+          }
+        }
+        "package=$pkg" >> $env:GITHUB_OUTPUT
+        # One artifact per job and matrix leg: upload-artifact rejects a
+        # duplicate name in the same run (#257).
+        $key = $env:SC_JOB
+        if ([int]("0$env:SC_JOB_TOTAL") -gt 1) { $key += "-$env:SC_JOB_INDEX" }
+        $name = $env:SC_ARTIFACT_NAME
+        if (-not $name) {
+          $name = "screencast-evidence-$key"
+          if ([int]("0$env:SC_ATTEMPT") -gt 1) { $name += "-attempt$env:SC_ATTEMPT" }
+        }
+        "artifact-name=$name" >> $env:GITHUB_OUTPUT
+        "comment-key=$key" >> $env:GITHUB_OUTPUT
+
     - name: Ensure ffmpeg
       shell: pwsh
       env:
@@ -99,21 +159,27 @@ runs:
       id: record
       shell: pwsh
       env:
+        # The CLI reads the command from this variable (--command-env), so no
+        # shell or npx.cmd re-quotes it on the way (#257).
         SC_COMMAND: ${{ inputs.command }}
         SC_TARGET: ${{ inputs.target }}
         SC_FPS: ${{ inputs.fps }}
         SC_ARTIFACTS: ${{ inputs.artifacts }}
         SC_LAST: ${{ inputs.last-seconds }}
+        SC_MAX_DURATION: ${{ inputs.max-duration }}
         SC_DISCARD: ${{ inputs.discard-on-success }}
         SC_OUT: ${{ inputs.output-dir }}
-        SC_PACKAGE: ${{ inputs.package }}
+        SC_PACKAGE: ${{ steps.resolve.outputs.package }}
         SC_CLI_PATH: ${{ inputs.cli-path }}
+        SC_OCR: ${{ inputs.ocr-errors }}
+        SC_COMMENT: ${{ inputs.comment }}
       run: |
         $PSNativeCommandArgumentPassing = 'Windows'
         $cliArgs = @('record', '--target', $env:SC_TARGET, '--fps', $env:SC_FPS, '--out', $env:SC_OUT,
-          '--artifacts', $env:SC_ARTIFACTS, '--last', $env:SC_LAST)
+          '--artifacts', $env:SC_ARTIFACTS, '--last', $env:SC_LAST, '--command-env', 'SC_COMMAND')
+        if ($env:SC_MAX_DURATION) { $cliArgs += @('--max-duration', $env:SC_MAX_DURATION) }
         if ($env:SC_DISCARD -eq 'true') { $cliArgs += '--discard-on-success' }
-        $cliArgs += @('--', $env:SC_COMMAND)
+        if ($env:SC_OCR -eq 'true' -or (-not $env:SC_OCR -and $env:SC_COMMENT -eq 'true')) { $cliArgs += '--ocr-errors' }
         if ($env:SC_CLI_PATH) { & node $env:SC_CLI_PATH @cliArgs } else { & npx -y $env:SC_PACKAGE @cliArgs }
         $code = $LASTEXITCODE
         "exit-code=$code" >> $env:GITHUB_OUTPUT
@@ -125,25 +191,83 @@ runs:
           "gif=$($e.gif)" >> $env:GITHUB_OUTPUT
           "contact-sheet=$($e.contactSheet)" >> $env:GITHUB_OUTPUT
           "recording=$($e.recording)" >> $env:GITHUB_OUTPUT
+          "end-reason=$($e.endReason)" >> $env:GITHUB_OUTPUT
           $status = if ($code -eq 0) { 'passed' } else { "failed (exit $code)" }
           $lines = @("### Screencast: ``$($e.command)`` $status", "")
+          if ($e.endReason) { $lines += "- Recording ended: $($e.endReason) after $($e.durationSec) s (the command ran $($e.commandSec) s)" }
           if ($e.gif) { $lines += "- GIF: ``$(Split-Path $e.gif -Leaf)``" }
           if ($e.contactSheet) { $lines += "- Contact sheet: ``$(Split-Path $e.contactSheet -Leaf)``" }
           if ($e.recording) { $lines += "- Recording: ``$(Split-Path $e.recording -Leaf)`` ($($e.durationSec) s)" }
-          foreach ($w in $e.warnings) { $lines += "- Warning: $w" }
+          foreach ($w in $e.warnings) { $lines += "- Warning: $w"; Write-Host "::warning::screencast: $w" }
           $lines += ""
           $lines -join "`n" >> $env:GITHUB_STEP_SUMMARY
         }
         exit 0
 
     - name: Upload the evidence
+      id: upload
       if: always() && inputs.upload == 'true' && steps.record.outputs.evidence-dir != ''
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: ${{ inputs.artifact-name }}
+        name: ${{ steps.resolve.outputs.artifact-name }}
         path: ${{ inputs.output-dir }}
         retention-days: ${{ inputs.retention-days }}
         if-no-files-found: ignore
+
+    # One sticky comment per job and matrix leg, found again by its marker
+    # (#268). GitHub cannot show images stored in workflow artifacts, so the
+    # comment links the artifact instead of embedding the GIF.
+    - name: Comment on the pull request
+      if: always() && inputs.comment == 'true' && steps.record.outputs.evidence-dir != '' && github.event.pull_request.number != ''
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        SC_REPO: ${{ github.repository }}
+        SC_PR: ${{ github.event.pull_request.number }}
+        SC_KEY: ${{ steps.resolve.outputs.comment-key }}
+        SC_OUT: ${{ inputs.output-dir }}
+        SC_CODE: ${{ steps.record.outputs.exit-code }}
+        SC_ARTIFACT_NAME: ${{ steps.resolve.outputs.artifact-name }}
+        SC_ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        SC_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        SC_ATTEMPT: ${{ github.run_attempt }}
+      run: |
+        $env:SC_MARKER = "<!-- screencast-mcp:evidence:$env:SC_KEY -->"
+        $existing = gh api "repos/$env:SC_REPO/issues/$env:SC_PR/comments" --paginate --jq '.[] | select(.body | contains(env.SC_MARKER)) | .id'
+        if ($LASTEXITCODE -ne 0) { Write-Host "::warning::Could not read the PR comments (the job needs permissions: pull-requests: write; fork PRs get a read-only token)."; exit 0 }
+        $id = @($existing | Where-Object { $_ })[0]
+        $code = [int]$env:SC_CODE
+        # A passing run only updates a comment an earlier failure created.
+        if ($code -eq 0 -and -not $id) { exit 0 }
+        $e = $null
+        $json = Join-Path $env:SC_OUT 'evidence.json'
+        if (Test-Path $json) { $e = Get-Content $json -Raw | ConvertFrom-Json }
+        $cmd = if ($e) { ($e.command -replace '`', "'") } else { '(unknown)' }
+        $verdict = if ($code -eq 0) { 'passed' } else { "failed (exit $code)" }
+        $lines = @($env:SC_MARKER, "### Screencast ($env:SC_KEY): ``$cmd`` $verdict", "")
+        $lines += "| | |", "|---|---|", "| Exit code | $code |"
+        if ($e -and $e.endReason) { $lines += "| Recording | ended by $($e.endReason) after $($e.durationSec) s; the command ran $($e.commandSec) s |" }
+        $lines += ""
+        if ($e -and $e.errors -and @($e.errors).Count -gt 0) {
+          $lines += "**Errors on screen** (OCR of the GIF's window, best effort, secrets masked):", "", '```text'
+          $lines += @($e.errors | ForEach-Object { $_ -replace '```', "'''" })
+          $lines += '```', ""
+        }
+        if ($e -and $e.warnings) { foreach ($w in $e.warnings) { $lines += "> Warning: $w" }; $lines += "" }
+        $have = @()
+        if ($e -and $e.gif) { $have += 'GIF' }
+        if ($e -and $e.contactSheet) { $have += 'contact sheet' }
+        if ($e -and $e.recording) { $have += 'recording' }
+        $have += 'evidence.json'
+        if ($env:SC_ARTIFACT_URL) { $lines += "**Evidence:** [$env:SC_ARTIFACT_NAME]($env:SC_ARTIFACT_URL) ($($have -join ', ')) from [this run]($env:SC_RUN_URL)." }
+        else { $lines += "**Evidence:** [this run]($env:SC_RUN_URL) (no artifact was uploaded)." }
+        $lines += "", "<sub>GitHub cannot show images stored in workflow artifacts, so open the artifact for the GIF. Updated by run attempt $env:SC_ATTEMPT.</sub>"
+        $file = Join-Path $env:RUNNER_TEMP "screencast-comment-$env:SC_KEY.md"
+        Set-Content -LiteralPath $file -Value ($lines -join "`n") -Encoding utf8NoBOM
+        if ($id) { gh api -X PATCH "repos/$env:SC_REPO/issues/comments/$id" -F "body=@$file" --silent }
+        else { gh api "repos/$env:SC_REPO/issues/$env:SC_PR/comments" -F "body=@$file" --silent }
+        if ($LASTEXITCODE -ne 0) { Write-Host "::warning::Could not write the PR comment (needs permissions: pull-requests: write)." }
+        exit 0
 
     - name: Fail with the command's exit code
       if: steps.record.outputs.exit-code != '0'

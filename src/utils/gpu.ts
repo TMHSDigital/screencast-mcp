@@ -129,6 +129,22 @@ export async function probeHwEncoders(ffmpeg: string, run: Runner = ffmpegRunner
   return Object.fromEntries(HW_ENCODERS.map((e, i) => [e, results[i]])) as Record<HwEncoder, boolean>;
 }
 
+/** The largest frame each hardware H.264 encoder takes (#253). NVENC's H.264
+ * encoder stops at 4096 px a side; Quick Sync and AMF at about 4096x2304
+ * (4K DCI-ish). A super-ultrawide or 5K display is over the line; libx264
+ * has no such limit. */
+export const HW_MAX_FRAME: Record<HwEncoder, { width: number; height: number }> = {
+  nvenc: { width: 4096, height: 4096 },
+  qsv: { width: 4096, height: 2304 },
+  amf: { width: 4096, height: 2304 },
+};
+
+/** Whether a hardware encoder takes frames of this size. Pure. */
+export function encoderFits(encoder: HwEncoder, frame: { width: number; height: number }): boolean {
+  const max = HW_MAX_FRAME[encoder];
+  return frame.width <= max.width && frame.height <= max.height;
+}
+
 export interface EncoderPick {
   encoder: VideoEncoder;
   /** ddagrab frames go to the encoder without a copy to system memory. */
@@ -139,22 +155,49 @@ export interface EncoderPick {
 
 /**
  * Settle the encoder for a recording. `auto` takes the first hardware encoder
- * that passes its trial encode, else libx264; an explicit hardware encoder that
- * fails its trial is an error. With ddagrab, a second trial decides whether the
- * encoder takes D3D11 frames directly or needs hwdownload.
+ * that passes its trial encode and takes the capture's frame size, else
+ * libx264; an explicit hardware encoder that fails its trial, or cannot take
+ * the frame size, is an error. With ddagrab, a second trial decides whether
+ * the encoder takes D3D11 frames directly or needs hwdownload.
+ *
+ * The trial encode is 256x256, so it cannot tell whether the encoder takes the
+ * real capture size: `frame` (the capture's width and height, when known) is
+ * checked against HW_MAX_FRAME instead (#253).
  */
 export async function resolveEncoder(
   choice: EncoderChoice,
   backend: "gdigrab" | "ddagrab",
   ffmpeg: string,
   run: Runner = ffmpegRunner(ffmpeg),
+  frame?: { width: number; height: number },
 ): Promise<EncoderPick> {
   if (choice === "x264") return { encoder: "x264", gpuFrames: false };
+  const fits = (e: HwEncoder) => !frame || encoderFits(e, frame);
+  const size = frame ? `${frame.width}x${frame.height}` : "";
+  if (choice !== "auto" && !fits(choice)) {
+    const max = HW_MAX_FRAME[choice];
+    throw new ScreencastError(
+      `The ${choice} encoder (${ENCODER_CODECS[choice]}) cannot encode a ${size} frame (at most ${max.width}x${max.height}).`,
+      'Use encoder: "x264" (or "auto", which picks libx264 for it), or record a smaller target.',
+    );
+  }
   const available = await probeHwEncoders(ffmpeg, run);
   const pick: HwEncoder | undefined =
-    choice === "auto" ? HW_ENCODERS.find((e) => available[e]) : available[choice] ? choice : undefined;
+    choice === "auto" ? HW_ENCODERS.find((e) => available[e] && fits(e)) : available[choice] ? choice : undefined;
   if (!pick) {
-    if (choice === "auto") return { encoder: "x264", gpuFrames: false, note: "No hardware encoder passed a trial encode; using libx264." };
+    if (choice === "auto") {
+      const working = HW_ENCODERS.filter((e) => available[e]);
+      return {
+        encoder: "x264",
+        gpuFrames: false,
+        note:
+          working.length > 0
+            ? `The capture is ${size}, larger than the hardware encoders here take (${working
+                .map((e) => `${e}: ${HW_MAX_FRAME[e].width}x${HW_MAX_FRAME[e].height}`)
+                .join(", ")}); using libx264.`
+            : "No hardware encoder passed a trial encode; using libx264.",
+      };
+    }
     throw new ScreencastError(
       `The ${choice} encoder (${ENCODER_CODECS[choice]}) failed a trial encode on this machine.`,
       'Use encoder: "auto" (falls back to libx264) or "x264"; doctor lists the encoders that work here.',
@@ -163,6 +206,38 @@ export async function resolveEncoder(
   const gpuFrames =
     backend === "ddagrab" && (await cachedProbe(ffmpeg, `dda:${pick}`, buildDdaProbeArgs(pick), run));
   return { encoder: pick, gpuFrames };
+}
+
+/**
+ * Start a capture with the picked encoder, and when a hardware encoder makes
+ * it exit during startup, retry once with libx264 (#253): an encoder that
+ * passed its small trial encode can still refuse the real capture (its size,
+ * a session limit, a busy GPU). `launch` starts and settles one attempt;
+ * `canFallback` says whether libx264 can take this capture at all;
+ * `beforeRetry` clears what the failed attempt left. The returned pick carries
+ * a note when it fell back, and `failure` says why the hardware attempt ended.
+ */
+export async function startWithEncoderFallback<T extends { settled: "running" | "exited" }>(
+  pick: EncoderPick,
+  launch: (p: EncoderPick) => Promise<T>,
+  opts: { why: (run: T) => string; canFallback?: () => Promise<boolean>; beforeRetry?: () => void },
+): Promise<{ run: T; pick: EncoderPick; failure?: string }> {
+  const first = await launch(pick);
+  if (first.settled === "running" || pick.encoder === "x264") return { run: first, pick };
+  const fallback: EncoderPick = { encoder: "x264", gpuFrames: false };
+  if (opts.canFallback && !(await opts.canFallback())) return { run: first, pick };
+  const name = `${pick.encoder} (${ENCODER_CODECS[pick.encoder]})`;
+  const why = opts.why(first).trim();
+  const failure = `the ${name} encoder exited at start${why ? `:\n${why}` : ""}`;
+  opts.beforeRetry?.();
+  const run = await launch(fallback);
+  if (run.settled === "exited") return { run, pick: fallback, failure };
+  const last = why.split("\n").at(-1) ?? "";
+  return {
+    run,
+    pick: { ...fallback, note: `The ${name} encoder exited at start; recording with libx264 instead.${last ? ` ffmpeg said: ${last}` : ""}` },
+    failure,
+  };
 }
 
 /** Whether Desktop Duplication captures here (cached per process). */

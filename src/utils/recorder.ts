@@ -10,7 +10,7 @@ import { logMessage, StderrWatch } from "./logging.js";
 import { parseCaptureStart, whenFinalized } from "./events.js";
 import { buildCaptureArgs } from "./targets.js";
 import { requireFfmpeg } from "./ffmpeg.js";
-import { joinSegments, probeDuration } from "./lifecycle.js";
+import { joinSegments, probeDuration, withSessionOp } from "./lifecycle.js";
 import {
   endSession,
   isPausing,
@@ -97,7 +97,8 @@ export function captureStartMs(watch: CaptureWatch, backend: CaptureBackend, spa
  * stop records its own final state; only an exit nobody asked for is
  * classified here: non-zero is a crash, a clean one the maxDurationSec cap or
  * the recorded window closing (#240). A segmented recording that ends on its
- * own is joined here, since no stop_recording will do it.
+ * own is joined here, since no stop_recording will do it. The exit of a child
+ * that is no longer the session's attached capture changes nothing (#252).
  */
 export function attachExitHandler(
   store: SessionStore,
@@ -106,7 +107,9 @@ export function attachExitHandler(
   opts: { backend: CaptureBackend; maxDurationSec: number; spawnedAt: number; watch: CaptureWatch },
 ): void {
   child.on("exit", (code) => {
-    store.detachChild(id);
+    const attached = store.getChild(id);
+    if (attached && attached !== child) return;
+    store.detachChild(id, child);
     if (!isPausing(id)) endSession(id);
     const cur = store.get(id);
     if (!cur || cur.status !== "recording" || store.isStopping(id)) return;
@@ -149,9 +152,19 @@ async function finalizeSegments(store: SessionStore, record: SessionRecord): Pro
 /**
  * Start the next segment of a paused recording (#200) with the settings it
  * was started with. The video clock picks up where the last segment ended.
- * On failure the session stays paused.
+ * On failure the session stays paused. A second resume while one is starting
+ * joins it, so two captures never write the same segment; one during a pause
+ * or stop is rejected (#252).
  */
-export async function resumeSession(
+export function resumeSession(
+  store: SessionStore,
+  record: SessionRecord,
+  ffmpeg: string,
+): Promise<{ record: SessionRecord; recordedSec: number; capSec: number }> {
+  return withSessionOp(store, record.id, "resume", () => runResume(store, store.get(record.id) ?? record, ffmpeg));
+}
+
+async function runResume(
   store: SessionStore,
   record: SessionRecord,
   ffmpeg: string,
@@ -176,7 +189,11 @@ export async function resumeSession(
   const spawnedAt = Date.now();
   const child = spawn(ffmpeg, args, { stdio: ["pipe", "ignore", "pipe"], windowsHide: true });
   const watch = watchStderr(child, record.id);
+  // Remove what this attempt wrote, never a file another live capture of the
+  // session is writing (#252).
   const cleanup = () => {
+    const other = store.getChild(record.id);
+    if (other && other !== child) return;
     if (index > 0) rmSync(path, { force: true });
     if (webcamPath) rmSync(webcamPath, { force: true });
   };
@@ -187,6 +204,11 @@ export async function resumeSession(
   const startMs = captureStartMs(watch, backend, spawnedAt);
   const camStart = webcamPath ? parseCaptureStart(watch.head(), capture.opts.audio ? 2 : 1) : null;
   store.attachChild(record.id, child);
+  const abandon = () => {
+    store.detachChild(record.id, child);
+    if (child.pid !== undefined) killPid(child.pid);
+    cleanup();
+  };
   let updated: SessionRecord | undefined;
   try {
     updated = store.update(record.id, {
@@ -200,15 +222,11 @@ export async function resumeSession(
       },
     });
   } catch (err) {
-    store.detachChild(record.id);
-    if (child.pid !== undefined) killPid(child.pid);
-    cleanup();
+    abandon();
     throw new ScreencastError(`Resume stopped: the session registry could not be written (${(err as Error).message}).`);
   }
   if (!updated) {
-    store.detachChild(record.id);
-    if (child.pid !== undefined) killPid(child.pid);
-    cleanup();
+    abandon();
     throw new ScreencastError(`No session with id "${record.id}".`);
   }
   store.clearPaused(record.id);

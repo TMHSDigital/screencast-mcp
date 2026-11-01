@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildTranscribeArgs, mergePunctuation, parseSrt, normalizeCues } from "../utils/captions.js";
-import { cueWords, findQuote, mapTime, mergeCuts, planTranscriptCuts, retimeCues } from "../utils/transcriptCut.js";
+import { cueByNumber, cueWords, findQuote, mapTime, mergeCuts, planTranscriptCuts, retimeCues } from "../utils/transcriptCut.js";
 
 // Word-level whisper output, as ffmpeg 8.1's whisper filter wrote it with
 // max_len=1 for Windows TTS speech: punctuation gets its own (often
@@ -132,6 +132,48 @@ describe("cut_by_transcript (#173)", () => {
       [1, 3],
       [5, 6],
     ]);
+  });
+
+  it("keeps every removed piece's text when one cut lies inside another (#259)", () => {
+    const merged = mergeCuts([
+      { start: 1, end: 5, text: "So, um, the settings page.", exact: true },
+      { start: 2, end: 3, text: "um,", exact: true },
+      { start: 4.5, end: 6, text: "Uh.", exact: true },
+    ]);
+    expect(merged).toEqual([{ start: 1, end: 6, text: "So, um, the settings page. Uh.", exact: true }]);
+    expect(mergeCuts([{ start: 1, end: 5, text: "a", exact: true }, { start: 2, end: 3, text: "b", exact: true }])[0]!.text).toBe("a b");
+  });
+
+  describe("cue numbers match the SRT's own (#259)", () => {
+    const ZERO_BASED = "0\n00:00:00,000 --> 00:00:02,000\nIntro.\n\n1\n00:00:02,000 --> 00:00:04,000\nKeep this.\n\n2\n00:00:04,000 --> 00:00:06,000\nCut this.\n";
+    const UNSORTED =
+      "1\n00:00:04,000 --> 00:00:06,000\nThird in time.\n\n2\n00:00:00,000 --> 00:00:02,000\nFirst in time.\n\n" +
+      "3\n00:00:02,000 --> 00:00:02,000\n.\n\n4\n00:00:02,000 --> 00:00:04,000\nSecond in time.\n";
+    const read = (srt: string) => normalizeCues(parseSrt(srt, { index: true }));
+
+    it("names the cue a 0-based SRT shows under the number", () => {
+      const cues = read(ZERO_BASED);
+      expect(cues.map((c) => c.index)).toEqual([0, 1, 2]);
+      expect(planTranscriptCuts(cues, { remove: [2] }).cuts).toEqual([{ start: 4, end: 6, text: "Cut this.", exact: true }]);
+      expect(planTranscriptCuts(cues, { remove: [0] }).cuts[0]!.text).toBe("Intro.");
+      expect(() => planTranscriptCuts(cues, { remove: [3] })).toThrow(/No cue 3: the transcript's cues are numbered 0-2/);
+    });
+
+    it("names the cue an unsorted SRT shows under the number, past a dropped zero-length cue", () => {
+      const cues = read(UNSORTED);
+      // Sorted by time, the zero-length cue 3 dropped: positions no longer match numbers.
+      expect(cues.map((c) => c.index)).toEqual([2, 4, 1]);
+      expect(planTranscriptCuts(cues, { remove: [1] }).cuts).toEqual([{ start: 4, end: 6, text: "Third in time.", exact: true }]);
+      expect(planTranscriptCuts(cues, { remove: [4] }).cuts[0]!.text).toBe("Second in time.");
+      expect(() => planTranscriptCuts(cues, { remove: [3] })).toThrow(/No cue 3.*no duration/);
+    });
+
+    it("refuses a number the file uses twice, and falls back to position without numbers", () => {
+      const dup = read("5\n00:00:00,000 --> 00:00:01,000\na\n\n5\n00:00:01,000 --> 00:00:02,000\nb\n");
+      expect(() => planTranscriptCuts(dup, { remove: [5] })).toThrow(/numbers 2 cues 5/);
+      expect(cueByNumber(normalizeCues(parseSrt(ZERO_BASED)), 1).text).toBe("Intro.");
+      expect(parseSrt(ZERO_BASED)[0]).not.toHaveProperty("index");
+    });
   });
 
   it("maps source times onto the cut timeline", () => {

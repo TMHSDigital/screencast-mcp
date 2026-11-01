@@ -54,7 +54,10 @@
         <li><code>--target</code>: <code>full</code> (default), <code>monitor:0</code>, <code>window:exe=MyApp.exe</code>, or <code>region:x,y,w,h</code>.</li>
         <li><code>--artifacts failure|always|never</code>: when to make <code>evidence.gif</code> and <code>contact-sheet.png</code> (default <code>failure</code>).</li>
         <li><code>--last 30</code>: the GIF covers the last 30 s, where the failure usually is; <code>0</code> keeps it all.</li>
-        <li><code>--out</code>, <code>--fps</code>, <code>--no-gif</code>, <code>--no-contact-sheet</code>, <code>--discard-on-success</code>, <code>--max-duration</code>.</li>
+        <li><code>--out</code>, <code>--fps</code>, <code>--no-gif</code>, <code>--no-contact-sheet</code>, <code>--discard-on-success</code>.</li>
+        <li><code>--max-duration</code>: whole seconds, 0 to 604800 (0 = no cap; default 3600).</li>
+        <li><code>--command-env NAME</code>: run the command line stored in an environment variable, so quotes and <code>&amp;</code> reach the shell unchanged.</li>
+        <li><code>--ocr-errors</code>: on failure, OCR the end of the run and add the error lines it finds (secrets masked) to <code>evidence.json</code>.</li>
       </ul>
       <p>Everything lands in <code>screencast-evidence/</code> with an <code>evidence.json</code> summary. Any single tool works the same way: <code>npx -y @tmhs/screencast-mcp call doctor</code>, or <code>call pipeline @recipe.json</code>.</p>
     </section>
@@ -71,12 +74,14 @@
         with:
           node-version: 22
       - run: npm ci
-      - uses: TMHSDigital/screencast-mcp@main # pin a release tag or SHA
+      - uses: TMHSDigital/screencast-mcp@v0 # newest 0.x release; pin vX.Y.Z or a SHA to freeze it
         with:
           command: npm run test:e2e
           target: full          # or window:exe=MyApp.exe
           artifacts: failure    # GIF and contact sheet only when it fails</code></pre>
-      <p>Outputs: <code>exit-code</code>, <code>gif</code>, <code>contact-sheet</code>, <code>recording</code>, and <code>evidence-dir</code>, for a later step that comments on the PR. All inputs are in <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/action.yml"><code>action.yml</code></a>.</p>
+      <p>Outputs: <code>exit-code</code>, <code>end-reason</code>, <code>gif</code>, <code>contact-sheet</code>, <code>recording</code>, <code>evidence-dir</code>, <code>artifact-name</code>, and <code>artifact-url</code>. All inputs are in <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/action.yml"><code>action.yml</code></a>.</p>
+      <p><code>@v0</code> is a floating tag that each release moves to the newest 0.x version, so a broken <code>main</code> never reaches your CI; use a full version tag such as <code>@v0.47.0</code> or a commit SHA to pin exactly. Pinning the action pins the CLI too: by default it runs the npm version the action was released with. Each job and matrix leg uploads its own artifact (<code>screencast-evidence-&lt;job&gt;[-&lt;index&gt;]</code>), so matrices do not collide. The Action is being published to GitHub Marketplace.</p>
+      <p><code>comment: true</code> keeps one PR comment per job, created when the command fails and updated on later runs, with the exit code, how the recording ended, OCR&apos;d errors, and a link to the evidence artifact. It needs <code>permissions: pull-requests: write</code>; fork PRs get a read-only token, so the step only warns. GitHub cannot show images stored in artifacts, so the GIF stays in the artifact.</p>
     </section>
 
     <section class="chapter">
@@ -85,6 +90,7 @@
         <li>Hosted Windows runners have an interactive desktop, so <code>gdigrab</code> records what your app draws. This repo records its own capture smoke test with the action on every change to it.</li>
         <li>A recording holds whatever is on screen. Keep secrets off the runner's desktop, and remember artifacts are visible to anyone who can read the run.</li>
         <li>For a longer suite, keep the default <code>discard-on-success</code> so green runs upload only <code>evidence.json</code>.</li>
+        <li><code>evidence.json</code> records <code>endReason</code>. If the recording hit <code>max-duration</code> or crashed before the command finished, the run warns, because the GIF then shows the end of the recording rather than the end of the run.</li>
       </ul>
       <nav class="pager" aria-label="More">
         <span><a href="workflows/">&larr; Workflows</a></span>

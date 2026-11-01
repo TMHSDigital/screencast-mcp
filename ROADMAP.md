@@ -44,45 +44,62 @@ FFmpeg 8 (#78, #192), CodeQL, releases gated on green CI (#190), and several
 correctness rounds (A/V sync, job timeouts and cancellation, privacy and
 retention, see CHANGELOG).
 
+**Typed metadata, setup, and docs** (0.43.0). `registerTool` with titles,
+annotations, and output schemas (#212); FFmpeg 8 up front, `doctor`, and a
+slimmer tarball (#195); `list_targets` (#213); docs, positioning, and release
+process (#193, #194, #196, #216, #217, #219, #224).
+
+**Smaller tool surface and safety** (0.44.0 to 0.44.2). Server instructions,
+opt-in toolsets, and merged tools (#214); output paths confined to MCP roots or
+`SCREENCAST_ALLOWED_DIRS` (#221); opt-in capture consent through elicitation
+(#222); typed tests and stricter TypeScript (#220); an agent eval harness
+(#223).
+
+**Agent workflows** (0.45.0). `bug_report` (#198), instant replay with
+`save_replay` (#197), `keystroke_overlay` (#169), `backdrop` (#171), and
+markers and chapters (#174).
+
+**Pipeline polish and search** (0.46.0). Pipeline ops for `cut_idle`, audio,
+subtitles, and click zoom, plus named recipes (#244); `index_recording` /
+`search_recording` (#245); `step_guide` (#172); transcript-based editing
+(#173).
+
+**GPU capture and reach** (0.47.0). `ddagrab` and hardware encoders (#199);
+`pause_recording` / `resume_recording` and webcam picture-in-picture (#200);
+a re-rendered cursor with spotlight (#170); `narrate` voiceover (#175); a
+Claude Code plugin (#177); a headless CLI and GitHub Action (#179); generated
+tool reference pages and `llms.txt` (#202).
+
+**Hardening and onboarding** (0.48.0). Network paths refused and input paths
+confined; recipe overrides in source space (#251); pause/resume/stop serialized
+(#252); encoder size limits and x264 retry (#253); `narrate` and OCR past the
+command-line limit (#254); index and search fixes (#255, #266); `.srt` sidecars
+(#256); CLI and Action robustness (#257); bounded replay event log (#258);
+transcript cue numbers and `step_guide` size (#259); FFmpeg 8 on every CI leg
+and timestamp-based smoke tests (#260); every tool tested through MCP, with
+coverage (#261); `screencast-mcp setup` (#267); the Action's sticky PR comment
+(#268).
+
 ## Now
 
-- Typed tool metadata: `registerTool` with titles, annotations, and output schemas (#212)
-- Setup friction: FFmpeg 8 up front, a `doctor` / capabilities tool, a slimmer tarball (#195), and `list_targets` (#213)
-- Docs, positioning, and release process: #193, #194, #196, #216, #217, #219, #224
+- Capture consent by default when the client supports elicitation (#266)
+- Publish the Action to GitHub Marketplace (#264)
 - Protect `main` with a ruleset that requires CI (#218)
 
 ## Next
 
-Agent workflows
+- Windows on ARM64: verify capture, OCR, and WGC, and keep a `windows-11-arm` CI leg (#246)
+- Visual baseline assertions ("golden flows") for desktop-app regression tests in CI (#269)
+- Scheduled agent evals and a tool-selection scoreboard (#270)
+- Directory listings and install badges (#178)
+- Sharing via S3-compatible storage and YouTube upload (#176)
+- A commercial-use path for the NC license (#201)
+- Launch and community: Discussions, a gallery, a launch video (#271)
 
-- `bug_report`: one call from recording to redacted repro package (#198)
-- Instant replay: a rolling buffer and `save_replay` (#197)
-- `index_recording` / `search_recording`: a searchable text timeline (#245)
-- `step_guide`: a recording into a step-by-step how-to (#172)
-- A smaller tool surface: server instructions, opt-in toolsets, merged tools (#214)
+Bigger bets, not yet scheduled:
 
-Editing and polish
-
-- Pipeline ops for `cut_idle`, audio, subtitles, click zoom, plus named recipes (#244)
-- `keystroke_overlay` (#169), a re-rendered cursor with spotlight (#170), `backdrop` (#171)
-- Transcript-based editing (#173), markers and chapters (#174), `narrate` voiceover (#175)
-
-Capture
-
-- GPU capture: `ddagrab` and hardware encoders (#199)
-- `pause_recording` / `resume_recording` and webcam picture-in-picture (#200)
-- Windows on ARM64 (#246)
-
-Safety and quality
-
-- Confine output paths to MCP roots or `SCREENCAST_ALLOWED_DIRS` (#221)
-- Opt-in capture consent through elicitation (#222)
-- Typed tests and stricter TypeScript (#220); an agent eval harness (#223)
-
-Reach
-
-- Directory listings and install badges (#178), a Claude Code plugin (#177), a headless CLI and GitHub Action (#179), sharing via S3-compatible storage (#176)
-- Generated tool reference pages and `llms.txt` (#202); a commercial-use path (#201)
+- A flight recorder for computer-use agents (#272)
+- Remote Windows capture over Streamable HTTP (#273)
 
 ## Not planned
 
@@ -115,8 +132,9 @@ Adding a tool, an optional parameter, or a result field stays a minor release.
 **Criteria for 1.0**
 
 - Tool metadata settled (#212) and the tool surface consolidated (#214), since
-  both rename or merge tools.
-- Tool-layer tests cover every tool through an MCP client (#192 started this).
+  both rename or merge tools. Met in 0.43.0 and 0.44.0.
+- Tool-layer tests cover every tool through an MCP client. Met in 0.48.0 (#261):
+  a guard test fails when a registered tool has no case.
 - No open `bug` issues at high priority.
 - Release hygiene: curated, dated release notes and no docs-only releases
-  (#219).
+  (#219). Met in 0.43.0.

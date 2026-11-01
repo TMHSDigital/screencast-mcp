@@ -187,6 +187,48 @@ export function buildStepFrameArgs(input: string, t: number, output: string): st
   return ["-y", "-v", "error", "-ss", String(t), "-i", input, "-frames:v", "1", output];
 }
 
+/** The most guide.html may weigh (#259): its screenshots are inlined, so
+ * they are re-encoded as JPEG, down the ladder below, until the page fits. */
+export const HTML_MAX_BYTES = 10_000_000;
+
+/** JPEG renditions for guide.html, best first: the widest the image may be,
+ * and ffmpeg's -q:v (2 best .. 31 worst). */
+export const HTML_IMAGE_LADDER: ReadonlyArray<{ width: number; q: number }> = [
+  { width: 1280, q: 4 },
+  { width: 960, q: 6 },
+  { width: 800, q: 8 },
+  { width: 640, q: 10 },
+  { width: 480, q: 14 },
+  { width: 360, q: 20 },
+];
+
+/** The file guide.html embeds for a screenshot. */
+export const htmlImageName = (file: string): string => file.replace(/\.png$/i, ".jpg");
+
+/** ffmpeg args that re-encode a rendered screenshot as a JPEG for guide.html. */
+export function buildHtmlImageArgs(png: string, rung: { width: number; q: number }, output: string): string[] {
+  return [
+    "-y", "-v", "error", "-i", png,
+    "-vf", `scale=w='min(iw,${rung.width})':h=-2:flags=lanczos,format=yuvj420p`,
+    "-frames:v", "1", "-q:v", String(rung.q), output,
+  ];
+}
+
+/** Bytes a file of `n` bytes takes as base64. */
+export const base64Bytes = (n: number): number => 4 * Math.ceil(n / 3);
+
+/** The ladder rung to try after rung `at` made the page `bytes` long, over
+ * `budget`: the first one whose smaller area alone (bytes scale about with
+ * pixels) would bring it within budget, so a big guide skips straight down
+ * instead of re-encoding every image at each rung. null when none is left. Pure. */
+export function nextHtmlRung(at: number, bytes: number, budget: number = HTML_MAX_BYTES): number | null {
+  const w = HTML_IMAGE_LADDER[at]!.width;
+  for (let k = at + 1; k < HTML_IMAGE_LADDER.length; k++) {
+    if (bytes * (HTML_IMAGE_LADDER[k]!.width / w) ** 2 <= budget) return k;
+  }
+  return at + 1 < HTML_IMAGE_LADDER.length ? HTML_IMAGE_LADDER.length - 1 : null;
+}
+
 /** ffmpeg args that render a grabbed frame through shotFilter. */
 export function buildStepShotArgs(frame: string, filter: string, output: string): string[] {
   return ["-y", "-v", "error", "-i", frame, "-filter_complex", filter, "-map", "[out]", "-frames:v", "1", output];

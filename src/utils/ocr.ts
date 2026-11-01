@@ -29,16 +29,25 @@ export interface OcrLine extends Rect {
   words: OcrWord[];
 }
 
+/** The OCR shim and its path list. The list travels as JSON in a temp file,
+ * not on the command line (capped at 32,767 characters by Windows), so a
+ * whole-clip scan of hundreds of frames fits (#254). Pure. */
+export function ocrCall(paths: string[]): { script: string; payload: string } {
+  return { script: PS_OCR, payload: JSON.stringify(paths) };
+}
+
 /** Recognise every image in `paths` (already upscaled by `scales[i]`) in one
- * PowerShell run. Paths travel base64-encoded, so no quoting is involved. */
+ * PowerShell run. Paths travel as JSON in a temp file, so no quoting is involved. */
 export async function recognize(paths: string[], scales: number[]): Promise<OcrLine[][]> {
   if (process.platform !== "win32") {
     throw new ScreencastError("find_text uses the Windows OCR engine and runs on Windows only.");
   }
-  const list = Buffer.from(JSON.stringify(paths), "utf8").toString("base64");
+  const { script, payload } = ocrCall(paths);
   // The limit grows with the image count, so a whole-clip scan gets the time it needs.
-  const stdout = await runPowerShell(PS_OCR.replace("__PATHS__", list), "text (OCR)", {
+  const stdout = await runPowerShell(script, "text (OCR)", {
     timeoutMs: psTimeoutMs(OCR_TIMEOUT_MS + Math.max(0, paths.length - 2) * OCR_PER_IMAGE_MS),
+    payload,
+    failure: "Could not run OCR",
   });
   let raw: unknown;
   try {
@@ -281,7 +290,7 @@ $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsR
 $null = [Windows.Graphics.Imaging.BitmapDecoder, Windows.Foundation, ContentType = WindowsRuntime]
 $asTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' })[0]
 function Await($op, [Type]$t) { $task = $asTask.MakeGenericMethod($t).Invoke($null, @($op)); if (-not $task.Wait(${OCR_STEP_TIMEOUT_MS})) { throw "The OCR engine did not answer within ${OCR_STEP_TIMEOUT_MS / 1000} s." }; $task.Result }
-$paths = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PATHS__')) | ConvertFrom-Json
+$paths = $Payload | ConvertFrom-Json
 $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
 $out = foreach ($p in $paths) {
   try {

@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -16,6 +16,7 @@ import { binaryWorks, probeMedia } from "../../utils/ffmpeg.js";
 import { bundledFontPath } from "../../utils/fonts.js";
 import { ocrStatus } from "../../utils/capabilities.js";
 import { formatEventsJsonl, type InputEvent } from "../../utils/events.js";
+import { HTML_MAX_BYTES } from "../../utils/stepGuide.js";
 
 const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
 const AVAILABLE = binaryWorks(FFMPEG) && binaryWorks(process.env.FFPROBE_PATH || "ffprobe");
@@ -89,8 +90,8 @@ describe.skipIf(!AVAILABLE)("step_guide against real ffmpeg (#172)", { timeout: 
     if (home) rmSync(home, { recursive: true, force: true });
   });
 
-  async function call(name: string, args: Record<string, unknown>) {
-    const res = await client.callTool({ name, arguments: args });
+  async function call(name: string, args: Record<string, unknown>, timeout?: number) {
+    const res = await client.callTool({ name, arguments: args }, undefined, timeout ? { timeout } : undefined);
     const text = (res.content as Array<{ type: string; text?: string }>).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
     return { isError: res.isError === true, text, data: res.structuredContent as Record<string, unknown> | undefined };
   }
@@ -127,7 +128,7 @@ describe.skipIf(!AVAILABLE)("step_guide against real ffmpeg (#172)", { timeout: 
     expect(md).not.toContain(dir); // no local paths in the shareable guide
 
     const html = readFileSync(join(out, "guide.html"), "utf8");
-    expect(html.match(/src="data:image\/png;base64,/g)).toHaveLength(4);
+    expect(html.match(/src="data:image\/jpeg;base64,/g)).toHaveLength(4);
     expect(html).not.toContain("images/step-");
 
     // The same folder again is refused, then replaced with overwrite.
@@ -137,6 +138,12 @@ describe.skipIf(!AVAILABLE)("step_guide against real ffmpeg (#172)", { timeout: 
     const replaced = await call("step_guide", { input: video, ocr: false, format: "md", outputDir: out, overwrite: true, title: "Again" });
     expect(replaced.isError, replaced.text).toBe(false);
     expect(readFileSync(join(out, "guide.md"), "utf8")).toContain("# Again");
+    // The earlier guide's HTML went with it, so the folder holds one guide (#259).
+    expect(existsSync(join(out, "guide.html"))).toBe(false);
+    // And back to HTML only: the Markdown and its images go.
+    const html2 = await call("step_guide", { input: video, ocr: false, format: "html", outputDir: out, overwrite: true });
+    expect(html2.isError, html2.text).toBe(false);
+    expect(readdirSync(out)).toEqual(["guide.html"]);
   });
 
   it("writes only the HTML page, with no images folder, for format html", async () => {
@@ -145,6 +152,28 @@ describe.skipIf(!AVAILABLE)("step_guide against real ffmpeg (#172)", { timeout: 
     expect(res.isError, res.text).toBe(false);
     expect(readdirSync(out)).toEqual(["guide.html"]);
   });
+
+  // About 300 ffmpeg runs (90 s locally): skipped on CI unless RUN_SLOW_TESTS=1;
+  // the size ladder itself is unit-tested in stepGuide.test.ts.
+  it.runIf(!process.env.CI || process.env.RUN_SLOW_TESTS === "1")(`keeps a 100-step guide.html of busy 720p screenshots under ${HTML_MAX_BYTES / 1e6} MB (#259)`, async () => {
+    // Noisy frames are close to the worst case for image size; all-intra so each grab is quick.
+    const busy = join(dir, "busy.mp4");
+    const res0 = spawnSync(
+      FFMPEG,
+      ["-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=s=1280x720:r=10:d=10,noise=alls=30:allf=t+u", "-c:v", "libx264", "-preset", "ultrafast", "-g", "1", "-pix_fmt", "yuv420p", busy],
+      { encoding: "utf8" },
+    );
+    expect(res0.status, res0.stderr).toBe(0);
+    const clicks: InputEvent[] = Array.from({ length: 100 }, (_, k) => ({ t: 0.2 + k * 0.095, type: "down", x: 100 + 10 * k, y: 400, inFrame: true, button: "left" }));
+    writeFileSync(join(dir, "busy.events.jsonl"), formatEventsJsonl(clicks));
+    const out = join(home, "busy-guide");
+    const res = await call("step_guide", { input: busy, ocr: false, format: "html", outputDir: out }, 580_000);
+    expect(res.isError, res.text).toBe(false);
+    const html = readFileSync(join(out, "guide.html"), "utf8");
+    expect(html.match(/src="data:image\/jpeg;base64,/g)).toHaveLength(100);
+    expect(statSync(join(out, "guide.html")).size).toBeLessThanOrEqual(HTML_MAX_BYTES);
+    expect(res.data?.warnings).toBeUndefined();
+  }, 600_000); // about 300 ffmpeg runs: slow hosted runners need the room
 
   it("refuses a recording without an event log", async () => {
     const res = await call("step_guide", { input: bare, ocr: false });
