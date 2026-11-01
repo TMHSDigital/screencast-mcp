@@ -25,6 +25,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `redact_region` and `pipeline` `style: "blur"` failed on FFmpeg 8.1.3 and newer for small or thin regions (a 4x4 box, a 16 px text line): boxblur now requires a radius strictly under half the region's side, and the radius is chosen that way.
+
 - `pipeline` recipes: `redact`, `crop`, and `cursor` overrides now run first (after any trim), in source pixels and time. Before, a redact added to `social_reel` landed after the cut and the 9:16 reframe and missed the secret, and on the other recipes a redact or cursor override failed to plan (#251).
 - Overlapping `pause_recording`, `resume_recording`, and `stop_recording` calls on one session now run one at a time: a second resume no longer starts an untracked ffmpeg, a stop during a pause no longer force-kills the segment it is finalizing, and a segment ffprobe cannot read is kept with an estimated length instead of dropped (#252).
 - `encoder: "auto"` skips hardware encoders the frame is too large for (NVENC 4096 px, QSV/AMF 4096x2304), and a hardware encoder that fails at start is retried once with x264, with an `encoderNote` (#253).

@@ -800,12 +800,14 @@ export const MIN_PIXEL_BLOCK = 16;
 
 /** boxblur settings for a region: a radius of at least MIN_BLUR_RADIUS (a
  * thin text line used to get 4, which stayed readable), applied BLUR_PASSES
- * times. A radius must stay within half the plane's smaller side, and the
- * yuv420p chroma plane is half the size, so it gets its own radius (#188). */
+ * times. A radius must be under half the plane's smaller side (FFmpeg 8.1.3
+ * made that strict: a 4 px side allows 1, not 2), and the yuv420p chroma
+ * plane is half the size, so it gets its own radius (#188). */
 export function blurRadius(r: { w: number; h: number }): string {
   const m = Math.min(r.w, r.h);
-  const lr = Math.min(Math.floor(m / 2), Math.max(MIN_BLUR_RADIUS, Math.min(20, Math.floor(m / 4))));
-  const cr = Math.min(lr, Math.floor(Math.ceil(m / 2) / 2));
+  const maxRadius = (side: number) => Math.max(0, Math.floor((side - 1) / 2));
+  const lr = Math.min(maxRadius(m), Math.max(MIN_BLUR_RADIUS, Math.min(20, Math.floor(m / 4))));
+  const cr = Math.min(lr, maxRadius(Math.ceil(m / 2)));
   return `lr=${lr}:lp=${BLUR_PASSES}:cr=${cr}:cp=${BLUR_PASSES}`;
 }
 

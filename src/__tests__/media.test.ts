@@ -364,12 +364,13 @@ describe("scene sampling (#114)", () => {
 
 describe("blurRadius (#188)", () => {
   it("keeps both planes' radii legal on tiny regions", () => {
-    expect(blurRadius({ w: 4, h: 4 })).toBe("lr=2:lp=3:cr=1:cp=3");
-    expect(blurRadius({ w: 2, h: 6 })).toBe("lr=1:lp=3:cr=0:cp=3");
+    expect(blurRadius({ w: 4, h: 4 })).toBe("lr=1:lp=3:cr=0:cp=3"); // FFmpeg 8.1.3: radius < side/2
+    expect(blurRadius({ w: 5, h: 5 })).toBe("lr=2:lp=3:cr=1:cp=3");
+    expect(blurRadius({ w: 2, h: 6 })).toBe("lr=0:lp=3:cr=0:cp=3");
   });
   it("never goes below the minimum radius where the region allows it (#204)", () => {
     expect(blurRadius({ w: 300, h: 18 })).toBe("lr=8:lp=3:cr=4:cp=3"); // was lr=4, often readable
-    expect(blurRadius({ w: 40, h: 40 })).toBe("lr=10:lp=3:cr=10:cp=3");
+    expect(blurRadius({ w: 40, h: 40 })).toBe("lr=10:lp=3:cr=9:cp=3");
     expect(blurRadius({ w: 400, h: 300 })).toBe("lr=20:lp=3:cr=20:cp=3");
   });
 });
