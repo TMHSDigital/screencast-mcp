@@ -163,12 +163,6 @@ async function enumerateDshow(): Promise<void> {
   cachedVideo = parseDshowVideoDevices(res.stderr);
 }
 
-/** Drop the cached device list (test seam; also lets a caller force a re-probe). */
-export function clearAudioDeviceCache(): void {
-  cachedDevices = null;
-  cachedVideo = null;
-}
-
 /** Resolve the loopback device to use, throwing a clear, actionable error when
  * an explicit name is not present or no loopback device exists. */
 export async function resolveLoopbackDevice(explicit?: string): Promise<string> {
