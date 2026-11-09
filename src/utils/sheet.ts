@@ -23,10 +23,10 @@ export function evenTimes(durationSec: number, count: number): number[] {
 
 /** `m:ss.s`, or `h:mm:ss` from an hour up. */
 export function formatTimecode(sec: number): string {
-  const s = Math.max(0, sec);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const rest = s % 60;
+  const tenths = Math.round(Math.max(0, sec) * 10);
+  const h = Math.floor(tenths / 36000);
+  const m = Math.floor((tenths % 36000) / 600);
+  const rest = (tenths % 600) / 10;
   if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(Math.floor(rest)).padStart(2, "0")}`;
   return `${m}:${rest.toFixed(1).padStart(4, "0")}`;
 }
