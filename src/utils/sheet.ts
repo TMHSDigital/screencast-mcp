@@ -28,7 +28,15 @@ export function formatTimecode(sec: number): string {
   const m = Math.floor((s % 3600) / 60);
   const rest = s % 60;
   if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(Math.floor(rest)).padStart(2, "0")}`;
-  return `${m}:${rest.toFixed(1).padStart(4, "0")}`;
+
+  // Round seconds to 1 decimal place and handle carry
+  const roundedRest = Math.round(rest * 10) / 10;
+  if (roundedRest >= 60) {
+    const newM = m + 1;
+    if (newM >= 60) return `1:00:00`;
+    return `${newM}:00.0`;
+  }
+  return `${m}:${roundedRest.toFixed(1).padStart(4, "0")}`;
 }
 
 /** Grid for `count` tiles: `columns` if given, else one row for up to four

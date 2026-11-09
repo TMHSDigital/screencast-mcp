@@ -22,6 +22,13 @@ describe("contact sheet helpers (#115)", () => {
     expect(formatTimecode(3725)).toBe("1:02:05");
   });
 
+  it("carries seconds into minutes when rounding reaches 60 (#288)", () => {
+    expect(formatTimecode(59.96)).toBe("1:00.0");
+    expect(formatTimecode(119.96)).toBe("2:00.0");
+    expect(formatTimecode(3539.96)).toBe("59:00.0");
+    expect(formatTimecode(3599.96)).toBe("1:00:00");
+  });
+
   it("lays out one row for up to four tiles, then roughly square", () => {
     expect(sheetGrid(3)).toEqual({ columns: 3, rows: 1 });
     expect(sheetGrid(12)).toEqual({ columns: 4, rows: 3 });
