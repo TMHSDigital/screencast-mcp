@@ -6,6 +6,7 @@ import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildXfadeArgs, clipLength, DEFAULT_TRANSITION_DUR } from "../utils/produce.js";
+import { assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
@@ -42,6 +43,7 @@ export function register(server: McpServer): void {
         for (const f of [args.inputA, args.inputB]) {
           if (!existsSync(f)) throw new ScreencastError(`Input file not found: ${f}`);
         }
+        assertEditContainer(args.output);
         const [a, b] = await Promise.all([probeMedia(args.inputA), probeMedia(args.inputB)]);
         const durA = clipLength(a);
         const durB = clipLength(b);

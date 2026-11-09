@@ -9,6 +9,7 @@ import { buildTitleCardArgs, DEFAULT_TITLE_DURATION } from "../utils/produce.js"
 import { resolveTextFont } from "../utils/fonts.js";
 import { fontFileSchema } from "./callout.js";
 import { resolveOutput, subdir, stamp, rand, tempPath } from "../utils/paths.js";
+import { assertEditContainer } from "../utils/media.js";
 
 const inputSchema = {
   text: z.string().min(1).describe("Title text. Multiple lines are allowed (use \\n)."),
@@ -40,6 +41,7 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
+        assertEditContainer(args.output);
         const output = resolveOutput(args.output, subdir("edits"), `title-${stamp()}-${rand()}.mp4`, args.overwrite);
         const font = resolveTextFont(args.text, { weight: args.bold === false ? "regular" : "bold", fontFile: args.fontFile });
         // Write the text to a temp file so arbitrary content (quotes, colons,
