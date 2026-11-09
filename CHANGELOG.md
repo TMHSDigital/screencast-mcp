@@ -7,9 +7,12 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.48.1] - 2026-11-09
+
 ### Fixed
 
 - `formatTimecode` now rounds seconds to tenths before splitting into minutes and hours, avoiding `m:60.0` at minute boundaries (#288).
+- `xfade_transition`, `assemble_highlights`, `title_card`, `export_preset` and `pipeline` now refuse a `.webm` or `.gif` output with a clear message, like the other H.264/AAC edit tools, instead of failing inside ffmpeg (#287).
 
 ## [0.48.0]
 
