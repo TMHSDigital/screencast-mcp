@@ -240,11 +240,6 @@ export function isRecorderProcess(pid: number | null, image: string): boolean {
   return tasklistHasImage(res.stdout, image);
 }
 
-/** isRecorderProcess for an ffmpeg.exe. */
-export function isFfmpegProcess(pid: number | null): boolean {
-  return isRecorderProcess(pid, "ffmpeg.exe");
-}
-
 /** Classify a recorder exit nobody asked for. Non-zero is a crash; the wgc
  * window-closed code is its own reason; a clean exit is the maxDurationSec cap
  * only once the cap could actually have been reached (#240). Pure. */
