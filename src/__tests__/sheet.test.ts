@@ -19,6 +19,9 @@ describe("contact sheet helpers (#115)", () => {
   it("formats timecodes as m:ss.s, and h:mm:ss from an hour", () => {
     expect(formatTimecode(0)).toBe("0:00.0");
     expect(formatTimecode(75.25)).toBe("1:15.3");
+    expect(formatTimecode(59.96)).toBe("1:00.0");
+    expect(formatTimecode(119.97)).toBe("2:00.0");
+    expect(formatTimecode(3599.97)).toBe("1:00:00");
     expect(formatTimecode(3725)).toBe("1:02:05");
   });
 

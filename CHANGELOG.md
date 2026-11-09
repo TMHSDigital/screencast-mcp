@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Fixed
+
+- `formatTimecode` now rounds seconds to tenths before splitting into minutes and hours, avoiding `m:60.0` at minute boundaries (#288).
+
 ## [0.48.0]
 
 ### Security
