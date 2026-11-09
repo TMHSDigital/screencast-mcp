@@ -13,6 +13,7 @@ import {
   type ReframeFit,
 } from "../utils/produce.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { assertEditContainer } from "../utils/media.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
@@ -47,6 +48,7 @@ export function register(server: McpServer): void {
         if (!existsSync(args.input)) {
           throw new ScreencastError(`Input file not found: ${args.input}`);
         }
+        assertEditContainer(args.output);
         const platform = args.platform as Platform;
         const output = resolveOutput(args.output, subdir("edits"), `${platform}-${stamp()}-${rand()}.mp4`, args.overwrite);
         const ffArgs = buildExportPresetArgs(

@@ -12,6 +12,7 @@ import { calloutFonts, prepareCalloutAssets } from "../utils/calloutAssets.js";
 import { exportAnimation } from "../utils/animExport.js";
 import type { CalloutAssets } from "../utils/callout.js";
 import { calloutItemSchema, fontFileSchema } from "./callout.js";
+import { assertEditContainer } from "../utils/media.js";
 import { readClicks, zoomKeyframeSchema } from "./zoom.js";
 import { redactRegionSchema } from "./redactRegion.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
@@ -177,6 +178,7 @@ export function register(server: McpServer): void {
         const timeout = jobTimeoutMs(info.durationSec);
         const last = steps.at(-1);
         if (!last) throw new ScreencastError("Provide at least one step.");
+        if (last.op !== "export_gif") assertEditContainer(args.output);
         const ext = last.op === "export_gif" ? `.${last.format ?? "gif"}` : ".mp4";
         const output = resolveOutput(args.output, subdir("edits"), `pipeline-${stamp()}-${rand()}${ext}`, args.overwrite);
         // A transcript made for captions goes next to an mp4 result; like the
