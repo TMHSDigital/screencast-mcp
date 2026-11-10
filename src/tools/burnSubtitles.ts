@@ -2,14 +2,14 @@ import { z } from "zod";
 import { dirname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia, hasFilter } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildBurnSubtitlesArgs, CAPTION_STYLE_NAMES } from "../utils/captions.js";
 import { bundledFontPath } from "../utils/fonts.js";
-import { editOutputExt, assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
@@ -45,9 +45,8 @@ export function register(server: McpServer): void {
         if (!hasFilter("subtitles")) {
           throw new ScreencastError("This ffmpeg has no subtitles filter (it needs libass).", "Install a full ffmpeg build, e.g. `winget install Gyan.FFmpeg`.");
         }
-        assertEditContainer(args.output);
         const ext = editOutputExt(args.input);
-        const output = resolveOutput(args.output, subdir("edits"), `subtitled-${stamp()}-${rand()}${ext}`, args.overwrite);
+        const output = editOutput(args.output, "subtitled", ext, { overwrite: args.overwrite });
         const fontsDir = dirname(bundledFontPath("regular"));
         const style = args.style ?? (/\.(ass|ssa)$/i.test(args.subtitles) ? null : "clean");
         await runEditJob(buildBurnSubtitlesArgs(args.input, args.subtitles, output, fontsDir, style), {

@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { requireInput } from "../utils/editTool.js";
+import { errorResponse, okResponse } from "../utils/errors.js";
 import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { probeMedia } from "../utils/ffmpeg.js";
 
@@ -31,9 +31,7 @@ export function register(server: McpServer): void {
     },
     async (args) => {
       try {
-        if (!existsSync(args.input)) {
-          throw new ScreencastError(`Input file not found: ${args.input}`);
-        }
+        requireInput(args.input);
         return okResponse({ input: args.input, ...(await probeMedia(args.input)) });
       } catch (error) {
         return errorResponse(error);

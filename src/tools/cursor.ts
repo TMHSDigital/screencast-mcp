@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { join } from "node:path";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
@@ -16,8 +17,7 @@ import {
   cursorOptionsSchema,
   loadCursor,
 } from "../utils/cursor.js";
-import { editOutputExt, assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { editOutputExt } from "../utils/media.js";
 
 const o = cursorOptionsSchema;
 
@@ -49,7 +49,7 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) throw new ScreencastError(`Input file not found: ${args.input}`);
+        requireInput(args.input);
         const info = await probeMedia(args.input);
         if (!info.width || !info.height) throw new ScreencastError(`Could not read the size of ${args.input}.`);
         const plan = transformCursor(loadCursor(args.input, args.events, args, info.durationSec));
@@ -59,8 +59,7 @@ export function register(server: McpServer): void {
           shownSec: Math.round(plan.visible.reduce((s, [a, b]) => s + (Math.min(b, info.durationSec ?? b) - a), 0) * 10) / 10,
         };
         if (args.dryRun) return okResponse({ dryRun: true, ...summary, visible: plan.visible });
-        assertEditContainer(args.output);
-        const output = resolveOutput(args.output, subdir("edits"), `cursor-${stamp()}-${rand()}${editOutputExt(args.input)}`, args.overwrite);
+        const output = editOutput(args.output, "cursor", editOutputExt(args.input), { overwrite: args.overwrite });
         const work = mkdtempSync(join(tmpdir(), "screencast-cursor-"));
         try {
           const cmdFile = join(work, "cursor.cmd");

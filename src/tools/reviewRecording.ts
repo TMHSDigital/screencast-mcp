@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia, runFfmpegBuffer } from "../utils/ffmpeg.js";
@@ -93,7 +94,7 @@ export function register(server: McpServer): void {
       try {
         requireFfmpeg();
         const input = resolveInput(args);
-        if (!existsSync(input)) throw new ScreencastError(`Input file not found: ${input}`);
+        requireInput(input);
         const info = await probeMedia(input);
         return okResponse({
           input,
@@ -135,7 +136,7 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) throw new ScreencastError(`Input file not found: ${args.input}`);
+        requireInput(args.input);
         const info = await probeMedia(args.input);
         const durationSec = info.durationSec ?? 0;
         const plan = playerFramePlan(durationSec, args.maxFrames ?? DEFAULT_PLAYER_FRAMES);

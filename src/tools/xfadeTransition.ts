@@ -1,13 +1,11 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildXfadeArgs, clipLength, DEFAULT_TRANSITION_DUR } from "../utils/produce.js";
-import { assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
   inputA: z.string().min(1).describe("Outgoing video."),
@@ -41,9 +39,8 @@ export function register(server: McpServer): void {
       try {
         requireFfmpeg();
         for (const f of [args.inputA, args.inputB]) {
-          if (!existsSync(f)) throw new ScreencastError(`Input file not found: ${f}`);
+          requireInput(f);
         }
-        assertEditContainer(args.output);
         const [a, b] = await Promise.all([probeMedia(args.inputA), probeMedia(args.inputB)]);
         const durA = clipLength(a);
         const durB = clipLength(b);
@@ -52,12 +49,7 @@ export function register(server: McpServer): void {
         }
         const clipHasAudio: [boolean, boolean] = [a.audioCodec !== null, b.audioCodec !== null];
         const hasAudio = clipHasAudio[0] || clipHasAudio[1];
-        const output = resolveOutput(
-          args.output,
-          subdir("edits"),
-          `xfade-${stamp()}-${rand()}.mp4`,
-          args.overwrite,
-        );
+        const output = editOutput(args.output, "xfade", ".mp4", { overwrite: args.overwrite });
         const ffArgs = buildXfadeArgs(
           args.inputA,
           args.inputB,

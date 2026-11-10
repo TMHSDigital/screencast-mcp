@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpegFrames, probeMedia } from "../utils/ffmpeg.js";
@@ -26,8 +26,7 @@ import { validateColor } from "../utils/validate.js";
 /** Most clicks one render will ring; more would make a very long filter graph. */
 export const MAX_RINGS = 200;
 
-import { editOutputExt, assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
@@ -91,7 +90,7 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) throw new ScreencastError(`Input file not found: ${args.input}`);
+        requireInput(args.input);
         const info = await probeMedia(args.input);
         const { width: W, height: H, durationSec } = info;
         if (!W || !H) throw new ScreencastError(`Could not read the size of ${args.input}.`);
@@ -148,9 +147,8 @@ export function register(server: McpServer): void {
         }
 
         const views = keyframesToViews(keyframes, W, H);
-        assertEditContainer(args.output);
         const ext = editOutputExt(args.input);
-        const output = resolveOutput(args.output, subdir("edits"), `zoom-${stamp()}-${rand()}${ext}`, args.overwrite);
+        const output = editOutput(args.output, "zoom", ext, { overwrite: args.overwrite });
         const rings = args.highlightClicks ? { clicks: clicks ?? [], color: ringColor } : undefined;
         await runEditJob(buildZoomArgs(args.input, output, views, { width: W, height: H, fps }, transition, "standard", rings), {
           output,

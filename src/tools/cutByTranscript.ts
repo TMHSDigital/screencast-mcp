@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
@@ -8,8 +9,7 @@ import { runEditJob } from "../utils/jobs.js";
 import { parseSrt, normalizeCues, formatSrt } from "../utils/captions.js";
 import { buildCutIdleArgs, MAX_CUTS } from "../utils/idle.js";
 import { planTranscriptCuts, retimeCues } from "../utils/transcriptCut.js";
-import { editOutputExt, assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
@@ -66,9 +66,8 @@ export function register(server: McpServer): void {
           const text = retimed.map((c) => c.text.replace(/\n/g, " ")).join(" ");
           return okResponse({ ...summary, ...(cuts.length ? { dryRun: true } : {}), text: text.length > 4000 ? `${text.slice(0, 4000)}…` : text });
         }
-        assertEditContainer(args.output);
         const ext = editOutputExt(args.input);
-        const output = resolveOutput(args.output, subdir("edits"), `cut-transcript-${stamp()}-${rand()}${ext}`, args.overwrite);
+        const output = editOutput(args.output, "cut-transcript", ext, { overwrite: args.overwrite });
         const srtPath = output.replace(/\.[^.\\/]+$/, "") + ".srt";
         if (!args.overwrite && existsSync(srtPath)) throw new ScreencastError(`Output already exists: ${srtPath}. Pass overwrite: true to replace it.`);
         await runEditJob(buildCutIdleArgs(args.input, output, cuts, info.audioCodec !== null), {

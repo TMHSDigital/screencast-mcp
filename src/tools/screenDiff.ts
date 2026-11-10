@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { existsSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runCapture, runFfmpeg, runFfmpegBuffer, probeMedia } from "../utils/ffmpeg.js";
@@ -57,7 +58,7 @@ export function register(server: McpServer): void {
       try {
         requireFfmpeg();
         for (const f of [args.a, args.b]) {
-          if (!existsSync(f)) throw new ScreencastError(`Input file not found: ${f}`);
+          requireInput(f);
         }
         const [ia, ib] = await Promise.all([probeMedia(args.a), probeMedia(args.b)]);
         if (!ia.width || !ia.height) throw new ScreencastError(`Could not read the size of ${args.a}.`);

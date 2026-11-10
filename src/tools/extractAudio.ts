@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, runCapture } from "../utils/ffmpeg.js";
@@ -12,7 +12,6 @@ import {
   copyAudioExtension,
   type AudioFormat,
 } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 // Re-encode formats have a fixed container. `copy` keeps the source codec, so
 // its container must match that codec (probed per call, see below) - a blanket
@@ -47,9 +46,7 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         const { ffprobe } = requireFfmpeg();
-        if (!existsSync(args.input)) {
-          throw new ScreencastError(`Input file not found: ${args.input}`);
-        }
+        requireInput(args.input);
         const format = args.format as AudioFormat;
         let audioCodec: string | null = null;
         let ext: string;
@@ -71,12 +68,7 @@ export function register(server: McpServer): void {
         } else {
           ext = EXTENSION[format];
         }
-        const output = resolveOutput(
-          args.output,
-          subdir("edits"),
-          `audio-${stamp()}-${rand()}.${ext}`,
-          args.overwrite,
-        );
+        const output = editOutput(args.output, "audio", `.${ext}`, { overwrite: args.overwrite, anyContainer: true });
         await runEditJob(buildExtractAudioArgs(args.input, output, format), { output, durationSec: await probeDuration(args.input), extra });
         return okResponse({
           outputPath: output,

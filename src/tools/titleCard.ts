@@ -1,14 +1,14 @@
 import { z } from "zod";
 import { writeFileSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput } from "../utils/editTool.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildTitleCardArgs, DEFAULT_TITLE_DURATION } from "../utils/produce.js";
 import { resolveTextFont } from "../utils/fonts.js";
-import { resolveOutput, subdir, stamp, rand, tempPath } from "../utils/paths.js";
-import { assertEditContainer } from "../utils/media.js";
+import { tempPath } from "../utils/paths.js";
 import { fontFileSchema } from "../utils/callout.js";
 
 const inputSchema = {
@@ -41,8 +41,7 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        assertEditContainer(args.output);
-        const output = resolveOutput(args.output, subdir("edits"), `title-${stamp()}-${rand()}.mp4`, args.overwrite);
+        const output = editOutput(args.output, "title", ".mp4", { overwrite: args.overwrite });
         const font = resolveTextFont(args.text, { weight: args.bold === false ? "regular" : "bold", fontFile: args.fontFile });
         // Write the text to a temp file so arbitrary content (quotes, colons,
         // percent signs) needs no inline filtergraph escaping.

@@ -1,20 +1,15 @@
 import { z } from "zod";
 import { extname, resolve } from "node:path";
-import { existsSync, writeFileSync, rmSync } from "node:fs";
+import { writeFileSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
-import {
-  buildConcatArgs,
-  buildConcatListContent,
-  concatCopyBlocker,
-  editOutputExt,
-  assertEditContainer,
-} from "../utils/media.js";
+import { buildConcatArgs, buildConcatListContent, concatCopyBlocker, editOutputExt } from "../utils/media.js";
 import { buildAssembleArgs, clipLength } from "../utils/produce.js";
-import { resolveOutput, subdir, stamp, rand, tempPath } from "../utils/paths.js";
+import { tempPath } from "../utils/paths.js";
 
 const inputSchema = {
   inputs: z
@@ -45,7 +40,7 @@ export function register(server: McpServer): void {
         // absolute by the time they are written to the list.
         const inputs = args.inputs.map((f) => resolve(f));
         for (const f of inputs) {
-          if (!existsSync(f)) throw new ScreencastError(`Input file not found: ${f}`);
+          requireInput(f);
         }
         const infos = await Promise.all(inputs.map((f) => probeMedia(f)));
         // The schema requires two or more inputs; this guard just narrows.
@@ -58,8 +53,7 @@ export function register(server: McpServer): void {
         // and a copy carries any hidden frames along (#203): re-encode then.
         const reason = concatCopyBlocker(inputs, infos);
         if (reason !== null) {
-          assertEditContainer(args.output);
-          const output = resolveOutput(args.output, subdir("edits"), `concat-${stamp()}-${rand()}${editOutputExt(firstInput)}`, args.overwrite);
+          const output = editOutput(args.output, "concat", editOutputExt(firstInput), { overwrite: args.overwrite });
           const even = (n: number | null) => (n !== null && n >= 2 ? n - (n % 2) : undefined);
           const ffArgs = buildAssembleArgs(
             inputs,
@@ -72,7 +66,7 @@ export function register(server: McpServer): void {
           return okResponse({ outputPath: output, inputCount: inputs.length, mode: "reencode", reason });
         }
         const ext = extname(firstInput) || ".mp4";
-        const output = resolveOutput(args.output, subdir("edits"), `concat-${stamp()}-${rand()}${ext}`, args.overwrite);
+        const output = editOutput(args.output, "concat", ext, { overwrite: args.overwrite, anyContainer: true });
         const listFile = tempPath(".txt");
         writeFileSync(listFile, buildConcatListContent(inputs));
         try {

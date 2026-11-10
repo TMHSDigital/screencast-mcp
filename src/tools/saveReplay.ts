@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { eventPaths, prepareEventPaths } from "../utils/events.js";
 import { logMessage } from "../utils/logging.js";
 import { MAX_REPLAY_SEC, replayDiskBytes, saveReplay } from "../utils/replay.js";
@@ -53,7 +53,7 @@ export function register(server: McpServer): void {
         const { ffmpeg, ffprobe } = requireFfmpeg();
         const buf = record.replay;
         const lastSec = Math.min(args.lastSec ?? buf.bufferSec, buf.bufferSec);
-        const output = resolveOutput(args.output, subdir("recordings"), `replay-${stamp()}-${rand()}.mp4`, args.overwrite);
+        const output = editOutput(args.output, "replay", ".mp4", { overwrite: args.overwrite, dir: "recordings", anyContainer: true });
         if (buf.events) prepareEventPaths(eventPaths(output), args.overwrite);
         const started = Date.now();
         const result = await saveReplay(buf, {

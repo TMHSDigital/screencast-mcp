@@ -2,6 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import { extname } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
@@ -43,7 +44,7 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) throw new ScreencastError(`Input file not found: ${args.input}`);
+        requireInput(args.input);
         if (args.image && !existsSync(args.image)) throw new ScreencastError(`Background image not found: ${args.image}`);
         const still = STILL.test(args.input);
         if (still && args.output && !STILL.test(args.output)) {

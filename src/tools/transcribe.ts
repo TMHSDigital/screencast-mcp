@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpeg, probeMedia, hasFilter } from "../utils/ffmpeg.js";
@@ -14,7 +15,7 @@ import {
   formatSrt,
   WHISPER_MODEL_ENV,
 } from "../utils/captions.js";
-import { resolveOutput, subdir, stamp, rand, tempPath } from "../utils/paths.js";
+import { tempPath } from "../utils/paths.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the video or audio to transcribe."),
@@ -44,7 +45,7 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) throw new ScreencastError(`Input file not found: ${args.input}`);
+        requireInput(args.input);
         if (!hasFilter("whisper")) {
           throw new ScreencastError(
             "This ffmpeg has no whisper filter.",
@@ -55,7 +56,7 @@ export function register(server: McpServer): void {
         const model = resolveWhisperModel(args.model);
         const info = await probeMedia(args.input);
         if (!info.audioCodec) throw new ScreencastError(`Input has no audio to transcribe: ${args.input}`);
-        const output = resolveOutput(args.output, subdir("edits"), `captions-${stamp()}-${rand()}.srt`, args.overwrite);
+        const output = editOutput(args.output, "captions", ".srt", { overwrite: args.overwrite, anyContainer: true });
 
         // whisper writes (appends) to its destination; use a fresh temp file,
         // then tidy it into the output.

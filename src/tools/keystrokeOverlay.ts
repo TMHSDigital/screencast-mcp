@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { join } from "node:path";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
@@ -16,8 +17,7 @@ import {
   loadBadges,
   prepareKeystrokeAssets,
 } from "../utils/keystrokes.js";
-import { editOutputExt, assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { editOutputExt } from "../utils/media.js";
 import { fontFileSchema } from "../utils/callout.js";
 
 const o = keystrokeOptionsSchema;
@@ -53,7 +53,7 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) throw new ScreencastError(`Input file not found: ${args.input}`);
+        requireInput(args.input);
         const plan: BadgePlanOptions = { clicks: args.clicks, typing: args.typing, keys: args.keys, lingerSec: args.lingerSec };
         const { badges, shortcutsLogged } = loadBadges(args.input, args.events, plan);
         const note =
@@ -75,10 +75,9 @@ export function register(server: McpServer): void {
             ...(note && { note }),
           });
         }
-        assertEditContainer(args.output);
         const info = await probeMedia(args.input);
         if (!info.height) throw new ScreencastError(`Could not read the size of ${args.input}.`);
-        const output = resolveOutput(args.output, subdir("edits"), `keys-${stamp()}-${rand()}${editOutputExt(args.input)}`, args.overwrite);
+        const output = editOutput(args.output, "keys", editOutputExt(args.input), { overwrite: args.overwrite });
         const work = mkdtempSync(join(tmpdir(), "screencast-keys-"));
         try {
           const assets = prepareKeystrokeAssets(groups.map((g) => g.label), work, "", args.fontFile);

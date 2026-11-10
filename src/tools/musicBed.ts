@@ -1,13 +1,12 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildMusicBedArgs } from "../utils/produce.js";
-import { editOutputExt, assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
   video: z.string().min(1).describe("Path to the video."),
@@ -36,15 +35,14 @@ export function register(server: McpServer): void {
       try {
         requireFfmpeg();
         for (const f of [args.video, args.music]) {
-          if (!existsSync(f)) throw new ScreencastError(`Input file not found: ${f}`);
+          requireInput(f);
         }
         const info = await probeMedia(args.video);
         if (info.durationSec === null) {
           throw new ScreencastError(`Could not read duration of ${args.video}.`);
         }
-        assertEditContainer(args.output);
         const ext = editOutputExt(args.video);
-        const output = resolveOutput(args.output, subdir("edits"), `music-${stamp()}-${rand()}${ext}`, args.overwrite);
+        const output = editOutput(args.output, "music", ext, { overwrite: args.overwrite });
         const ffArgs = buildMusicBedArgs(
           args.video,
           args.music,

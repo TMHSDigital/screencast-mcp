@@ -10,6 +10,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 ### Internal
 
 - The H.264/AAC/faststart encode tail lives in one helper, `encodeTail` in `src/utils/targets.ts`, used by every edit builder. ffmpeg arguments are unchanged; the deliberate audio bitrate differences (192k for music beds and audio export, 128k for compress, ffmpeg's default for trim, clip and speed) are now explicit parameters (#312).
+- File-writing tools share one scaffold, `requireInput` and `editOutput` in `src/utils/editTool.ts`, instead of each pasting the input check, the #187 container check and the default output name; a guard test keeps new tools on it (#308).
 
 ## [0.49.1] - 2026-11-10
 

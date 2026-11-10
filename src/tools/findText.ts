@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { extname, join } from "node:path";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
@@ -115,7 +116,7 @@ export function register(server: McpServer): void {
             const area = targetSize(resolved.target, resolved.monitors);
             origin = backend === "wgc" && resolved.window?.client ? resolved.window.client : { x: area.x, y: area.y };
           } else {
-            if (!existsSync(args.input!)) throw new ScreencastError(`Input file not found: ${args.input}`);
+            requireInput(args.input!);
             const isImage = IMAGE_EXTENSIONS.has(extname(args.input!).toLowerCase());
             source = join(work, "frame.png");
             await runFfmpeg(
@@ -187,7 +188,7 @@ type Args = {
  * any part of the time between two samples. */
 async function scanClip(args: Args, work: string, signal: AbortSignal) {
   if (args.input === undefined) throw new ScreencastError("scanEverySec reads a video file: pass input, not target.");
-  if (!existsSync(args.input)) throw new ScreencastError(`Input file not found: ${args.input}`);
+  requireInput(args.input);
   if (IMAGE_EXTENSIONS.has(extname(args.input).toLowerCase())) {
     throw new ScreencastError("scanEverySec is for a video input; an image has one frame, so drop scanEverySec.");
   }

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { join } from "node:path";
 import { mkdirSync, readdirSync, existsSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
@@ -115,9 +116,7 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) {
-          throw new ScreencastError(`Input file not found: ${args.input}`);
-        }
+        requireInput(args.input);
         const hasFps = args.fps !== undefined;
         const hasTs = args.timestamps !== undefined && args.timestamps.length > 0;
         const mode = args.mode ?? (hasTs ? "timestamps" : "fps");

@@ -1,13 +1,12 @@
 import { z } from "zod";
 import { extname } from "node:path";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
+import { errorResponse, okResponse } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
-import { buildTrimArgs, editOutputExt, assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { buildTrimArgs, editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
@@ -40,19 +39,11 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) {
-          throw new ScreencastError(`Input file not found: ${args.input}`);
-        }
+        requireInput(args.input);
         // A stream copy keeps the input's container; a re-encode needs one that
         // holds libx264/AAC.
-        if (args.exact !== false) assertEditContainer(args.output);
         const ext = args.exact === false ? extname(args.input) || ".mp4" : editOutputExt(args.input);
-        const output = resolveOutput(
-          args.output,
-          subdir("edits"),
-          `trim-${stamp()}-${rand()}${ext}`,
-          args.overwrite,
-        );
+        const output = editOutput(args.output, "trim", ext, { overwrite: args.overwrite, anyContainer: args.exact === false });
         const ffArgs = buildTrimArgs(args.input, output, {
           start: args.start,
           end: args.end,

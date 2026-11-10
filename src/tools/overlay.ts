@@ -1,12 +1,11 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
+import { errorResponse, okResponse } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
-import { buildOverlayArgs, editOutputExt, assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { buildOverlayArgs, editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the base video."),
@@ -37,20 +36,10 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) {
-          throw new ScreencastError(`Input file not found: ${args.input}`);
-        }
-        if (!existsSync(args.overlay)) {
-          throw new ScreencastError(`Overlay file not found: ${args.overlay}`);
-        }
-        assertEditContainer(args.output);
+        requireInput(args.input);
+        requireInput(args.overlay, "Overlay file");
         const ext = editOutputExt(args.input);
-        const output = resolveOutput(
-          args.output,
-          subdir("edits"),
-          `overlay-${stamp()}-${rand()}${ext}`,
-          args.overwrite,
-        );
+        const output = editOutput(args.output, "overlay", ext, { overwrite: args.overwrite });
         const scale =
           args.width !== undefined || args.height !== undefined
             ? { width: args.width, height: args.height }

@@ -3,6 +3,7 @@ import { extname, join } from "node:path";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia, runCapture } from "../utils/ffmpeg.js";
@@ -23,7 +24,6 @@ import {
   type ChapterPoint,
   type Marker,
 } from "../utils/chapters.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { getStore } from "../context.js";
 
 const CONTAINERS = new Set<string>([".mp4", ".mkv", ".mov"]);
@@ -84,7 +84,7 @@ export function register(server: McpServer): void {
           sessionMarkers = record.markers;
         }
         if (!input) throw new ScreencastError("Pass input or sessionId.");
-        if (!existsSync(input)) throw new ScreencastError(`Input file not found: ${input}`);
+        requireInput(input);
         for (const f of [args.transcript, args.subtitles]) {
           if (f !== undefined && !existsSync(f)) throw new ScreencastError(`File not found: ${f}`);
         }
@@ -149,7 +149,7 @@ export function register(server: McpServer): void {
         if (!CONTAINERS.has(ext)) {
           throw new ScreencastError(`Chapters can be written to .mp4, .mkv, or .mov, not ${ext || "a file without an extension"}.`);
         }
-        const output = resolveOutput(args.output, subdir("edits"), `chapters-${stamp()}-${rand()}${ext}`, args.overwrite);
+        const output = editOutput(args.output, "chapters", ext, { overwrite: args.overwrite, anyContainer: true });
         const work = mkdtempSync(join(tmpdir(), "screencast-chapters-"));
         try {
           const meta = join(work, "chapters.txt");

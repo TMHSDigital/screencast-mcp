@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
@@ -13,8 +13,7 @@ import {
   type LoudnessPreset,
   loudnessTargetSchema,
 } from "../utils/audio.js";
-import { editOutputExt, assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video or audio file."),
@@ -42,15 +41,12 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         const { ffmpeg } = requireFfmpeg();
-        if (!existsSync(args.input)) {
-          throw new ScreencastError(`Input file not found: ${args.input}`);
-        }
+        requireInput(args.input);
         const info = await probeMedia(args.input);
         if (!info.audioCodec) throw new ScreencastError(`Input has no audio stream: ${args.input}`);
         const t = loudnessTarget(args.target as LoudnessPreset | number | undefined);
-        assertEditContainer(args.output);
         const ext = editOutputExt(args.input, { audio: true });
-        const output = resolveOutput(args.output, subdir("edits"), `loudnorm-${stamp()}-${rand()}${ext}`, args.overwrite);
+        const output = editOutput(args.output, "loudnorm", ext, { overwrite: args.overwrite });
 
         const timeout = jobTimeoutMs(info.durationSec);
         const before = await runCapture(ffmpeg, buildLoudnessMeasureArgs(args.input, t), timeout, { signal: extra.signal });

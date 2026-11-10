@@ -1,12 +1,11 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
+import { errorResponse, okResponse } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
-import { buildCropArgs, editOutputExt, assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { buildCropArgs, editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
@@ -32,18 +31,10 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) {
-          throw new ScreencastError(`Input file not found: ${args.input}`);
-        }
+        requireInput(args.input);
         const { width, height, durationSec } = await probeMedia(args.input);
-        assertEditContainer(args.output);
         const ext = editOutputExt(args.input);
-        const output = resolveOutput(
-          args.output,
-          subdir("edits"),
-          `crop-${stamp()}-${rand()}${ext}`,
-          args.overwrite,
-        );
+        const output = editOutput(args.output, "crop", ext, { overwrite: args.overwrite });
         const ffArgs = buildCropArgs(
           args.input,
           output,

@@ -1,11 +1,11 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput } from "../utils/editTool.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { captureStill } from "../utils/still.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js";
 import { windowMatchReport } from "../utils/windows.js";
 import { confirmCapture, describeTarget } from "../utils/consent.js";
@@ -71,12 +71,7 @@ export function register(server: McpServer): void {
         requireFfmpeg();
         const resolved = await resolveCaptureTarget(args.target, { exactTitle: args.exactTitle, backend: args.backend });
         const { window } = resolved;
-        const output = resolveOutput(
-          args.output,
-          subdir("screenshots"),
-          `shot-${stamp()}-${rand()}.png`,
-          args.overwrite,
-        );
+        const output = editOutput(args.output, "shot", ".png", { overwrite: args.overwrite, dir: "screenshots", anyContainer: true });
         const backend = args.backend ?? "gdigrab";
         await confirmCapture(server, `Take a screenshot of ${describeTarget(args.target, window)}, saved to ${output}?`, extra.signal);
         await captureStill(resolved, output, backend);

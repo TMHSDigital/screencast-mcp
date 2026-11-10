@@ -3,12 +3,12 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
-import { editOutputExt, assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { editOutputExt } from "../utils/media.js";
 import { markersOrChapters, readMarkers, writeMarkers } from "../utils/chapters.js";
 import { formatSrt } from "../utils/captions.js";
 import {
@@ -57,14 +57,13 @@ export function register(server: McpServer): void {
       let work: string | null = null;
       try {
         requireFfmpeg();
-        if (!existsSync(args.video)) throw new ScreencastError(`Input file not found: ${args.video}`);
+        requireInput(args.video);
         const info = await probeMedia(args.video);
         if (info.durationSec === null) throw new ScreencastError(`Could not read duration of ${args.video}.`);
         const needsMarkers = args.lines.some((l) => l.marker !== undefined);
         const markers = needsMarkers ? (await markersOrChapters(args.video, extra.signal)).markers : [];
         const lines = resolveLines(args.lines, markers);
-        assertEditContainer(args.output);
-        const output = resolveOutput(args.output, subdir("edits"), `narrated-${stamp()}-${rand()}${editOutputExt(args.video)}`, args.overwrite);
+        const output = editOutput(args.output, "narrated", editOutputExt(args.video), { overwrite: args.overwrite });
         // The .srt beside the result is an output too: never clobber one without overwrite (#256).
         const srtPath = output.replace(/\.[^./\\]+$/, "") + ".srt";
         if (!args.overwrite && existsSync(srtPath)) throw new ScreencastError(`Output already exists: ${srtPath}. Pass overwrite: true to replace it.`);

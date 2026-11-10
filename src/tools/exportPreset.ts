@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
+import { errorResponse, okResponse } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
@@ -12,8 +12,6 @@ import {
   type Platform,
   type ReframeFit,
 } from "../utils/produce.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
-import { assertEditContainer } from "../utils/media.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
@@ -45,12 +43,9 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) {
-          throw new ScreencastError(`Input file not found: ${args.input}`);
-        }
-        assertEditContainer(args.output);
+        requireInput(args.input);
         const platform = args.platform as Platform;
-        const output = resolveOutput(args.output, subdir("edits"), `${platform}-${stamp()}-${rand()}.mp4`, args.overwrite);
+        const output = editOutput(args.output, platform, ".mp4", { overwrite: args.overwrite });
         const ffArgs = buildExportPresetArgs(
           args.input,
           output,

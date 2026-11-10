@@ -1,13 +1,12 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob, jobTimeoutMs } from "../utils/jobs.js";
 import { buildDenoiseArgs, buildNoiseFloorArgs, parseNoiseFloor, type DenoiseStrength, DENOISE_STRENGTHS } from "../utils/audio.js";
-import { editOutputExt, assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video or audio file."),
@@ -34,15 +33,12 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) {
-          throw new ScreencastError(`Input file not found: ${args.input}`);
-        }
+        requireInput(args.input);
         const info = await probeMedia(args.input);
         if (!info.audioCodec) throw new ScreencastError(`Input has no audio stream: ${args.input}`);
         const strength = (args.strength as DenoiseStrength | undefined) ?? "medium";
-        assertEditContainer(args.output);
         const ext = editOutputExt(args.input, { audio: true });
-        const output = resolveOutput(args.output, subdir("edits"), `denoise-${stamp()}-${rand()}${ext}`, args.overwrite);
+        const output = editOutput(args.output, "denoise", ext, { overwrite: args.overwrite });
         // Measure the noise floor first: afftdn only works when told roughly how
         // loud the noise is.
         const scan = await runCapture(requireFfmpeg().ffmpeg, buildNoiseFloorArgs(args.input), jobTimeoutMs(info.durationSec), {

@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
+import { requireInput } from "../utils/editTool.js";
 import { errorMessage, errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { looseOutput } from "../utils/toolSpec.js";
 import { assertOutputAllowed } from "../utils/paths.js";
@@ -95,7 +95,7 @@ export function register(server: McpServer): void {
         }
         const input = args.input!;
         if (args.at === undefined) throw new ScreencastError("Pass at (video seconds) to mark a file.");
-        if (!existsSync(input)) throw new ScreencastError(`Input file not found: ${input}`);
+        requireInput(input);
         assertOutputAllowed(markersPath(input));
         const markers = insertMarker(readMarkers(input), { t: args.at, label: args.label, at: new Date().toISOString() });
         const path = writeMarkers(input, markers);

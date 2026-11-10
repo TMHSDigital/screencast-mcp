@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia, hasFilter, runCapture, runFfmpeg, scriptLongFilters } from "../utils/ffmpeg.js";
@@ -11,8 +12,7 @@ import { planPipeline, probeArgs, sidecarCues, MAX_PIPELINE_STEPS, type AudioMea
 import { calloutFonts, prepareCalloutAssets } from "../utils/calloutAssets.js";
 import { exportAnimation } from "../utils/animExport.js";
 import type { CalloutAssets } from "../utils/callout.js";
-import { assertEditContainer, redactRegionSchema, REDACT_STYLES } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { redactRegionSchema, REDACT_STYLES } from "../utils/media.js";
 import { PLATFORMS, ASPECTS, REFRAME_FITS } from "../utils/produce.js";
 import { buildChapters, ffmetadata, markerPoints, markersOrChapters, retimeMarkers, writeMarkers, type Chapter, type Marker } from "../utils/chapters.js";
 import type { CursorStepAssets, KeystrokeStepAssets } from "../utils/pipeline.js";
@@ -146,7 +146,7 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         const { ffmpeg } = requireFfmpeg();
-        if (!existsSync(args.input)) throw new ScreencastError(`Input file not found: ${args.input}`);
+        requireInput(args.input);
         const info = await probeMedia(args.input);
         const hasAudio = info.audioCodec !== null;
         const warnings: string[] = [];
@@ -175,9 +175,8 @@ export function register(server: McpServer): void {
         const timeout = jobTimeoutMs(info.durationSec);
         const last = steps.at(-1);
         if (!last) throw new ScreencastError("Provide at least one step.");
-        if (last.op !== "export_gif") assertEditContainer(args.output);
         const ext = last.op === "export_gif" ? `.${last.format ?? "gif"}` : ".mp4";
-        const output = resolveOutput(args.output, subdir("edits"), `pipeline-${stamp()}-${rand()}${ext}`, args.overwrite);
+        const output = editOutput(args.output, "pipeline", ext, { overwrite: args.overwrite, anyContainer: last.op === "export_gif" });
         // A transcript made for captions goes next to an mp4 result; like the
         // output, an existing file there is only replaced with overwrite (#256).
         const transcribes = last.op !== "export_gif" && steps.some((s) => s.op === "burn_subtitles" && s.transcribe);

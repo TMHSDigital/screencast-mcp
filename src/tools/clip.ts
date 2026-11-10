@@ -1,12 +1,11 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
+import { errorResponse, okResponse } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildClipArgs, editOutputExt, assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
@@ -40,20 +39,16 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) {
-          throw new ScreencastError(`Input file not found: ${args.input}`);
-        }
+        requireInput(args.input);
         assertEditContainer(args.output);
         const ext = editOutputExt(args.input);
         const single = args.segments.length === 1;
         const outputs: string[] = [];
         for (const [i, seg] of args.segments.entries()) {
-          const output = resolveOutput(
-            single ? args.output : undefined,
-            subdir("edits"),
-            `clip-${stamp()}-${rand()}-${String(i).padStart(2, "0")}${ext}`,
-            args.overwrite,
-          );
+          // output names the clip only when there is one; checked above.
+          const output = editOutput(single ? args.output : undefined, "clip", `-${String(i).padStart(2, "0")}${ext}`, {
+            overwrite: args.overwrite,
+          });
           await runEditJob(buildClipArgs(args.input, output, seg), { output, durationSec: seg.end - seg.start, extra });
           outputs.push(output);
         }

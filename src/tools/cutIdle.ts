@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
@@ -15,8 +15,7 @@ import {
   DEFAULT_MIN_IDLE_SEC,
   DEFAULT_KEEP_SEC,
 } from "../utils/idle.js";
-import { editOutputExt, assertEditContainer } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
+import { editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
@@ -53,7 +52,7 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         const { ffmpeg } = requireFfmpeg();
-        if (!existsSync(args.input)) throw new ScreencastError(`Input file not found: ${args.input}`);
+        requireInput(args.input);
         const info = await probeMedia(args.input);
         const duration = info.durationSec;
         if (duration === null) throw new ScreencastError(`Could not read duration of ${args.input}.`);
@@ -80,9 +79,8 @@ export function register(server: McpServer): void {
         if (args.dryRun || cuts.length === 0) {
           return okResponse({ ...summary, ...(cuts.length === 0 ? { note: "No idle stretches found; nothing to cut." } : { dryRun: true }) });
         }
-        assertEditContainer(args.output);
         const ext = editOutputExt(args.input);
-        const output = resolveOutput(args.output, subdir("edits"), `trimmed-idle-${stamp()}-${rand()}${ext}`, args.overwrite);
+        const output = editOutput(args.output, "trimmed-idle", ext, { overwrite: args.overwrite });
         await runEditJob(buildCutIdleArgs(args.input, output, cuts, hasAudio), {
           output,
           durationSec: duration - removedSec,

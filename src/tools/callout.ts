@@ -1,16 +1,16 @@
 import { z } from "zod";
 import { join } from "node:path";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
+import { errorResponse, okResponse } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildCalloutArgs, type Callout, calloutItemSchema, fontFileSchema } from "../utils/callout.js";
 import { prepareCalloutAssets } from "../utils/calloutAssets.js";
 import { stillEdit } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video or image (png/jpg; from/to are ignored for an image)."),
@@ -42,13 +42,11 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) {
-          throw new ScreencastError(`Input file not found: ${args.input}`);
-        }
+        requireInput(args.input);
         const items = args.items as Callout[];
         // A png/jpg input is annotated as one image (#319).
         const { still, ext } = stillEdit(args.input, args.output);
-        const output = resolveOutput(args.output, subdir("edits"), `callout-${stamp()}-${rand()}${ext}`, args.overwrite);
+        const output = editOutput(args.output, "callout", ext, { overwrite: args.overwrite, anyContainer: true });
         // Text files and rendered arrows live in a private temp dir.
         const work = mkdtempSync(join(tmpdir(), "screencast-callout-"));
         try {

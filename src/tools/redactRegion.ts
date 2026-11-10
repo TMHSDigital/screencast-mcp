@@ -1,12 +1,11 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { editOutput, requireInput } from "../utils/editTool.js";
+import { errorResponse, okResponse } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
 import { buildRedactArgs, stillEdit, redactRegionSchema, REDACT_STYLES } from "../utils/media.js";
-import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video or image (png/jpg; time ranges are ignored for an image)."),
@@ -44,18 +43,11 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         requireFfmpeg();
-        if (!existsSync(args.input)) {
-          throw new ScreencastError(`Input file not found: ${args.input}`);
-        }
+        requireInput(args.input);
         const { width, height, durationSec } = await probeMedia(args.input);
         // A png/jpg input is redacted as one image (#319).
         const { still, ext } = stillEdit(args.input, args.output);
-        const output = resolveOutput(
-          args.output,
-          subdir("edits"),
-          `redact-${stamp()}-${rand()}${ext}`,
-          args.overwrite,
-        );
+        const output = editOutput(args.output, "redact", ext, { overwrite: args.overwrite, anyContainer: true });
         const ffArgs = buildRedactArgs(
           args.input,
           output,

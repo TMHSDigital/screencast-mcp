@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
@@ -82,9 +82,7 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         const { ffmpeg } = requireFfmpeg();
-        if (!existsSync(args.input)) {
-          throw new ScreencastError(`Input file not found: ${args.input}`);
-        }
+        requireInput(args.input);
         const { durationSec } = await probeMedia(args.input);
         if (durationSec === null) throw new ScreencastError(`Could not read duration of ${args.input}.`);
         const kind = args.poster ? "poster" : "sheet";
