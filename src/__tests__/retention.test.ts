@@ -26,7 +26,7 @@ describe("capture retention (#209)", () => {
     expect(retentionDays({ [RETENTION_ENV]: "7" })).toBe(7);
   });
 
-  it("deletes old screenshots, frames, and raw event logs, and keeps the rest", () => {
+  it("deletes old screenshots, frames, and raw event logs, and keeps the rest", async () => {
     const oldShot = file("screenshots/ocr-old.png", 10);
     const newShot = file("screenshots/shot-new.png", 1);
     const oldFrame = file("frames/sample-1/frame_00001.png", 10);
@@ -35,13 +35,13 @@ describe("capture retention (#209)", () => {
     const oldEvents = file("recordings/rec-1.events.jsonl", 10);
     const oldEdit = file("edits/clip.mp4", 10);
 
-    const r = pruneCaptures(7, Date.now(), root);
+    const r = await pruneCaptures(7, Date.now(), root);
     expect(r.removed).toBe(3);
     for (const gone of [oldShot, oldFrame, oldRaw]) expect(existsSync(gone)).toBe(false);
     for (const kept of [newShot, oldRec, oldEvents, oldEdit]) expect(existsSync(kept)).toBe(true);
   });
 
-  it("deletes old index_recording sidecars under SCREENCAST_HOME, never the recordings (#266)", () => {
+  it("deletes old index_recording sidecars under SCREENCAST_HOME, never the recordings (#266)", async () => {
     const oldIdx = file("recordings/rec-2.mp4.index.json", 10);
     const oldTmp = file("recordings/rec-2.mp4.index.json.123.tmp", 10);
     const oldEditIdx = file("edits/clip.mp4.index.json", 10);
@@ -51,7 +51,7 @@ describe("capture retention (#209)", () => {
     const edit = file("edits/clip.mp4", 10);
     const nested = file("edits/project/old.index.json", 10);
 
-    const r = pruneCaptures(7, Date.now(), root);
+    const r = await pruneCaptures(7, Date.now(), root);
     expect(r.removed).toBe(4);
     for (const gone of [oldIdx, oldTmp, oldEditIdx, oldFallback]) expect(existsSync(gone)).toBe(false);
     for (const kept of [newIdx, rec, edit, nested]) expect(existsSync(kept)).toBe(true);

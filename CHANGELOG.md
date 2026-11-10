@@ -16,6 +16,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - `stop_recording` refuses, with a clear message, to stop a gdigrab or ddagrab recording that another running server instance owns, instead of force-killing it and racing that instance to finalize and join its segments. WGC recordings are still handed over through their stop file (#286).
 - CLI commands (`record`, `call`, `setup`) no longer build an unused stdio server or install the server's exit handlers: an unknown `SCREENCAST_TOOLSETS` entry no longer warns twice, and output piped into a command that closes early (`| head`) keeps the CLI's own exit code (#289).
 
+### Changed
+
+- With `SCREENCAST_RETENTION_DAYS` set, the startup prune now runs after the transport connects and walks folders asynchronously, so a large `frames/` folder no longer delays the client's initialize; a failure is logged (#294).
+
 ## [0.48.1] - 2026-11-09
 
 ### Fixed

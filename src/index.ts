@@ -50,16 +50,24 @@ async function main(): Promise<void> {
   } catch (err) {
     process.stderr.write(`Replay buffer cleanup skipped: ${err instanceof Error ? err.message : String(err)}\n`);
   }
-  const days = retentionDays();
-  if (days !== null) {
-    const pruned = pruneCaptures(days);
-    if (pruned.removed > 0) {
-      process.stderr.write(`Deleted ${pruned.removed} capture file(s) older than ${days} day(s) (${RETENTION_ENV}).\n`);
-    }
-  }
-
   const transport = new StdioServerTransport();
   await server.connect(transport);
+
+  // After connecting, in the background: frames/ can hold tens of thousands
+  // of files, and walking them must not delay the client's initialize (#294).
+  const days = retentionDays();
+  if (days !== null) {
+    pruneCaptures(days).then(
+      (pruned) => {
+        if (pruned.removed > 0) {
+          process.stderr.write(`Deleted ${pruned.removed} capture file(s) older than ${days} day(s) (${RETENTION_ENV}).\n`);
+        }
+      },
+      (err: unknown) => {
+        process.stderr.write(`Retention prune failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      },
+    );
+  }
 
   // Without this, a client that disconnects mid-recording leaves the server
   // and its ffmpeg child running (the child's pipes keep the event loop

@@ -12,7 +12,7 @@
  * touched: they are the user's work. Sidecars next to recordings outside
  * SCREENCAST_HOME are not touched either. Off by default.
  */
-import { readdirSync, rmdirSync, statSync, unlinkSync } from "node:fs";
+import { readdir, rmdir, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { homeRoot } from "./paths.js";
 
@@ -32,27 +32,29 @@ export interface PruneResult {
   bytes: number;
 }
 
-/** Delete capture files older than `days` under `root`. Returns what went. */
-export function pruneCaptures(days: number, now: number = Date.now(), root: string = homeRoot()): PruneResult {
+/** Delete capture files older than `days` under `root`. Returns what went.
+ * Async so a large frames/ folder never blocks the event loop; the server
+ * runs it after the transport connects (#294). */
+export async function pruneCaptures(days: number, now: number = Date.now(), root: string = homeRoot()): Promise<PruneResult> {
   const cutoff = now - days * 86_400_000;
   const result: PruneResult = { removed: 0, bytes: 0 };
-  const prune = (dir: string, keep: (name: string) => boolean, recurse: boolean): void => {
+  const prune = async (dir: string, keep: (name: string) => boolean, recurse: boolean): Promise<void> => {
     let names: string[];
     try {
-      names = readdirSync(dir);
+      names = await readdir(dir);
     } catch {
       return; // not created yet
     }
     for (const name of names) {
       const path = join(dir, name);
       try {
-        const st = statSync(path);
+        const st = await stat(path);
         if (st.isDirectory()) {
           if (!recurse) continue;
-          prune(path, keep, true);
-          if (readdirSync(path).length === 0 && st.mtimeMs < cutoff) rmdirSync(path);
+          await prune(path, keep, true);
+          if ((await readdir(path)).length === 0 && st.mtimeMs < cutoff) await rmdir(path);
         } else if (!keep(name) && st.mtimeMs < cutoff) {
-          unlinkSync(path);
+          await unlink(path);
           result.removed++;
           result.bytes += st.size;
         }
@@ -61,10 +63,10 @@ export function pruneCaptures(days: number, now: number = Date.now(), root: stri
       }
     }
   };
-  prune(join(root, "screenshots"), () => false, true);
-  prune(join(root, "frames"), () => false, true);
-  prune(join(root, "recordings"), (name) => !/\.events\.raw(\.stop)?$/.test(name) && !INDEX_FILE.test(name), false);
-  prune(join(root, "edits"), (name) => !INDEX_FILE.test(name), false);
-  prune(join(root, "edits", "indexes"), (name) => !INDEX_FILE.test(name), false);
+  await prune(join(root, "screenshots"), () => false, true);
+  await prune(join(root, "frames"), () => false, true);
+  await prune(join(root, "recordings"), (name) => !/\.events\.raw(\.stop)?$/.test(name) && !INDEX_FILE.test(name), false);
+  await prune(join(root, "edits"), (name) => !INDEX_FILE.test(name), false);
+  await prune(join(root, "edits", "indexes"), (name) => !INDEX_FILE.test(name), false);
   return result;
 }
