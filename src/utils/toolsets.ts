@@ -16,6 +16,7 @@ export const TOOLSETS = {
     "resume_recording",
     "save_replay",
     "list_sessions",
+    "delete_recording",
     "get_session",
     "read_events",
     "add_marker",

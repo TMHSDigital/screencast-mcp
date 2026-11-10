@@ -185,6 +185,33 @@
     }
   },
   {
+    "name": "delete_recording",
+    "toolset": "capture",
+    "title": "Delete Recording",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "description": "Delete a finished recording with its sidecars (event log, webcam, transcript, index, markers, pause parts) and registry entries; reports bytes freed. Asks the user first when the client supports it. Edits made from it are kept.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "description": "Session id of the recording to delete.",
+          "type": "string",
+          "minLength": 1
+        },
+        "input": {
+          "description": "Or the recording's path.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  {
     "name": "pause_recording",
     "toolset": "capture",
     "title": "Pause Recording",

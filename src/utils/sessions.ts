@@ -501,6 +501,8 @@ export class SessionStore {
    * field is taken from disk, so a stale copy never undoes another instance's
    * update (#55, #235). */
   private pending = new Map<string, Partial<SessionRecord>>();
+  /** Records this instance deleted, kept out of the next write (#321). */
+  private removed = new Set<string>();
   /** Identity of the registry file as last read or written, so get()/list()
    * re-read it only when another instance has replaced it (#235). */
   private seen: string | null = null;
@@ -567,6 +569,7 @@ export class SessionStore {
       const base = disk.get(id) ?? this.records.get(id);
       if (base) disk.set(id, { ...base, ...patch });
     }
+    for (const id of this.removed) disk.delete(id);
     return disk;
   }
 
@@ -623,6 +626,7 @@ export class SessionStore {
         this.seen = this.signature();
         this.records = new Map(pruned.map((r) => [r.id, r]));
         this.pending.clear();
+        this.removed.clear();
       },
       this.lockWaitMs,
     );
@@ -645,6 +649,27 @@ export class SessionStore {
     } catch (err) {
       this.records.delete(record.id);
       this.pending.delete(record.id);
+      throw err;
+    }
+  }
+
+  /** Delete finished records from the registry (#321). A failed write puts
+   * them back in this instance's view and rethrows. */
+  remove(ids: readonly string[]): void {
+    const before = ids.flatMap((id) => {
+      const r = this.records.get(id);
+      return r ? [r] : [];
+    });
+    for (const id of ids) {
+      this.removed.add(id);
+      this.pending.delete(id);
+      this.records.delete(id);
+    }
+    try {
+      this.persist();
+    } catch (err) {
+      for (const id of ids) this.removed.delete(id);
+      for (const r of before) this.records.set(r.id, r);
       throw err;
     }
   }

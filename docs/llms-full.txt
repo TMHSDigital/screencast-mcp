@@ -2,7 +2,7 @@
 
 > An MCP server (stdio) that lets AI agents record the Windows screen, watch the footage as frames, and edit it with ffmpeg. Install: `npx -y @tmhs/screencast-mcp`. Capture is Windows-only; the watch and edit tools run anywhere ffmpeg runs.
 
-58 tools. Generated from the server's schemas; the same content is on https://tmhsdigital.github.io/screencast-mcp/tools/.
+59 tools. Generated from the server's schemas; the same content is on https://tmhsdigital.github.io/screencast-mcp/tools/.
 
 # Core toolset
 
@@ -91,6 +91,23 @@ Minimal call:
 
 ```json
 {"sessionId":"rec-20260101-120000-ab12"}
+```
+
+## delete_recording
+
+**Delete Recording**
+
+Delete a finished recording with its sidecars (event log, webcam, transcript, index, markers, pause parts) and registry entries; reports bytes freed. Asks the user first when the client supports it. Edits made from it are kept.
+
+Parameters:
+
+- `sessionId` (string): Session id of the recording to delete.
+- `input` (string): Or the recording's path.
+
+Minimal call:
+
+```json
+{}
 ```
 
 ## pause_recording

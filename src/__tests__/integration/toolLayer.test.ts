@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname, isAbsolute, join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -82,6 +82,16 @@ const SRT = "1\n00:00:00,200 --> 00:00:01,200\nHello there\n\n2\n00:00:01,500 --
 
 const CASES: Case[] = [
   { name: "get_media_info", args: (f) => ({ input: f.av }), expect: "ok" },
+  {
+    name: "delete_recording",
+    args: (f) => {
+      const doomed = join(f.dir, "doomed.mp4");
+      copyFileSync(f.av, doomed);
+      writeFileSync(`${doomed}.index.json`, "{}");
+      return { input: doomed };
+    },
+    expect: "ok",
+  },
   { name: "trim", args: (f) => ({ input: f.av, start: 0.5, end: 2 }), expect: "media" },
   { name: "concat", args: (f) => ({ inputs: [f.av, f.av2] }), expect: "media" },
   { name: "convert", args: (f) => ({ input: f.v, format: "gif", fps: 8, width: 160 }), expect: "media" },

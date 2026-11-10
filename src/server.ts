@@ -15,6 +15,7 @@ import {
 
 import { register as registerStartRecording } from "./tools/startRecording.js";
 import { register as registerStopRecording } from "./tools/stopRecording.js";
+import { register as registerDeleteRecording } from "./tools/deleteRecording.js";
 import { register as registerSaveReplay } from "./tools/saveReplay.js";
 import { register as registerPauseRecording } from "./tools/pauseRecording.js";
 import { register as registerResumeRecording } from "./tools/resumeRecording.js";
@@ -106,6 +107,7 @@ export function createServer(options: { toolsets?: string } = {}): McpServer {
 
   registerStartRecording(server);
   registerStopRecording(server);
+  registerDeleteRecording(server);
   registerPauseRecording(server);
   registerResumeRecording(server);
   registerSaveReplay(server);

@@ -11,6 +11,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 - Resource subscriptions: a client can subscribe to `screencast://sessions` or `screencast://sessions/{id}` and gets `resources/updated` when it changes, so a recording that ended on its own (`maxDurationSec`, window closed) is noticed without polling (#324).
 - `redact_region` and `callout` accept a still image (png, jpg, bmp, tiff) and write an image: scrub a secret from a screenshot, using the rectangles `find_text` returns, without a video round trip. Time ranges are ignored for an image; a jpg stays a jpg (#319).
+- `delete_recording { sessionId | input }` (#321): deletes a finished recording with its sidecars (event logs, webcam file, transcript, index with its OCR'd screen text, markers, pause parts) and its registry entries, and reports the bytes freed. It asks the user through elicitation when the client supports it (and refuses without it when `SCREENCAST_CONFIRM_CAPTURE` is on), refuses a recording that is still running, and only deletes inside `SCREENCAST_HOME` or the allowed directories. Edits made from the recording are kept.
 
 ### Changed
 

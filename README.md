@@ -4,7 +4,7 @@
 
 **An MCP server that lets an agent record the screen, _watch_ the footage, and make minimal ffmpeg edits — over stdio, on Windows.**
 
-Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, redact, annotate, zoom toward clicks, and export for GitHub or social. No cloud service, no telemetry: ffmpeg and ffprobe behind <!--tool-count-->58<!--/tool-count--> typed tools.
+Capture the desktop, a monitor, a window, or a region; sample a recording into frames the agent can actually look at; trim, crop, redact, annotate, zoom toward clicks, and export for GitHub or social. No cloud service, no telemetry: ffmpeg and ffprobe behind <!--tool-count-->59<!--/tool-count--> typed tools.
 
 **For developers who want their coding agent to see and prove UI changes on Windows**: bug repros, UI verification, and demo clips the agent records, checks, and edits itself. Capture is Windows-only; the watch and edit tools work on any OS with ffmpeg. Free for non-commercial use ([CC BY-NC-ND 4.0](#license)); [why not OBS, Playwright, or a screenshot MCP?](#why-not-just)
 
@@ -75,7 +75,7 @@ The core is the **watch loop**: the agent records, samples the footage into fram
 ## Tools
 
 <!-- tools:start -->
-58 tools in 6 toolsets, generated from the server's own schemas by `npm run docs` (do not edit between the markers). Each name links to its reference page with every parameter, an example call, and what it returns; [`mcp-tools.json`](mcp-tools.json) is the same list as JSON, and [`llms-full.txt`](https://tmhsdigital.github.io/screencast-mcp/llms-full.txt) all of it in one file.
+59 tools in 6 toolsets, generated from the server's own schemas by `npm run docs` (do not edit between the markers). Each name links to its reference page with every parameter, an example call, and what it returns; [`mcp-tools.json`](mcp-tools.json) is the same list as JSON, and [`llms-full.txt`](https://tmhsdigital.github.io/screencast-mcp/llms-full.txt) all of it in one file.
 
 ### Core
 
@@ -94,6 +94,7 @@ Record or screenshot the desktop, a monitor, a window, or a region. Every captur
 | --- | --- |
 | [`start_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/start_recording.html) | Start a background screen recording. Returns a session id; finalize it with stop_recording. Never auto-starts. |
 | [`stop_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/stop_recording.html) | Stop a recording gracefully so the file is finalized; returns the path and duration. |
+| [`delete_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/delete_recording.html) | Delete a finished recording with its sidecars (event log, webcam, transcript, index, markers, pause parts) and registry entries; reports bytes freed. Asks the user first when the client supports it. Edits made from it are kept. |
 | [`pause_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/pause_recording.html) | Pause a recording; until resume_recording nothing is captured, and the gap is left out of the file, events, and markers. |
 | [`resume_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/resume_recording.html) | Resume a paused recording (same target and settings). |
 | [`save_replay`](https://tmhsdigital.github.io/screencast-mcp/tools/save_replay.html) | Save the last N seconds of a replay buffer (start_recording replayBufferSec) to an mp4; the buffer keeps running. |
@@ -203,7 +204,7 @@ Every capture tool takes one `target` string: `full`, `monitor:<index>`, `window
 <!-- toolsets:start -->
 | Toolset | Tools |
 | --- | --- |
-| `capture` | `start_recording`, `stop_recording`, `pause_recording`, `resume_recording`, `save_replay`, `list_sessions`, `get_session`, `read_events`, `add_marker`, `screenshot`, `list_audio_devices`, `list_video_devices`, `list_targets` |
+| `capture` | `start_recording`, `stop_recording`, `delete_recording`, `pause_recording`, `resume_recording`, `save_replay`, `list_sessions`, `get_session`, `read_events`, `add_marker`, `screenshot`, `list_audio_devices`, `list_video_devices`, `list_targets` |
 | `watch` | `review_recording`, `player_frames`, `sample_frames`, `contact_sheet`, `screen_diff`, `wait_for_change`, `find_text`, `index_recording`, `search_recording` |
 | `edit` | `trim`, `concat`, `convert`, `export_gif`, `crop`, `scale`, `speed`, `compress`, `clip`, `cut_idle`, `cut_by_transcript`, `redact_region`, `pipeline` |
 | `produce` | `overlay`, `callout`, `keystroke_overlay`, `cursor`, `backdrop`, `burn_subtitles`, `chapters`, `xfade_transition`, `assemble_highlights`, `title_card`, `reframe`, `zoom`, `export_preset`, `bug_report`, `step_guide` |
@@ -230,7 +231,7 @@ Every capture tool takes one `target` string: `full`, `monitor:<index>`, `window
 - **What a tool returns goes to your model provider.** Inline frames, OCR text, and event summaries reach your agent like any tool result; files on disk stay on disk unless a tool returns them or you share them.
 - **Everything is stored under `SCREENCAST_HOME`** (`recordings/`, `screenshots/`, `frames/`, `edits/`, `sessions.json`) unless a call names another path. `find_text` and `wait_for_change` delete their captures after the call by default (`keep: true` keeps them); `screen_diff` compares existing images and captures nothing.
 - **The event log never records typed text.** Only with `start_recording` `events: true` (or `cursor: "events"`), and only while that recording runs: clicks, scrolls, and cursor positions system-wide, and typing as bursts on a 0.5 s grid with no key names (`keys: "shortcuts"` also names Ctrl/Alt/Win chords). There is no microphone capture; system audio only with `audio.source` = `system`.
-- **Deleting data.** Delete files under `SCREENCAST_HOME`, or set `SCREENCAST_RETENTION_DAYS`; recordings and edits are never deleted automatically.
+- **Deleting data.** `delete_recording` removes a recording with its sidecars (event log, webcam, transcript, index with its screen text, markers) and registry entry, asking you first when the client supports it. Otherwise delete files under `SCREENCAST_HOME`, or set `SCREENCAST_RETENTION_DAYS`; recordings and edits are never deleted automatically.
 
 ## Contributing
 

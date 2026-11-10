@@ -23,6 +23,7 @@ Every tool is an explicit call: nothing records on its own. Tools return file pa
 
 - [start_recording](https://tmhsdigital.github.io/screencast-mcp/tools/start_recording.html): Start a background screen recording.
 - [stop_recording](https://tmhsdigital.github.io/screencast-mcp/tools/stop_recording.html): Stop a recording gracefully so the file is finalized; returns the path and duration.
+- [delete_recording](https://tmhsdigital.github.io/screencast-mcp/tools/delete_recording.html): Delete a finished recording with its sidecars (event log, webcam, transcript, index, markers, pause parts) and registry entries; reports bytes freed.
 - [pause_recording](https://tmhsdigital.github.io/screencast-mcp/tools/pause_recording.html): Pause a recording; until resume_recording nothing is captured, and the gap is left out of the file, events, and markers.
 - [resume_recording](https://tmhsdigital.github.io/screencast-mcp/tools/resume_recording.html): Resume a paused recording (same target and settings).
 - [save_replay](https://tmhsdigital.github.io/screencast-mcp/tools/save_replay.html): Save the last N seconds of a replay buffer (start_recording replayBufferSec) to an mp4; the buffer keeps running.

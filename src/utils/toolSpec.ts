@@ -37,6 +37,15 @@ export const STOPS_SESSION: ToolAnnotations = {
   openWorldHint: false,
 };
 
+/** Deletes files the caller owns (delete_recording, #321); a second call
+ * finds nothing left to delete. */
+export const DELETES_FILE: ToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: false,
+};
+
 /** An output schema that names the fields a tool always returns and allows
  * any others. Loose on purpose: a strict object would publish
  * `additionalProperties: false`, and clients reject any extra or optional
