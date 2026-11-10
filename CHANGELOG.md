@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.48.2] - 2026-11-09
+
 ### Fixed
 
 - WGC window recordings no longer copy the partial frame on every pipe chunk: chunks are collected and joined once per frame, so large windows (1440p, 4K) keep up instead of dropping frames and pinning a core (#282).
