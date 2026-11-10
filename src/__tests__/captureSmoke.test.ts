@@ -92,24 +92,33 @@ describe.skipIf(!RUN)("capture smoke (RUN_CAPTURE_SMOKE)", { retry: RETRY }, () 
   }, 60_000);
 
   it("events: true writes events.jsonl, removes the raw log, and leaves no helper running (#298)", async () => {
-    const powershells = () =>
-      new Set(
-        (spawnSync("tasklist", ["/FI", "IMAGENAME eq powershell.exe", "/FO", "CSV", "/NH"], { encoding: "utf8" }).stdout ?? "")
-          .split(/\r?\n/)
-          .map((l) => l.split('","')[1])
-          .filter((pid): pid is string => !!pid),
-      );
-    const before = powershells();
+    // PowerShell children of this process: the hook helper. Other suites
+    // running alongside spawn PowerShell too, so a desktop-wide count is not
+    // a signal; the query's own PowerShell is left out.
+    const helpers = () =>
+      (
+        spawnSync(
+          "powershell",
+          ["-NoProfile", "-NonInteractive", "-Command",
+            `Get-CimInstance Win32_Process -Filter "ParentProcessId=${process.pid} AND Name='powershell.exe'" | Where-Object { $_.ProcessId -ne $PID } | ForEach-Object { $_.ProcessId }`],
+          { encoding: "utf8", windowsHide: true },
+        ).stdout ?? ""
+      )
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean);
     const start = await call("start_recording", { target: "region:0,0,640,480", quality: "draft", fps: 15, events: true });
     expect(start.isError, start.text).toBe(false);
     await sleep(1500);
+    expect(helpers(), "the hook helper is not a child of this process").not.toEqual([]);
     const stop = await call("stop_recording", { sessionId: start.json.sessionId });
     expect(stop.isError, stop.text).toBe(false);
     const base = (start.json.outputPath as string).replace(/\.mp4$/, "");
     expect(existsSync(`${base}.events.jsonl`), stop.text).toBe(true);
     expect(existsSync(`${base}.events.raw`)).toBe(false);
-    const leftover = [...powershells()].filter((pid) => !before.has(pid));
-    expect(leftover, "the hook helper is still running").toEqual([]);
+    let left = helpers();
+    for (const t0 = Date.now(); left.length > 0 && Date.now() - t0 < 3000; left = helpers()) await sleep(200);
+    expect(left, "the hook helper is still running").toEqual([]);
   }, 90_000);
 
   it("leaves a paused stretch out of the file and the markers (#200)", async () => {
