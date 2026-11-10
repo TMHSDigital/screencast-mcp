@@ -9,7 +9,7 @@
  */
 import { ScreencastError } from "./errors.js";
 import type { Monitor } from "./monitors.js";
-import { targetInputArgs, SCREENSHOT_GRAB_FPS, type Target } from "./targets.js";
+import { targetInputArgs, type Target } from "./targets.js";
 import { stillOutput } from "./paths.js";
 
 /** Width frames are analysed at by analysisSize (auto-zoom's whole-video scan). */
@@ -246,18 +246,25 @@ export function buildRawFrameArgs(input: string, size: { width: number; height: 
   ];
 }
 
-/** Grab one live frame of a resolved target as a raw gray bitmap at the
- * analysis size on stdout (gdigrab at 30 fps; see SCREENSHOT_GRAB_FPS). */
-export function buildRawGrabArgs(
+/** One long-running gdigrab that writes a raw gray frame at the analysis size
+ * every 1/fps second, for wait_for_change's polling (#292): one process per
+ * call instead of one per poll. Each frame is flushed as it is written, so
+ * the newest one never waits in ffmpeg's output buffer. */
+export function buildRawStreamArgs(
   target: Target,
   monitors: Monitor[],
   size: { width: number; height: number },
+  fps: number,
 ): string[] {
   return [
-    "-v", "error", "-f", "gdigrab", "-framerate", String(SCREENSHOT_GRAB_FPS),
+    "-v", "error",
+    // At a few fps ffmpeg's input probing would hold the first frames back
+    // for seconds; the frame format is known, so skip it.
+    "-probesize", "32", "-analyzeduration", "0",
+    "-f", "gdigrab", "-framerate", String(Math.round(fps * 1000) / 1000),
     ...targetInputArgs(target, monitors),
-    "-frames:v", "1",
     "-vf", `scale=${size.width}:${size.height}:flags=area,format=gray`,
+    "-flush_packets", "1",
     "-f", "rawvideo", "-",
   ];
 }

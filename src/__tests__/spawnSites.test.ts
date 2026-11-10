@@ -13,9 +13,10 @@ const toolsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "tools");
 const SPAWN = /\b(runFfmpeg|runCapture|runFfmpegBuffer|runFfmpegFrames|runEditJob)\(/g;
 
 /** Calls whose work is bounded however long the input is (one frame, a still
- * image, a live grab, or a probe), so a fixed timeout is fine. */
+ * image, a live grab or stream timed by the call's own timeout, or a probe),
+ * so a fixed timeout is fine. */
 const FIXED_OK = [
-  /\bbuild(RawFrame|Ssim|Highlight|RawGrab|Screenshot|Tile|Sheet|SampleAtTimestamp|Probe|StepFrame|StepShot|HtmlImage)Args\(/,
+  /\bbuild(RawFrame|Ssim|Highlight|RawStream|Screenshot|Tile|Sheet|SampleAtTimestamp|Probe|StepFrame|StepShot|HtmlImage)Args\(/,
   /"-frames:v", "1"/,
   /scale=iw\*\$\{scale\}/, // OCR upscale of one still
 ];

@@ -9,7 +9,7 @@ import {
   targetSize,
   meanDifference,
   diffFrames,
-  buildRawGrabArgs,
+  buildRawStreamArgs,
   buildSsimArgs,
   buildHighlightArgs,
   parseSsim,
@@ -75,11 +75,11 @@ describe("frame differencing (#116)", () => {
     expect(() => meanDifference(new Uint8Array(3), new Uint8Array(4))).toThrow();
   });
 
-  it("builds raw grab, SSIM, and highlight args", () => {
-    const g = buildRawGrabArgs({ kind: "region", x: 10, y: 20, w: 300, h: 200 }, [], { width: 300, height: 200 }).join(" ");
-    expect(g).toContain("-f gdigrab -framerate 30");
+  it("builds raw stream, SSIM, and highlight args", () => {
+    const g = buildRawStreamArgs({ kind: "region", x: 10, y: 20, w: 300, h: 200 }, [], { width: 300, height: 200 }, 4).join(" ");
+    expect(g).toContain("-f gdigrab -framerate 4");
     expect(g).toContain("-offset_x 10 -offset_y 20 -video_size 300x200");
-    expect(g).toContain("format=gray -f rawvideo -");
+    expect(g).toContain("format=gray -flush_packets 1 -f rawvideo -");
     expect(buildSsimArgs("a.png", "b.png", { width: 320, height: 180 }).join(" ")).toContain("[x][y]ssim");
     const h = buildHighlightArgs("b.png", [{ x: 1, y: 2, width: 3, height: 4 }], "o.png");
     expect(h[h.indexOf("-vf") + 1]).toBe("drawbox=x=1:y=2:w=3:h=4:color=red@0.9:t=3");

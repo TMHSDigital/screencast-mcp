@@ -2,17 +2,18 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
 import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
-import { requireFfmpeg, runFfmpeg, runFfmpegBuffer } from "../utils/ffmpeg.js";
+import { requireFfmpeg, runFfmpeg, runFfmpegFrames } from "../utils/ffmpeg.js";
 import { resolveCaptureTarget } from "../utils/resolveTarget.js";
 import { buildScreenshotArgs } from "../utils/targets.js";
 import {
   detectionSize,
   targetSize,
-  buildRawGrabArgs,
+  buildRawStreamArgs,
   targetDiffOptions,
   DEFAULT_PIXEL_THRESHOLD,
 } from "../utils/diff.js";
 import { waitLoop } from "../utils/waitLoop.js";
+import { FrameQueue } from "../utils/frameQueue.js";
 import { windowMatchReport } from "../utils/windows.js";
 import { confirmCapture, describeTarget } from "../utils/consent.js";
 import { subdir, stamp, rand } from "../utils/paths.js";
@@ -103,25 +104,49 @@ export function register(server: McpServer): void {
         );
         const area = targetSize(target, monitors);
         const size = detectionSize(area.width, area.height);
-        const grab = () => runFfmpegBuffer(buildRawGrabArgs(target, monitors, size), 15_000, { signal: extra.signal });
         const opts = targetDiffOptions(area, size, args.pixelThreshold);
 
-        const { outcome, regions, everChanged, startedAt: started } = await waitLoop({
-          grab,
-          mode,
-          width: size.width,
-          height: size.height,
-          diff: opts,
-          timeoutMs,
-          settleMs,
-          intervalMs: interval,
-          signal: extra.signal,
-        });
+        // One gdigrab for the whole wait, a frame every interval (#292); each
+        // poll takes the next frame, so the stream sets the pace.
+        const frames = new FrameQueue();
+        const stop = new AbortController();
+        const capture = runFfmpegFrames(
+          buildRawStreamArgs(target, monitors, size, 1000 / interval),
+          size.width * size.height,
+          (f) => frames.push(f),
+          timeoutMs + 60_000,
+          { signal: AbortSignal.any([extra.signal, stop.signal]) },
+        ).then(
+          () => frames.end(),
+          (err: unknown) => frames.fail(err),
+        );
+        let loop;
+        let endedAt = 0;
+        try {
+          loop = await waitLoop({
+            grab: () => frames.next(15_000),
+            mode,
+            width: size.width,
+            height: size.height,
+            diff: opts,
+            timeoutMs,
+            settleMs,
+            intervalMs: interval,
+            signal: extra.signal,
+            sleep: async () => {},
+          });
+          endedAt = Date.now();
+        } finally {
+          stop.abort();
+          await capture;
+        }
+        const { outcome, regions, everChanged, startedAt: started } = loop;
 
         const result: Record<string, unknown> = {
           outcome,
           mode,
-          elapsedSec: Number(((Date.now() - started) / 1000).toFixed(2)),
+          // Up to the loop's end, not the capture's teardown after it.
+          elapsedSec: Number(((endedAt - started) / 1000).toFixed(2)),
           ...(mode === "settle" ? { changedWhileWaiting: everChanged } : {}),
           regions,
           origin: { x: area.x, y: area.y },
