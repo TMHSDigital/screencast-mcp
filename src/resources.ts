@@ -6,10 +6,13 @@
  *   screencast://sessions/{id}          one session's record (JSON)
  *   screencast://sessions/{id}/poster   a JPEG preview frame of its recording
  *
- * Clients are told when the list changes (a recording starts or stops).
+ * Clients are told when the list changes (a recording starts or stops), and
+ * a client that subscribes to the list or one session gets resources/updated
+ * when its content changes (#324).
  */
 import { existsSync, rmSync } from "node:fs";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { SubscribeRequestSchema, UnsubscribeRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { getStore, isShuttingDown } from "./context.js";
 import { ScreencastError } from "./utils/errors.js";
 import { runFfmpeg, probeMedia } from "./utils/ffmpeg.js";
@@ -82,6 +85,20 @@ export function registerResources(server: McpServer): void {
     },
   );
 
+  // Subscriptions (#324): a client subscribed to the session list or one
+  // session's URI gets resources/updated when its content changes, e.g. a
+  // recording that ended on its own (max duration, window closed).
+  const subscribed = new Map<string, string | null>();
+  server.server.registerCapabilities({ resources: { subscribe: true } });
+  server.server.setRequestHandler(SubscribeRequestSchema, (req) => {
+    subscribed.set(req.params.uri, resourceSnapshot(req.params.uri));
+    return {};
+  });
+  server.server.setRequestHandler(UnsubscribeRequestSchema, (req) => {
+    subscribed.delete(req.params.uri);
+    return {};
+  });
+
   // Skipped once shutdown starts (the client's pipe may be gone), and never
   // allowed to throw into a registry write (#229).
   getStore().onChange(() => {
@@ -91,5 +108,22 @@ export function registerResources(server: McpServer): void {
     } catch {
       /* the client went away */
     }
+    for (const [uri, before] of subscribed) {
+      const now = resourceSnapshot(uri);
+      if (now === before) continue;
+      subscribed.set(uri, now);
+      server.server.sendResourceUpdated({ uri }).catch(() => {
+        /* the client went away */
+      });
+    }
   });
+}
+
+/** What a subscribable URI currently holds, to tell whether it changed; null
+ * for a session that does not exist (yet) or a URI with no snapshot. */
+export function resourceSnapshot(uri: string): string | null {
+  if (uri === "screencast://sessions") return JSON.stringify(getStore().list());
+  const m = /^screencast:\/\/sessions\/([^/]+)$/.exec(uri);
+  const s = m ? getStore().get(decodeURIComponent(m[1]!)) : undefined;
+  return s ? JSON.stringify(s) : null;
 }

@@ -221,7 +221,7 @@ Every capture tool takes one `target` string: `full`, `monitor:<index>`, `window
     with:
       command: npm run test:e2e
   ```
-- **Prompts and resources:** the server also ships MCP prompts that clients show as slash commands (`bug-repro-clip`, `file-bug-report`, `document-steps`, `demo-gif`, `verify-ui-change`, `review-recording`) and `screencast://sessions` resources for attaching recordings without a filesystem tool.
+- **Prompts and resources:** the server also ships MCP prompts that clients show as slash commands (`bug-repro-clip`, `file-bug-report`, `document-steps`, `demo-gif`, `verify-ui-change`, `review-recording`) and `screencast://sessions` resources for attaching recordings without a filesystem tool. A client can subscribe to the list or one session and is notified when it changes, such as a recording that stopped at its cap.
 - **Threat model and Windows notes:** what capture can expose, and how window, monitor, WGC, and system-audio capture behave, are on the [docs home page](https://tmhsdigital.github.io/screencast-mcp/#threat-model).
 
 ## Privacy

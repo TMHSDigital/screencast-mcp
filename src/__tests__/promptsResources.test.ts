@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { ResourceListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
+import { ResourceListChangedNotificationSchema, ResourceUpdatedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import { RECIPES } from "../utils/recipes.js";
 
 const home = mkdtempSync(join(tmpdir(), "screencast-pr-"));
@@ -89,6 +89,27 @@ describe("MCP prompts and resources (#126)", () => {
     expect(templates).toContain("screencast://sessions/{id}/poster");
     await expect(client.readResource({ uri: "screencast://sessions/rec-1/poster" })).rejects.toThrow(/not found/);
     await expect(client.readResource({ uri: "screencast://sessions/missing" })).rejects.toThrow(/No session/);
+  });
+
+  it("sends resources/updated to a subscriber when that session changes (#324)", async () => {
+    const store = getStore();
+    store.create({ id: "rec-sub", target: "full", outputPath: join(home, "sub.mp4"), fps: 30, quality: "standard", pid: null, status: "recording", startedAt: new Date().toISOString() });
+    store.create({ id: "rec-other", target: "full", outputPath: join(home, "other.mp4"), fps: 30, quality: "standard", pid: null, status: "recording", startedAt: new Date().toISOString() });
+    const updated: string[] = [];
+    client.setNotificationHandler(ResourceUpdatedNotificationSchema, (n) => {
+      updated.push(n.params.uri);
+    });
+    await client.subscribeResource({ uri: "screencast://sessions/rec-sub" });
+    store.update("rec-other", { status: "stopped", endReason: "max_duration" });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(updated).toEqual([]);
+    store.update("rec-sub", { status: "stopped", endReason: "max_duration" });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(updated).toEqual(["screencast://sessions/rec-sub"]);
+    await client.unsubscribeResource({ uri: "screencast://sessions/rec-sub" });
+    store.update("rec-sub", { durationSec: 3 });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(updated).toHaveLength(1);
   });
 });
 

@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- Resource subscriptions: a client can subscribe to `screencast://sessions` or `screencast://sessions/{id}` and gets `resources/updated` when it changes, so a recording that ended on its own (`maxDurationSec`, window closed) is noticed without polling (#324).
+
 ### Changed
 
 - Frame extraction runs several ffmpeg processes at once (a quarter of the cores, 2 to 4) instead of one at a time: `sample_frames` with timestamps or scenes, `index_recording` keyframes, `step_guide` shots, `contact_sheet` tiles, and inline image encoding. 40 frames from a 720p clip took 5.5 s instead of 14.8 s on a 12-core machine. Output order and file names are unchanged (#290).
