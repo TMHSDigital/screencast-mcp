@@ -8,12 +8,13 @@
  * `npm test` never captures a developer's screen.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const RUN = process.platform === "win32" && !!process.env.RUN_CAPTURE_SMOKE;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -173,6 +174,122 @@ describe.skipIf(!RUN)("capture smoke (RUN_CAPTURE_SMOKE)", { retry: RETRY }, () 
     expect(info.width).toBe(640);
     expect(info.durationSec!).toBeGreaterThan(1);
   }, 60_000);
+
+  // Moved from the local-only suite so they gate releases (#300).
+
+  it("maxDurationSec ends a recording on its own with a playable file (#82)", async () => {
+    const { probeMedia } = await import("../utils/ffmpeg.js");
+    const start = await call("start_recording", { target: "region:0,0,64,64", quality: "draft", fps: 5, maxDurationSec: 2 });
+    expect(start.isError, start.text).toBe(false);
+    expect(start.json.maxDurationSec).toBe(2);
+    // Poll rather than sleep a fixed time: a loaded host is slow to spin up ffmpeg.
+    let got = await call("get_session", { sessionId: start.json.sessionId });
+    for (const t0 = Date.now(); got.json.status === "recording" && Date.now() - t0 < 30_000; ) {
+      await sleep(500);
+      got = await call("get_session", { sessionId: start.json.sessionId });
+    }
+    expect(got.json, got.text).toMatchObject({ status: "stopped", endReason: "max_duration" });
+    const info = await probeMedia(start.json.outputPath as string);
+    expect(info.durationSec!).toBeCloseTo(2, 0);
+  }, 60_000);
+
+  it("wait_for_change: a still region settles, and an unchanged one times out (#116)", async () => {
+    // The top-left corner of a runner's desktop holds no clock or cursor.
+    const settle = await call("wait_for_change", { target: "region:0,0,64,64", mode: "settle", settleSec: 0.5, timeoutSec: 10, returnImage: false });
+    expect(settle.isError, settle.text).toBe(false);
+    expect(settle.json.outcome).toBe("settled");
+    const change = await call("wait_for_change", { target: "region:0,0,64,64", mode: "change", timeoutSec: 1, returnImage: false });
+    expect(change.isError, change.text).toBe(false);
+    expect(change.json.outcome).toBe("timeout");
+  }, 60_000);
+
+  // These two start their own server process from dist/ (CI builds first).
+  const SERVER = join(process.cwd(), "dist", "index.js");
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  it("reaps a live orphaned ffmpeg on startup", async () => {
+    const { requireFfmpeg } = await import("../utils/ffmpeg.js");
+    const h = mkdtempSync(join(tmpdir(), "sc-smoke-reap-"));
+    mkdirSync(join(h, "recordings"), { recursive: true });
+    const out = join(h, "recordings", "orphan.mp4");
+    const ff = spawn(
+      requireFfmpeg().ffmpeg,
+      ["-y", "-f", "gdigrab", "-framerate", "5", "-offset_x", "0", "-offset_y", "0", "-video_size", "200x150", "-i", "desktop", "-t", "30",
+        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-movflags", "+frag_keyframe+empty_moov", out],
+      { detached: true, stdio: "ignore", windowsHide: true },
+    );
+    ff.unref();
+    try {
+      await sleep(1500);
+      expect(alive(ff.pid!)).toBe(true);
+      writeFileSync(
+        join(h, "sessions.json"),
+        JSON.stringify([{ id: "rec-orphan", target: "region:0,0,200,150", outputPath: out, fps: 5, quality: "draft", pid: ff.pid, status: "recording", startedAt: "2026-01-01T00:00:00.000Z" }]),
+      );
+      const c2 = new Client({ name: "reap", version: "0.0.0" });
+      await c2.connect(new StdioClientTransport({ command: process.execPath, args: [SERVER], env: { ...process.env, SCREENCAST_HOME: h } as Record<string, string>, stderr: "pipe" }));
+      try {
+        let status = "";
+        for (const t0 = Date.now(); Date.now() - t0 < 15_000; await sleep(300)) {
+          const sess = await c2.callTool({ name: "get_session", arguments: { sessionId: "rec-orphan" } });
+          status = (JSON.parse((sess.content as Array<{ text: string }>)[0]!.text) as { status: string }).status;
+          if (status === "orphaned" && !alive(ff.pid!)) break;
+        }
+        expect(status).toBe("orphaned");
+        expect(alive(ff.pid!)).toBe(false);
+      } finally {
+        await c2.close();
+      }
+    } finally {
+      if (alive(ff.pid!)) spawnSync("taskkill", ["/PID", String(ff.pid), "/F"]);
+      rmSync(h, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it("a client disconnect finalizes the recording and the server + ffmpeg exit (#76)", async () => {
+    const { probeMedia } = await import("../utils/ffmpeg.js");
+    // Raw stdio (not StdioClientTransport, whose close() kills the child and
+    // would hide the bug): end the server's stdin like a client going away.
+    const h = mkdtempSync(join(tmpdir(), "sc-smoke-disconnect-"));
+    const srv = spawn(process.execPath, [SERVER], { env: { ...process.env, SCREENCAST_HOME: h }, stdio: ["pipe", "pipe", "pipe"] });
+    let started: { pid: number; outputPath: string; sessionId: string } | undefined;
+    try {
+      let buf = "";
+      let errBuf = "";
+      srv.stdout.on("data", (d) => (buf += d));
+      srv.stderr.on("data", (d) => (errBuf += d));
+      const send = (m: object) => srv.stdin.write(JSON.stringify(m) + "\n");
+      send({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "disconnect", version: "0" } } });
+      send({ jsonrpc: "2.0", method: "notifications/initialized" });
+      send({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "start_recording", arguments: { target: "region:0,0,64,64", quality: "draft", fps: 5 } } });
+      for (const t0 = Date.now(); !buf.includes('"id":2') && Date.now() - t0 < 45_000; ) await sleep(100);
+      const line = buf.split("\n").find((l) => l.includes('"id":2'));
+      expect(line, `start_recording never answered. stdout: ${buf.slice(0, 400)} stderr: ${errBuf.slice(0, 400)}`).toBeDefined();
+      started = JSON.parse((JSON.parse(line!) as { result: { content: Array<{ text: string }> } }).result.content[0]!.text) as typeof started;
+      await sleep(1500);
+
+      const exited = new Promise<void>((r) => srv.once("exit", () => r()));
+      srv.stdin.end();
+      await Promise.race([exited, sleep(30_000)]);
+
+      expect(srv.exitCode !== null || srv.signalCode !== null, `server still running. stderr: ${errBuf.slice(-400)}`).toBe(true);
+      expect(alive(started!.pid)).toBe(false);
+      expect((await probeMedia(started!.outputPath)).durationSec!).toBeGreaterThan(0.5);
+      const reg = JSON.parse(readFileSync(join(h, "sessions.json"), "utf8")) as Array<{ id: string; status: string; endReason?: string }>;
+      expect(reg.find((r) => r.id === started!.sessionId)).toMatchObject({ status: "stopped", endReason: "shutdown" });
+    } finally {
+      if (srv.exitCode === null && srv.signalCode === null) srv.kill();
+      if (started && alive(started.pid)) spawnSync("taskkill", ["/PID", String(started.pid), "/F"]);
+      rmSync(h, { recursive: true, force: true });
+    }
+  }, 120_000);
 
   // A camera is needed too, so this one has its own switch.
   it.skipIf(!process.env.RUN_WEBCAM_SMOKE)("records a webcam aligned with the screen (#200)", async () => {

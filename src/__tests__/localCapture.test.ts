@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { defined } from "./testUtils.js";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -426,81 +426,6 @@ describe.skipIf(!RUN)("local gdigrab capture (RUN_LOCAL_CAPTURE_TESTS)", () => {
     expect(d.json.ssim).toBeCloseTo(1, 5);
   }, 30_000);
 
-  it("reaps a live orphaned ffmpeg on startup", async () => {
-    const h = mkdtempSync(join(tmpdir(), "screencast-reap-"));
-    mkdirSync(join(h, "recordings"), { recursive: true });
-    const out = join(h, "recordings", "orphan.mp4");
-    const ff = spawn("ffmpeg", ["-y", "-f", "gdigrab", "-framerate", "5", "-offset_x", "0", "-offset_y", "0", "-video_size", "200x150", "-i", "desktop", "-t", "30", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-movflags", "+frag_keyframe+empty_moov", out], { detached: true, stdio: "ignore", windowsHide: true });
-    ff.unref();
-    await sleep(1500);
-    const wasAlive = spawnSync("tasklist", ["/FI", `PID eq ${ff.pid}`, "/FO", "CSV", "/NH"], { encoding: "utf8" }).stdout.includes("ffmpeg");
-    expect(wasAlive).toBe(true);
-    writeFileSync(join(h, "sessions.json"), JSON.stringify([{ id: "rec-orphan", target: "region:0,0,200,150", outputPath: out, fps: 5, quality: "draft", pid: ff.pid, status: "recording", startedAt: "2026-01-01T00:00:00.000Z" }]));
-    const tr = new StdioClientTransport({ command: process.execPath, args: [SERVER], env: { ...process.env, SCREENCAST_HOME: h }, stderr: "pipe" });
-    const c2 = new Client({ name: "reap", version: "0.0.0" }, { capabilities: {} });
-    await c2.connect(tr);
-    await sleep(1200);
-    const stillAlive = spawnSync("tasklist", ["/FI", `PID eq ${ff.pid}`, "/FO", "CSV", "/NH"], { encoding: "utf8" }).stdout.includes("ffmpeg");
-    const sess = await c2.callTool({ name: "get_session", arguments: { sessionId: "rec-orphan" } });
-    const status = JSON.parse(defined((sess.content as Array<{ text: string }>)[0]).text).status;
-    await c2.close();
-    rmSync(h, { recursive: true, force: true });
-    expect(stillAlive).toBe(false);
-    expect(status).toBe("orphaned");
-  }, 30_000);
-
-  it("maxDurationSec ends a recording on its own with a playable file (#82)", async () => {
-    const start = await call("start_recording", { target: "region:0,0,64,64", quality: "draft", fps: 5, maxDurationSec: 2 });
-    expect(start.json.maxDurationSec).toBe(2);
-    // Poll rather than sleep a fixed time: a loaded host is slow to spin up ffmpeg.
-    let got = await call("get_session", { sessionId: start.json.sessionId });
-    for (const t0 = Date.now(); got.json.status === "recording" && Date.now() - t0 < 30_000; ) {
-      await sleep(500);
-      got = await call("get_session", { sessionId: start.json.sessionId });
-    }
-    expect(got.json.status).toBe("stopped");
-    expect(got.json.endReason).toBe("max_duration");
-    const p = ffprobe(start.json.outputPath);
-    expect(p.ok).toBe(true);
-    expect(p.durationSec).toBeCloseTo(2, 0);
-  }, 60_000);
-
-  it("a client disconnect finalizes the recording and the server + ffmpeg exit (#76)", async () => {
-    // Raw stdio (not StdioClientTransport, whose close() kills the child and
-    // would hide the bug): end the server's stdin like a client going away.
-    const h = mkdtempSync(join(tmpdir(), "screencast-disconnect-"));
-    const srv = spawn(process.execPath, [SERVER], { env: { ...process.env, SCREENCAST_HOME: h }, stdio: ["pipe", "pipe", "pipe"] });
-    let buf = "";
-    let errBuf = "";
-    srv.stdout.on("data", (d) => (buf += d));
-    srv.stderr.on("data", (d) => (errBuf += d));
-    const send = (m: object) => srv.stdin.write(JSON.stringify(m) + "\n");
-    send({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "disconnect", version: "0" } } });
-    send({ jsonrpc: "2.0", method: "notifications/initialized" });
-    send({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "start_recording", arguments: { target: "region:0,0,64,64", quality: "draft", fps: 5 } } });
-    const t0 = Date.now();
-    while (!buf.includes('"id":2') && Date.now() - t0 < 45_000) await sleep(100);
-    const line = buf.split("\n").find((l) => l.includes('"id":2'));
-    expect(line, `start_recording never answered. stdout: ${buf.slice(0, 400)} stderr: ${errBuf.slice(0, 400)}`).toBeDefined();
-    const started = JSON.parse(JSON.parse(line!).result.content[0].text);
-    await sleep(1500);
-
-    const exited = new Promise<void>((r) => srv.once("exit", () => r()));
-    srv.stdin.end();
-    await Promise.race([exited, sleep(30_000)]);
-
-    const isAlive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
-    const serverAlive = srv.exitCode === null && srv.signalCode === null;
-    const ffmpegAlive = isAlive(started.pid);
-    if (serverAlive) srv.kill();
-    if (ffmpegAlive) spawnSync("taskkill", ["/PID", String(started.pid), "/F"]);
-    const p = ffprobe(started.outputPath);
-    const reg = JSON.parse(readFileSync(join(h, "sessions.json"), "utf8")) as Array<{ id: string; status: string; endReason?: string }>;
-    rmSync(h, { recursive: true, force: true });
-
-    expect(serverAlive).toBe(false);
-    expect(ffmpegAlive).toBe(false);
-    expect(p.ok).toBe(true);
-    expect(reg.find((r) => r.id === started.sessionId)).toMatchObject({ status: "stopped", endReason: "shutdown" });
-  }, 120_000);
+  // Orphan reaping, maxDurationSec and client disconnect run in CI's capture
+  // smoke now (captureSmoke.test.ts, #300).
 });
