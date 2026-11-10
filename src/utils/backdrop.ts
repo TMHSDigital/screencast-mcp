@@ -12,7 +12,7 @@
  */
 import { ScreencastError } from "./errors.js";
 import { validateColor } from "./validate.js";
-import { ASPECT_DIMS, type Aspect } from "./produce.js";
+import { ASPECT_DIMS, type Aspect, ASPECTS } from "./produce.js";
 import { resolveQuality, type Quality } from "./targets.js";
 import { stillOutput } from "./paths.js";
 import { z } from "zod";
@@ -263,5 +263,5 @@ export const backdropOptionsSchema = {
   radius: z.number().int().nonnegative().max(1000).optional(),
   shadow: z.number().int().nonnegative().max(200).optional(),
   shadowOpacity: z.number().min(0).max(1).optional(),
-  aspect: z.enum(["16:9", "9:16", "1:1", "4:5"]).optional(),
+  aspect: z.enum(ASPECTS).optional(),
 };

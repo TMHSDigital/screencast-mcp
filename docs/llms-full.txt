@@ -1319,7 +1319,7 @@ Normalize loudness to a delivery target (two-pass EBU R128 loudnorm); video is c
 Parameters:
 
 - `input` (string; required): Path to the source video or audio file.
-- `target` ("youtube" | "podcast" | "broadcast" | number): youtube (-14 LUFS, default), podcast (-16), broadcast (-23), or a LUFS number.
+- `target` ("youtube" | "podcast" | "broadcast" | number): youtube (-14 LUFS, default), podcast (-16), broadcast (-23), or a LUFS number (-70 to -5).
 - `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
 - `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
 

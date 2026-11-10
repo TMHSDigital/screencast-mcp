@@ -6,7 +6,7 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia, hasFilter } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
-import { buildBurnSubtitlesArgs, type CaptionStyle } from "../utils/captions.js";
+import { buildBurnSubtitlesArgs, CAPTION_STYLE_NAMES } from "../utils/captions.js";
 import { bundledFontPath } from "../utils/fonts.js";
 import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
@@ -15,7 +15,7 @@ const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
   subtitles: z.string().min(1).describe("Path to an .srt (e.g. from transcribe) or .ass subtitle file."),
   style: z
-    .enum(["clean", "social"])
+    .enum(CAPTION_STYLE_NAMES)
     .optional()
     .describe(
       "clean (default for .srt): outlined line. social: big bold text on a dark box. .ass keeps its own " +
@@ -49,7 +49,7 @@ export function register(server: McpServer): void {
         const ext = editOutputExt(args.input);
         const output = resolveOutput(args.output, subdir("edits"), `subtitled-${stamp()}-${rand()}${ext}`, args.overwrite);
         const fontsDir = dirname(bundledFontPath("regular"));
-        const style = (args.style as CaptionStyle | undefined) ?? (/\.(ass|ssa)$/i.test(args.subtitles) ? null : "clean");
+        const style = args.style ?? (/\.(ass|ssa)$/i.test(args.subtitles) ? null : "clean");
         await runEditJob(buildBurnSubtitlesArgs(args.input, args.subtitles, output, fontsDir, style), {
           output,
           durationSec: (await probeMedia(args.input)).durationSec,

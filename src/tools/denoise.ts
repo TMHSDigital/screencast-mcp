@@ -5,14 +5,14 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob, jobTimeoutMs } from "../utils/jobs.js";
-import { buildDenoiseArgs, buildNoiseFloorArgs, parseNoiseFloor, type DenoiseStrength } from "../utils/audio.js";
+import { buildDenoiseArgs, buildNoiseFloorArgs, parseNoiseFloor, type DenoiseStrength, DENOISE_STRENGTHS } from "../utils/audio.js";
 import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video or audio file."),
   strength: z
-    .enum(["light", "medium", "strong"])
+    .enum(DENOISE_STRENGTHS)
     .optional()
     .describe("How hard to reduce noise: light (6 dB), medium (12 dB, default), strong (20 dB)."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),

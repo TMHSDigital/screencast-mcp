@@ -11,16 +11,16 @@ import { planPipeline, probeArgs, sidecarCues, MAX_PIPELINE_STEPS, type AudioMea
 import { calloutFonts, prepareCalloutAssets } from "../utils/calloutAssets.js";
 import { exportAnimation } from "../utils/animExport.js";
 import type { CalloutAssets } from "../utils/callout.js";
-import { assertEditContainer, redactRegionSchema } from "../utils/media.js";
+import { assertEditContainer, redactRegionSchema, REDACT_STYLES } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
-import { PLATFORMS } from "../utils/produce.js";
+import { PLATFORMS, ASPECTS, REFRAME_FITS } from "../utils/produce.js";
 import { buildChapters, ffmetadata, markerPoints, markersOrChapters, retimeMarkers, writeMarkers, type Chapter, type Marker } from "../utils/chapters.js";
 import type { CursorStepAssets, KeystrokeStepAssets } from "../utils/pipeline.js";
 import { cursorSpritePath, cursorOptionsSchema, loadCursor } from "../utils/cursor.js";
 import { MAX_ZOOM, type ClickPoint, readClicks, zoomKeyframeSchema } from "../utils/zoom.js";
 import { buildIdleScanArgs, intersect, parseFreezes, parseSilences, DEFAULT_MIN_IDLE_SEC } from "../utils/idle.js";
-import { buildLoudnessMeasureArgs, buildNoiseFloorArgs, loudnessTarget, parseLoudnorm, parseNoiseFloor } from "../utils/audio.js";
-import { buildTranscribeArgs, formatSrt, normalizeCues, parseSrt, resolveWhisperModel, type Cue } from "../utils/captions.js";
+import { buildLoudnessMeasureArgs, buildNoiseFloorArgs, loudnessTarget, parseLoudnorm, parseNoiseFloor, DENOISE_STRENGTHS, loudnessTargetSchema } from "../utils/audio.js";
+import { buildTranscribeArgs, formatSrt, normalizeCues, parseSrt, resolveWhisperModel, type Cue, CAPTION_STYLE_NAMES } from "../utils/captions.js";
 import { eventPaths } from "../utils/events.js";
 import { bundledFontPath } from "../utils/fonts.js";
 import { retimeAss, retimeCues, type Span } from "../utils/timeline.js";
@@ -40,8 +40,8 @@ function transcribeBlocker(): string | null {
   }
 }
 
-const aspect = z.enum(["16:9", "9:16", "1:1", "4:5"]);
-const fit = z.enum(["pad", "crop"]).optional();
+const aspect = z.enum(ASPECTS);
+const fit = z.enum(REFRAME_FITS).optional();
 
 const step = z.discriminatedUnion("op", [
   z.object({
@@ -62,7 +62,7 @@ const step = z.discriminatedUnion("op", [
   z.object({
     op: z.literal("redact"),
     regions: z.array(redactRegionSchema).min(1),
-    style: z.enum(["box", "blur", "pixelate"]).optional(),
+    style: z.enum(REDACT_STYLES).optional(),
     pad: z.number().int().nonnegative().optional(),
     color: z.string().optional(),
   }),
@@ -79,14 +79,14 @@ const step = z.discriminatedUnion("op", [
   z.object({ op: z.literal("cut_idle"), minIdleSec: z.number().positive().optional(), keepSec: z.number().min(0).optional() }),
   z.object({
     op: z.literal("audio"),
-    normalize: z.union([z.enum(["youtube", "podcast", "broadcast"]), z.number().min(-70).max(-5)]).optional(),
-    denoise: z.enum(["light", "medium", "strong"]).optional(),
+    normalize: loudnessTargetSchema.optional(),
+    denoise: z.enum(DENOISE_STRENGTHS).optional(),
   }),
   z.object({
     op: z.literal("burn_subtitles"),
-    subtitles: z.string().optional(),
+    subtitles: z.string().min(1).optional(),
     transcribe: z.boolean().optional(),
-    style: z.enum(["clean", "social"]).optional(),
+    style: z.enum(CAPTION_STYLE_NAMES).optional(),
   }),
   z.object({ op: z.literal("backdrop"), ...backdropOptionsSchema }),
   z.object({ op: z.literal("keystroke_overlay"), ...keystrokeOptionsSchema }),

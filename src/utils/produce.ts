@@ -360,8 +360,12 @@ export function buildMusicBedArgs(
 
 // --- Aspect variants and platform export ----------------------------------
 
-export type Aspect = "16:9" | "9:16" | "1:1" | "4:5";
-export type ReframeFit = "pad" | "crop";
+/** Option values shared by the tools, the pipeline steps and their schemas
+ * (#309). */
+export const ASPECTS = ["16:9", "9:16", "1:1", "4:5"] as const;
+export type Aspect = (typeof ASPECTS)[number];
+export const REFRAME_FITS = ["pad", "crop"] as const;
+export type ReframeFit = (typeof REFRAME_FITS)[number];
 
 /** Canonical target dimensions per aspect (even dims, social-ready). */
 export const ASPECT_DIMS: Record<Aspect, { w: number; h: number }> = {

@@ -9,8 +9,15 @@
 import { extname } from "node:path";
 import { ScreencastError } from "./errors.js";
 import { isAudioOnlyPath } from "./media.js";
+import { z } from "zod";
 
-export type LoudnessPreset = "youtube" | "podcast" | "broadcast";
+export const LOUDNESS_PRESET_NAMES = ["youtube", "podcast", "broadcast"] as const;
+export type LoudnessPreset = (typeof LOUDNESS_PRESET_NAMES)[number];
+
+/** A loudness target: a preset name or integrated LUFS in the range
+ * loudnessTarget accepts. Shared by normalize_audio and the pipeline's audio
+ * step, so both advertise the same bounds (#309). */
+export const loudnessTargetSchema = z.union([z.enum(LOUDNESS_PRESET_NAMES), z.number().min(-70).max(-5)]);
 
 export interface LoudnessTarget {
   /** Integrated loudness, LUFS. */
@@ -123,7 +130,8 @@ export function buildLoudnessApplyArgs(input: string, output: string, t: Loudnes
   ];
 }
 
-export type DenoiseStrength = "light" | "medium" | "strong";
+export const DENOISE_STRENGTHS = ["light", "medium", "strong"] as const;
+export type DenoiseStrength = (typeof DENOISE_STRENGTHS)[number];
 
 /** afftdn noise-reduction amount (dB) per strength. */
 export const DENOISE_NR: Record<DenoiseStrength, number> = { light: 6, medium: 12, strong: 20 };

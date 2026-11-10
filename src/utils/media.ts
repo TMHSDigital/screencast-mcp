@@ -754,7 +754,8 @@ export function buildClipArgs(
 // against the real frame so an off-frame typo fails loudly instead of leaving
 // the secret visible.
 
-export type RedactStyle = "box" | "blur" | "pixelate";
+export const REDACT_STYLES = ["box", "blur", "pixelate"] as const;
+export type RedactStyle = (typeof REDACT_STYLES)[number];
 
 export interface RedactRegion {
   x: number;

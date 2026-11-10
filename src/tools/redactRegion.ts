@@ -5,7 +5,7 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
-import { buildRedactArgs, type RedactStyle, stillEdit, redactRegionSchema } from "../utils/media.js";
+import { buildRedactArgs, stillEdit, redactRegionSchema, REDACT_STYLES } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
@@ -15,7 +15,7 @@ const inputSchema = {
     .min(1)
     .describe("Pixel rectangles (x, y, width, height), each optionally limited to start..end seconds."),
   style: z
-    .enum(["box", "blur", "pixelate"])
+    .enum(REDACT_STYLES)
     .optional()
     .describe("box (default): irreversible fill; blur/pixelate are partially recoverable."),
   pad: z
@@ -61,7 +61,7 @@ export function register(server: McpServer): void {
           output,
           args.regions,
           {
-            style: args.style as RedactStyle | undefined,
+            style: args.style,
             pad: args.pad,
             color: args.color,
           },

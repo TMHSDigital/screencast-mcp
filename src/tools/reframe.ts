@@ -5,17 +5,17 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
-import { buildReframeArgs, type Aspect, type ReframeFit } from "../utils/produce.js";
+import { buildReframeArgs, type ReframeFit, ASPECTS, REFRAME_FITS } from "../utils/produce.js";
 import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
   aspect: z
-    .enum(["16:9", "9:16", "1:1", "4:5"])
+    .enum(ASPECTS)
     .describe("Target aspect ratio."),
   fit: z
-    .enum(["pad", "crop"])
+    .enum(REFRAME_FITS)
     .optional()
     .describe("pad (default): letterbox, nothing lost. crop: fill and center-crop."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
@@ -45,7 +45,7 @@ export function register(server: McpServer): void {
         const ffArgs = buildReframeArgs(
           args.input,
           output,
-          args.aspect as Aspect,
+          args.aspect,
           (args.fit as ReframeFit | undefined) ?? "pad",
         );
         await runEditJob(ffArgs, { output, durationSec: await probeDuration(args.input), extra });

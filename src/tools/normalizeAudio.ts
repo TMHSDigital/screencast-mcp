@@ -11,17 +11,17 @@ import {
   buildLoudnessApplyArgs,
   parseLoudnorm,
   type LoudnessPreset,
+  loudnessTargetSchema,
 } from "../utils/audio.js";
 import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video or audio file."),
-  target: z
-    .union([z.enum(["youtube", "podcast", "broadcast"]), z.number()])
+  target: loudnessTargetSchema
     .optional()
     .describe(
-      "youtube (-14 LUFS, default), podcast (-16), broadcast (-23), or a LUFS number.",
+      "youtube (-14 LUFS, default), podcast (-16), broadcast (-23), or a LUFS number (-70 to -5).",
     ),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),

@@ -10,6 +10,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - `wait_for_change` runs one screen capture for the whole wait instead of starting ffmpeg for every check: a 10-minute wait no longer spawns 1000+ processes, and checks now land on the requested interval instead of ~200 ms later. Cancel and timeout still stop the capture (#292).
+- `normalize_audio`'s `target` now advertises the LUFS range it accepts (-70 to -5) in its schema, as the pipeline's `audio` step already did; a value outside it is rejected as invalid arguments instead of by the tool. A pipeline `burn_subtitles` step rejects an empty `subtitles` path like the tool does (#309).
 
 ## [0.49.0] - 2026-11-09
 

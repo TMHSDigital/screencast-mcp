@@ -118,7 +118,8 @@ export function formatSrt(cues: Cue[]): string {
   return cues.map((c, i) => `${i + 1}\n${fmt(c.start)} --> ${fmt(c.end)}\n${c.text}\n`).join("\n");
 }
 
-export type CaptionStyle = "clean" | "social";
+export const CAPTION_STYLE_NAMES = ["clean", "social"] as const;
+export type CaptionStyle = (typeof CAPTION_STYLE_NAMES)[number];
 
 /** libass force_style overrides. SRT is laid out on a 288 px-tall canvas, so
  * sizes are relative to that: "clean" is a modest outlined line at the bottom;
