@@ -21,7 +21,7 @@ import { windowMatchReport } from "../utils/windows.js";
 import { resolveLoopbackDevice, resolveVideoDevice } from "../utils/audioDevices.js";
 import { confirmCapture, describeTarget } from "../utils/consent.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
-import { getStore } from "../context.js";
+import { beginStart, getStore } from "../context.js";
 import { killPid, serverIdentity, type SessionRecord } from "../utils/sessions.js";
 import { mkdirSync, rmSync } from "node:fs";
 import {
@@ -208,7 +208,10 @@ export function register(server: McpServer): void {
       annotations: WRITES_FILE,
     },
     async (args, extra) => {
+      // Shutdown waits for this call so it can stop what it spawns (#285).
+      let release = (): void => {};
       try {
+        release = beginStart();
         const { ffmpeg } = requireFfmpeg();
         // A cursor left out of the video is redrawn from the event log (#170).
         const hideCursor = args.cursor === "events";
@@ -511,6 +514,8 @@ export function register(server: McpServer): void {
         });
       } catch (error) {
         return errorResponse(error);
+      } finally {
+        release();
       }
     },
   );

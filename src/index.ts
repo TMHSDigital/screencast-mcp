@@ -11,13 +11,16 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import { isCliInvocation, runCli } from "./cli.js";
-import { getStore, isShuttingDown, markShuttingDown } from "./context.js";
+import { getStore, isShuttingDown, markShuttingDown, startsSettled } from "./context.js";
 import { requireFfmpeg } from "./utils/ffmpeg.js";
 import { abortEditJobs } from "./utils/jobs.js";
 import { probeDuration, stopAll } from "./utils/lifecycle.js";
 import { createServer } from "./server.js";
 import { pruneCaptures, retentionDays, RETENTION_ENV } from "./utils/retention.js";
 import { cleanupReplayDirs } from "./utils/replay.js";
+
+/** How long shutdown waits for in-flight start_recording calls (#285). */
+const START_SETTLE_MS = 10_000;
 
 const server = createServer();
 
@@ -95,6 +98,11 @@ async function shutdown(reason: string, exitCode = 0): Promise<void> {
   // (#237); cancel edits alongside stopping recordings, then await both.
   const edits = abortEditJobs();
   try {
+    // A start_recording between consent and registering its session is not
+    // in the store yet; let it register so stopAll stops its capture (#285).
+    if (!(await startsSettled(START_SETTLE_MS))) {
+      process.stderr.write(`Shutdown (${reason}): a start_recording call did not finish within ${START_SETTLE_MS / 1000}s.\n`);
+    }
     const store = getStore();
     if (store.activeIds().length > 0) {
       let ffprobe: string | null = null;
