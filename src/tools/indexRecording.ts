@@ -41,6 +41,7 @@ import {
   type RecordingIndex,
   type TimedText,
 } from "../utils/recordingIndex.js";
+import { mapPool } from "../utils/pool.js";
 
 /** Keyframes per OCR run: the job checks for cancellation between batches. */
 const OCR_BATCH = 8;
@@ -118,12 +119,12 @@ export function register(server: McpServer): void {
             for (let b = 0; b < spans.length; b += OCR_BATCH) {
               extra.signal.throwIfAborted();
               const batch = spans.slice(b, b + OCR_BATCH);
-              const frames: Array<{ at: number; path: string }> = [];
-              for (const [i, span] of batch.entries()) {
+              const grabbed = await mapPool(batch, async (span, i) => {
                 const out = join(work, `key_${b + i}.png`);
                 await runFfmpeg(buildSampleAtTimestampArgs(source.path, keyframeTime(span), out), 60_000, { signal: extra.signal });
-                if (existsSync(out)) frames.push({ at: b + i, path: out });
-              }
+                return { at: b + i, path: out };
+              });
+              const frames = grabbed.filter((f) => existsSync(f.path));
               const read = frames.length > 0 ? await readFrames(frames.map((f) => f.path), work, extra.signal) : [];
               read.forEach((f, i) => (texts[frames[i]!.at] = f.lines.map((l) => l.text)));
               framesRead += read.length;

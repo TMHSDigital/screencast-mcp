@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Changed
+
+- Frame extraction runs several ffmpeg processes at once (a quarter of the cores, 2 to 4) instead of one at a time: `sample_frames` with timestamps or scenes, `index_recording` keyframes, `step_guide` shots, `contact_sheet` tiles, and inline image encoding. 40 frames from a 720p clip took 5.5 s instead of 14.8 s on a 12-core machine. Output order and file names are unchanged (#290).
+
 ## [0.48.2] - 2026-11-09
 
 ### Fixed

@@ -36,6 +36,7 @@ import {
   type GuideFormat,
 } from "../utils/stepGuide.js";
 import { resolveSource } from "./bugReport.js";
+import { mapPool } from "../utils/pool.js";
 
 /** Frames OCR'd per PowerShell run, so a cancel lands between batches. */
 const OCR_BATCH = 10;
@@ -128,13 +129,12 @@ export function register(server: McpServer): void {
           const tick = () => progress?.(++done / total);
 
           // 1. One raw frame per step.
-          const frames: string[] = [];
-          for (const { s } of shots) {
+          const frames = await mapPool(shots, async ({ s }) => {
             const out = join(work, `frame-${String(s.n).padStart(3, "0")}.png`);
             await runFfmpeg(buildStepFrameArgs(source.path, s.shotT!, out), 60_000, { signal: extra.signal });
-            frames.push(out);
             tick();
-          }
+            return out;
+          });
 
           // 2. OCR them in batches: a label under each click, secret boxes.
           const read: Array<ReadFrame | null> = frames.map(() => null);
@@ -165,17 +165,21 @@ export function register(server: McpServer): void {
           }
           mkdirSync(imageDir, { recursive: true });
           let redactions = 0;
-          for (const [k, { i }] of shots.entries()) {
+          const frameSize = { width: info.width, height: info.height };
+          const rendered = await mapPool(shots, async ({ i }, k) => {
             const step = steps[i]!;
             const file = GUIDE_FILES.image(step.n);
             const ring = step.x !== undefined && step.y !== undefined ? { x: step.x, y: step.y } : undefined;
-            const filter = shotFilter({ width: info.width, height: info.height }, { click: ring, boxes: boxes[k] });
+            const filter = shotFilter(frameSize, { click: ring, boxes: boxes[k] });
             const out = join(imageDir, file);
             await runFfmpeg(buildStepShotArgs(frames[k]!, filter, out), 60_000, { signal: extra.signal });
+            tick();
+            return { step, file, out };
+          });
+          for (const [k, { step, file, out }] of rendered.entries()) {
             if (wantMd) written.push(out);
             step.image = file;
             redactions += boxes[k]!.length;
-            tick();
           }
 
           // 4. guide.md and/or guide.html.

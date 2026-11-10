@@ -10,6 +10,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { ScreencastError, type ImageContent } from "./errors.js";
 import { runFfmpeg } from "./ffmpeg.js";
 import { tempPath, stillOutput } from "./paths.js";
+import { mapPool } from "./pool.js";
 
 /** Default downscale width for inline previews. */
 export const DEFAULT_MAX_IMAGE_WIDTH = 1280;
@@ -53,15 +54,15 @@ export async function encodeInlineImages(
   maxCount: number = DEFAULT_MAX_INLINE_IMAGES,
 ): Promise<InlineImages> {
   const chosen = paths.slice(0, maxCount);
-  const images: ImageContent[] = [];
-  for (const path of chosen) {
+  // Encoded a few at a time, kept in input order (#290).
+  const images = await mapPool(chosen, async (path): Promise<ImageContent> => {
     const tmp = tempPath(".jpg");
     try {
       await runFfmpeg(buildPreviewArgs(path, tmp, maxWidth), 30_000);
-      images.push({ type: "image", data: readFileSync(tmp).toString("base64"), mimeType: "image/jpeg" });
+      return { type: "image", data: readFileSync(tmp).toString("base64"), mimeType: "image/jpeg" };
     } finally {
       rmSync(tmp, { force: true });
     }
-  }
+  });
   return { images, omitted: paths.length - chosen.length };
 }
