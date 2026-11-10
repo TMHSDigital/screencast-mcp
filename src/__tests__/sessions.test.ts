@@ -424,7 +424,13 @@ describe("recycled server pid (#185)", () => {
     const p = join(tmpdir(), `sc-recycled-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
     try {
       await new Promise((r) => child.once("spawn", r));
-      const info = processInfo(child.pid!);
+      // A CIM query right after spawn can miss the process on a loaded
+      // runner; poll until its details are readable (#330).
+      let info = processInfo(child.pid!);
+      for (let i = 0; !info && i < 10; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        info = processInfo(child.pid!);
+      }
       expect(info?.image.toLowerCase()).toBe("node.exe");
       expect(Math.abs(info!.startMs - Date.now())).toBeLessThan(30_000);
       const old = new Date(Date.now() - 600_000).toISOString();
@@ -442,7 +448,7 @@ describe("recycled server pid (#185)", () => {
       child.kill();
       rmSync(p, { force: true });
     }
-  }, 30_000);
+  }, 120_000);
 });
 
 describe("stale-lock takeover (#185)", () => {
