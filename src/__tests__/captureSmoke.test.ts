@@ -90,6 +90,27 @@ describe.skipIf(!RUN)("capture smoke (RUN_CAPTURE_SMOKE)", { retry: RETRY }, () 
     expect(info.durationSec!).toBeGreaterThan(1);
   }, 60_000);
 
+  it("events: true writes events.jsonl, removes the raw log, and leaves no helper running (#298)", async () => {
+    const powershells = () =>
+      new Set(
+        (spawnSync("tasklist", ["/FI", "IMAGENAME eq powershell.exe", "/FO", "CSV", "/NH"], { encoding: "utf8" }).stdout ?? "")
+          .split(/\r?\n/)
+          .map((l) => l.split('","')[1])
+          .filter((pid): pid is string => !!pid),
+      );
+    const before = powershells();
+    const start = await call("start_recording", { target: "region:0,0,640,480", quality: "draft", fps: 15, events: true });
+    expect(start.isError, start.text).toBe(false);
+    await sleep(1500);
+    const stop = await call("stop_recording", { sessionId: start.json.sessionId });
+    expect(stop.isError, stop.text).toBe(false);
+    const base = (start.json.outputPath as string).replace(/\.mp4$/, "");
+    expect(existsSync(`${base}.events.jsonl`), stop.text).toBe(true);
+    expect(existsSync(`${base}.events.raw`)).toBe(false);
+    const leftover = [...powershells()].filter((pid) => !before.has(pid));
+    expect(leftover, "the hook helper is still running").toEqual([]);
+  }, 90_000);
+
   it("leaves a paused stretch out of the file and the markers (#200)", async () => {
     const { requireFfmpeg } = await import("../utils/ffmpeg.js");
     const start = await call("start_recording", { target: "region:0,0,640,480", quality: "draft", fps: 15 });
