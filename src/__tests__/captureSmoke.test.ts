@@ -120,7 +120,11 @@ describe.skipIf(!RUN)("capture smoke (RUN_CAPTURE_SMOKE)", { retry: RETRY }, () 
     // were kept, as a frozen stretch or a timestamp hole, the timeline would
     // jump by about 3 s where the first segment ends.
     const { pts, frameSec, durationSec } = videoTimeline(requireFfmpeg().ffprobe, output);
-    const summary = `${pts.length} frames over ${durationSec}s, first segment ${recorded}s`;
+    // On failure, show what resume and stop reported, to tell an empty or late
+    // second segment from one the join dropped (#331).
+    const summary =
+      `${pts.length} frames over ${durationSec}s, first segment ${recorded}s` +
+      `\nresume: ${JSON.stringify(resume.json)}\nstop: ${JSON.stringify(stop.json)}`;
     expect(pts.length, summary).toBeGreaterThan(15);
     expect(pts[0]!, summary).toBeLessThan(0.5);
     const gaps = pts.slice(1).map((t, i) => t - pts[i]!);
