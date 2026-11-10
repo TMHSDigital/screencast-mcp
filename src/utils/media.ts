@@ -328,20 +328,24 @@ export function buildTrimArgs(
   return args;
 }
 
-/** Build the concat-demuxer list file content for a set of inputs. */
+/** The concat-demuxer list for a set of files, single quotes escaped. The one
+ * implementation for concat, replay joins and pause segments (#313). Pure. */
+export function concatListContent(files: string[]): string {
+  return files.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n") + "\n";
+}
+
+/** The concat tool's list file content: at least two inputs. */
 export function buildConcatListContent(inputs: string[]): string {
   if (inputs.length < 2) {
     throw new ScreencastError("concat requires at least two input files.");
   }
-  return (
-    inputs
-      .map((p) => `file '${p.replace(/'/g, "'\\''")}'`)
-      .join("\n") + "\n"
-  );
+  return concatListContent(inputs);
 }
 
-export function buildConcatArgs(listFile: string, output: string): string[] {
-  return ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", output];
+/** Join the files in a concat list by stream copy. `quiet` keeps stderr to
+ * errors for callers that capture it (replay and pause joins). Pure. */
+export function buildConcatArgs(listFile: string, output: string, opts: { quiet?: boolean } = {}): string[] {
+  return ["-y", ...(opts.quiet ? ["-v", "error"] : []), "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", output];
 }
 
 /** True when a file holds noticeably more video packets than its duration

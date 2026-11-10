@@ -10,9 +10,7 @@ import {
   REPLAY_SEGMENT_SEC,
   REPLAY_SLACK_SEGMENTS,
   buildReplayCutArgs,
-  buildReplayJoinArgs,
   cleanupReplayDirs,
-  concatList,
   finishReplay,
   liveSegmentFile,
   parseSegmentList,
@@ -23,6 +21,7 @@ import {
   segmentOutputArgs,
   sliceEvents,
 } from "../utils/replay.js";
+import { buildConcatArgs, concatListContent } from "../utils/media.js";
 import { buildCaptureArgs } from "../utils/targets.js";
 import { SessionStore, type SessionRecord } from "../utils/sessions.js";
 import { stopSession } from "../utils/lifecycle.js";
@@ -124,11 +123,11 @@ describe("segment list", () => {
 
 describe("join and cut args", () => {
   it("quotes concat entries", () => {
-    expect(concatList(["C:/a/0.ts", "C:/it's/1.ts"])).toBe("file 'C:/a/0.ts'\nfile 'C:/it'\\''s/1.ts'\n");
+    expect(concatListContent(["C:/a/0.ts", "C:/it's/1.ts"])).toBe("file 'C:/a/0.ts'\nfile 'C:/it'\\''s/1.ts'\n");
   });
 
   it("joins by stream copy", () => {
-    expect(buildReplayJoinArgs("list.txt", "joined.mp4")).toEqual([
+    expect(buildConcatArgs("list.txt", "joined.mp4", { quiet: true })).toEqual([
       "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", "joined.mp4",
     ]);
   });

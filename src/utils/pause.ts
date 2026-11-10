@@ -27,7 +27,7 @@ import { basename, dirname, extname, join } from "node:path";
 import { ScreencastError } from "./errors.js";
 import { runCapture } from "./ffmpeg.js";
 import { jobTimeoutMs } from "./jobs.js";
-import { concatList, buildReplayJoinArgs } from "./replay.js";
+import { buildConcatArgs, concatListContent } from "./media.js";
 import type { ClockSpan } from "./events.js";
 import type { CaptureOptions, Target } from "./targets.js";
 import type { SessionRecord } from "./sessions.js";
@@ -283,8 +283,8 @@ export async function finishSegments(
     mkdirSync(dir, { recursive: true });
     const list = join(dir, "segments.txt");
     const tmp = join(dir, `joined${extname(output) || ".mp4"}`);
-    writeFileSync(list, concatList(video.map((p) => p.path)));
-    const res = await runCapture(opts.ffmpeg, buildReplayJoinArgs(list, tmp), jobTimeoutMs(total));
+    writeFileSync(list, concatListContent(video.map((p) => p.path)));
+    const res = await runCapture(opts.ffmpeg, buildConcatArgs(list, tmp, { quiet: true }), jobTimeoutMs(total));
     if (res.code === 0 && existsSync(tmp)) {
       renameSync(tmp, output);
       result.joined = true;

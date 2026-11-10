@@ -23,7 +23,7 @@ import { join } from "node:path";
 import { errorMessage, ScreencastError } from "./errors.js";
 import { runCapture } from "./ffmpeg.js";
 import { jobTimeoutMs } from "./jobs.js";
-import { buildProbeArgs, parseMediaInfo } from "./media.js";
+import { buildConcatArgs, buildProbeArgs, concatListContent, parseMediaInfo } from "./media.js";
 import { homeRoot, rand, sequencePattern, stamp } from "./paths.js";
 import { resolveQuality, type Quality } from "./targets.js";
 import {
@@ -181,16 +181,6 @@ export function liveSegmentFile(entries: SegmentEntry[], wrap: number): string {
   return `seg${String(index).padStart(5, "0")}.ts`;
 }
 
-/** The concat-demuxer list for the snapshot files. Pure. */
-export function concatList(files: string[]): string {
-  return files.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n") + "\n";
-}
-
-/** Join the snapshot segments into one mp4 (stream copy). Pure. */
-export function buildReplayJoinArgs(listFile: string, output: string): string[] {
-  return ["-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", output];
-}
-
 /** Cut the joined mp4 to its last stretch from `startSec`. The input is an mp4,
  * whose index makes the seek exact (MPEG-TS seeking is not). A stream copy
  * keeps the frames back to the previous keyframe behind an edit list; a
@@ -317,10 +307,10 @@ export async function saveReplay(buf: ReplayBuffer, opts: SaveReplayOptions): Pr
       );
     }
     const listFile = join(snap, "join.txt");
-    writeFileSync(listFile, concatList(files));
+    writeFileSync(listFile, concatListContent(files));
     const joined = join(snap, "joined.mp4");
     const timeout = jobTimeoutMs(opts.lastSec + 2 * buf.segmentSec);
-    const join1 = await runCapture(opts.ffmpeg, buildReplayJoinArgs(listFile, joined), timeout, { signal: opts.signal });
+    const join1 = await runCapture(opts.ffmpeg, buildConcatArgs(listFile, joined, { quiet: true }), timeout, { signal: opts.signal });
     if (join1.code !== 0) {
       throw new ScreencastError(`Joining the replay segments failed:\n${join1.stderr.trim().split("\n").slice(-4).join("\n")}`);
     }
