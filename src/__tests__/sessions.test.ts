@@ -15,6 +15,8 @@ import {
   SessionStore,
   classifyUnrequestedExit,
   expectedImage,
+  isOwnRecorder,
+  isSameRecorder,
   tasklistHasImage,
   isSameServer,
   parseProcessInfo,
@@ -474,4 +476,37 @@ describe("stale-lock takeover (#185)", () => {
     withRegistryLock(join(dir, "b.json"), () => undefined);
     expect(existsSync(join(dir, "b.json.lock"))).toBe(false);
   });
+});
+
+describe("recorder pid-reuse guard (#284)", () => {
+  const spawned = Date.parse("2026-01-01T00:00:00Z");
+  const rec = { backend: "wgc" as const, processImage: "node.exe", pidSpawnedAt: spawned };
+
+  it("accepts the recorder it spawned, within the slack", () => {
+    expect(isSameRecorder(rec, { image: "NODE.EXE", startMs: spawned + 200 })).toBe(true);
+    expect(isSameRecorder(rec, { image: "node.exe", startMs: spawned - 1000 })).toBe(true);
+  });
+  it("rejects a process that started after the spawn (a recycled pid)", () => {
+    expect(isSameRecorder(rec, { image: "node.exe", startMs: spawned + 60_000 })).toBe(false);
+  });
+  it("rejects a different image", () => {
+    expect(isSameRecorder(rec, { image: "code.exe", startMs: spawned })).toBe(false);
+  });
+  it("defers to the image check when details are unreadable or the record has no spawn time", () => {
+    expect(isSameRecorder(rec, null)).toBe(true);
+    expect(isSameRecorder({ backend: "wgc" }, { image: "node.exe", startMs: spawned + 60_000 })).toBe(true);
+  });
+
+  it.skipIf(process.platform !== "win32")("does not claim a live node process started after the record's spawn", async () => {
+    const other = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"], { stdio: "ignore" });
+    try {
+      await new Promise((r) => setTimeout(r, 300));
+      const pid = other.pid ?? null;
+      const base = { pid, backend: "wgc" as const, processImage: "node.exe" };
+      expect(isOwnRecorder({ ...base, pidSpawnedAt: Date.now() - 600_000 })).toBe(false);
+      expect(isOwnRecorder({ ...base, pidSpawnedAt: Date.now() })).toBe(true);
+    } finally {
+      other.kill();
+    }
+  }, 30_000);
 });

@@ -94,6 +94,10 @@ export interface SessionRecord {
    * wgc recorder), checked before a kill by pid (#182). Absent on older
    * records; see expectedImage. */
   processImage?: string;
+  /** When the process behind `pid` was spawned (epoch ms), so a pid recycled
+   * by a later process is never killed as the recorder (#284). Absent on
+   * older records. */
+  pidSpawnedAt?: number;
   /** Input event log (#118), when the recording was started with events: true. */
   events?: {
     path: string;
@@ -238,6 +242,30 @@ export function isRecorderProcess(pid: number | null, image: string): boolean {
   );
   if (res.status !== 0 || !res.stdout) return false;
   return tasklistHasImage(res.stdout, image);
+}
+
+/** False when what runs under a record's `pid` is provably not the recorder
+ * it spawned: a different image, or a process created after the spawn (a
+ * recycled pid). Details that cannot be read, or a record with no spawn time,
+ * leave the decision to the image check. Pure (#284). */
+export function isSameRecorder(
+  record: Pick<SessionRecord, "pidSpawnedAt" | "processImage" | "backend">,
+  running: { image: string; startMs: number } | null,
+): boolean {
+  if (!running) return true;
+  if (running.image.toLowerCase() !== expectedImage(record).toLowerCase()) return false;
+  const ref = record.pidSpawnedAt;
+  return !(typeof ref === "number" && Number.isFinite(ref) && running.startMs > ref + OWNER_START_SLACK_MS);
+}
+
+/** True when a record's pid is still the recorder it started: the image
+ * matches and the process is not newer than the spawn. Only then may the pid
+ * be killed (its tree included: the wgc recorder's ffmpeg children). */
+export function isOwnRecorder(
+  record: Pick<SessionRecord, "pid" | "pidSpawnedAt" | "processImage" | "backend">,
+): boolean {
+  if (record.pid === null || !isRecorderProcess(record.pid, expectedImage(record))) return false;
+  return record.pidSpawnedAt === undefined || isSameRecorder(record, processInfo(record.pid));
 }
 
 /** Classify a recorder exit nobody asked for. Non-zero is a crash; the wgc
@@ -713,7 +741,7 @@ export class SessionStore {
       const alive = isAlive(record.pid);
       const verdict = classifyOrphan(record, alive);
       if (verdict.reaped && record.pid !== null) {
-        if (isRecorderProcess(record.pid, expectedImage(record))) killPid(record.pid);
+        if (isOwnRecorder(record)) killPid(record.pid);
         reaped.push(record.id);
       }
       const patch: Partial<SessionRecord> = {

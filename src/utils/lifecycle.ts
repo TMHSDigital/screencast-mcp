@@ -27,9 +27,8 @@ import {
   type SegmentPart,
 } from "./pause.js";
 import {
-  expectedImage,
   isAlive,
-  isRecorderProcess,
+  isOwnRecorder,
   killPid,
   type EndReason,
   type SessionRecord,
@@ -339,7 +338,7 @@ async function runStop(
       // Cross-restart stop: no stdin handle. Act on the pid only while it is
       // still the recorder this record started (never a recycled, unrelated
       // process); the wgc recorder runs under node, not ffmpeg (#182).
-      if (isRecorderProcess(record.pid, expectedImage(record))) {
+      if (isOwnRecorder(record)) {
         if (stopFile) {
           // The wgc recorder finalizes when its stop file appears.
           writeFileSync(stopFile, "");

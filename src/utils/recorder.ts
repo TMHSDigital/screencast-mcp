@@ -214,6 +214,7 @@ async function runResume(
     updated = store.update(record.id, {
       status: "recording",
       pid: child.pid ?? null,
+      pidSpawnedAt: spawnedAt,
       // now - videoStartMs stays the video time across the pause (#174).
       videoStartMs: startMs - done * 1000,
       segments: {

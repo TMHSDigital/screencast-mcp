@@ -388,6 +388,7 @@ export function register(server: McpServer): void {
           fps,
           quality,
           pid: child.pid ?? null,
+          pidSpawnedAt: spawnedAt,
           ...serverIdentity(),
           status: "recording",
           startedAt: new Date().toISOString(),
