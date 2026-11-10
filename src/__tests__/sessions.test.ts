@@ -8,6 +8,7 @@ import {
   classifyOrphan,
   isAlive,
   isForeignLiveRecording,
+  foreignStopRefusal,
   isLockStale,
   LOCK_STALE_MS,
   pruneRecords,
@@ -509,4 +510,17 @@ describe("recorder pid-reuse guard (#284)", () => {
       other.kill();
     }
   }, 30_000);
+});
+
+describe("foreignStopRefusal (#286)", () => {
+  it("refuses a gdigrab or ddagrab recording another live instance owns, paused included", () => {
+    expect(foreignStopRefusal(record({ serverPid: 999 }), 1000, true)).toMatch(/another running screencast-mcp instance \(pid 999\)/);
+    expect(foreignStopRefusal(record({ serverPid: 999, status: "paused", backend: "ddagrab" }), 1000, true)).not.toBeNull();
+  });
+  it("allows its own recordings, a dead owner's, older records and wgc (stop-file handoff)", () => {
+    expect(foreignStopRefusal(record({ serverPid: 1000 }), 1000, true)).toBeNull();
+    expect(foreignStopRefusal(record({ serverPid: 999 }), 1000, false)).toBeNull();
+    expect(foreignStopRefusal(record({}), 1000, true)).toBeNull();
+    expect(foreignStopRefusal(record({ serverPid: 999, backend: "wgc" }), 1000, true)).toBeNull();
+  });
 });

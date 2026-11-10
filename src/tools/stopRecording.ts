@@ -6,6 +6,7 @@ import { STOPS_SESSION, looseOutput } from "../utils/toolSpec.js";
 import { probeMedia, requireFfmpeg } from "../utils/ffmpeg.js";
 import { probeDuration, stopSession } from "../utils/lifecycle.js";
 import { getStore } from "../context.js";
+import { foreignStopRefusal, ownerAlive } from "../utils/sessions.js";
 import { finishReplay, type ReplayStopResult } from "../utils/replay.js";
 import { webcamPlacement, type WebcamInfo } from "../utils/pause.js";
 
@@ -109,6 +110,10 @@ export function register(server: McpServer): void {
                   : "Session was not active; returning its recorded final state.",
           });
         }
+
+        // Only the owning instance finalizes a live gdigrab/ddagrab capture (#286).
+        const refusal = foreignStopRefusal(record, process.pid, ownerAlive(record));
+        if (refusal) throw new ScreencastError(refusal);
 
         const { ffprobe } = requireFfmpeg();
         const { record: updated, graceful, durationSec, replay, segments } = await stopSession(store, record, {

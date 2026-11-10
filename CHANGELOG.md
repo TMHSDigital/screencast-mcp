@@ -13,6 +13,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - `sample_frames` in fps mode no longer overwrites and drops an earlier run's frames when `outputDir` is reused: a folder that already holds `frame_NNNNN.png` gets a per-run file prefix, and both runs return their full frame sets (#283).
 - A client that disconnects while `start_recording` is still starting no longer leaves ffmpeg capturing the screen after the server exits: shutdown waits (up to 10 s) for in-flight starts to register their session and then stops it, and new starts are refused once shutdown begins (#285).
 - Orphan reaping at startup and a cross-restart `stop_recording` no longer kill an unrelated process that reused a recorder's pid: records store when the recorder was spawned, and a pid whose process started later is left alone (#284).
+- `stop_recording` refuses, with a clear message, to stop a gdigrab or ddagrab recording that another running server instance owns, instead of force-killing it and racing that instance to finalize and join its segments. WGC recordings are still handed over through their stop file (#286).
 
 ## [0.48.1] - 2026-11-09
 

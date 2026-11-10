@@ -157,6 +157,37 @@ export function isForeignLiveRecording(
   );
 }
 
+/** Why this server must not stop a record, or null when it may. Another live
+ * instance's gdigrab/ddagrab capture can only be force-killed from here,
+ * which leaves both processes finalizing (and joining paused segments) at
+ * once; a wgc recording is handed over through its stop file instead (#182).
+ * Pure (#286). */
+export function foreignStopRefusal(
+  record: SessionRecord,
+  currentServerPid: number,
+  ownerIsAlive: boolean,
+): string | null {
+  if (record.backend === "wgc" || !isForeignLiveRecording(record, currentServerPid, ownerIsAlive)) return null;
+  return (
+    `Recording ${record.id} belongs to another running screencast-mcp instance (pid ${record.serverPid}). ` +
+    "Stop it from the client connected to that instance; closing that instance also finalizes it."
+  );
+}
+
+/** True when the server instance that created a record is another process
+ * that is still running. A live pid may be a crashed server's, recycled by
+ * another process (#185), so it must still be the same program, started
+ * before the record. `cache` memoizes processInfo across records. */
+export function ownerAlive(
+  record: SessionRecord,
+  cache: Map<number, ReturnType<typeof processInfo>> = new Map(),
+): boolean {
+  const pid = record.serverPid;
+  if (pid === undefined || pid === process.pid || !isAlive(pid)) return false;
+  if (!cache.has(pid)) cache.set(pid, processInfo(pid));
+  return isSameServer(record, cache.get(pid) ?? null);
+}
+
 /** This server process's identity, stamped on the records it creates. */
 export function serverIdentity(): Pick<SessionRecord, "serverPid" | "serverStartedAt" | "serverImage"> {
   return {
@@ -723,19 +754,11 @@ export class SessionStore {
     this.refresh();
     const reaped: string[] = [];
     const owners = new Map<number, ReturnType<typeof processInfo>>();
-    const ownerAlive = (record: SessionRecord): boolean => {
-      const pid = record.serverPid;
-      if (pid === undefined || pid === process.pid || !isAlive(pid)) return false;
-      // A live pid may be a crashed server's, recycled by another process
-      // (#185): check it is still the same program, started before the record.
-      if (!owners.has(pid)) owners.set(pid, processInfo(pid));
-      return isSameServer(record, owners.get(pid) ?? null);
-    };
     for (const record of this.records.values()) {
       if (!isLive(record.status)) continue;
       // Never reap a recording owned by another still-live server instance:
       // that would kill its active capture. Leave the record untouched.
-      if (isForeignLiveRecording(record, process.pid, ownerAlive(record))) {
+      if (isForeignLiveRecording(record, process.pid, ownerAlive(record, owners))) {
         continue;
       }
       const alive = isAlive(record.pid);
