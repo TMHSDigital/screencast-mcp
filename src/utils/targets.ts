@@ -167,6 +167,41 @@ export function resolveQuality(quality: Quality): string[] {
     "-pix_fmt", "yuv420p"];
 }
 
+/** House AAC bitrate for re-encoded audio (#312). */
+export const AAC_BITRATE = "160k";
+
+/** AAC audio at `bitrate`; null leaves the bitrate to ffmpeg's default. */
+export function aacArgs(bitrate: string | null = AAC_BITRATE): string[] {
+  return ["-c:a", "aac", ...(bitrate ? ["-b:a", bitrate] : [])];
+}
+
+/** Moves the MP4 index to the front so the file plays while it downloads. */
+export const FASTSTART: readonly string[] = ["-movflags", "+faststart"];
+
+/** The encode tail shared by the edit builders (#312): video from a quality
+ * preset (or explicit codec args), then audio, then optionally faststart.
+ * Audio "aac" re-encodes (bitrate as for aacArgs), "copy" stream-copies,
+ * "none" drops it (-an), and "omit" adds nothing. Pure. */
+export function encodeTail(opts: {
+  quality?: Quality;
+  video?: readonly string[];
+  audio: "aac" | "copy" | "none" | "omit";
+  bitrate?: string | null;
+  faststart?: boolean;
+}): string[] {
+  const audio = {
+    aac: () => aacArgs(opts.bitrate),
+    copy: () => ["-c:a", "copy"],
+    none: () => ["-an"],
+    omit: () => [],
+  }[opts.audio]();
+  return [
+    ...(opts.video ?? resolveQuality(opts.quality ?? "standard")),
+    ...audio,
+    ...(opts.faststart ? FASTSTART : []),
+  ];
+}
+
 /** Largest even integer <= n. libx264 + yuv420p requires even W/H. */
 function evenDown(n: number): number {
   return n - (n % 2);
@@ -363,7 +398,7 @@ export function buildCaptureArgs(target: Target, opts: CaptureOptions): string[]
       : []),
     ...(opts.videoCodec ?? resolveQuality(quality)),
     ...captureKeyframeArgs(fps),
-    ...(opts.audio ? ["-c:a", "aac", "-b:a", "160k"] : []),
+    ...(opts.audio ? aacArgs() : []),
     ...FRAGMENTED_MP4,
     ...capArgs,
     opts.output,

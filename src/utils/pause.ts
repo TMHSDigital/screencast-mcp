@@ -30,6 +30,7 @@ import { jobTimeoutMs } from "./jobs.js";
 import { buildConcatArgs, concatListContent } from "./media.js";
 import type { ClockSpan } from "./events.js";
 import type { CaptureOptions, Target } from "./targets.js";
+import { FASTSTART } from "./targets.js";
 import type { SessionRecord } from "./sessions.js";
 
 /** One finished segment. */
@@ -251,7 +252,7 @@ export function buildWebcamAlignArgs(
     "-filter_complex", `${chains.join(";")};${join}`,
     "-map", "[v]",
     ...codec,
-    "-movflags", "+faststart",
+    ...FASTSTART,
     output,
   ];
 }

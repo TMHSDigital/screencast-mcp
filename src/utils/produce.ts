@@ -8,7 +8,7 @@
  * unit-tested without ffmpeg present.
  */
 import { ScreencastError } from "./errors.js";
-import { resolveQuality, type Quality } from "./targets.js";
+import { encodeTail, aacArgs, FASTSTART, type Quality } from "./targets.js";
 import { escapeFilterPath } from "./fonts.js";
 import {
   validateTransition,
@@ -61,10 +61,6 @@ export function videoNormalizeChain(w: number, h: number, fps: number): string {
 /** Audio normalization chain: common sample rate, stereo, float planar. */
 export function audioNormalizeChain(rate: number): string {
   return `aresample=${rate},aformat=sample_fmts=fltp:channel_layouts=stereo`;
-}
-
-function encodeArgs(quality: Quality): string[] {
-  return resolveQuality(quality);
 }
 
 /**
@@ -232,9 +228,7 @@ export function buildAssembleArgs(
     ...inputs.flatMap((f) => ["-i", f]),
     "-filter_complex", parts.join(";"),
     ...maps,
-    ...encodeArgs(opts.quality ?? DEFAULT_QUALITY),
-    ...(anyAudio ? ["-c:a", "aac", "-b:a", "160k"] : ["-an"]),
-    "-movflags", "+faststart",
+    ...encodeTail({ quality: opts.quality ?? DEFAULT_QUALITY, audio: anyAudio ? "aac" : "none", faststart: true }),
     output,
   ];
 }
@@ -286,9 +280,7 @@ export function buildTitleCardArgs(
     "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
     "-vf", draw,
     "-shortest",
-    ...encodeArgs(opts.quality ?? DEFAULT_QUALITY),
-    "-c:a", "aac", "-b:a", "160k",
-    "-movflags", "+faststart",
+    ...encodeTail({ quality: opts.quality ?? DEFAULT_QUALITY, audio: "aac", faststart: true }),
     output,
   ];
 }
@@ -351,9 +343,8 @@ export function buildMusicBedArgs(
     "-filter_complex", parts.join(";"),
     "-map", "0:v", "-map", "[aout]",
     "-t", String(videoDuration),
-    "-c:v", "copy",
-    "-c:a", "aac", "-b:a", "192k",
-    "-movflags", "+faststart",
+    // Music beds get a higher audio bitrate than speech.
+    ...encodeTail({ video: ["-c:v", "copy"], audio: "aac", bitrate: "192k", faststart: true }),
     output,
   ];
 }
@@ -400,9 +391,7 @@ export function buildReframeArgs(
   return [
     "-y", "-i", input,
     "-vf", `${reframeFilter(dim.w, dim.h, fit)},format=yuv420p`,
-    ...encodeArgs(quality),
-    "-c:a", "copy",
-    "-movflags", "+faststart",
+    ...encodeTail({ quality, audio: "copy", faststart: true }),
     output,
   ];
 }
@@ -481,10 +470,10 @@ export function exportPresetParts(
       ...(p.cbr ? ["-minrate", p.videoBitrate, "-x264-params", "nal-hrd=cbr"] : []),
       "-maxrate", p.videoBitrate, "-bufsize", p.bufsize,
       "-pix_fmt", "yuv420p",
-      "-c:a", "aac", "-b:a", p.audioBitrate,
+      ...aacArgs(p.audioBitrate),
       ...(p.loudness?.sampleRate ? ["-ar", String(p.loudness.sampleRate), "-ac", "2"] : []),
       "-r", String(p.fps),
-      "-movflags", "+faststart",
+      ...FASTSTART,
     ],
     width: dim.w,
     height: dim.h,

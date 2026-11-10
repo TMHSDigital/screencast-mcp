@@ -6,7 +6,7 @@
  * for a short pad at both edges, in one select/aselect pass. Pure helpers.
  */
 import { ScreencastError } from "./errors.js";
-import { resolveQuality, type Quality } from "./targets.js";
+import { encodeTail, type Quality } from "./targets.js";
 import { sumExpr } from "./expr.js";
 
 export interface Interval {
@@ -121,8 +121,7 @@ export function buildCutIdleArgs(
     "-y", "-i", input,
     "-vf", f.video,
     ...(withAudio ? ["-af", f.audio] : ["-an"]),
-    ...resolveQuality(quality),
-    ...(withAudio ? ["-c:a", "aac", "-b:a", "160k"] : []),
+    ...encodeTail({ quality, audio: withAudio ? "aac" : "omit" }),
     output,
   ];
 }

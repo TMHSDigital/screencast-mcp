@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Internal
+
+- The H.264/AAC/faststart encode tail lives in one helper, `encodeTail` in `src/utils/targets.ts`, used by every edit builder. ffmpeg arguments are unchanged; the deliberate audio bitrate differences (192k for music beds and audio export, 128k for compress, ffmpeg's default for trim, clip and speed) are now explicit parameters (#312).
+
 ## [0.49.1] - 2026-11-10
 
 ### Changed

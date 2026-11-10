@@ -6,7 +6,7 @@
  */
 import { extname } from "node:path";
 import { ScreencastError } from "./errors.js";
-import { resolveQuality, type Quality } from "./targets.js";
+import { encodeTail, aacArgs, type Quality } from "./targets.js";
 import { validateColor, validateEvenDimension } from "./validate.js";
 import { isStillImage, stillOutput } from "./paths.js";
 import { z } from "zod";
@@ -325,7 +325,7 @@ export function buildTrimArgs(
     args.push("-t", String(validatePositive(opts.duration!, "duration")));
   }
   if (opts.exact === false) args.push("-c", "copy", output);
-  else args.push(...resolveQuality(DEFAULT_EDIT_QUALITY), "-c:a", "aac", output);
+  else args.push(...encodeTail({ quality: DEFAULT_EDIT_QUALITY, audio: "aac", bitrate: null }), output);
   return args;
 }
 
@@ -416,9 +416,8 @@ export function buildConvertArgs(
     case "mp4":
       return [
         "-y", "-i", input,
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-        "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart",
+        // Audio takes the mp4 muxer default (AAC).
+        ...encodeTail({ quality: "standard", audio: "omit", faststart: true }),
         output,
       ];
     default:
@@ -429,7 +428,7 @@ export function buildConvertArgs(
 // --- Phase 2 edit surface -------------------------------------------------
 //
 // Every tool below RE-ENCODES (a filter rewrites pixels, so stream copy is not
-// an option). They reuse resolveQuality() so the draft/standard/high presets
+// an option). They reuse encodeTail() so the draft/standard/high presets
 // are identical to capture. Audio is copied unless a filter forces a re-encode.
 
 function requireNonNegativeInt(value: number, label: string): number {
@@ -494,8 +493,7 @@ export function buildCropArgs(
   return [
     "-y", "-i", input,
     "-vf", cropFilter(rect, dims),
-    ...resolveQuality(quality),
-    "-c:a", "copy",
+    ...encodeTail({ quality, audio: "copy" }),
     output,
   ];
 }
@@ -533,8 +531,7 @@ export function buildScaleArgs(
   return [
     "-y", "-i", input,
     "-vf", scaleFilter(opts),
-    ...resolveQuality(quality),
-    "-c:a", "copy",
+    ...encodeTail({ quality, audio: "copy" }),
     output,
   ];
 }
@@ -571,13 +568,7 @@ export function buildSpeedArgs(
   }
   const args = ["-y", "-i", input, "-filter:v", `setpts=PTS/${factor}`];
   if (hasAudio) args.push("-filter:a", atempoChain(factor));
-  args.push(...resolveQuality(quality));
-  if (hasAudio) {
-    args.push("-c:a", "aac");
-  } else {
-    args.push("-an");
-  }
-  args.push(output);
+  args.push(...encodeTail({ quality, audio: hasAudio ? "aac" : "none", bitrate: null }), output);
   return args;
 }
 
@@ -632,8 +623,7 @@ export function buildOverlayArgs(
     "-y", "-i", input, "-i", overlay,
     "-filter_complex", filter,
     "-map", "[v]", "-map", "0:a?",
-    ...resolveQuality(quality),
-    "-c:a", "copy",
+    ...encodeTail({ quality, audio: "copy" }),
     // A longer overlay video would otherwise run the output past the main clip.
     ...(dur != null && dur > 0 ? ["-t", String(dur)] : []),
     output,
@@ -665,9 +655,13 @@ export function buildCompressArgs(
     args.push("-vf", `scale='trunc(min(${opts.maxWidth},iw)/2)*2':-2`);
   }
   args.push(
-    "-c:v", "libx264", "-preset", "slow", "-crf", String(crf), "-pix_fmt", "yuv420p",
-    "-c:a", "aac", "-b:a", "128k",
-    "-movflags", "+faststart",
+    // compress trades audio bitrate for size too.
+    ...encodeTail({
+      video: ["-c:v", "libx264", "-preset", "slow", "-crf", String(crf), "-pix_fmt", "yuv420p"],
+      audio: "aac",
+      bitrate: "128k",
+      faststart: true,
+    }),
     output,
   );
   return args;
@@ -677,7 +671,7 @@ export type AudioFormat = "mp3" | "aac" | "wav" | "copy";
 
 const AUDIO_CODEC: Record<AudioFormat, string[]> = {
   mp3: ["-c:a", "libmp3lame", "-q:a", "2"],
-  aac: ["-c:a", "aac", "-b:a", "192k"],
+  aac: aacArgs("192k"),
   wav: ["-c:a", "pcm_s16le"],
   copy: ["-c:a", "copy"],
 };
@@ -739,8 +733,7 @@ export function buildClipArgs(
     "-y", "-i", input,
     "-ss", String(seg.start),
     "-t", String(seg.end - seg.start),
-    ...resolveQuality(quality),
-    "-c:a", "aac",
+    ...encodeTail({ quality, audio: "aac", bitrate: null }),
     output,
   ];
 }
@@ -934,14 +927,13 @@ export function buildRedactArgs(
   if ((opts.style ?? "box") === "box" && chain !== undefined) {
     // One linear chain: a plain -vf, without the graph labels.
     const vf = chain.slice("[0:v]".length, -out.length);
-    return ["-y", "-i", input, "-vf", vf, ...resolveQuality("high"), "-c:a", "copy", output];
+    return ["-y", "-i", input, "-vf", vf, ...encodeTail({ quality: "high", audio: "copy" }), output];
   }
   return [
     "-y", "-i", input,
     "-filter_complex", steps.join(";"),
     "-map", out, "-map", "0:a?",
-    ...resolveQuality("high"),
-    "-c:a", "copy",
+    ...encodeTail({ quality: "high", audio: "copy" }),
     output,
   ];
 }

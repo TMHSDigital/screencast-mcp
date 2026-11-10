@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   parseTarget,
   resolveQuality,
+  encodeTail,
+  aacArgs,
   buildCaptureArgs,
   buildScreenshotArgs,
   buildAudioInputArgs,
@@ -333,5 +335,23 @@ describe("full on an odd-sized virtual desktop (#226)", () => {
 
   it("leaves screenshots at the exact desktop size", () => {
     expect(buildScreenshotArgs({ kind: "full" }, "s.png", ODD).join(" ")).not.toContain("-video_size");
+  });
+});
+
+describe("encodeTail (#312)", () => {
+  it("defaults to the standard preset, house AAC bitrate, no faststart", () => {
+    expect(encodeTail({ audio: "aac" })).toEqual([...resolveQuality("standard"), "-c:a", "aac", "-b:a", "160k"]);
+  });
+
+  it("covers each audio mode and faststart", () => {
+    const v = resolveQuality("high");
+    expect(encodeTail({ quality: "high", audio: "copy", faststart: true })).toEqual([...v, "-c:a", "copy", "-movflags", "+faststart"]);
+    expect(encodeTail({ quality: "high", audio: "none" })).toEqual([...v, "-an"]);
+    expect(encodeTail({ quality: "high", audio: "omit" })).toEqual(v);
+  });
+
+  it("takes explicit video args and bitrates", () => {
+    expect(encodeTail({ video: ["-c:v", "copy"], audio: "aac", bitrate: "192k" })).toEqual(["-c:v", "copy", "-c:a", "aac", "-b:a", "192k"]);
+    expect(aacArgs(null)).toEqual(["-c:a", "aac"]);
   });
 });

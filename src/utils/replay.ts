@@ -27,7 +27,7 @@ import { runCapture } from "./ffmpeg.js";
 import { jobTimeoutMs } from "./jobs.js";
 import { buildConcatArgs, buildProbeArgs, concatListContent, parseMediaInfo } from "./media.js";
 import { homeRoot, rand, sequencePattern, stamp } from "./paths.js";
-import { resolveQuality, type Quality } from "./targets.js";
+import { encodeTail, FASTSTART, type Quality } from "./targets.js";
 import {
   convertEvents,
   eventPaths,
@@ -193,14 +193,14 @@ export function buildReplayCutArgs(
   opts: { startSec: number; reencode?: boolean; quality?: Quality; audio?: boolean },
 ): string[] {
   const codec = opts.reencode
-    ? [...resolveQuality(opts.quality ?? "standard"), ...(opts.audio ? ["-c:a", "aac", "-b:a", "160k"] : [])]
+    ? encodeTail({ quality: opts.quality ?? "standard", audio: opts.audio ? "aac" : "omit" })
     : ["-c", "copy"];
   return [
     "-y", "-v", "error",
     "-ss", String(round3(Math.max(0, opts.startSec))),
     "-i", input,
     ...codec,
-    "-movflags", "+faststart",
+    ...FASTSTART,
     output,
   ];
 }
