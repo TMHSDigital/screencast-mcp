@@ -6,6 +6,7 @@ import { join } from "node:path";
 import type { ChildProcess } from "node:child_process";
 import {
   MAX_REPLAY_SEC,
+  copyShared,
   MIN_REPLAY_SEC,
   REPLAY_SEGMENT_SEC,
   REPLAY_SLACK_SEGMENTS,
@@ -221,5 +222,25 @@ describe("stopping a replay session", () => {
     expect(res.replay).toEqual({ saved: false, discarded: true });
     expect(existsSync(dir)).toBe(false);
     expect(res.record?.status).toBe("stopped");
+  });
+});
+
+describe("copyShared (#293)", () => {
+  it("streams a file another handle is still writing, up to its size now", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sc-copy-"));
+    const src = join(dir, "seg.ts");
+    const dst = join(dir, "copy.ts");
+    const { openSync, writeSync, closeSync, readFileSync } = await import("node:fs");
+    const fd = openSync(src, "w");
+    try {
+      writeSync(fd, Buffer.alloc(300_000, 7));
+      expect(await copyShared(src, dst)).toBe(300_000);
+      expect(readFileSync(dst).equals(Buffer.alloc(300_000, 7))).toBe(true);
+      writeFileSync(join(dir, "empty.ts"), "");
+      expect(await copyShared(join(dir, "empty.ts"), join(dir, "e2.ts"))).toBe(0);
+    } finally {
+      closeSync(fd);
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

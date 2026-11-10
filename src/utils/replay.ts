@@ -18,7 +18,9 @@
  *
  * Everything but saveReplay and the directory cleanup is pure.
  */
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createReadStream, createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { stat, writeFile } from "node:fs/promises";
+import { pipeline } from "node:stream/promises";
 import { join } from "node:path";
 import { errorMessage, ScreencastError } from "./errors.js";
 import { runCapture } from "./ffmpeg.js";
@@ -211,24 +213,18 @@ export function sliceEvents(events: InputEvent[], from: number, to: number): Inp
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
-/** Copy a file another process may still be writing. fs.copyFile (CopyFileW
- * on Windows) refuses a file open for writing; a plain read shares it. */
-function copyShared(src: string, dst: string): number {
-  const fd = openSync(src, "r");
-  try {
-    const size = statSync(src).size;
-    const buf = Buffer.alloc(size);
-    let read = 0;
-    while (read < size) {
-      const n = readSync(fd, buf, read, size - read, read);
-      if (n === 0) break;
-      read += n;
-    }
-    writeFileSync(dst, buf.subarray(0, read));
-    return read;
-  } finally {
-    closeSync(fd);
+/** Copy a file another process may still be writing, up to its size now.
+ * fs.copyFile (CopyFileW on Windows) refuses a file open for writing; a read
+ * stream shares it. Streamed, so a long buffer (GBs) never blocks the event
+ * loop or sits in memory (#293). Returns the bytes copied. */
+export async function copyShared(src: string, dst: string, signal?: AbortSignal): Promise<number> {
+  const size = (await stat(src)).size;
+  if (size === 0) {
+    await writeFile(dst, "");
+    return 0;
   }
+  await pipeline(createReadStream(src, { start: 0, end: size - 1 }), createWriteStream(dst), { signal });
+  return (await stat(dst)).size;
 }
 
 async function probeStart(ffprobe: string, path: string, signal?: AbortSignal): Promise<number | null> {
@@ -274,20 +270,21 @@ export async function saveReplay(buf: ReplayBuffer, opts: SaveReplayOptions): Pr
   const listPath = segmentListPath(buf.dir);
   const entries = existsSync(listPath) ? parseSegmentList(readFileSync(listPath, "utf8")) : [];
   const picked = pickSegments(entries, opts.lastSec);
-  // Snapshot first: copying takes milliseconds, while ffmpeg may reopen the
-  // oldest ring slot within a couple of seconds.
+  // Snapshot first, oldest segment first: ffmpeg reopens the oldest ring
+  // slot next, within a couple of seconds.
   const snap = mkdtempSync(join(buf.dir, "save-"));
   try {
-    const files = picked.map((e, i) => {
+    const files: string[] = [];
+    for (const [i, e] of picked.entries()) {
       const dst = join(snap, `${String(i).padStart(5, "0")}.ts`);
-      copyShared(join(buf.dir, e.file), dst);
-      return dst;
-    });
+      await copyShared(join(buf.dir, e.file), dst, opts.signal);
+      files.push(dst);
+    }
     let includesLive = false;
     if (opts.live !== false) {
       const src = join(buf.dir, liveSegmentFile(entries, buf.wrap));
       const dst = join(snap, "live.ts");
-      if (existsSync(src) && copyShared(src, dst) > 0) {
+      if (existsSync(src) && (await copyShared(src, dst, opts.signal)) > 0) {
         // A ring slot still holding a lap-old segment (ffmpeg has not reopened
         // it yet) starts before the newest completed one: leave it out.
         const newest = files.at(-1);

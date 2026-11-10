@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Changed
+
+- `save_replay` streams the buffer's segments into its snapshot instead of reading each into memory and writing it synchronously, so saving a long buffer no longer stalls the server (other tool calls, progress, recorder events) for seconds (#293).
+
 ## [0.49.0] - 2026-11-09
 
 ### Added
