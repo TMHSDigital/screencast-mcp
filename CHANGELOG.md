@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.49.0] - 2026-11-09
+
 ### Added
 
 - Resource subscriptions: a client can subscribe to `screencast://sessions` or `screencast://sessions/{id}` and gets `resources/updated` when it changes, so a recording that ended on its own (`maxDurationSec`, window closed) is noticed without polling (#324).
