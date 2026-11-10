@@ -7,5 +7,5 @@ Read AGENTS.md first: it is the single source for layout, conventions, and the r
 
 - Use conventional commits (feat:, fix:, chore:, docs:)
 - One tool per file in src/tools/ exporting register(server), wired in src/server.ts; pure helpers in src/utils/
-- Keep mcp-tools.json, the README tools table, and docs/index.html in sync with the registered tools
+- mcp-tools.json, the README tools table, and the docs/index.html tool tables are generated from the registered tools: run npm run docs after changing a tool (CI checks with npm run docs:check)
 - Add a CHANGELOG.md entry under "## Unreleased"; version bumps happen once per release batch, never for docs/CI/chore-only work (see CONTRIBUTING.md#releases)

@@ -13,7 +13,7 @@ body:
     id: version
     attributes:
       label: Screencast MCP version
-      description: From `npm ls -g @tmhs/screencast-mcp`, your MCP config, or the `.mcpb` file name.
+      description: From the `doctor` tool's `server.version`, `npx @tmhs/screencast-mcp --version`, or the `.mcpb` file name.
       placeholder: "0.42.0"
     validations:
       required: true

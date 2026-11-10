@@ -25,7 +25,7 @@ Screencast MCP -- MCP server for Windows screen recording, frame sampling, and f
 
 - Use conventional commits (`feat:`, `fix:`, `chore:`, `docs:`)
 - Tools live in `src/tools/` (one `register(server)` per file, wired in `src/server.ts`); pure helpers live in `src/utils/`
-- Keep `mcp-tools.json`, the README tools table, and `docs/index.html` in sync with the registered tools
+- `mcp-tools.json`, the README tools table, and the `docs/index.html` tool tables are generated from the registered tools: run `npm run docs` after changing a tool (CI checks with `npm run docs:check`)
 - Add a `CHANGELOG.md` entry under `## Unreleased`
 - A version bump is a release: bump once per batch of user-facing changes (`npm version <patch|minor|major> --no-git-tag-version`), never for docs/CI/chore-only work. See [CONTRIBUTING.md](CONTRIBUTING.md#releases)
 

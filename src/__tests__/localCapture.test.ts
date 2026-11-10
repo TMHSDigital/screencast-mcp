@@ -1,9 +1,9 @@
 /**
  * Local capture regression harness (NOT run in CI).
  *
- * CI runs on headless Linux with no display and no gdigrab, so it can only
- * prove build + unit logic. These tests drive the BUILT server over real stdio
- * and exercise the gdigrab capture path end to end on a Windows desktop. They
+ * CI's Windows leg runs a short real-capture smoke (captureSmoke.test.ts,
+ * RUN_CAPTURE_SMOKE); this fuller harness is local-only. These tests drive
+ * the BUILT server over real stdio and exercise the gdigrab capture path end to end on a Windows desktop. They
  * are gated behind RUN_LOCAL_CAPTURE_TESTS so `npm test` stays green everywhere
  * else.
  *

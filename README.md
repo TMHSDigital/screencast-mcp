@@ -42,6 +42,8 @@ The fastest path: `npx -y @tmhs/screencast-mcp setup` checks FFmpeg 8, OCR, and 
 
 **You need** Windows 10 or 11, [Node.js](https://nodejs.org) 22+, and **FFmpeg 8 or newer** on `PATH` (`winget install Gyan.FFmpeg`, the full build). Older builds run most tools, but `transcribe` (the `whisper` filter) and `backend: "wgc"` (`gfxcapture`) need FFmpeg 8, and essentials or distro builds can lack them (Ubuntu LTS `apt install ffmpeg` gives 6.x). Capture is Windows-only; the watch, edit, and produce tools work anywhere ffmpeg runs. After connecting, ask the agent to run `doctor`: it reports the ffmpeg version, the filters and devices it has, OCR, and anything missing.
 
+**Windows on ARM64** is in progress (#246): CI runs a non-blocking `windows-11-arm` job. gyan.dev ships no arm64 FFmpeg, so use BtbN's `winarm64-gpl` FFmpeg 8 build; it has `gdigrab`, `gfxcapture` and `drawtext` but no `whisper` or libvpx, so `transcribe` and `.webm` output need another build. `doctor` reports `arch` and what is missing.
+
 **Add it to your client:**
 
 | Client | How |
@@ -226,7 +228,7 @@ Every capture tool takes one `target` string: `full`, `monitor:<index>`, `window
 
 - **No network requests, no telemetry.** The server runs ffmpeg, ffprobe, and PowerShell locally and talks to your client over stdio. OCR (`find_text`) and speech (`narrate`) use the engines built into Windows.
 - **What a tool returns goes to your model provider.** Inline frames, OCR text, and event summaries reach your agent like any tool result; files on disk stay on disk unless a tool returns them or you share them.
-- **Everything is stored under `SCREENCAST_HOME`** (`recordings/`, `screenshots/`, `frames/`, `edits/`, `sessions.json`) unless a call names another path. `find_text`, `wait_for_change`, and `screen_diff` delete their captures after the call by default.
+- **Everything is stored under `SCREENCAST_HOME`** (`recordings/`, `screenshots/`, `frames/`, `edits/`, `sessions.json`) unless a call names another path. `find_text` and `wait_for_change` delete their captures after the call by default (`keep: true` keeps them); `screen_diff` compares existing images and captures nothing.
 - **The event log never records typed text.** Only with `start_recording` `events: true` (or `cursor: "events"`), and only while that recording runs: clicks, scrolls, and cursor positions system-wide, and typing as bursts on a 0.5 s grid with no key names (`keys: "shortcuts"` also names Ctrl/Alt/Win chords). There is no microphone capture; system audio only with `audio.source` = `system`.
 - **Deleting data.** Delete files under `SCREENCAST_HOME`, or set `SCREENCAST_RETENTION_DAYS`; recordings and edits are never deleted automatically.
 

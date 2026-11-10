@@ -91,7 +91,7 @@
         <p class="vf-note" id="vf-note">Every frame here came from <code>sample_frames</code> on a real recording. The amber mark is where <code>mode: "scenes"</code> picks a frame; the red one is the click <code>read_events</code> logged.</p>
       </figure>
       <p id="prerequisites" class="sub small">
-      Needs Windows 10 or 11 and <code>ffmpeg</code> / <code>ffprobe</code> on <code>PATH</code>
+      Needs Windows 10 or 11, Node.js 22+, and FFmpeg 8 or newer (<code>ffmpeg</code> / <code>ffprobe</code>) on <code>PATH</code>
       (<code>winget install Gyan.FFmpeg</code>, or set <code>FFMPEG_PATH</code> / <code>FFPROBE_PATH</code>).
       Capture is Windows-only; the watch and edit tools run anywhere ffmpeg runs. Any other MCP client:</p>
       <pre class="copyable"><code>{
@@ -277,8 +277,8 @@
         (the app's topmost window) or <code>window:hwnd=0x1A2B</code>.</li>
         <li>Fullscreen-exclusive apps can produce black frames under gdigrab; use
         borderless-windowed mode.</li>
-        <li><code>backend: "wgc"</code> on <code>start_recording</code> or
-        <code>screenshot</code> captures one window&rsquo;s own surface through
+        <li><code>backend: "wgc"</code> on <code>start_recording</code>,
+        <code>screenshot</code>, or <code>find_text</code> captures one window&rsquo;s own surface through
         Windows Graphics Capture (FFmpeg 8+): it keeps recording the window while it
         is covered, moved, or in the background.</li>
         <li>System audio capture (<code>start_recording</code> with
