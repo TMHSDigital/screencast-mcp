@@ -66,7 +66,7 @@
         },
         {
           "name": "SCREENCAST_RETENTION_DAYS",
-          "description": "At startup, delete screenshots, frames, and leftover raw event logs older than this many days (never recordings or edits; off by default)",
+          "description": "At startup, delete screenshots, frames, leftover raw event logs, and index_recording indexes older than this many days (never recordings or edits; off by default)",
           "isRequired": false,
           "isSecret": false,
           "format": "number"

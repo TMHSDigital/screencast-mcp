@@ -96,7 +96,7 @@ export function buildManifest(p, toolList) {
       retention_days: {
         type: "number",
         title: "Capture retention (days)",
-        description: "At startup, delete screenshots, frames, and leftover raw event logs older than this. Never recordings or edits. Leave empty to keep everything.",
+        description: "At startup, delete screenshots, frames, leftover raw event logs, and index_recording indexes older than this. Never recordings or edits. Leave empty to keep everything.",
         required: false,
         min: 1,
       },

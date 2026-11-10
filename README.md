@@ -192,7 +192,7 @@ Every capture tool takes one `target` string: `full`, `monitor:<index>`, `window
 | `SCREENCAST_MAX_RECORDING_SEC` | `3600` | Default recording cap (`0` disables it) |
 | `SCREENCAST_JOB_TIMEOUT_MS` | scales with length | Override the edit job timeout |
 | `SCREENCAST_WHISPER_MODEL` | none | whisper.cpp model for `transcribe` |
-| `SCREENCAST_RETENTION_DAYS` | off | Delete screenshots, frames, and leftover raw event logs older than this many days at startup (never recordings or edits) |
+| `SCREENCAST_RETENTION_DAYS` | off | Delete screenshots, frames, leftover raw event logs, and `index_recording` indexes older than this many days at startup (never recordings or edits; an index is rebuilt by running `index_recording` again) |
 | `SCREENCAST_PS_TIMEOUT_MS` | 20000 (OCR 60000) | Limit for the PowerShell helpers that list monitors and windows and run OCR |
 | `SCREENCAST_CONFIRM_CAPTURE` | off | Set to `1` to ask the user to confirm every live capture through MCP elicitation; clients without elicitation are refused |
 | `SCREENCAST_TOOLSETS` | `all` | Comma-separated toolsets to expose; the rest are not loaded, which shrinks the tool list the agent pays for on every turn (`core` is always on) |
