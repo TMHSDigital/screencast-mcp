@@ -44,7 +44,7 @@ watch, and produce tools run anywhere ffmpeg runs.
 ```bash
 npm run lint        # eslint .
 npm run build       # tsc
-npm run typecheck   # tsc --noEmit
+npm run typecheck   # tsc over src/, src/__tests__/ and evals/
 npm test            # vitest; the ffmpeg integration suite skips without ffmpeg on PATH
 ```
 
