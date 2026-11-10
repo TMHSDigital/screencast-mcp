@@ -3,8 +3,8 @@ import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { STOPS_SESSION, looseOutput } from "../utils/toolSpec.js";
-import { probeMedia, requireFfmpeg } from "../utils/ffmpeg.js";
-import { probeDuration, stopSession } from "../utils/lifecycle.js";
+import { probeDuration, probeMedia, requireFfmpeg } from "../utils/ffmpeg.js";
+import { stopSession } from "../utils/lifecycle.js";
 import { getStore } from "../context.js";
 import { foreignStopRefusal, ownerAlive } from "../utils/sessions.js";
 import { finishReplay, type ReplayStopResult } from "../utils/replay.js";
@@ -118,7 +118,7 @@ export function register(server: McpServer): void {
         const { ffprobe } = requireFfmpeg();
         const { record: updated, graceful, durationSec, replay, segments } = await stopSession(store, record, {
           reason: "stopped",
-          probe: (path) => probeDuration(ffprobe, path),
+          probe: (path) => probeDuration(path, { ffprobe }),
           saveReplay: args.save,
         });
 

@@ -12,9 +12,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 import { isCliInvocation, runCli } from "./cli.js";
 import { getStore, isShuttingDown, markShuttingDown, startsSettled } from "./context.js";
-import { requireFfmpeg } from "./utils/ffmpeg.js";
+import { probeDuration, requireFfmpeg } from "./utils/ffmpeg.js";
 import { abortEditJobs } from "./utils/jobs.js";
-import { probeDuration, stopAll } from "./utils/lifecycle.js";
+import { stopAll } from "./utils/lifecycle.js";
 import { createServer } from "./server.js";
 import { pruneCaptures, retentionDays, RETENTION_ENV } from "./utils/retention.js";
 import { cleanupReplayDirs } from "./utils/replay.js";
@@ -127,7 +127,7 @@ async function shutdown(reason: string, exitCode = 0): Promise<void> {
         /* duration stays unknown */
       }
       const stopped = await stopAll(store, (path) =>
-        ffprobe ? probeDuration(ffprobe, path) : Promise.resolve(null),
+        ffprobe ? probeDuration(path, { ffprobe }) : Promise.resolve(null),
       );
       process.stderr.write(`Shutdown (${reason}): stopped ${stopped.length} recording(s).\n`);
     }

@@ -15,6 +15,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - Orphan reaping at startup and a cross-restart `stop_recording` no longer kill an unrelated process that reused a recorder's pid: records store when the recorder was spawned, and a pid whose process started later is left alone (#284).
 - `stop_recording` refuses, with a clear message, to stop a gdigrab or ddagrab recording that another running server instance owns, instead of force-killing it and racing that instance to finalize and join its segments. WGC recordings are still handed over through their stop file (#286).
 - CLI commands (`record`, `call`, `setup`) no longer build an unused stdio server or install the server's exit handlers: an unknown `SCREENCAST_TOOLSETS` entry no longer warns twice, and output piped into a command that closes early (`| head`) keeps the CLI's own exit code (#289).
+- `stop_recording` waits for a force-killed capture's process handle to close before joining or probing the file, as `pause_recording` already did, so a slow quit no longer risks a busy-file error (#310).
 
 ### Changed
 

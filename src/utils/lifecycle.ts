@@ -6,12 +6,11 @@
  * cross-restart stop), the process is terminated by pid; the fragmented-mp4
  * muxing keeps a killed recording playable either way.
  */
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import type { ChildProcess } from "node:child_process";
-import { requireFfmpeg, runCapture } from "./ffmpeg.js";
+import { probeDuration, requireFfmpeg } from "./ffmpeg.js";
 import { finishReplay, type ReplayStopResult } from "./replay.js";
 import { whenFinalized } from "./events.js";
-import { buildProbeArgs, parseMediaInfo } from "./media.js";
 import { errorMessage, ScreencastError } from "./errors.js";
 import { wgcStopFile } from "./wgc.js";
 import { encoderArgs } from "./gpu.js";
@@ -53,18 +52,6 @@ export function waitForExit(child: ChildProcess, ms: number): Promise<boolean> {
       resolve(true);
     });
   });
-}
-
-/** Probe a finished file's duration, or null if it is missing/unreadable. */
-export async function probeDuration(ffprobe: string, path: string): Promise<number | null> {
-  if (!existsSync(path)) return null;
-  try {
-    const res = await runCapture(ffprobe, buildProbeArgs(path), 30_000);
-    if (res.code !== 0) return null;
-    return parseMediaInfo(JSON.parse(res.stdout)).durationSec;
-  } catch {
-    return null;
-  }
 }
 
 export interface StopOptions {
@@ -112,7 +99,7 @@ export async function finalParts(record: SessionRecord, ffprobe: string): Promis
   const parts = [...seg.parts];
   if (seg.current) {
     // A failed probe does not drop footage: the span stands in (#252).
-    const probed = await probeDuration(ffprobe, seg.current.path);
+    const probed = await probeDuration(seg.current.path, { ffprobe });
     const endMs = record.stoppedAt ? Date.parse(record.stoppedAt) : Date.now();
     const durationSec = segmentDurationSec(seg.current.path, probed, seg.current.startMs, endMs) ?? 0;
     parts.push({ ...seg.current, durationSec });
@@ -326,14 +313,14 @@ async function runStop(
     let graceful = false;
     const child = store.getChild(record.id);
 
+    const stillRunning = (pid: number) =>
+      new ScreencastError(`Could not stop recording ${record.id}: its process (pid ${pid}) is still running.`);
+
     if (child && child.stdin && child.stdin.writable) {
-      child.stdin.write("q\n");
-      child.stdin.end();
-      graceful = await waitForExit(child, opts.gracefulMs ?? 8000);
-      if (!graceful && record.pid !== null) {
-        killPid(record.pid);
-        await waitForPidExit(record.pid, 2000);
-      }
+      // The same quit-then-kill sequence pause uses, which also waits for the
+      // child handle so the file is released before a join or probe (#310).
+      graceful = await quitChild(child, record.pid, opts.gracefulMs ?? 8000);
+      if (!graceful && record.pid !== null && isAlive(record.pid)) throw stillRunning(record.pid);
     } else if (record.pid !== null && isAlive(record.pid)) {
       // Cross-restart stop: no stdin handle. Act on the pid only while it is
       // still the recorder this record started (never a recycled, unrelated
@@ -349,11 +336,7 @@ async function runStop(
           killPid(record.pid);
           await waitForPidExit(record.pid, 2000);
         }
-        if (isAlive(record.pid)) {
-          throw new ScreencastError(
-            `Could not stop recording ${record.id}: its process (pid ${record.pid}) is still running.`,
-          );
-        }
+        if (isAlive(record.pid)) throw stillRunning(record.pid);
       }
     }
     store.detachChild(record.id, child);

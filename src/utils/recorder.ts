@@ -9,8 +9,8 @@ import { errorMessage, ScreencastError } from "./errors.js";
 import { logMessage, StderrWatch } from "./logging.js";
 import { parseCaptureStart, whenFinalized } from "./events.js";
 import { buildCaptureArgs } from "./targets.js";
-import { requireFfmpeg } from "./ffmpeg.js";
-import { joinSegments, probeDuration, withSessionOp } from "./lifecycle.js";
+import { probeDuration, requireFfmpeg } from "./ffmpeg.js";
+import { joinSegments, withSessionOp } from "./lifecycle.js";
 import {
   endSession,
   isPausing,
@@ -145,7 +145,7 @@ async function finalizeSegments(store: SessionStore, record: SessionRecord): Pro
   const tools = requireFfmpeg();
   await whenFinalized(record.id);
   const { patch, error } = await joinSegments(record, tools);
-  const durationSec = await probeDuration(tools.ffprobe, record.outputPath);
+  const durationSec = await probeDuration(record.outputPath, { ffprobe: tools.ffprobe });
   store.tryUpdate(record.id, { ...patch, durationSec: durationSec ?? undefined, ...(error ? { error } : {}) });
 }
 

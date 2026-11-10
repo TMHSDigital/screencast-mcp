@@ -7,7 +7,7 @@
  * spawn failure deep inside a tool call.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ScreencastError } from "./errors.js";
@@ -355,6 +355,21 @@ export async function runFfmpeg(
     logFfmpegWarnings(res.stderr);
   } finally {
     scripted.cleanup();
+  }
+}
+
+/** A file's duration in seconds, or null when it is missing or cannot be
+ * probed (no ffprobe included). Never throws: callers use it to size timeouts
+ * and progress and to report a recording's length. `ffprobe` overrides the
+ * detected binary. The one probeDuration (#310). */
+export async function probeDuration(path: string, opts: { ffprobe?: string } = {}): Promise<number | null> {
+  if (!existsSync(path)) return null;
+  try {
+    const res = await runCapture(opts.ffprobe ?? requireFfmpeg().ffprobe, buildProbeArgs(path), 30_000);
+    if (res.code !== 0) return null;
+    return parseMediaInfo(JSON.parse(res.stdout)).durationSec;
+  } catch {
+    return null;
   }
 }
 

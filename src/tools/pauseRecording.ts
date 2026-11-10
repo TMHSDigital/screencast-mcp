@@ -2,8 +2,8 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { STOPS_SESSION, looseOutput } from "../utils/toolSpec.js";
-import { requireFfmpeg } from "../utils/ffmpeg.js";
-import { pauseSession, probeDuration } from "../utils/lifecycle.js";
+import { probeDuration, requireFfmpeg } from "../utils/ffmpeg.js";
+import { pauseSession } from "../utils/lifecycle.js";
 import { recordedSec } from "../utils/pause.js";
 import { getStore } from "../context.js";
 
@@ -34,7 +34,7 @@ export function register(server: McpServer): void {
           });
         }
         const { ffprobe } = requireFfmpeg();
-        const res = await pauseSession(store, record, { probe: (p) => probeDuration(ffprobe, p) });
+        const res = await pauseSession(store, record, { probe: (p) => probeDuration(p, { ffprobe }) });
         return okResponse({
           sessionId: record.id,
           status: "paused",

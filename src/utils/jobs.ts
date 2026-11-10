@@ -21,7 +21,7 @@ import { renameSync, rmSync } from "node:fs";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type { ServerNotification, ServerRequest } from "@modelcontextprotocol/sdk/types.js";
 import { ScreencastError } from "./errors.js";
-import { probeMedia, runFfmpeg } from "./ffmpeg.js";
+import { runFfmpeg } from "./ffmpeg.js";
 
 /** The `extra` argument the SDK passes to every tool callback. */
 export type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
@@ -200,12 +200,5 @@ export async function abortEditJobs(graceMs = 3_000): Promise<number> {
   return jobs.length;
 }
 
-/** Probe a file's duration, or null when it cannot be read. Used to size
- * timeouts and progress; never fails the job on its own. */
-export async function probeDuration(input: string): Promise<number | null> {
-  try {
-    return (await probeMedia(input)).durationSec;
-  } catch {
-    return null;
-  }
-}
+/** The edit tools import it from here with runEditJob (#310). */
+export { probeDuration } from "./ffmpeg.js";
