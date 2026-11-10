@@ -150,15 +150,21 @@ export function calloutSteps(
   return { steps, out: cur, extraInputs };
 }
 
-/** Draw every callout in order (later items on top). Pure. */
+/** Draw every callout in order (later items on top). With `still`, the input
+ * is one image: from/to are ignored and one image is written (#319). Pure. */
 export function buildCalloutArgs(
   input: string,
   output: string,
   items: Callout[],
   assets: CalloutAssets,
   quality: Quality = "standard",
+  still = false,
 ): string[] {
-  const { steps, out, extraInputs } = calloutSteps(items, assets, "[0:v]", 1, "");
+  const drawn = still ? items.map(({ from: _f, to: _t, ...c }) => c as Callout) : items;
+  const { steps, out, extraInputs } = calloutSteps(drawn, assets, "[0:v]", 1, "");
+  if (still) {
+    return ["-y", "-i", input, ...extraInputs, "-filter_complex", steps.join(";"), "-map", out, "-frames:v", "1", ...stillOutput(output)];
+  }
   return [
     "-y", "-i", input, ...extraInputs,
     "-filter_complex", steps.join(";"),

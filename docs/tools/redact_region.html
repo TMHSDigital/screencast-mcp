@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>redact_region — Screencast MCP</title>
-  <meta name="description" content="Cover given rectangles in a video (e.g. secrets on screen).">
+  <meta name="description" content="Cover given rectangles in a video or screenshot (e.g. secrets on screen).">
   <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/tools/redact_region.html">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
   <meta property="og:title" content="redact_region — Screencast MCP">
-  <meta property="og:description" content="Cover given rectangles in a video (e.g. secrets on screen).">
+  <meta property="og:description" content="Cover given rectangles in a video or screenshot (e.g. secrets on screen).">
   <meta property="og:type" content="article">
   <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/tools/redact_region.html">
   <meta property="og:site_name" content="Screencast MCP">
@@ -44,7 +44,7 @@
       <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">TOOLS</a> / EDIT</p>
       <h1>Redact Regions</h1>
       <p class="tool-id"><code>redact_region</code></p>
-      <p class="lede">Cover given rectangles in a video (e.g. secrets on screen). Not automatic detection: find them with find_text redact: true. Off-frame regions are rejected.</p>
+      <p class="lede">Cover given rectangles in a video or screenshot (e.g. secrets on screen). Not automatic detection: find them with find_text redact: true. Off-frame regions are rejected.</p>
       <p class="chips"><span class="chip set">edit</span><span class="chip warn">writes</span><span class="chip warn">destructive</span><span class="chip">since v0.4.0</span></p>
     </section>
 
@@ -54,7 +54,7 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video.</td></tr>
+          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video or image (png/jpg; time ranges are ignored for an image).</td></tr>
           <tr><td><code>regions</code> <span class="req">required</span></td><td><code class="type">object[]</code></td><td>Pixel rectangles (x, y, width, height), each optionally limited to start..end seconds. <span class="bounds">at least 1 items</span></td></tr>
           <tr class="nested d1"><td><code>regions[].x</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
           <tr class="nested d1"><td><code>regions[].y</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
@@ -74,7 +74,7 @@
 
     <section class="chapter">
       <div class="tc-mark"><span class="tc">00:05</span><span>A MINIMAL CALL</span></div>
-      <pre class="copyable"><code>redact_region { &quot;input&quot;: &quot;recording.mp4&quot;, &quot;regions&quot;: [{&quot;x&quot;: 0, &quot;y&quot;: 0, &quot;width&quot;: 1, &quot;height&quot;: 1}] }</code></pre>
+      <pre class="copyable"><code>redact_region { &quot;input&quot;: &quot;before.png&quot;, &quot;regions&quot;: [{&quot;x&quot;: 0, &quot;y&quot;: 0, &quot;width&quot;: 1, &quot;height&quot;: 1}] }</code></pre>
       <p>The required arguments only, with placeholder values. Everything else takes its default.</p>
     </section>
 

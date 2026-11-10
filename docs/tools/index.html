@@ -117,7 +117,7 @@
           <tr><td><code><a href="clip.html">clip</a></code></td><td>Extract several frame-exact segments, each to its own file.</td></tr>
           <tr><td><code><a href="cut_idle.html">cut_idle</a></code></td><td>Remove dead air: cut stretches where the screen is frozen (and silent), keeping a short pad.</td></tr>
           <tr><td><code><a href="cut_by_transcript.html">cut_by_transcript</a></code></td><td>Edit a video by its transcript: cut quoted text, cue numbers, or fillers.</td></tr>
-          <tr><td><code><a href="redact_region.html">redact_region</a></code></td><td>Cover given rectangles in a video (e.g. secrets on screen).</td></tr>
+          <tr><td><code><a href="redact_region.html">redact_region</a></code></td><td>Cover given rectangles in a video or screenshot (e.g. secrets on screen).</td></tr>
           <tr><td><code><a href="pipeline.html">pipeline</a></code></td><td>Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files.</td></tr>
         </tbody>
       </table>
@@ -130,7 +130,7 @@
         <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
         <tbody>
           <tr><td><code><a href="overlay.html">overlay</a></code></td><td>Composite an image or video (logo, watermark, picture-in-picture) onto a video at a pixel position, optionally scaled and time-limited; keeps the base's audio and length.</td></tr>
-          <tr><td><code><a href="callout.html">callout</a></code></td><td>Annotate a video with timed boxes, text labels, and arrows.</td></tr>
+          <tr><td><code><a href="callout.html">callout</a></code></td><td>Annotate a video or screenshot with timed boxes, text labels, and arrows.</td></tr>
           <tr><td><code><a href="keystroke_overlay.html">keystroke_overlay</a></code></td><td>Burn keycast-style badges for shortcuts, clicks, and typing from the recording's input event log (start_recording events: true).</td></tr>
           <tr><td><code><a href="cursor.html">cursor</a></code></td><td>Draw a smoothed, scaled cursor that hides when idle from the event log of a start_recording cursor: &quot;events&quot; recording (no OS cursor in the video), with click ripples and an optional spotlight.</td></tr>
           <tr><td><code><a href="backdrop.html">backdrop</a></code></td><td>Frame a video or screenshot on a gradient, color, or wallpaper with padding, rounded corners, and a drop shadow, optionally on a 16:9/1:1/9:16/4:5 canvas.</td></tr>

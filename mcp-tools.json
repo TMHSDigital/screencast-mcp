@@ -1447,14 +1447,14 @@
       "idempotentHint": false,
       "openWorldHint": false
     },
-    "description": "Annotate a video with timed boxes, text labels, and arrows. Fallback fonts used are listed in fallbackFonts; characters no font covers are reported in warnings.",
+    "description": "Annotate a video or screenshot with timed boxes, text labels, and arrows. Fallback fonts used are listed in fallbackFonts; characters no font covers are reported in warnings.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Path to the source video or image (png/jpg; from/to are ignored for an image)."
         },
         "items": {
           "minItems": 1,
@@ -2420,14 +2420,14 @@
       "idempotentHint": false,
       "openWorldHint": false
     },
-    "description": "Cover given rectangles in a video (e.g. secrets on screen). Not automatic detection: find them with find_text redact: true. Off-frame regions are rejected.",
+    "description": "Cover given rectangles in a video or screenshot (e.g. secrets on screen). Not automatic detection: find them with find_text redact: true. Off-frame regions are rejected.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Path to the source video or image (png/jpg; time ranges are ignored for an image)."
         },
         "regions": {
           "minItems": 1,

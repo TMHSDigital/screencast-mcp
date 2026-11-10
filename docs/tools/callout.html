@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>callout — Screencast MCP</title>
-  <meta name="description" content="Annotate a video with timed boxes, text labels, and arrows.">
+  <meta name="description" content="Annotate a video or screenshot with timed boxes, text labels, and arrows.">
   <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/tools/callout.html">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
   <meta property="og:title" content="callout — Screencast MCP">
-  <meta property="og:description" content="Annotate a video with timed boxes, text labels, and arrows.">
+  <meta property="og:description" content="Annotate a video or screenshot with timed boxes, text labels, and arrows.">
   <meta property="og:type" content="article">
   <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/tools/callout.html">
   <meta property="og:site_name" content="Screencast MCP">
@@ -44,7 +44,7 @@
       <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">TOOLS</a> / PRODUCE</p>
       <h1>Add Callouts</h1>
       <p class="tool-id"><code>callout</code></p>
-      <p class="lede">Annotate a video with timed boxes, text labels, and arrows. Fallback fonts used are listed in fallbackFonts; characters no font covers are reported in warnings.</p>
+      <p class="lede">Annotate a video or screenshot with timed boxes, text labels, and arrows. Fallback fonts used are listed in fallbackFonts; characters no font covers are reported in warnings.</p>
       <p class="chips"><span class="chip set">produce</span><span class="chip warn">writes</span><span class="chip warn">destructive</span><span class="chip">since v0.21.0</span></p>
     </section>
 
@@ -54,7 +54,7 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video.</td></tr>
+          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video or image (png/jpg; from/to are ignored for an image).</td></tr>
           <tr><td><code>items</code> <span class="req">required</span></td><td><code class="type">object[]</code></td><td>Boxes, text labels, and arrows, drawn in order (later on top), in video pixels. Each shows from..to seconds (default: whole video); color is a name, #RRGGBB, or name@alpha. <span class="bounds">at least 1 items, at most 50 items</span></td></tr>
           <tr class="nested d1"><td><code>items[box].x</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
           <tr class="nested d1"><td><code>items[box].y</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
@@ -91,18 +91,7 @@
 
     <section class="chapter">
       <div class="tc-mark"><span class="tc">00:05</span><span>A MINIMAL CALL</span></div>
-      <pre class="copyable"><code>callout {
-  &quot;input&quot;: &quot;recording.mp4&quot;,
-  &quot;items&quot;: [
-    {
-      &quot;type&quot;: &quot;box&quot;,
-      &quot;x&quot;: 1,
-      &quot;y&quot;: 1,
-      &quot;width&quot;: 1,
-      &quot;height&quot;: 1
-    }
-  ]
-}</code></pre>
+      <pre class="copyable"><code>callout { &quot;input&quot;: &quot;before.png&quot;, &quot;items&quot;: [{&quot;type&quot;: &quot;box&quot;, &quot;x&quot;: 1, &quot;y&quot;: 1, &quot;width&quot;: 1, &quot;height&quot;: 1}] }</code></pre>
       <p>The required arguments only, with placeholder values. Everything else takes its default.</p>
     </section>
 

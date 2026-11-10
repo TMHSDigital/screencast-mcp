@@ -55,6 +55,11 @@ export function sequencePattern(dir: string, name: string): string {
 
 const STILL_IMAGE = /\.(png|jpe?g|bmp|tiff?)$/i;
 
+/** True for a still-image path (png, jpg, bmp, tiff). */
+export function isStillImage(path: string): boolean {
+  return STILL_IMAGE.test(path);
+}
+
 /** The output args for a single still image. ffmpeg's image2 muxer reads a `%`
  * in the file name as a sequence pattern (`b%dx.png` becomes `b1x.png`), so
  * `-update 1` keeps the name literal and the returned path real (#238). */

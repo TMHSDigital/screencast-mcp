@@ -139,7 +139,7 @@ Cut, convert, compress, and redact. A tool that writes a file refuses to replace
 | [`clip`](https://tmhsdigital.github.io/screencast-mcp/tools/clip.html) | Extract several frame-exact segments, each to its own file. For one segment, trim does the same. |
 | [`cut_idle`](https://tmhsdigital.github.io/screencast-mcp/tools/cut_idle.html) | Remove dead air: cut stretches where the screen is frozen (and silent), keeping a short pad. Returns the time saved. |
 | [`cut_by_transcript`](https://tmhsdigital.github.io/screencast-mcp/tools/cut_by_transcript.html) | Edit a video by its transcript: cut quoted text, cue numbers, or fillers. Also writes the re-timed .srt. |
-| [`redact_region`](https://tmhsdigital.github.io/screencast-mcp/tools/redact_region.html) | Cover given rectangles in a video (e.g. secrets on screen). Not automatic detection: find them with find_text redact: true. Off-frame regions are rejected. |
+| [`redact_region`](https://tmhsdigital.github.io/screencast-mcp/tools/redact_region.html) | Cover given rectangles in a video or screenshot (e.g. secrets on screen). Not automatic detection: find them with find_text redact: true. Off-frame regions are rejected. |
 | [`pipeline`](https://tmhsdigital.github.io/screencast-mcp/tools/pipeline.html) | Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call. |
 
 ### Produce
@@ -149,7 +149,7 @@ Annotate, frame, and assemble a finished piece. Tools that combine clips normali
 | Tool | What it does |
 | --- | --- |
 | [`overlay`](https://tmhsdigital.github.io/screencast-mcp/tools/overlay.html) | Composite an image or video (logo, watermark, picture-in-picture) onto a video at a pixel position, optionally scaled and time-limited; keeps the base's audio and length. |
-| [`callout`](https://tmhsdigital.github.io/screencast-mcp/tools/callout.html) | Annotate a video with timed boxes, text labels, and arrows. Fallback fonts used are listed in fallbackFonts; characters no font covers are reported in warnings. |
+| [`callout`](https://tmhsdigital.github.io/screencast-mcp/tools/callout.html) | Annotate a video or screenshot with timed boxes, text labels, and arrows. Fallback fonts used are listed in fallbackFonts; characters no font covers are reported in warnings. |
 | [`keystroke_overlay`](https://tmhsdigital.github.io/screencast-mcp/tools/keystroke_overlay.html) | Burn keycast-style badges for shortcuts, clicks, and typing from the recording's input event log (start_recording events: true). Never shows typed text: the log has none. |
 | [`cursor`](https://tmhsdigital.github.io/screencast-mcp/tools/cursor.html) | Draw a smoothed, scaled cursor that hides when idle from the event log of a start_recording cursor: "events" recording (no OS cursor in the video), with click ripples and an optional spotlight. |
 | [`backdrop`](https://tmhsdigital.github.io/screencast-mcp/tools/backdrop.html) | Frame a video or screenshot on a gradient, color, or wallpaper with padding, rounded corners, and a drop shadow, optionally on a 16:9/1:1/9:16/4:5 canvas. |

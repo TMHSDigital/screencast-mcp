@@ -5,6 +5,8 @@ import {
   buildProbeArgs,
   buildSampleByFpsArgs,
   pickFramePrefix,
+  buildRedactArgs,
+  stillEdit,
   planFpsSampling,
   buildSceneScanArgs,
   parseSceneScan,
@@ -446,5 +448,20 @@ describe("pickFramePrefix (#283)", () => {
   });
   it("uses a per-run prefix when plain frame names already exist", () => {
     expect(pickFramePrefix(["frame_00001.png"], "u1")).toBe("frame_u1_");
+  });
+});
+
+describe("still edits (#319)", () => {
+  it("keeps a jpg a jpg, makes other images png, and refuses a video output", () => {
+    expect(stillEdit("a.jpg")).toEqual({ still: true, ext: ".jpg" });
+    expect(stillEdit("a.PNG")).toEqual({ still: true, ext: ".png" });
+    expect(stillEdit("a.bmp")).toEqual({ still: true, ext: ".png" });
+    expect(() => stillEdit("a.png", "out.mp4")).toThrow(/image/);
+    expect(stillEdit("a.mov")).toEqual({ still: false, ext: ".mov" });
+  });
+  it("redacts a still without time ranges and writes one image", () => {
+    const a = buildRedactArgs("in.png", "o.png", [{ x: 0, y: 0, width: 4, height: 4, start: 1, end: 2 }], {}, undefined, true);
+    expect(a.join(" ")).not.toContain("enable");
+    expect(a.slice(-5)).toEqual(["-frames:v", "1", "-update", "1", "o.png"]);
   });
 });

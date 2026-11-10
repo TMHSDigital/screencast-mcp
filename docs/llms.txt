@@ -49,7 +49,7 @@ Every tool is an explicit call: nothing records on its own. Tools return file pa
 - [scale](https://tmhsdigital.github.io/screencast-mcp/tools/scale.html): Resize a video to a target width and/or height and re-encode.
 - [speed](https://tmhsdigital.github.io/screencast-mcp/tools/speed.html): Change playback speed by a factor (>1 faster, <1 slower) and re-encode.
 - [overlay](https://tmhsdigital.github.io/screencast-mcp/tools/overlay.html): Composite an image or video (logo, watermark, picture-in-picture) onto a video at a pixel position, optionally scaled and time-limited; keeps the base's audio and length.
-- [callout](https://tmhsdigital.github.io/screencast-mcp/tools/callout.html): Annotate a video with timed boxes, text labels, and arrows.
+- [callout](https://tmhsdigital.github.io/screencast-mcp/tools/callout.html): Annotate a video or screenshot with timed boxes, text labels, and arrows.
 - [keystroke_overlay](https://tmhsdigital.github.io/screencast-mcp/tools/keystroke_overlay.html): Burn keycast-style badges for shortcuts, clicks, and typing from the recording's input event log (start_recording events: true).
 - [cursor](https://tmhsdigital.github.io/screencast-mcp/tools/cursor.html): Draw a smoothed, scaled cursor that hides when idle from the event log of a start_recording cursor: "events" recording (no OS cursor in the video), with click ripples and an optional spotlight.
 - [backdrop](https://tmhsdigital.github.io/screencast-mcp/tools/backdrop.html): Frame a video or screenshot on a gradient, color, or wallpaper with padding, rounded corners, and a drop shadow, optionally on a 16:9/1:1/9:16/4:5 canvas.
@@ -63,7 +63,7 @@ Every tool is an explicit call: nothing records on its own. Tools return file pa
 - [clip](https://tmhsdigital.github.io/screencast-mcp/tools/clip.html): Extract several frame-exact segments, each to its own file.
 - [cut_idle](https://tmhsdigital.github.io/screencast-mcp/tools/cut_idle.html): Remove dead air: cut stretches where the screen is frozen (and silent), keeping a short pad.
 - [cut_by_transcript](https://tmhsdigital.github.io/screencast-mcp/tools/cut_by_transcript.html): Edit a video by its transcript: cut quoted text, cue numbers, or fillers.
-- [redact_region](https://tmhsdigital.github.io/screencast-mcp/tools/redact_region.html): Cover given rectangles in a video (e.g. secrets on screen).
+- [redact_region](https://tmhsdigital.github.io/screencast-mcp/tools/redact_region.html): Cover given rectangles in a video or screenshot (e.g. secrets on screen).
 - [list_audio_devices](https://tmhsdigital.github.io/screencast-mcp/tools/list_audio_devices.html): List DirectShow audio devices and flag a likely loopback (Stereo Mix or a virtual-audio driver), for start_recording's audio.device.
 - [list_video_devices](https://tmhsdigital.github.io/screencast-mcp/tools/list_video_devices.html): List DirectShow cameras for start_recording's webcam.device.
 - [list_targets](https://tmhsdigital.github.io/screencast-mcp/tools/list_targets.html): List the desktop, monitors, and visible windows (topmost first, with capturability per backend).

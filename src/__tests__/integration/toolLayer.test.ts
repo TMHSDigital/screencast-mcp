@@ -357,6 +357,35 @@ describe.skipIf(!AVAILABLE)("every non-capture tool through the MCP client (#261
     }
   });
 
+  it("redact_region and callout turn a PNG into a PNG (#319)", async () => {
+    // Red 64x64 logo: a black box over its top-left quarter, a white one for callout.
+    const pixel = (file: string, x: number, y: number) =>
+      [...spawnSync(FFMPEG, ["-v", "error", "-i", file, "-vf", `crop=1:1:${x}:${y},format=rgb24`, "-f", "rawvideo", "-"]).stdout];
+    const redacted = await client.callTool(
+      { name: "redact_region", arguments: { input: fx.png, regions: [{ x: 0, y: 0, width: 32, height: 32, start: 5, end: 9 }] } },
+      undefined,
+      CALL_OPTS,
+    );
+    expect(redacted.isError ?? false).toBe(false);
+    const r = (redacted.structuredContent as { outputPath: string }).outputPath;
+    expect(extname(r)).toBe(".png");
+    expect(pixel(r, 5, 5)).toEqual([0, 0, 0]); // time ranges are ignored for an image
+    expect(pixel(r, 50, 50)[0]).toBeGreaterThan(200);
+
+    const called = await client.callTool(
+      { name: "callout", arguments: { input: fx.png, items: [{ type: "box", x: 0, y: 0, width: 32, height: 32, fill: true, color: "white" }] } },
+      undefined,
+      CALL_OPTS,
+    );
+    expect(called.isError ?? false).toBe(false);
+    const c = (called.structuredContent as { outputPath: string }).outputPath;
+    expect(extname(c)).toBe(".png");
+    expect(pixel(c, 5, 5)).toEqual([255, 255, 255]);
+
+    const bad = await client.callTool({ name: "redact_region", arguments: { input: fx.png, regions: [{ x: 0, y: 0, width: 8, height: 8 }], output: join(home, "x.mp4") } });
+    expect(bad.isError).toBe(true);
+  });
+
   it("sample_frames fps mode keeps both runs' frames in a reused outputDir (#283)", async () => {
     const outputDir = join(home, "reused-frames");
     const run = async () => {

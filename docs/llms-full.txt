@@ -720,11 +720,11 @@ Minimal call:
 
 **Redact Regions** (since v0.4.0)
 
-Cover given rectangles in a video (e.g. secrets on screen). Not automatic detection: find them with find_text redact: true. Off-frame regions are rejected.
+Cover given rectangles in a video or screenshot (e.g. secrets on screen). Not automatic detection: find them with find_text redact: true. Off-frame regions are rejected.
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Path to the source video or image (png/jpg; time ranges are ignored for an image).
 - `regions` (object[]; required, at least 1 items): Pixel rectangles (x, y, width, height), each optionally limited to start..end seconds.
 - `regions[].x` (integer; required, ≥ 0, ≤ 9007199254740991)
 - `regions[].y` (integer; required, ≥ 0, ≤ 9007199254740991)
@@ -741,7 +741,7 @@ Parameters:
 Minimal call:
 
 ```json
-{"input":"recording.mp4","regions":[{"x":0,"y":0,"width":1,"height":1}]}
+{"input":"before.png","regions":[{"x":0,"y":0,"width":1,"height":1}]}
 ```
 
 ## pipeline
@@ -897,11 +897,11 @@ Minimal call:
 
 **Add Callouts** (since v0.21.0)
 
-Annotate a video with timed boxes, text labels, and arrows. Fallback fonts used are listed in fallbackFonts; characters no font covers are reported in warnings.
+Annotate a video or screenshot with timed boxes, text labels, and arrows. Fallback fonts used are listed in fallbackFonts; characters no font covers are reported in warnings.
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Path to the source video or image (png/jpg; from/to are ignored for an image).
 - `items` (object[]; required, at least 1 items, at most 50 items): Boxes, text labels, and arrows, drawn in order (later on top), in video pixels. Each shows from..to seconds (default: whole video); color is a name, #RRGGBB, or name@alpha.
 - `items[box].x` (number; required)
 - `items[box].y` (number; required)
@@ -935,7 +935,7 @@ Parameters:
 Minimal call:
 
 ```json
-{"input":"recording.mp4","items":[{"type":"box","x":1,"y":1,"width":1,"height":1}]}
+{"input":"before.png","items":[{"type":"box","x":1,"y":1,"width":1,"height":1}]}
 ```
 
 ## keystroke_overlay

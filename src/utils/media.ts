@@ -8,7 +8,7 @@ import { extname } from "node:path";
 import { ScreencastError } from "./errors.js";
 import { resolveQuality, type Quality } from "./targets.js";
 import { validateColor, validateEvenDimension } from "./validate.js";
-import { stillOutput } from "./paths.js";
+import { isStillImage, stillOutput } from "./paths.js";
 
 /** Edit re-encodes default to the same preset as a standard capture. */
 const DEFAULT_EDIT_QUALITY: Quality = "standard";
@@ -895,16 +895,38 @@ export function redactSteps(
   return { steps, out: `[${tag}out]` };
 }
 
+/** For an edit tool that takes a video or a still (#319): whether `input` is
+ * a still image, and the default output extension. A still writes an image
+ * (a .jpg input keeps .jpg, anything else becomes .png); a video keeps the
+ * usual container rules. */
+export function stillEdit(input: string, output?: string): { still: boolean; ext: string } {
+  if (!isStillImage(input)) {
+    assertEditContainer(output);
+    return { still: false, ext: editOutputExt(input) };
+  }
+  if (output && !isStillImage(output)) {
+    throw new ScreencastError("An image input writes an image: give the output a .png or .jpg extension.");
+  }
+  return { still: true, ext: /\.jpe?g$/i.test(input) ? extname(input).toLowerCase() : ".png" };
+}
+
 /** Redact declared rectangles. `box` (default) draws an irreversible solid fill;
- * `blur` and `pixelate` composite a softened crop back over each region. */
+ * `blur` and `pixelate` composite a softened crop back over each region. With
+ * `still`, the input is one image: time ranges are ignored and one image is
+ * written (#319). */
 export function buildRedactArgs(
   input: string,
   output: string,
   regions: RedactRegion[],
   opts: RedactOptions = {},
   dims?: { width: number | null; height: number | null },
+  still = false,
 ): string[] {
-  const { steps, out } = redactSteps(regions, opts, dims, "[0:v]", "");
+  const rs = still ? regions.map(({ start: _s, end: _e, ...r }) => r) : regions;
+  const { steps, out } = redactSteps(rs, opts, dims, "[0:v]", "");
+  if (still) {
+    return ["-y", "-i", input, "-filter_complex", steps.join(";"), "-map", out, "-frames:v", "1", ...stillOutput(output)];
+  }
   // A crisp re-encode keeps the redaction edges sharp.
   const [chain] = steps;
   if ((opts.style ?? "box") === "box" && chain !== undefined) {

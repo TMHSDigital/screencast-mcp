@@ -65,3 +65,12 @@ describe("callout (#121)", () => {
     expect(fc[1]).toContain("drawtext=fontfile=C\\\\:/Windows/Fonts/YuGothB.ttc:");
   });
 });
+
+describe("buildCalloutArgs on a still (#319)", () => {
+  it("drops from/to and writes one image", () => {
+    const a = buildCalloutArgs("in.png", "o.png", [{ type: "box", x: 0, y: 0, width: 5, height: 5, from: 1, to: 2 }], { fontFile: "f.ttf", textFiles: [null], arrowFiles: [null] }, undefined, true);
+    expect(a.join(" ")).not.toContain("enable");
+    expect(a.slice(-4)).toEqual(["1", "-update", "1", "o.png"]);
+    expect(a).not.toContain("-c:a");
+  });
+});

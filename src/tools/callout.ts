@@ -9,7 +9,7 @@ import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildCalloutArgs, type Callout } from "../utils/callout.js";
 import { prepareCalloutAssets } from "../utils/calloutAssets.js";
-import { editOutputExt, assertEditContainer } from "../utils/media.js";
+import { stillEdit } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const timing = {
@@ -61,7 +61,7 @@ export const calloutItemSchema = z.discriminatedUnion("type", [
 ]);
 
 const inputSchema = {
-  input: z.string().min(1).describe("Path to the source video."),
+  input: z.string().min(1).describe("Path to the source video or image (png/jpg; from/to are ignored for an image)."),
   items: z
     .array(calloutItemSchema)
     .min(1)
@@ -81,7 +81,7 @@ export function register(server: McpServer): void {
     {
       title: "Add Callouts",
       description:
-        "Annotate a video with timed boxes, text labels, and arrows. Fallback fonts used are listed in " +
+        "Annotate a video or screenshot with timed boxes, text labels, and arrows. Fallback fonts used are listed in " +
         "fallbackFonts; characters no font covers are reported in warnings.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
@@ -94,15 +94,15 @@ export function register(server: McpServer): void {
           throw new ScreencastError(`Input file not found: ${args.input}`);
         }
         const items = args.items as Callout[];
-        assertEditContainer(args.output);
-        const ext = editOutputExt(args.input);
+        // A png/jpg input is annotated as one image (#319).
+        const { still, ext } = stillEdit(args.input, args.output);
         const output = resolveOutput(args.output, subdir("edits"), `callout-${stamp()}-${rand()}${ext}`, args.overwrite);
         // Text files and rendered arrows live in a private temp dir.
         const work = mkdtempSync(join(tmpdir(), "screencast-callout-"));
         try {
           const assets = await prepareCalloutAssets(items, work, "", args.fontFile);
-          const ffArgs = buildCalloutArgs(args.input, output, items, assets);
-          await runEditJob(ffArgs, { output, durationSec: await probeDuration(args.input), extra });
+          const ffArgs = buildCalloutArgs(args.input, output, items, assets, undefined, still);
+          await runEditJob(ffArgs, { output, durationSec: still ? null : await probeDuration(args.input), extra });
           return okResponse({
             outputPath: output,
             callouts: items.length,

@@ -10,6 +10,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Resource subscriptions: a client can subscribe to `screencast://sessions` or `screencast://sessions/{id}` and gets `resources/updated` when it changes, so a recording that ended on its own (`maxDurationSec`, window closed) is noticed without polling (#324).
+- `redact_region` and `callout` accept a still image (png, jpg, bmp, tiff) and write an image: scrub a secret from a screenshot, using the rectangles `find_text` returns, without a video round trip. Time ranges are ignored for an image; a jpg stays a jpg (#319).
 
 ### Changed
 

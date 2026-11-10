@@ -5,7 +5,7 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
-import { buildRedactArgs, type RedactStyle, editOutputExt, assertEditContainer } from "../utils/media.js";
+import { buildRedactArgs, type RedactStyle, stillEdit } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 /** One rectangle to redact; shared with pipeline. */
@@ -19,7 +19,7 @@ export const redactRegionSchema = z.object({
 });
 
 const inputSchema = {
-  input: z.string().min(1).describe("Path to the source video."),
+  input: z.string().min(1).describe("Path to the source video or image (png/jpg; time ranges are ignored for an image)."),
   regions: z
     .array(redactRegionSchema)
     .min(1)
@@ -45,7 +45,7 @@ export function register(server: McpServer): void {
     {
       title: "Redact Regions",
       description:
-        "Cover given rectangles in a video (e.g. secrets on screen). Not automatic detection: find " +
+        "Cover given rectangles in a video or screenshot (e.g. secrets on screen). Not automatic detection: find " +
         "them with find_text redact: true. Off-frame regions are rejected.",
       inputSchema,
       outputSchema: OUTPUT_PATH,
@@ -58,8 +58,8 @@ export function register(server: McpServer): void {
           throw new ScreencastError(`Input file not found: ${args.input}`);
         }
         const { width, height, durationSec } = await probeMedia(args.input);
-        assertEditContainer(args.output);
-        const ext = editOutputExt(args.input);
+        // A png/jpg input is redacted as one image (#319).
+        const { still, ext } = stillEdit(args.input, args.output);
         const output = resolveOutput(
           args.output,
           subdir("edits"),
@@ -76,8 +76,9 @@ export function register(server: McpServer): void {
             color: args.color,
           },
           { width, height },
+          still,
         );
-        await runEditJob(ffArgs, { output, durationSec, extra });
+        await runEditJob(ffArgs, { output, durationSec: still ? null : durationSec, extra });
         return okResponse({
           outputPath: output,
           regions: args.regions.length,
