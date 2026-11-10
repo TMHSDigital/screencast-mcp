@@ -28,12 +28,12 @@ import {
   type WgcRecorderConfig,
 } from "./utils/wgc.js";
 
-/** Give up if the window produces no frame at all within this long. */
-const FIRST_FRAME_TIMEOUT_MS = 10_000;
 /** Skip a frame instead of queueing when the encoder is this far behind. */
 const MAX_QUEUED_FRAMES = 4;
 
 const cfg = JSON.parse(process.argv[2] ?? "{}") as WgcRecorderConfig;
+/** Give up if the window produces no frame at all within this long. */
+const FIRST_FRAME_TIMEOUT_MS = cfg.firstFrameTimeoutMs ?? 10_000;
 const log = (s: string) => process.stderr.write(s.endsWith("\n") ? s : `${s}\n`);
 
 const grab = spawn(cfg.ffmpeg, buildWgcGrabArgs(cfg.hwnd, cfg.fps, cfg.cursor !== false), { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });

@@ -29,6 +29,9 @@ export interface WgcRecorderConfig {
   maxDurationSec: number;
   /** False leaves the cursor out of the frames (#170). */
   cursor?: boolean;
+  /** How long to wait for the window's first frame (default 10 s; tests
+   * shorten it, #296). */
+  firstFrameTimeoutMs?: number;
 }
 
 /** ffmpeg args that turn a window's WGC frames into raw yuv420p on stdout,
