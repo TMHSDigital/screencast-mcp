@@ -125,7 +125,7 @@ export function register(server: McpServer): void {
                 return { at: b + i, path: out };
               });
               const frames = grabbed.filter((f) => existsSync(f.path));
-              const read = frames.length > 0 ? await readFrames(frames.map((f) => f.path), work, extra.signal) : [];
+              const read = frames.length > 0 ? await readFrames(frames.map((f) => f.path), work, extra.signal, { sameSize: true }) : [];
               read.forEach((f, i) => (texts[frames[i]!.at] = f.lines.map((l) => l.text)));
               framesRead += read.length;
               report?.(0.1 + (0.85 * Math.min(spans.length, b + OCR_BATCH)) / spans.length);

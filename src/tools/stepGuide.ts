@@ -141,7 +141,7 @@ export function register(server: McpServer): void {
           if (useOcr) {
             for (let b = 0; b < frames.length; b += OCR_BATCH) {
               extra.signal.throwIfAborted();
-              const batch = await readFrames(frames.slice(b, b + OCR_BATCH), work, extra.signal);
+              const batch = await readFrames(frames.slice(b, b + OCR_BATCH), work, extra.signal, { sameSize: true });
               batch.forEach((f, k) => {
                 read[b + k] = f;
                 tick();

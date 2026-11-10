@@ -139,6 +139,8 @@ describe("review player as an MCP App (#128)", () => {
     expect(html).toContain('callTool("pipeline"');
   });
 
+  // These generate video with blocking ffmpeg calls; a busy machine (the rest
+  // of the suite running ffmpeg in parallel) needs more than the 5 s default.
   it.skipIf(!hasFfmpeg)("labels each frame with its real pts: the first frame of every grid interval (#232, #243)", async () => {
     const src = join(home, "clip.mp4");
     spawnSync(FFMPEG, ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=320x180:d=3:r=30", "-pix_fmt", "yuv420p", src]);
@@ -160,7 +162,7 @@ describe("review player as an MCP App (#128)", () => {
     expect(meta.sceneFrames.length).toBeLessThanOrEqual(12);
     const rv = await client.callTool({ name: "review_recording", arguments: { input: src } });
     expect(JSON.parse(defined((rv.content as Array<{ text: string }>)[0]).text)).toMatchObject({ input: src, durationSec: 3, width: 320 });
-  });
+  }, 60_000);
 
   it.skipIf(!hasFfmpeg)("shows a 3 s on-screen change in a 10-minute recording that the 5 s grid misses (#232)", async () => {
     const src = join(home, "long.mp4");
@@ -183,7 +185,7 @@ describe("review player as an MCP App (#128)", () => {
     expect(meta.sceneFrames).toContain(shown);
     expect(centre(shown)).toBeGreaterThan(200); // the dialog is in the frame
     expect(centre(meta.frameTimes.indexOf(300))).toBeLessThan(200); // the grid frame before it is not
-  });
+  }, 60_000);
 });
 
 describe("the player page's script in jsdom (#243)", () => {

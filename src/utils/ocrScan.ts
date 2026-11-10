@@ -14,6 +14,7 @@ import { jobTimeoutMs } from "./jobs.js";
 import { buildSampleByFpsArgs, planFpsSampling } from "./media.js";
 import { recognize, mergePasses, findMatches, redactionRects, passScales, type OcrLine, type TextMatch } from "./ocr.js";
 import type { Rect } from "./diff.js";
+import { mapPool } from "./pool.js";
 
 export interface ReadFrame {
   lines: OcrLine[];
@@ -21,30 +22,51 @@ export interface ReadFrame {
   height: number;
 }
 
-/** OCR several frames in one PowerShell run: each frame is upscaled for every
- * pass (passScales), and the passes are merged back per frame. */
-export async function readFrames(sources: string[], work: string, signal?: AbortSignal): Promise<ReadFrame[]> {
-  const sized = await Promise.all(
-    sources.map(async (source) => {
-      const { width, height } = await probeMedia(source);
-      if (!width || !height) throw new ScreencastError("Could not read the image size.");
-      return { source, width, height };
-    }),
-  );
-  const passes: string[] = [];
-  const passScaleList: number[] = [];
-  const owner: number[] = [];
-  for (const [f, { source, width, height }] of sized.entries()) {
-    for (const [i, scale] of passScales(width, height).entries()) {
-      const out = join(work, `pass${f}-${i}.png`);
-      await runFfmpeg(["-y", "-v", "error", "-i", source, "-vf", `scale=iw*${scale}:ih*${scale}:flags=lanczos`, out], 60_000, {
-        signal,
-      });
-      passes.push(out);
-      passScaleList.push(scale);
-      owner.push(f);
-    }
+/** One ffmpeg run that writes every OCR pass of a frame: the frame is split
+ * and upscaled once per scale. The PNGs are scratch read straight back by
+ * OCR, so they are written uncompressed (#291). Pure. */
+export function buildOcrPassArgs(source: string, scales: number[], outputs: string[]): string[] {
+  if (scales.length === 0 || scales.length !== outputs.length) {
+    throw new ScreencastError("Each OCR pass needs one output.");
   }
+  const scale = (s: number) => `scale=iw*${s}:ih*${s}:flags=lanczos`;
+  const png = ["-compression_level", "0"];
+  if (scales.length === 1) return ["-y", "-v", "error", "-i", source, "-vf", scale(scales[0]!), ...png, outputs[0]!];
+  const labels = scales.map((_s, i) => `[s${i}]`);
+  const graph = [`[0:v]split=${scales.length}${labels.join("")}`, ...scales.map((s, i) => `${labels[i]}${scale(s)}[o${i}]`)].join(";");
+  return [
+    "-y", "-v", "error", "-i", source, "-filter_complex", graph,
+    ...outputs.flatMap((out, i) => ["-map", `[o${i}]`, ...png, out]),
+  ];
+}
+
+/** OCR several frames in one PowerShell run: each frame is upscaled for every
+ * pass (passScales), and the passes are merged back per frame. `sameSize`
+ * probes only the first frame, for frames sampled from one video (#291). */
+export async function readFrames(
+  sources: string[],
+  work: string,
+  signal?: AbortSignal,
+  opts: { sameSize?: boolean } = {},
+): Promise<ReadFrame[]> {
+  const sizeOf = async (source: string) => {
+    const { width, height } = await probeMedia(source);
+    if (!width || !height) throw new ScreencastError("Could not read the image size.");
+    return { width, height };
+  };
+  const shared = opts.sameSize && sources[0] ? await sizeOf(sources[0]) : null;
+  const sized = await mapPool(sources, async (source) => ({ source, ...(shared ?? (await sizeOf(source))) }));
+  // One ffmpeg per frame for all its scales, a few frames at a time.
+  const perFrame = await mapPool(sized, async ({ source, width, height }, f) => {
+    const scales = passScales(width, height);
+    const outs = scales.map((_s, i) => join(work, `pass${f}-${i}.png`));
+    await runFfmpeg(buildOcrPassArgs(source, scales, outs), 60_000, { signal });
+    return scales.map((scale, i) => ({ out: outs[i]!, scale, f }));
+  });
+  const flat = perFrame.flat();
+  const passes = flat.map((p) => p.out);
+  const passScaleList = flat.map((p) => p.scale);
+  const owner = flat.map((p) => p.f);
   const results = await recognize(passes, passScaleList);
   return sized.map(({ width, height }, f) => ({
     lines: mergePasses(results.filter((_r, i) => owner[i] === f)),
@@ -93,7 +115,7 @@ export async function scanVideoFrames(
   const step = 1 / plan.fps;
   const timeAt = (i: number) => Math.round(i * step * 1000) / 1000;
   const end = length ?? timeAt(paths.length - 1) + step;
-  const read = await readFrames(paths, work, signal);
+  const read = await readFrames(paths, work, signal, { sameSize: true });
   return {
     frames: read.map((frame, i) => ({ ...frame, t: timeAt(i), path: paths[i] ?? "" })),
     step,
