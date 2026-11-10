@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { RootsListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import { setClientRoots } from "./paths.js";
+import { errorMessage } from "./errors.js";
 
 /** The local directories among root URIs; non-file URIs are skipped. Pure. */
 export function rootDirs(roots: Array<{ uri: string }>): string[] {
@@ -42,7 +43,7 @@ export function trackClientRoots(server: McpServer): void {
       // A client that advertises roots but cannot list them fails closed:
       // SCREENCAST_HOME and SCREENCAST_ALLOWED_DIRS stay usable, nothing else.
       if (initial) setClientRoots([]);
-      process.stderr.write(`roots/list failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.stderr.write(`roots/list failed: ${errorMessage(err)}\n`);
     }
   };
   const previous = low.oninitialized;

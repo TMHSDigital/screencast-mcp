@@ -20,7 +20,7 @@ import { randomBytes } from "node:crypto";
 import { rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ScreencastError } from "./errors.js";
+import { errorMessage, ScreencastError } from "./errors.js";
 
 export interface Monitor {
   index: number;
@@ -203,7 +203,7 @@ async function queryMonitors(): Promise<Monitor[]> {
     return parseMonitors(JSON.parse(stdout));
   } catch (err) {
     throw new ScreencastError(
-      `Could not parse monitor geometry: ${(err as Error).message}`,
+      `Could not parse monitor geometry: ${errorMessage(err)}`,
     );
   }
 }

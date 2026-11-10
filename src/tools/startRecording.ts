@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { errorMessage, errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, wgcAvailable } from "../utils/ffmpeg.js";
 import { fileURLToPath } from "node:url";
@@ -449,7 +449,7 @@ export function register(server: McpServer): void {
           if (replay) discardReplay(replay);
           if (webcamRaw) rmSync(partsDir(output), { recursive: true, force: true });
           throw new ScreencastError(
-            `Recording stopped: the session registry could not be written (${(err as Error).message}).`,
+            `Recording stopped: the session registry could not be written (${errorMessage(err)}).`,
           );
         }
         if (logger && replay) {
@@ -471,11 +471,11 @@ export function register(server: McpServer): void {
                 });
               } catch (err) {
                 store.tryUpdate(id, {
-                  events: { path: evPaths.jsonl, keys: keyMode, error: (err as Error).message },
+                  events: { path: evPaths.jsonl, keys: keyMode, error: errorMessage(err) },
                 });
               }
             }).catch((err: unknown) => {
-              process.stderr.write(`Event log for ${id} failed: ${err instanceof Error ? err.message : String(err)}\n`);
+              process.stderr.write(`Event log for ${id} failed: ${errorMessage(err)}\n`);
             }),
           );
         }

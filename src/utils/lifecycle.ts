@@ -12,7 +12,7 @@ import { requireFfmpeg, runCapture } from "./ffmpeg.js";
 import { finishReplay, type ReplayStopResult } from "./replay.js";
 import { whenFinalized } from "./events.js";
 import { buildProbeArgs, parseMediaInfo } from "./media.js";
-import { ScreencastError } from "./errors.js";
+import { errorMessage, ScreencastError } from "./errors.js";
 import { wgcStopFile } from "./wgc.js";
 import { encoderArgs } from "./gpu.js";
 import {
@@ -274,7 +274,7 @@ export async function stopAll(
       await stopSession(store, record, { reason: "shutdown", probe, gracefulMs: Math.min(8000, capMs) });
     } catch (err) {
       process.stderr.write(
-        `Stopping ${id} on shutdown failed: ${err instanceof Error ? err.message : String(err)}\n`,
+        `Stopping ${id} on shutdown failed: ${errorMessage(err)}\n`,
       );
     }
   });

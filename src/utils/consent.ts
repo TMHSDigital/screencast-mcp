@@ -7,7 +7,7 @@
  * fails closed: nothing is captured.
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ScreencastError } from "./errors.js";
+import { errorMessage, ScreencastError } from "./errors.js";
 
 export const CONFIRM_CAPTURE_ENV = "SCREENCAST_CONFIRM_CAPTURE";
 
@@ -48,7 +48,7 @@ export async function confirmCapture(server: McpServer, request: string, signal?
     ));
   } catch (err) {
     throw new ScreencastError(
-      `Capture blocked: the confirmation request failed (${err instanceof Error ? err.message : String(err)}). Nothing was captured.`,
+      `Capture blocked: the confirmation request failed (${errorMessage(err)}). Nothing was captured.`,
     );
   }
   if (action !== "accept") {

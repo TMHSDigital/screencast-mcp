@@ -18,6 +18,7 @@ import { probeDuration, stopAll } from "./utils/lifecycle.js";
 import { createServer } from "./server.js";
 import { pruneCaptures, retentionDays, RETENTION_ENV } from "./utils/retention.js";
 import { cleanupReplayDirs } from "./utils/replay.js";
+import { errorMessage } from "./utils/errors.js";
 
 /** How long shutdown waits for in-flight start_recording calls (#285). */
 const START_SETTLE_MS = 10_000;
@@ -36,7 +37,7 @@ async function main(): Promise<void> {
     }
   } catch (err) {
     process.stderr.write(
-      `Orphan reaping skipped: ${err instanceof Error ? err.message : String(err)}\n`,
+      `Orphan reaping skipped: ${errorMessage(err)}\n`,
     );
   }
   // Replay buffers (#197) no live recording owns are scratch: a crash, a
@@ -48,7 +49,7 @@ async function main(): Promise<void> {
     const removed = cleanupReplayDirs(live);
     if (removed > 0) process.stderr.write(`Removed ${removed} leftover replay buffer(s).\n`);
   } catch (err) {
-    process.stderr.write(`Replay buffer cleanup skipped: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.stderr.write(`Replay buffer cleanup skipped: ${errorMessage(err)}\n`);
   }
   const transport = new StdioServerTransport();
   await server.connect(transport);
@@ -64,7 +65,7 @@ async function main(): Promise<void> {
         }
       },
       (err: unknown) => {
-        process.stderr.write(`Retention prune failed: ${err instanceof Error ? err.message : String(err)}\n`);
+        process.stderr.write(`Retention prune failed: ${errorMessage(err)}\n`);
       },
     );
   }
@@ -132,7 +133,7 @@ async function shutdown(reason: string, exitCode = 0): Promise<void> {
     }
   } catch (err) {
     process.stderr.write(
-      `Shutdown cleanup failed: ${err instanceof Error ? err.message : String(err)}\n`,
+      `Shutdown cleanup failed: ${errorMessage(err)}\n`,
     );
   }
   const cancelled = await edits;
@@ -142,7 +143,7 @@ async function shutdown(reason: string, exitCode = 0): Promise<void> {
 
 const fatal = (error: unknown): void => {
   process.stderr.write(
-    `Fatal error: ${error instanceof Error ? error.message : String(error)}\n`,
+    `Fatal error: ${errorMessage(error)}\n`,
   );
   process.exit(1);
 };

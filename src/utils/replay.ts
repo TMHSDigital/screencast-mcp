@@ -20,7 +20,7 @@
  */
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { ScreencastError } from "./errors.js";
+import { errorMessage, ScreencastError } from "./errors.js";
 import { runCapture } from "./ffmpeg.js";
 import { jobTimeoutMs } from "./jobs.js";
 import { buildProbeArgs, parseMediaInfo } from "./media.js";
@@ -476,6 +476,6 @@ export async function finishReplay(
     const save = await saveReplay(buf, { ...tools, lastSec: buf.bufferSec, output: opts.output, quality: opts.quality, live: false });
     return { saved: true, discarded: discardReplay(buf), save };
   } catch (err) {
-    return { saved: false, discarded: false, error: err instanceof Error ? err.message : String(err) };
+    return { saved: false, discarded: false, error: errorMessage(err) };
   }
 }

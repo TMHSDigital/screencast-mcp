@@ -2,7 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
-import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { errorMessage, errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { looseOutput } from "../utils/toolSpec.js";
 import { assertOutputAllowed } from "../utils/paths.js";
 import {
@@ -82,7 +82,7 @@ export function register(server: McpServer): void {
           try {
             sidecar = writeMarkers(record.outputPath, markers, args.sessionId);
           } catch (err) {
-            warning = `Saved in the session, but the sidecar ${sidecar} could not be written: ${(err as Error).message}`;
+            warning = `Saved in the session, but the sidecar ${sidecar} could not be written: ${errorMessage(err)}`;
           }
           return okResponse({
             sessionId: args.sessionId,

@@ -25,7 +25,7 @@ import {
 } from "node:fs";
 import type { ChildProcess } from "node:child_process";
 import { basename } from "node:path";
-import { ScreencastError } from "./errors.js";
+import { errorMessage, ScreencastError } from "./errors.js";
 import type { Quality } from "./targets.js";
 import { WGC_WINDOW_CLOSED_EXIT } from "./wgc.js";
 import type { ReplayBuffer } from "./replay.js";
@@ -441,7 +441,7 @@ export function withRegistryLock<T>(registry: string, fn: () => T, waitMs = LOCK
       // with EPERM/EACCES/EBUSY, not EEXIST. That means busy, so wait.
       const busy = code === "EEXIST" || code === "EPERM" || code === "EACCES" || code === "EBUSY";
       if (!busy) {
-        throw new ScreencastError(`Could not lock the session registry (${lock}): ${(err as Error).message}`);
+        throw new ScreencastError(`Could not lock the session registry (${lock}): ${errorMessage(err)}`);
       }
       if (code === "EEXIST") {
         let seen: { raw: string; holder: { pid?: number; at?: number } | null } | null;
@@ -601,7 +601,7 @@ export class SessionStore {
     try {
       disk = withRegistryLock(this.path, read, this.lockWaitMs);
     } catch (err) {
-      process.stderr.write(`${(err as Error).message} Reading the session registry without the lock.\n`);
+      process.stderr.write(`${errorMessage(err)} Reading the session registry without the lock.\n`);
       disk = read();
     }
     this.records = new Map(pruneRecords([...this.overlay(disk).values()]).map((r) => [r.id, r]));
@@ -686,7 +686,7 @@ export class SessionStore {
       return this.update(id, patch);
     } catch (err) {
       process.stderr.write(
-        `Could not save session ${id}: ${err instanceof Error ? err.message : String(err)}\n`,
+        `Could not save session ${id}: ${errorMessage(err)}\n`,
       );
       return undefined;
     }

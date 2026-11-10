@@ -17,6 +17,11 @@ export class ScreencastError extends Error {
   }
 }
 
+/** The message of any thrown value: an Error's message, else String(value). */
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export interface TextContent {
   type: "text";
   text: string;
@@ -58,10 +63,8 @@ export function errorResponse(error: unknown): ToolResult {
   let message: string;
   if (error instanceof ScreencastError) {
     message = error.hint ? `${error.message}\n\n${error.hint}` : error.message;
-  } else if (error instanceof Error) {
-    message = error.message;
   } else {
-    message = String(error);
+    message = errorMessage(error);
   }
   return { content: [{ type: "text", text: message }], isError: true };
 }

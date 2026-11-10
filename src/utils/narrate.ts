@@ -12,7 +12,7 @@
  * The PowerShell call is impure; line resolution, placement, the WAV header
  * parser, and the ffmpeg builder are pure.
  */
-import { ScreencastError } from "./errors.js";
+import { errorMessage, ScreencastError } from "./errors.js";
 import { runPowerShell, psTimeoutMs } from "./monitors.js";
 import { audioCodecFor } from "./audio.js";
 import { isAudioOnlyPath } from "./media.js";
@@ -246,7 +246,7 @@ async function runTts(request: object, timeoutMs: number, signal?: AbortSignal):
   try {
     return JSON.parse(stdout) as RawTts;
   } catch (err) {
-    throw new ScreencastError(`Could not parse the speech engine's output: ${(err as Error).message}`);
+    throw new ScreencastError(`Could not parse the speech engine's output: ${errorMessage(err)}`);
   }
 }
 
@@ -264,7 +264,7 @@ export async function ttsStatus(): Promise<{ available: boolean; voices: string[
     const voices = (await listVoices()).map((v) => `${v.name} (${v.language})`);
     return { available: voices.length > 0, voices, ...(voices.length ? {} : { error: "No speech voices are installed." }) };
   } catch (err) {
-    return { available: false, voices: [], error: (err as Error).message };
+    return { available: false, voices: [], error: errorMessage(err) };
   }
 }
 

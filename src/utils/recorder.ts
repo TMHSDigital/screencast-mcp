@@ -5,7 +5,7 @@
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
-import { ScreencastError } from "./errors.js";
+import { errorMessage, ScreencastError } from "./errors.js";
 import { logMessage, StderrWatch } from "./logging.js";
 import { parseCaptureStart, whenFinalized } from "./events.js";
 import { buildCaptureArgs } from "./targets.js";
@@ -135,7 +135,7 @@ export function attachExitHandler(
     });
     if (cur.segments && (cur.segments.parts.length > 0 || cur.webcam)) {
       void finalizeSegments(store, cur).catch((err: unknown) => {
-        process.stderr.write(`Joining ${id}'s segments failed: ${err instanceof Error ? err.message : String(err)}\n`);
+        process.stderr.write(`Joining ${id}'s segments failed: ${errorMessage(err)}\n`);
       });
     }
   });
@@ -224,7 +224,7 @@ async function runResume(
     });
   } catch (err) {
     abandon();
-    throw new ScreencastError(`Resume stopped: the session registry could not be written (${(err as Error).message}).`);
+    throw new ScreencastError(`Resume stopped: the session registry could not be written (${errorMessage(err)}).`);
   }
   if (!updated) {
     abandon();

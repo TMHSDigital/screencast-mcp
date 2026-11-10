@@ -17,6 +17,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
+import { errorMessage } from "./utils/errors.js";
 
 export const CLIENT_IDS = ["claude-desktop", "claude-code", "cursor", "vscode"] as const;
 export type ClientId = (typeof CLIENT_IDS)[number];
@@ -226,7 +227,7 @@ export function mergeServerConfig(
       parsed = JSON.parse(existing.charCodeAt(0) === 0xfeff ? existing.slice(1) : existing);
     } catch (err) {
       // JSON with comments (VS Code allows them) is left for the user to edit.
-      return { status: "invalid", reason: `not plain JSON (${err instanceof Error ? err.message : String(err)})` };
+      return { status: "invalid", reason: `not plain JSON (${errorMessage(err)})` };
     }
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
       return { status: "invalid", reason: "the file is not a JSON object" };
@@ -332,7 +333,7 @@ async function configureJsonClient(client: JsonClient, opts: SetupOptions, deps:
     try {
       text = fs.readFile(client.path);
     } catch (err) {
-      deps.out(`  ${client.name}: could not read ${client.path}: ${err instanceof Error ? err.message : String(err)}\n`);
+      deps.out(`  ${client.name}: could not read ${client.path}: ${errorMessage(err)}\n`);
       return false;
     }
   }
@@ -369,7 +370,7 @@ async function configureJsonClient(client: JsonClient, opts: SetupOptions, deps:
     deps.out(`  ${client.name}: ${had ? "updated" : "created"} ${client.path}${backup ? ` (backup: ${backup})` : ""}. Restart it to load the server.\n`);
     return true;
   } catch (err) {
-    deps.out(`  ${client.name}: could not write ${client.path}: ${err instanceof Error ? err.message : String(err)}\n`);
+    deps.out(`  ${client.name}: could not write ${client.path}: ${errorMessage(err)}\n`);
     return false;
   }
 }
@@ -417,7 +418,7 @@ export async function runSetup(opts: SetupOptions, deps: SetupDeps): Promise<num
   try {
     report = await deps.doctor();
   } catch (err) {
-    deps.err(`screencast-mcp: the doctor checks failed to run: ${err instanceof Error ? err.message : String(err)}\n`);
+    deps.err(`screencast-mcp: the doctor checks failed to run: ${errorMessage(err)}\n`);
     return 1;
   }
   for (const line of checklist(report, deps.env, deps.platform)) say(`${MARK[line.state]} ${line.text}\n`);
@@ -440,7 +441,7 @@ export async function runSetup(opts: SetupOptions, deps: SetupDeps): Promise<num
       const res = await deps.exec("winget", WINGET_FFMPEG).catch((err: unknown) => ({
         code: 1,
         stdout: "",
-        stderr: err instanceof Error ? err.message : String(err),
+        stderr: errorMessage(err),
       }));
       if (res.code === 0) say("  FFmpeg installed. Open a new terminal so PATH picks it up, then run setup again.\n");
       else say(`  winget failed (${(res.stderr || res.stdout).trim().split("\n").pop() || `exit ${res.code}`}). Install it yourself: ${line}\n`);
@@ -475,7 +476,7 @@ export async function runSetup(opts: SetupOptions, deps: SetupDeps): Promise<num
         say(`  recorded 3 s and exported ${gif}\n`);
         await deps.open(gif).catch(() => undefined);
       } catch (err) {
-        say(`  the test clip failed: ${err instanceof Error ? err.message : String(err)}\n`);
+        say(`  the test clip failed: ${errorMessage(err)}\n`);
         return 1;
       }
     }

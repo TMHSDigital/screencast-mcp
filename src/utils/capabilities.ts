@@ -8,6 +8,7 @@
 import { spawnSync } from "node:child_process";
 import { isAbsolute } from "node:path";
 import { runPowerShell, psTimeoutMs } from "./monitors.js";
+import { errorMessage } from "./errors.js";
 
 /** FFmpeg major version that transcribe (whisper) and backend "wgc" (gfxcapture) need. */
 export const FFMPEG_FEATURE_MAJOR = 8;
@@ -101,7 +102,7 @@ export async function ocrStatus(): Promise<OcrStatus> {
     const languages = Array.isArray(raw.languages) ? raw.languages : raw.languages ? [raw.languages] : [];
     return { available: raw.available === true, language: raw.language ?? null, languages };
   } catch (err) {
-    return { available: false, language: null, languages: [], error: (err as Error).message };
+    return { available: false, language: null, languages: [], error: errorMessage(err) };
   }
 }
 

@@ -12,7 +12,7 @@
  * The parsing and selection helpers are pure (string in, names out) so they are
  * unit-tested without ffmpeg or Windows present.
  */
-import { ScreencastError } from "./errors.js";
+import { errorMessage, ScreencastError } from "./errors.js";
 import { requireFfmpeg, runCapture } from "./ffmpeg.js";
 
 /** Names that identify a system-audio loopback device, matched case-insensitively
@@ -155,7 +155,7 @@ async function enumerateDshow(): Promise<void> {
     // non-zero exit for the dummy input resolves instead, so reaching here is a
     // genuine failure, not the expected exit code.
     throw new ScreencastError(
-      `Could not enumerate audio devices (${(err as Error).message}).`,
+      `Could not enumerate audio devices (${errorMessage(err)}).`,
       ENUM_FAILED_HINT,
     );
   }

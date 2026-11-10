@@ -11,6 +11,7 @@
 import type { Monitor } from "./monitors.js";
 import { virtualDesktopBounds } from "./targets.js";
 import { parseWindowSelector, selectWindow, type RawWindow, type WindowQuery } from "./windows.js";
+import { errorMessage } from "./errors.js";
 
 export interface Bounds {
   x: number;
@@ -80,7 +81,7 @@ function resolves(query: WindowQuery, w: RawWindow, allowCloaked: boolean): { ok
     selectWindow(query, windowTarget(w).slice("window:".length), { allowCloaked, exactOnly: true });
     return { ok: true };
   } catch (err) {
-    return { ok: false, reason: firstSentence((err as Error).message) };
+    return { ok: false, reason: firstSentence(errorMessage(err)) };
   }
 }
 

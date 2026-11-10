@@ -22,6 +22,7 @@ import { createServer } from "./server.js";
 import { MAX_RECORDING_CAP_SEC } from "./utils/targets.js";
 import { DEFAULT_ERROR_PATTERN, DEFAULT_SECRET_PATTERN, MAX_ERROR_LINES, maskSecrets } from "./utils/bugReport.js";
 import { defaultSetupDeps, parseSetupArgs, runSetup, SETUP_USAGE, type SetupOptions } from "./setup.js";
+import { errorMessage } from "./utils/errors.js";
 
 const VERSION = (createRequire(import.meta.url)("../package.json") as { version: string }).version;
 
@@ -225,7 +226,7 @@ export function parseCliArgs(argv: readonly string[], env: NodeJS.ProcessEnv = p
       try {
         return { kind: "setup", options: parseSetupArgs(rest) };
       } catch (err) {
-        throw new CliUsageError(err instanceof Error ? err.message : String(err));
+        throw new CliUsageError(errorMessage(err));
       }
     }
     default:
@@ -308,7 +309,7 @@ export function parseToolArgs(raw: string | undefined, readFile: (p: string) => 
   try {
     value = JSON.parse(text);
   } catch (err) {
-    throw new CliUsageError(`Tool arguments are not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+    throw new CliUsageError(`Tool arguments are not valid JSON: ${errorMessage(err)}`);
   }
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new CliUsageError("Tool arguments must be a JSON object.");
@@ -481,7 +482,7 @@ export async function runRecord(opts: RecordOptions, io: CliIo = defaultIo, deps
       io.err(`screencast-mcp: recording ${opts.target} to ${String(started.outputPath)}\n`);
     } catch (err) {
       // No evidence is better than a blocked test run: run the command anyway.
-      warn(`recording did not start, running the command without it: ${err instanceof Error ? err.message : String(err)}`);
+      warn(`recording did not start, running the command without it: ${errorMessage(err)}`);
     }
 
     const began = deps.now();
@@ -501,7 +502,7 @@ export async function runRecord(opts: RecordOptions, io: CliIo = defaultIo, deps
         const early = earlyEndWarning(evidence.status, evidence.endReason, evidence.durationSec);
         if (early) warn(early);
       } catch (err) {
-        warn(`stop_recording failed: ${err instanceof Error ? err.message : String(err)}`);
+        warn(`stop_recording failed: ${errorMessage(err)}`);
       }
     }
 
@@ -519,7 +520,7 @@ export async function runRecord(opts: RecordOptions, io: CliIo = defaultIo, deps
           });
           evidence.gif = String(gif.outputPath);
         } catch (err) {
-          warn(`export_gif failed: ${err instanceof Error ? err.message : String(err)}`);
+          warn(`export_gif failed: ${errorMessage(err)}`);
         }
       }
       if (opts.contactSheet) {
@@ -532,7 +533,7 @@ export async function runRecord(opts: RecordOptions, io: CliIo = defaultIo, deps
           });
           evidence.contactSheet = String(sheet.outputPath);
         } catch (err) {
-          warn(`contact_sheet failed: ${err instanceof Error ? err.message : String(err)}`);
+          warn(`contact_sheet failed: ${errorMessage(err)}`);
         }
       }
     }
@@ -592,7 +593,7 @@ async function ocrErrors(
     const matches = Array.isArray(found.matches) ? (found.matches as Array<Record<string, unknown>>) : [];
     return errorLines(matches);
   } catch (err) {
-    warn(`OCR of error lines failed: ${err instanceof Error ? err.message : String(err)}`);
+    warn(`OCR of error lines failed: ${errorMessage(err)}`);
     return null;
   } finally {
     if (tail) rmSync(tail, { force: true });

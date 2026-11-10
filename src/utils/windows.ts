@@ -13,7 +13,7 @@
  * aware). The matching, clamping, and even-dimension math (selectWindow) is
  * pure so it is unit-tested without Windows.
  */
-import { ScreencastError } from "./errors.js";
+import { errorMessage, ScreencastError } from "./errors.js";
 import { runPowerShell } from "./monitors.js";
 
 export interface RawWindow {
@@ -311,7 +311,7 @@ export async function getRawWindows(): Promise<WindowQuery> {
   try {
     parsed = JSON.parse(stdout);
   } catch (err) {
-    throw new ScreencastError(`Could not parse window geometry: ${(err as Error).message}`);
+    throw new ScreencastError(`Could not parse window geometry: ${errorMessage(err)}`);
   }
   const obj = parsed as { virtual?: WindowQuery["virtual"]; windows?: RawWindow | RawWindow[] };
   const windows = Array.isArray(obj.windows) ? obj.windows : obj.windows ? [obj.windows] : [];

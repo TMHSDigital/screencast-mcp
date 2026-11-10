@@ -12,7 +12,7 @@
  * The PowerShell/WinRT call is impure; parsing, merging, and matching are pure.
  */
 import { runInNewContext } from "node:vm";
-import { ScreencastError } from "./errors.js";
+import { errorMessage, ScreencastError } from "./errors.js";
 import { runPowerShell, psTimeoutMs } from "./monitors.js";
 import type { Rect } from "./diff.js";
 
@@ -53,7 +53,7 @@ export async function recognize(paths: string[], scales: number[]): Promise<OcrL
   try {
     raw = JSON.parse(stdout);
   } catch (err) {
-    throw new ScreencastError(`Could not parse OCR output: ${(err as Error).message}`);
+    throw new ScreencastError(`Could not parse OCR output: ${errorMessage(err)}`);
   }
   const passes = Array.isArray(raw) ? raw : [raw];
   return passes.map((p, i) => parseOcrPass(p, scales[i] ?? 1));
@@ -167,7 +167,7 @@ export function regexRanges(texts: string[], query: string, budgetMs = REGEX_BUD
   try {
     new RegExp(query, "gi");
   } catch (err) {
-    throw new ScreencastError(`Invalid regex: ${(err as Error).message}`);
+    throw new ScreencastError(`Invalid regex: ${errorMessage(err)}`);
   }
   try {
     return JSON.parse(runInNewContext(REGEX_SCAN, { texts, query }, { timeout: budgetMs }) as string);
