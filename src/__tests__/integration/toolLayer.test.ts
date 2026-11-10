@@ -75,6 +75,9 @@ interface Case {
   winOnly?: boolean;
 }
 
+/** Per-call request timeout, inside the describe's 300 s budget (#281). */
+const CALL_OPTS = { timeout: 240_000, resetTimeoutOnProgress: true };
+
 const SRT = "1\n00:00:00,200 --> 00:00:01,200\nHello there\n\n2\n00:00:01,500 --> 00:00:02,500\nSecond line\n";
 
 const CASES: Case[] = [
@@ -318,7 +321,9 @@ describe.skipIf(!AVAILABLE)("every non-capture tool through the MCP client (#261
   // model) is reported as skipped, not passed.
   for (const c of CASES) it.skipIf(c.when === false)(c.name, async () => {
     const name = c.name;
-    const res = await client.callTool({ name, arguments: c.args(fx) });
+    // The client's default 60 s request timeout is shorter than a slow
+    // Windows runner with coverage needs for some edits (#281).
+    const res = await client.callTool({ name, arguments: c.args(fx) }, undefined, CALL_OPTS);
     const text = (res.content as Array<{ type: string; text?: string }>)
       .filter((b) => b.type === "text")
       .map((b) => b.text)
@@ -355,7 +360,7 @@ describe.skipIf(!AVAILABLE)("every non-capture tool through the MCP client (#261
   it("sample_frames fps mode keeps both runs' frames in a reused outputDir (#283)", async () => {
     const outputDir = join(home, "reused-frames");
     const run = async () => {
-      const res = await client.callTool({ name: "sample_frames", arguments: { input: fx.av, fps: 1, outputDir, returnImages: false } });
+      const res = await client.callTool({ name: "sample_frames", arguments: { input: fx.av, fps: 1, outputDir, returnImages: false } }, undefined, CALL_OPTS);
       expect(res.isError ?? false).toBe(false);
       return res.structuredContent as { frameCount: number; frames: string[] };
     };
