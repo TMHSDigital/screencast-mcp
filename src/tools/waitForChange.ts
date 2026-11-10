@@ -8,13 +8,11 @@ import { buildScreenshotArgs } from "../utils/targets.js";
 import {
   detectionSize,
   targetSize,
-  diffFrames,
   buildRawGrabArgs,
-  SettleTracker,
   targetDiffOptions,
   DEFAULT_PIXEL_THRESHOLD,
-  type Rect,
 } from "../utils/diff.js";
+import { waitLoop } from "../utils/waitLoop.js";
 import { windowMatchReport } from "../utils/windows.js";
 import { confirmCapture, describeTarget } from "../utils/consent.js";
 import { subdir, stamp, rand } from "../utils/paths.js";
@@ -71,8 +69,6 @@ const inputSchema = {
     .describe("Keep the final screenshot on disk and return its path (default false)."),
 };
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 export function register(server: McpServer): void {
   server.registerTool(
     "wait_for_change",
@@ -110,48 +106,17 @@ export function register(server: McpServer): void {
         const grab = () => runFfmpegBuffer(buildRawGrabArgs(target, monitors, size), 15_000, { signal: extra.signal });
         const opts = targetDiffOptions(area, size, args.pixelThreshold);
 
-        const started = Date.now();
-        const baseline = await grab();
-        const settle = new SettleTracker(baseline, size.width, size.height, opts);
-        let lastChangeAt = started;
-        let everChanged = false;
-        let regions: Rect[] = [];
-        let outcome: "changed" | "settled" | "timeout" | "cancelled" = "timeout";
-
-        while (Date.now() - started < timeoutMs) {
-          if (extra.signal.aborted) {
-            outcome = "cancelled";
-            break;
-          }
-          await sleep(interval);
-          // A grab killed by the cancel is the cancel, not a failure.
-          const current = await grab().catch((error: unknown) => {
-            if (extra.signal.aborted) return null;
-            throw error;
-          });
-          if (!current) {
-            outcome = "cancelled";
-            break;
-          }
-          if (mode === "change") {
-            const d = diffFrames(baseline, current, size.width, size.height, opts);
-            if (d.regions.length > 0) {
-              regions = d.regions;
-              outcome = "changed";
-              break;
-            }
-          } else {
-            const changed = settle.push(current);
-            if (changed.length > 0) {
-              everChanged = true;
-              lastChangeAt = Date.now();
-              regions = changed;
-            } else if (Date.now() - lastChangeAt >= settleMs) {
-              outcome = "settled";
-              break;
-            }
-          }
-        }
+        const { outcome, regions, everChanged, startedAt: started } = await waitLoop({
+          grab,
+          mode,
+          width: size.width,
+          height: size.height,
+          diff: opts,
+          timeoutMs,
+          settleMs,
+          intervalMs: interval,
+          signal: extra.signal,
+        });
 
         const result: Record<string, unknown> = {
           outcome,
