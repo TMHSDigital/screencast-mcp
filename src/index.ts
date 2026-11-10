@@ -22,9 +22,11 @@ import { cleanupReplayDirs } from "./utils/replay.js";
 /** How long shutdown waits for in-flight start_recording calls (#285). */
 const START_SETTLE_MS = 10_000;
 
-const server = createServer();
-
 async function main(): Promise<void> {
+  // Built here, not at module load, so the CLI never constructs it (#289).
+  const server = createServer();
+  installServerHandlers();
+
   // Reconcile any sessions interrupted by a previous crash and kill ffmpeg
   // children that outlived the last run, so no zombie capture survives.
   try {
@@ -71,23 +73,27 @@ async function main(): Promise<void> {
   }
 }
 
-// A write to a client that has gone away fails with EPIPE; without a handler
-// that error is uncaught and kills the server mid-cleanup (#229).
-process.stdout.on("error", (err: NodeJS.ErrnoException) => {
-  if (err.code !== "EPIPE") process.stderr.write(`stdout error: ${err.message}\n`);
-  void shutdown("client pipe closed");
-});
+/** Process handlers for the stdio server only; the CLI keeps its own exit
+ * code and cleanup (#289). */
+function installServerHandlers(): void {
+  // A write to a client that has gone away fails with EPIPE; without a handler
+  // that error is uncaught and kills the server mid-cleanup (#229).
+  process.stdout.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code !== "EPIPE") process.stderr.write(`stdout error: ${err.message}\n`);
+    void shutdown("client pipe closed");
+  });
 
-// A crash must never leave captures running: stop them, then exit (#207).
-process.on("uncaughtException", (err) => {
-  process.stderr.write(`Uncaught exception: ${err.stack ?? err.message}\n`);
-  void shutdown("uncaught exception", 1);
-});
-process.on("unhandledRejection", (reason) => {
-  process.stderr.write(
-    `Unhandled rejection: ${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}\n`,
-  );
-});
+  // A crash must never leave captures running: stop them, then exit (#207).
+  process.on("uncaughtException", (err) => {
+    process.stderr.write(`Uncaught exception: ${err.stack ?? err.message}\n`);
+    void shutdown("uncaught exception", 1);
+  });
+  process.on("unhandledRejection", (reason) => {
+    process.stderr.write(
+      `Unhandled rejection: ${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}\n`,
+    );
+  });
+}
 
 /** Cancel in-flight edits, finalize every active recording, then exit.
  * Idempotent and never throws. */
@@ -137,6 +143,11 @@ const fatal = (error: unknown): void => {
 // no arguments (the way every MCP client starts it) is the stdio server.
 const argv = process.argv.slice(2);
 if (isCliInvocation(argv)) {
+  // Output piped into something that closes early (`| head`) must not crash
+  // the CLI before it stops its recording and returns its own exit code.
+  process.stdout.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code !== "EPIPE") process.stderr.write(`stdout error: ${err.message}\n`);
+  });
   runCli(argv).then((code) => process.exit(code), fatal);
 } else {
   main().catch(fatal);
