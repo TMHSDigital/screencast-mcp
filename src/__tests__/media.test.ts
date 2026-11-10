@@ -4,6 +4,7 @@ import {
   parseMediaInfo,
   buildProbeArgs,
   buildSampleByFpsArgs,
+  pickFramePrefix,
   planFpsSampling,
   buildSceneScanArgs,
   parseSceneScan,
@@ -435,5 +436,15 @@ describe("concat stream-copy checks (#206, #203)", () => {
     expect(hasHiddenFrames(trimmed)).toBe(true);
     expect(hasHiddenFrames(base)).toBe(false);
     expect(concatCopyBlocker(["a", "b"], [base, trimmed])).toMatch(/hidden frames/);
+  });
+});
+
+describe("pickFramePrefix (#283)", () => {
+  it("uses the plain prefix in an empty or unrelated folder", () => {
+    expect(pickFramePrefix([], "u1")).toBe("frame_");
+    expect(pickFramePrefix(["shot.png", "frame_u0_00001.png"], "u1")).toBe("frame_");
+  });
+  it("uses a per-run prefix when plain frame names already exist", () => {
+    expect(pickFramePrefix(["frame_00001.png"], "u1")).toBe("frame_u1_");
   });
 });

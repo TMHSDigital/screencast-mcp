@@ -162,6 +162,15 @@ export function planFpsSampling(
   return { fps: clampedFps, requestedFrames: requested, clamped: true };
 }
 
+/** The file prefix for an fps-mode frame sequence in `dir`. The plain
+ * "frame_" names are used unless the folder already holds a "frame_NNNNN.png"
+ * from an earlier run, which ffmpeg would overwrite; then the run gets its own
+ * "frame_<unique>_" prefix so both runs keep their frames (#283). */
+export function pickFramePrefix(existing: Iterable<string>, unique: string): string {
+  for (const f of existing) if (/^frame_\d+\.png$/i.test(f)) return `frame_${unique}_`;
+  return "frame_";
+}
+
 /** Sample frames at a fixed rate: ffmpeg -i in -vf fps=N -frames:v MAX
  * outdir/frame_%05d.png. -frames:v is a hard backstop on the frame count. */
 export function buildSampleByFpsArgs(

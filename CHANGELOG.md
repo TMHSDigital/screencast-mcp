@@ -10,6 +10,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - WGC window recordings no longer copy the partial frame on every pipe chunk: chunks are collected and joined once per frame, so large windows (1440p, 4K) keep up instead of dropping frames and pinning a core (#282).
+- `sample_frames` in fps mode no longer overwrites and drops an earlier run's frames when `outputDir` is reused: a folder that already holds `frame_NNNNN.png` gets a per-run file prefix, and both runs return their full frame sets (#283).
 
 ## [0.48.1] - 2026-11-09
 

@@ -351,4 +351,21 @@ describe.skipIf(!AVAILABLE)("every non-capture tool through the MCP client (#261
       }
     }
   });
+
+  it("sample_frames fps mode keeps both runs' frames in a reused outputDir (#283)", async () => {
+    const outputDir = join(home, "reused-frames");
+    const run = async () => {
+      const res = await client.callTool({ name: "sample_frames", arguments: { input: fx.av, fps: 1, outputDir, returnImages: false } });
+      expect(res.isError ?? false).toBe(false);
+      return res.structuredContent as { frameCount: number; frames: string[] };
+    };
+    const first = await run();
+    expect(first.frameCount).toBeGreaterThan(0);
+    const firstBytes = first.frames.map((f) => readFileSync(f));
+    const second = await run();
+    expect(second.frameCount).toBe(first.frameCount);
+    expect(second.frames.filter((f) => first.frames.includes(f))).toEqual([]);
+    // The first run's frames are still there, unchanged.
+    first.frames.forEach((f, i) => expect(readFileSync(f).equals(firstBytes[i]!)).toBe(true));
+  });
 });

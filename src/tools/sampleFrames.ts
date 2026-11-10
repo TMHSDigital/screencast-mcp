@@ -8,6 +8,7 @@ import { requireFfmpeg, runFfmpeg, runCapture, probeMedia } from "../utils/ffmpe
 import { jobTimeoutMs } from "../utils/jobs.js";
 import {
   buildSampleByFpsArgs,
+  pickFramePrefix,
   buildSampleAtTimestampArgs,
   planFpsSampling,
   buildSceneScanArgs,
@@ -170,16 +171,18 @@ export function register(server: McpServer): void {
           const isPng = (f: string) => f.endsWith(".png");
           // Snapshot any pre-existing PNGs so a reused outputDir does not
           // contaminate the result; return only the frames this run wrote.
+          // A folder that already has frame_NNNNN.png gets a per-run prefix
+          // so this run neither overwrites nor loses them (#283).
           const before = new Set(readdirSync(dir).filter(isPng));
-          const pattern = sequencePattern(dir, "frame_%05d.png");
+          const prefix = pickFramePrefix(before, `${stamp()}-${rand()}`);
+          const pattern = sequencePattern(dir, `${prefix}%05d.png`);
           await runFfmpeg(
             buildSampleByFpsArgs(args.input, plan.fps, pattern, maxFrames, args.dedupe === true),
             jobTimeoutMs(durationSec),
             { signal: extra.signal },
           );
           frames = readdirSync(dir)
-            .filter(isPng)
-            .filter((f) => !before.has(f))
+            .filter((f) => isPng(f) && f.startsWith(prefix) && !before.has(f))
             .sort()
             .map((f) => join(dir, f));
         } else {
