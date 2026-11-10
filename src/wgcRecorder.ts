@@ -17,6 +17,7 @@ import { existsSync, rmSync } from "node:fs";
 import {
   buildWgcEncodeArgs,
   buildWgcGrabArgs,
+  FrameAssembler,
   framesDue,
   parseRawSize,
   nudgeScript,
@@ -45,7 +46,7 @@ const nudge = spawn("powershell", ["-NoProfile", "-NonInteractive", "-Command", 
 let grabErr = "";
 let size: { width: number; height: number } | null = null;
 let frameBytes = 0;
-let carry: Buffer = Buffer.alloc(0);
+const frames = new FrameAssembler();
 let latest: Buffer | null = null;
 let encoder: ReturnType<typeof spawn> | null = null;
 let startedAt = 0;
@@ -80,12 +81,8 @@ function exitWith(code: number): never {
  * arrive in either order, and a static window may send nothing more. */
 function drain(): void {
   if (!size || finishing) return;
-  let off = 0;
-  while (carry.length - off >= frameBytes) {
-    latest = Buffer.from(carry.subarray(off, off + frameBytes));
-    off += frameBytes;
-  }
-  if (off) carry = Buffer.from(carry.subarray(off));
+  const frame = frames.take();
+  if (frame) latest = frame;
   if (latest && !encoder) begin();
 }
 
@@ -95,12 +92,13 @@ grab.stderr.on("data", (d: Buffer) => {
   size = parseRawSize(grabErr);
   if (size) {
     frameBytes = yuv420FrameBytes(size.width, size.height);
+    frames.frameBytes = frameBytes;
     drain();
   }
 });
 
 grab.stdout.on("data", (chunk: Buffer) => {
-  carry = carry.length ? Buffer.concat([carry, chunk]) : chunk;
+  frames.push(chunk);
   drain();
 });
 

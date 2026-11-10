@@ -59,6 +59,43 @@ export function yuv420FrameBytes(width: number, height: number): number {
   return (width * height * 3) / 2;
 }
 
+/** Cuts whole raw frames out of pipe chunks (~64 KB each). Chunks are kept in
+ * a list and joined once per completed frame, so per-chunk work stays
+ * O(chunk) rather than copying the partial frame on every chunk (#282). */
+export class FrameAssembler {
+  private parts: Buffer[] = [];
+  private length = 0;
+  frameBytes = 0;
+
+  push(chunk: Buffer): void {
+    if (!chunk.length) return;
+    this.parts.push(chunk);
+    this.length += chunk.length;
+  }
+
+  /** Bytes buffered that are not yet part of a returned frame. */
+  get buffered(): number {
+    return this.length;
+  }
+
+  /** The newest complete frame, or null when no frame has completed since the
+   * last call (or the frame size is not known yet). Older complete frames are
+   * dropped; the partial tail is kept for the next call. */
+  take(): Buffer | null {
+    const fb = this.frameBytes;
+    if (fb <= 0 || this.length < fb) return null;
+    const frames = Math.floor(this.length / fb);
+    const all = this.parts.length === 1 && this.parts[0] ? this.parts[0] : Buffer.concat(this.parts, this.length);
+    const end = frames * fb;
+    const frame = all.subarray(end - fb, end);
+    const rest = this.length - end;
+    // Copy the tail so it does not pin the joined buffer once the frame is replaced.
+    this.parts = rest ? [Buffer.from(all.subarray(end))] : [];
+    this.length = rest;
+    return frame;
+  }
+}
+
 /** ffmpeg args that encode raw yuv420p frames from stdin at a fixed rate,
  * fragmented like gdigrab recordings so a killed recorder still leaves a
  * playable file. */

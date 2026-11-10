@@ -1,7 +1,7 @@
 /** #113: recording one window through Windows Graphics Capture. */
 import { describe, it, expect } from "vitest";
 import { defined } from "./testUtils.js";
-import { buildWgcEncodeArgs, buildWgcGrabArgs, framesDue, nudgeScript, parseRawSize, startBanner, yuv420FrameBytes, wgcStopFile } from "../utils/wgc.js";
+import { buildWgcEncodeArgs, buildWgcGrabArgs, FrameAssembler, framesDue, nudgeScript, parseRawSize, startBanner, yuv420FrameBytes, wgcStopFile } from "../utils/wgc.js";
 import { parseCaptureStart } from "../utils/events.js";
 
 const CFG = { ffmpeg: "ffmpeg", hwnd: 4242, fps: 15, encode: ["-c:v", "libx264", "-crf", "23", "-pix_fmt", "yuv420p"], output: "o.mp4", maxDurationSec: 0 };
@@ -64,5 +64,69 @@ describe("wgc recorder cleanup and stop file (#208, #182)", () => {
   });
   it("puts the stop file next to the output", () => {
     expect(wgcStopFile("C:/r/rec.mp4")).toBe("C:/r/rec.mp4.stop");
+  });
+});
+
+describe("FrameAssembler (#282)", () => {
+  // Three 10-byte frames, each filled with its index, fed in uneven chunks so
+  // frames split across chunks and one chunk spans a frame boundary.
+  const frame = (i: number) => Buffer.alloc(10, i);
+  const stream = Buffer.concat([frame(1), frame(2), frame(3), Buffer.from([9, 9, 9])]);
+
+  it("returns nothing until the frame size is known and a frame completes", () => {
+    const a = new FrameAssembler();
+    a.push(stream.subarray(0, 25));
+    expect(a.take()).toBeNull();
+    a.frameBytes = 10;
+    const f = a.take();
+    expect(f && [...f]).toEqual([...frame(2)]);
+    expect(a.buffered).toBe(5);
+  });
+
+  it("cuts frames at the right boundaries across small chunks", () => {
+    const a = new FrameAssembler();
+    a.frameBytes = 10;
+    const seen: number[][] = [];
+    for (let i = 0; i < stream.length; i += 4) {
+      a.push(stream.subarray(i, i + 4));
+      const f = a.take();
+      if (f) seen.push([...f]);
+    }
+    expect(seen).toEqual([[...frame(1)], [...frame(2)], [...frame(3)]]);
+    expect(a.buffered).toBe(3);
+    expect(a.take()).toBeNull();
+  });
+
+  it("keeps only the newest frame when several complete in one chunk", () => {
+    const a = new FrameAssembler();
+    a.frameBytes = 10;
+    a.push(stream);
+    const f = a.take();
+    expect(f && [...f]).toEqual([...frame(3)]);
+    expect(a.buffered).toBe(3);
+  });
+
+  it("does per-chunk work proportional to the chunk, not the partial frame", () => {
+    const a = new FrameAssembler();
+    a.frameBytes = 4096 * 1024;
+    const chunk = Buffer.alloc(64 * 1024);
+    const spy = { concat: 0 };
+    const orig = Buffer.concat;
+    Buffer.concat = ((list: readonly Uint8Array[], len?: number) => {
+      spy.concat++;
+      return orig(list, len);
+    }) as typeof Buffer.concat;
+    try {
+      for (let i = 0; i < 63; i++) {
+        a.push(chunk);
+        expect(a.take()).toBeNull();
+      }
+      expect(spy.concat).toBe(0);
+      a.push(chunk);
+      expect(a.take()?.length).toBe(4096 * 1024);
+      expect(spy.concat).toBe(1);
+    } finally {
+      Buffer.concat = orig;
+    }
   });
 });
