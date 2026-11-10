@@ -20,11 +20,11 @@ export default defineConfig({
         "src/utils/**": { lines: 90 },
         // Per-file floors for the recording lifecycle, which the aggregate
         // above hides (#302). About 4 points under a local Windows run (Nov
-        // 2026: recorder 61.8, lifecycle 81.1, sessions 91.7, events 70.0,
+        // 2026: recorder 92.1 after #297, lifecycle 81.1, sessions 91.7, events 70.0,
         // tools 81.0); raise them as the lifecycle tests land (#295-#299).
         // src/index.ts and src/wgcRecorder.ts run as child processes and get
         // floors once their tests collect child coverage (#295, #296).
-        "src/utils/recorder.ts": { lines: 58 },
+        "src/utils/recorder.ts": { lines: 88, branches: 60 },
         "src/utils/lifecycle.ts": { lines: 77 },
         "src/utils/sessions.ts": { lines: 88 },
         "src/utils/events.ts": { lines: 66 },
