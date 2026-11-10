@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.49.1] - 2026-11-10
+
 ### Changed
 
 - `wait_for_change` runs one screen capture for the whole wait instead of starting ffmpeg for every check: a 10-minute wait no longer spawns 1000+ processes, and checks now land on the requested interval instead of ~200 ms later. Cancel and timeout still stop the capture (#292).
