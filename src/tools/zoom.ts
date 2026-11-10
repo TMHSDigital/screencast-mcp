@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
@@ -16,34 +16,18 @@ import {
   DEFAULT_AUTO_MAX_ZOOM,
   DEFAULT_RING_COLOR,
   MAX_ZOOM,
-  type ClickPoint,
   type ZoomKeyframe,
+  readClicks,
+  zoomKeyframeSchema,
 } from "../utils/zoom.js";
-import { eventPaths, parseEventsJsonl } from "../utils/events.js";
+import { eventPaths } from "../utils/events.js";
 import { validateColor } from "../utils/validate.js";
 
 /** Most clicks one render will ring; more would make a very long filter graph. */
 export const MAX_RINGS = 200;
 
-/** In-frame clicks (mouse down) from an event log, or null if there is none. */
-export function readClicks(path: string): ClickPoint[] | null {
-  if (!existsSync(path)) return null;
-  return parseEventsJsonl(readFileSync(path, "utf8"))
-    .filter((e) => e.type === "down" && e.inFrame)
-    .map((e) => ({ t: e.t, x: e.x, y: e.y }));
-}
 import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
-
-/** One zoom keyframe; shared with pipeline. */
-export const zoomKeyframeSchema = z.object({
-  t: z.number().nonnegative(),
-  x: z.number().optional(),
-  y: z.number().optional(),
-  width: z.number().positive().optional(),
-  height: z.number().positive().optional(),
-  full: z.boolean().optional(),
-});
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),

@@ -161,3 +161,7 @@ export function scanMatches(
   }
   return { matches, redactRegions };
 }
+
+/** Default and largest frame count for a whole-clip scan (#204). */
+export const DEFAULT_SCAN_FRAMES = 30;
+export const MAX_SCAN_FRAMES = 120;

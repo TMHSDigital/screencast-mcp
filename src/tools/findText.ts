@@ -10,7 +10,7 @@ import { resolveCaptureTarget } from "../utils/resolveTarget.js";
 import { captureStill } from "../utils/still.js";
 import { buildHighlightArgs, targetSize } from "../utils/diff.js";
 import { findMatches, redactionRects } from "../utils/ocr.js";
-import { readFrames, scanVideoFrames, scanMatches } from "../utils/ocrScan.js";
+import { readFrames, scanVideoFrames, scanMatches, DEFAULT_SCAN_FRAMES, MAX_SCAN_FRAMES } from "../utils/ocrScan.js";
 import { windowMatchReport } from "../utils/windows.js";
 import { confirmCapture, describeTarget } from "../utils/consent.js";
 import { subdir, stamp, rand, stillOutput } from "../utils/paths.js";
@@ -18,9 +18,6 @@ import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js"
 
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tif", ".tiff"]);
 const MAX_LINES = 300;
-/** Default and largest frame count for a whole-clip scan (#204). */
-export const DEFAULT_SCAN_FRAMES = 30;
-export const MAX_SCAN_FRAMES = 120;
 
 const inputSchema = {
   target: z

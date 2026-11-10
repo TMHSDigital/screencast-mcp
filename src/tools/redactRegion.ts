@@ -5,18 +5,8 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
-import { buildRedactArgs, type RedactStyle, stillEdit } from "../utils/media.js";
+import { buildRedactArgs, type RedactStyle, stillEdit, redactRegionSchema } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
-
-/** One rectangle to redact; shared with pipeline. */
-export const redactRegionSchema = z.object({
-  x: z.number().int().nonnegative(),
-  y: z.number().int().nonnegative(),
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
-  start: z.number().nonnegative().optional(),
-  end: z.number().positive().optional(),
-});
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video or image (png/jpg; time ranges are ignored for an image)."),

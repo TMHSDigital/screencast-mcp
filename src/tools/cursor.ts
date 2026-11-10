@@ -1,51 +1,25 @@
 import { z } from "zod";
 import { join } from "node:path";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
-import { eventPaths, parseEventsJsonl } from "../utils/events.js";
 import {
   buildCursorArgs,
   cursorSpritePath,
-  planCursor,
   transformCursor,
   DEFAULT_CURSOR_SIZE,
   DEFAULT_HIDE_AFTER_SEC,
-  type CursorPlan,
-  type CursorPlanOptions,
+  cursorOptionsSchema,
+  loadCursor,
 } from "../utils/cursor.js";
 import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
-/** Cursor options, undescribed: the pipeline step reuses them as-is, which
- * keeps tools/list small (#214). */
-export const cursorOptionsSchema = {
-  events: z.string().optional(),
-  size: z.number().min(0.25).max(8).optional(),
-  smoothing: z.number().min(0).max(1).optional(),
-  hideAfterSec: z.number().min(0).max(600).optional(),
-  clicks: z.boolean().optional(),
-  spotlight: z.boolean().optional(),
-};
 const o = cursorOptionsSchema;
-
-/** The cursor planned from a recording's event log, on the source's clock. */
-export function loadCursor(input: string, events: string | undefined, opts: CursorPlanOptions, endSec: number | null): CursorPlan {
-  const path = events ?? eventPaths(input).jsonl;
-  if (!existsSync(path)) {
-    throw new ScreencastError(
-      `No event log for ${input} (looked for ${path}). Record with start_recording cursor: "events" ` +
-        "(no OS cursor in the video, events logged), or pass events: <path to .events.jsonl>.",
-    );
-  }
-  const plan = planCursor(parseEventsJsonl(readFileSync(path, "utf8")), opts, endSec);
-  if (plan.path.length === 0) throw new ScreencastError(`The event log ${path} has no cursor positions to draw.`);
-  return plan;
-}
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the recording."),

@@ -11,18 +11,13 @@ import { runEditJob } from "../utils/jobs.js";
 import { planPipeline, type PipelineStep } from "../utils/pipeline.js";
 import { exportAnimation } from "../utils/animExport.js";
 import { DEFAULT_MAX_BYTES, type AnimFormat } from "../utils/anim.js";
-import { evenTimes, DEFAULT_SHEET_COUNT, DEFAULT_TILE_WIDTH } from "../utils/sheet.js";
-import { scanVideoFrames, scanMatches, type VideoScan } from "../utils/ocrScan.js";
-import { eventPaths, parseEventsJsonl, whenFinalized } from "../utils/events.js";
+import { evenTimes, DEFAULT_SHEET_COUNT, DEFAULT_TILE_WIDTH, renderContactSheet } from "../utils/sheet.js";
+import { scanVideoFrames, scanMatches, type VideoScan, DEFAULT_SCAN_FRAMES, MAX_SCAN_FRAMES } from "../utils/ocrScan.js";
+import { parseEventsJsonl } from "../utils/events.js";
 import { ocrStatus, parseFfmpegVersion, versionText } from "../utils/capabilities.js";
 import { getMonitors } from "../utils/monitors.js";
 import { resolveOutputDir, subdir, stamp, rand } from "../utils/paths.js";
 import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js";
-import type { SessionRecord } from "../utils/sessions.js";
-import { getStore } from "../context.js";
-import { redactRegionSchema } from "./redactRegion.js";
-import { renderContactSheet } from "./contactSheet.js";
-import { DEFAULT_SCAN_FRAMES, MAX_SCAN_FRAMES } from "./findText.js";
 import {
   DEFAULT_CLIP_SEC,
   DEFAULT_ERROR_PATTERN,
@@ -38,7 +33,9 @@ import {
   mergeRedactions,
   reconstructSteps,
   type BugReportData,
+  resolveSource,
 } from "../utils/bugReport.js";
+import { redactRegionSchema } from "../utils/media.js";
 
 const { version: serverVersion } = createRequire(import.meta.url)("../../package.json") as { version: string };
 
@@ -64,30 +61,6 @@ const inputSchema = {
 };
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
-
-export interface Source {
-  path: string;
-  eventsPath: string | null;
-  record?: SessionRecord;
-}
-
-export async function resolveSource(args: { input?: string; sessionId?: string }): Promise<Source> {
-  if (args.sessionId !== undefined) {
-    const record = getStore().get(args.sessionId);
-    if (!record) throw new ScreencastError(`No session with id "${args.sessionId}".`);
-    if (record.status === "recording" || record.status === "paused") {
-      throw new ScreencastError("The recording is still running; stop_recording it first.");
-    }
-    await whenFinalized(record.id);
-    if (!existsSync(record.outputPath)) throw new ScreencastError(`The session's recording is missing: ${record.outputPath}`);
-    const events = record.events?.path;
-    return { path: record.outputPath, eventsPath: events && existsSync(events) ? events : null, record };
-  }
-  const path = args.input!;
-  if (!existsSync(path)) throw new ScreencastError(`Input file not found: ${path}`);
-  const { jsonl } = eventPaths(path);
-  return { path, eventsPath: existsSync(jsonl) ? jsonl : null };
-}
 
 /** "1920x1080 @150% (primary)" per display, best-effort (Windows only). */
 async function displayRows(): Promise<string | null> {

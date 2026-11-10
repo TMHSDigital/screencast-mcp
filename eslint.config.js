@@ -40,6 +40,24 @@ export default tseslint.config(
     },
   },
   {
+    // A tool module registers one tool; shared schemas and helpers live in
+    // src/utils, so no tool imports another (#311).
+    files: ["src/tools/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["./*"],
+              message: "Tools must not import other tool modules; put shared code in src/utils (#311).",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Plain-JS build scripts run under Node.
     files: ["scripts/**/*.mjs"],
     languageOptions: { globals: { process: "readonly", console: "readonly", URL: "readonly" } },

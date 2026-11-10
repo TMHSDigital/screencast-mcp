@@ -23,10 +23,12 @@
 import { fileURLToPath } from "node:url";
 import { ScreencastError } from "./errors.js";
 import { escapeFilterPath } from "./fonts.js";
-import { MOVE_SAMPLE_MS, type InputEvent } from "./events.js";
+import { MOVE_SAMPLE_MS, type InputEvent, eventPaths, parseEventsJsonl } from "./events.js";
 import type { TimeOp } from "./chapters.js";
 import { mapTime, mapWindow } from "./timeline.js";
 import { resolveQuality, type Quality } from "./targets.js";
+import { z } from "zod";
+import { existsSync, readFileSync } from "node:fs";
 
 /** assets/cursor/arrow.png (scripts/make-cursor-sprite.mjs): its size, the
  * tip's pixel (the hotspot), and the arrow's height without outline/shadow. */
@@ -465,4 +467,29 @@ export function buildCursorArgs(
     ],
     commands,
   };
+}
+
+/** Cursor options, undescribed: the pipeline step reuses them as-is, which
+ * keeps tools/list small (#214). */
+export const cursorOptionsSchema = {
+  events: z.string().optional(),
+  size: z.number().min(0.25).max(8).optional(),
+  smoothing: z.number().min(0).max(1).optional(),
+  hideAfterSec: z.number().min(0).max(600).optional(),
+  clicks: z.boolean().optional(),
+  spotlight: z.boolean().optional(),
+};
+
+/** The cursor planned from a recording's event log, on the source's clock. */
+export function loadCursor(input: string, events: string | undefined, opts: CursorPlanOptions, endSec: number | null): CursorPlan {
+  const path = events ?? eventPaths(input).jsonl;
+  if (!existsSync(path)) {
+    throw new ScreencastError(
+      `No event log for ${input} (looked for ${path}). Record with start_recording cursor: "events" ` +
+        "(no OS cursor in the video, events logged), or pass events: <path to .events.jsonl>.",
+    );
+  }
+  const plan = planCursor(parseEventsJsonl(readFileSync(path, "utf8")), opts, endSec);
+  if (plan.path.length === 0) throw new ScreencastError(`The event log ${path} has no cursor positions to draw.`);
+  return plan;
 }

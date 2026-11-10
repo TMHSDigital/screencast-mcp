@@ -1,7 +1,5 @@
 import { z } from "zod";
-import { join } from "node:path";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
@@ -15,19 +13,14 @@ import {
 } from "../utils/media.js";
 import {
   evenTimes,
-  formatTimecode,
-  sheetGrid,
-  buildTileArgs,
-  buildSheetArgs,
   buildPosterArgs,
   DEFAULT_SHEET_COUNT,
   MAX_SHEET_COUNT,
   DEFAULT_TILE_WIDTH,
+  renderContactSheet,
 } from "../utils/sheet.js";
-import { bundledFontPath } from "../utils/fonts.js";
-import { resolveOutput, subdir, stamp, rand, sequencePattern } from "../utils/paths.js";
+import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js";
-import { mapPool } from "../utils/pool.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
@@ -73,34 +66,6 @@ const inputSchema = {
     .optional()
     .describe(`Max inline image width (default ${DEFAULT_MAX_IMAGE_WIDTH}).`),
 };
-
-/** Tile timecode-labelled frames of `input` at `times` into one PNG at
- * `output`; shared with bug_report (#198). Returns the grid used. */
-export async function renderContactSheet(
-  input: string,
-  times: number[],
-  output: string,
-  opts: { tileWidth: number; columns?: number },
-  signal?: AbortSignal,
-): Promise<{ columns: number; rows: number }> {
-  const grid = sheetGrid(times.length, opts.columns);
-  // Tiles and their label files live in a private temp dir, removed
-  // whatever happens.
-  const work = mkdtempSync(join(tmpdir(), "screencast-sheet-"));
-  try {
-    const font = bundledFontPath("bold");
-    await mapPool(times, async (t, i) => {
-      const labelFile = join(work, `label_${i}.txt`);
-      writeFileSync(labelFile, formatTimecode(t));
-      const tile = join(work, `tile_${String(i).padStart(3, "0")}.png`);
-      await runFfmpeg(buildTileArgs(input, t, tile, opts.tileWidth, font, labelFile), 60_000, { signal });
-    });
-    await runFfmpeg(buildSheetArgs(sequencePattern(work, "tile_%03d.png"), grid, output), 60_000, { signal });
-  } finally {
-    rmSync(work, { recursive: true, force: true });
-  }
-  return grid;
-}
 
 export function register(server: McpServer): void {
   server.registerTool(

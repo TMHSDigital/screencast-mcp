@@ -17,6 +17,9 @@ import { ScreencastError } from "./errors.js";
 import { diffFrames, type Rect } from "./diff.js";
 import { resolveQuality, type Quality } from "./targets.js";
 import { sumExpr } from "./expr.js";
+import { z } from "zod";
+import { existsSync, readFileSync } from "node:fs";
+import { parseEventsJsonl } from "./events.js";
 
 export const DEFAULT_TRANSITION_SEC = 0.6;
 export const MAX_ZOOM = 6;
@@ -361,3 +364,21 @@ export function ringFilters(clicks: ClickPoint[], W: number, H: number, fps: num
   });
   return steps;
 }
+
+/** In-frame clicks (mouse down) from an event log, or null if there is none. */
+export function readClicks(path: string): ClickPoint[] | null {
+  if (!existsSync(path)) return null;
+  return parseEventsJsonl(readFileSync(path, "utf8"))
+    .filter((e) => e.type === "down" && e.inFrame)
+    .map((e) => ({ t: e.t, x: e.x, y: e.y }));
+}
+
+/** One zoom keyframe; shared with pipeline. */
+export const zoomKeyframeSchema = z.object({
+  t: z.number().nonnegative(),
+  x: z.number().optional(),
+  y: z.number().optional(),
+  width: z.number().positive().optional(),
+  height: z.number().positive().optional(),
+  full: z.boolean().optional(),
+});

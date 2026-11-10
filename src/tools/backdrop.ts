@@ -6,24 +6,12 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
-import { buildBackdropArgs, BACKDROP_PRESET_NAMES, MAX_BACKDROP_COLORS, type BackdropOptions } from "../utils/backdrop.js";
+import { buildBackdropArgs, type BackdropOptions, backdropOptionsSchema } from "../utils/backdrop.js";
 import { editOutputExt, assertEditContainer } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 
 const STILL = /\.(png|jpe?g|bmp|tiff?|webp)$/i;
 
-/** Backdrop options, undescribed: the pipeline step reuses them as-is (its
- * description points at this tool), which keeps tools/list small (#214). */
-export const backdropOptionsSchema = {
-  preset: z.enum(BACKDROP_PRESET_NAMES).optional(),
-  colors: z.array(z.string()).min(1).max(MAX_BACKDROP_COLORS).optional(),
-  image: z.string().min(1).optional(),
-  padding: z.number().int().nonnegative().max(2000).optional(),
-  radius: z.number().int().nonnegative().max(1000).optional(),
-  shadow: z.number().int().nonnegative().max(200).optional(),
-  shadowOpacity: z.number().min(0).max(1).optional(),
-  aspect: z.enum(["16:9", "9:16", "1:1", "4:5"]).optional(),
-};
 const o = backdropOptionsSchema;
 
 const inputSchema = {

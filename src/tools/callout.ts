@@ -7,58 +7,10 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
-import { buildCalloutArgs, type Callout } from "../utils/callout.js";
+import { buildCalloutArgs, type Callout, calloutItemSchema, fontFileSchema } from "../utils/callout.js";
 import { prepareCalloutAssets } from "../utils/calloutAssets.js";
 import { stillEdit } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
-
-const timing = {
-  from: z.number().nonnegative().optional(),
-  to: z.number().positive().optional(),
-  color: z.string().optional(),
-};
-
-/** Explicit font for drawn text (#231); shared with pipeline and title_card. */
-export const fontFileSchema = z
-  .string()
-  .min(1)
-  .optional()
-  .describe(
-    "Font: a .ttf/.otf/.ttc path or a C:\\Windows\\Fonts file name. Default: bundled Inter, with a " +
-      "covering system font for scripts it lacks (CJK, emoji, Arabic, ...).",
-  );
-
-/** One callout; shared with pipeline. */
-export const calloutItemSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("box"),
-    x: z.number(),
-    y: z.number(),
-    width: z.number().positive(),
-    height: z.number().positive(),
-    thickness: z.number().positive().optional().describe("Outline px (default 4)."),
-    fill: z.boolean().optional().describe("Fill instead of outline."),
-    ...timing,
-  }),
-  z.object({
-    type: z.literal("text"),
-    x: z.number(),
-    y: z.number(),
-    text: z.string().min(1),
-    size: z.number().positive().optional().describe("Font size px (default 32)."),
-    background: z.boolean().optional().describe("Dark panel behind the text (default true)."),
-    ...timing,
-  }),
-  z.object({
-    type: z.literal("arrow"),
-    x1: z.number(),
-    y1: z.number(),
-    x2: z.number().describe("Head (x2,y2) is the point the arrow points at."),
-    y2: z.number(),
-    thickness: z.number().positive().optional().describe("Shaft px (default 8)."),
-    ...timing,
-  }),
-]);
 
 const inputSchema = {
   input: z.string().min(1).describe("Path to the source video or image (png/jpg; from/to are ignored for an image)."),

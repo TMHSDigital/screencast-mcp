@@ -9,6 +9,7 @@ import { ScreencastError } from "./errors.js";
 import { resolveQuality, type Quality } from "./targets.js";
 import { validateColor, validateEvenDimension } from "./validate.js";
 import { isStillImage, stillOutput } from "./paths.js";
+import { z } from "zod";
 
 /** Edit re-encodes default to the same preset as a standard capture. */
 const DEFAULT_EDIT_QUALITY: Quality = "standard";
@@ -943,3 +944,13 @@ export function buildRedactArgs(
     output,
   ];
 }
+
+/** One rectangle to redact; shared with pipeline. */
+export const redactRegionSchema = z.object({
+  x: z.number().int().nonnegative(),
+  y: z.number().int().nonnegative(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  start: z.number().nonnegative().optional(),
+  end: z.number().positive().optional(),
+});

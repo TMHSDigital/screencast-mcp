@@ -11,19 +11,13 @@ import { planPipeline, probeArgs, sidecarCues, MAX_PIPELINE_STEPS, type AudioMea
 import { calloutFonts, prepareCalloutAssets } from "../utils/calloutAssets.js";
 import { exportAnimation } from "../utils/animExport.js";
 import type { CalloutAssets } from "../utils/callout.js";
-import { calloutItemSchema, fontFileSchema } from "./callout.js";
-import { assertEditContainer } from "../utils/media.js";
-import { readClicks, zoomKeyframeSchema } from "./zoom.js";
-import { redactRegionSchema } from "./redactRegion.js";
+import { assertEditContainer, redactRegionSchema } from "../utils/media.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { PLATFORMS } from "../utils/produce.js";
 import { buildChapters, ffmetadata, markerPoints, markersOrChapters, retimeMarkers, writeMarkers, type Chapter, type Marker } from "../utils/chapters.js";
 import type { CursorStepAssets, KeystrokeStepAssets } from "../utils/pipeline.js";
-import { cursorOptionsSchema, loadCursor } from "./cursor.js";
-import { cursorSpritePath } from "../utils/cursor.js";
-import { backdropOptionsSchema } from "./backdrop.js";
-import { keystrokeOptionsSchema, loadBadges, prepareKeystrokeAssets } from "./keystrokeOverlay.js";
-import { MAX_ZOOM, type ClickPoint } from "../utils/zoom.js";
+import { cursorSpritePath, cursorOptionsSchema, loadCursor } from "../utils/cursor.js";
+import { MAX_ZOOM, type ClickPoint, readClicks, zoomKeyframeSchema } from "../utils/zoom.js";
 import { buildIdleScanArgs, intersect, parseFreezes, parseSilences, DEFAULT_MIN_IDLE_SEC } from "../utils/idle.js";
 import { buildLoudnessMeasureArgs, buildNoiseFloorArgs, loudnessTarget, parseLoudnorm, parseNoiseFloor } from "../utils/audio.js";
 import { buildTranscribeArgs, formatSrt, normalizeCues, parseSrt, resolveWhisperModel, type Cue } from "../utils/captions.js";
@@ -31,6 +25,9 @@ import { eventPaths } from "../utils/events.js";
 import { bundledFontPath } from "../utils/fonts.js";
 import { retimeAss, retimeCues, type Span } from "../utils/timeline.js";
 import { applyOverrides, recipeSteps, RECIPES } from "../utils/recipes.js";
+import { calloutItemSchema, fontFileSchema } from "../utils/callout.js";
+import { backdropOptionsSchema } from "../utils/backdrop.js";
+import { keystrokeOptionsSchema, loadBadges, prepareKeystrokeAssets } from "../utils/keystrokes.js";
 
 /** Why a recipe cannot transcribe captions here, or null when it can. */
 function transcribeBlocker(): string | null {

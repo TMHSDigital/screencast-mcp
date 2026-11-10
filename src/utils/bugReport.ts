@@ -12,6 +12,10 @@ import { findMatches, normalizeForMatch, regexRanges, type OcrLine } from "./ocr
 import type { TimedRect } from "./ocrScan.js";
 import { formatTimecode } from "./sheet.js";
 import type { ReproStep } from "./steps.js";
+import { existsSync } from "node:fs";
+import { eventPaths, whenFinalized } from "./events.js";
+import { getStore } from "../context.js";
+import type { SessionRecord } from "./sessions.js";
 
 /** Seconds of the recording's end the clip keeps by default. */
 export const DEFAULT_CLIP_SEC = 30;
@@ -276,4 +280,28 @@ export function buildReportMarkdown(r: BugReportData): string {
     "",
   );
   return out.join("\n");
+}
+
+export interface Source {
+  path: string;
+  eventsPath: string | null;
+  record?: SessionRecord;
+}
+
+export async function resolveSource(args: { input?: string; sessionId?: string }): Promise<Source> {
+  if (args.sessionId !== undefined) {
+    const record = getStore().get(args.sessionId);
+    if (!record) throw new ScreencastError(`No session with id "${args.sessionId}".`);
+    if (record.status === "recording" || record.status === "paused") {
+      throw new ScreencastError("The recording is still running; stop_recording it first.");
+    }
+    await whenFinalized(record.id);
+    if (!existsSync(record.outputPath)) throw new ScreencastError(`The session's recording is missing: ${record.outputPath}`);
+    const events = record.events?.path;
+    return { path: record.outputPath, eventsPath: events && existsSync(events) ? events : null, record };
+  }
+  const path = args.input!;
+  if (!existsSync(path)) throw new ScreencastError(`Input file not found: ${path}`);
+  const { jsonl } = eventPaths(path);
+  return { path, eventsPath: existsSync(jsonl) ? jsonl : null };
 }

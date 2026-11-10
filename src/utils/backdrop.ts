@@ -15,6 +15,7 @@ import { validateColor } from "./validate.js";
 import { ASPECT_DIMS, type Aspect } from "./produce.js";
 import { resolveQuality, type Quality } from "./targets.js";
 import { stillOutput } from "./paths.js";
+import { z } from "zod";
 
 /** Named looks in the project's REC/timecode palette (docs/site.css). */
 export const BACKDROP_PRESETS = {
@@ -251,3 +252,16 @@ export function buildBackdropArgs(
     : [...head, "-map", "0:a?", ...resolveQuality(quality), "-c:a", "copy", "-movflags", "+faststart", output];
   return { args, layout };
 }
+
+/** Backdrop options, undescribed: the pipeline step reuses them as-is (its
+ * description points at this tool), which keeps tools/list small (#214). */
+export const backdropOptionsSchema = {
+  preset: z.enum(BACKDROP_PRESET_NAMES).optional(),
+  colors: z.array(z.string()).min(1).max(MAX_BACKDROP_COLORS).optional(),
+  image: z.string().min(1).optional(),
+  padding: z.number().int().nonnegative().max(2000).optional(),
+  radius: z.number().int().nonnegative().max(1000).optional(),
+  shadow: z.number().int().nonnegative().max(200).optional(),
+  shadowOpacity: z.number().min(0).max(1).optional(),
+  aspect: z.enum(["16:9", "9:16", "1:1", "4:5"]).optional(),
+};

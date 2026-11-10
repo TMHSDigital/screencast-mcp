@@ -12,7 +12,7 @@ import { inputSteps } from "../utils/steps.js";
 import { readMarkers } from "../utils/chapters.js";
 import { ocrStatus } from "../utils/capabilities.js";
 import { readFrames, scanMatches, type ReadFrame } from "../utils/ocrScan.js";
-import { DEFAULT_SECRET_PATTERN } from "../utils/bugReport.js";
+import { DEFAULT_SECRET_PATTERN, resolveSource } from "../utils/bugReport.js";
 import { resolveOutputDir, subdir, stamp, rand } from "../utils/paths.js";
 import {
   GUIDE_FILES,
@@ -35,7 +35,6 @@ import {
   type GuideData,
   type GuideFormat,
 } from "../utils/stepGuide.js";
-import { resolveSource } from "./bugReport.js";
 import { mapPool } from "../utils/pool.js";
 
 /** Frames OCR'd per PowerShell run, so a cancel lands between batches. */
