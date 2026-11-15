@@ -412,16 +412,20 @@ Minimal call:
 
 **Wait for Screen Change** (since v0.18.0)
 
-Wait until part of the screen changes or settles, instead of guessing a sleep. Returns the elapsed time, changed regions (screenshot pixels; add `origin` for desktop), and the final state.
+Wait until part of the screen changes, settles, or shows (or loses) some text, instead of guessing a sleep. Returns the elapsed time, changed regions (screenshot pixels; add `origin` for desktop), and the final state.
 
 Parameters:
 
 - `target` (string; required): What to watch: full | monitor:<i> | window:<title> (or exe=/hwnd=) | region:<x>,<y>,<w>,<h>.
 - `exactTitle` (boolean): window: targets match the whole title only (default false).
-- `mode` ("change" | "settle"): change (default): return once it differs from the start. settle: once it has been still for settleSec.
+- `mode` ("change" | "settle" | "text"): change (default): return once it differs from the start. settle: once it has been still for settleSec. text: once text appears (OCR, re-read only after a change).
+- `text` (string; at most 500 characters): Mode text: what to wait for; tolerates OCR misreads.
+- `regex` (boolean): Mode text: text is a regex.
+- `gone` (boolean): Mode text: wait until it disappears instead.
+- `backend` ("gdigrab" | "wgc"): wgc: watch a window even when covered (window: targets; 1-2 s per check).
 - `timeoutSec` (number; > 0, ≤ 600): Give up after this many seconds (default 30; a timeout is a result, not an error).
 - `settleSec` (number; > 0, ≤ 60): Mode settle: seconds of stillness (default 1).
-- `intervalMs` (integer; ≥ 100, ≤ 5000): Pause between checks in ms (default 250).
+- `intervalMs` (integer; ≥ 100, ≤ 5000): Pause between checks in ms (default 250; 1000 with wgc).
 - `pixelThreshold` (number; ≥ 0, ≤ 255): Mean 0-255 difference for a ~32x32 cell to count as changed (default 12).
 - `returnImage` (boolean): Return the final state inline (default true).
 - `keep` (boolean): Keep the final screenshot on disk and return its path (default false).

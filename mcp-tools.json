@@ -795,7 +795,7 @@
       "idempotentHint": true,
       "openWorldHint": false
     },
-    "description": "Wait until part of the screen changes or settles, instead of guessing a sleep. Returns the elapsed time, changed regions (screenshot pixels; add `origin` for desktop), and the final state.",
+    "description": "Wait until part of the screen changes, settles, or shows (or loses) some text, instead of guessing a sleep. Returns the elapsed time, changed regions (screenshot pixels; add `origin` for desktop), and the final state.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -808,11 +808,34 @@
           "type": "boolean"
         },
         "mode": {
-          "description": "change (default): return once it differs from the start. settle: once it has been still for settleSec.",
+          "description": "change (default): return once it differs from the start. settle: once it has been still for settleSec. text: once text appears (OCR, re-read only after a change).",
           "type": "string",
           "enum": [
             "change",
-            "settle"
+            "settle",
+            "text"
+          ]
+        },
+        "text": {
+          "description": "Mode text: what to wait for; tolerates OCR misreads.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "regex": {
+          "description": "Mode text: text is a regex.",
+          "type": "boolean"
+        },
+        "gone": {
+          "description": "Mode text: wait until it disappears instead.",
+          "type": "boolean"
+        },
+        "backend": {
+          "description": "wgc: watch a window even when covered (window: targets; 1-2 s per check).",
+          "type": "string",
+          "enum": [
+            "gdigrab",
+            "wgc"
           ]
         },
         "timeoutSec": {
@@ -828,7 +851,7 @@
           "maximum": 60
         },
         "intervalMs": {
-          "description": "Pause between checks in ms (default 250).",
+          "description": "Pause between checks in ms (default 250; 1000 with wgc).",
           "type": "integer",
           "minimum": 100,
           "maximum": 5000
