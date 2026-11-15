@@ -100,6 +100,7 @@ const CASES: Case[] = [
   { name: "scale", args: (f) => ({ input: f.v, width: 160 }), expect: "media" },
   { name: "speed", args: (f) => ({ input: f.av, factor: 2 }), expect: "media" },
   { name: "overlay", args: (f) => ({ input: f.av, overlay: f.png, x: 10, y: 10, width: 32 }), expect: "media" },
+  { name: "compose", args: (f) => ({ inputs: [{ path: f.av, label: "Before" }, { path: f.av2 }], layout: "stack" }), expect: "media" },
   { name: "callout", args: (f) => ({ input: f.v, items: [{ type: "box", x: 20, y: 20, width: 80, height: 60 }] }), expect: "media" },
   { name: "keystroke_overlay", args: (f) => ({ input: f.av }), expect: "media" },
   { name: "cursor", args: (f) => ({ input: f.av }), expect: "media" },

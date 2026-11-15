@@ -57,6 +57,7 @@ export const TOOLSETS = {
     "cursor",
     "backdrop",
     "overlay",
+    "compose",
     "zoom",
     "reframe",
     "title_card",
@@ -148,7 +149,7 @@ export function serverInstructions(selection: ToolsetSelection): string {
   }
   if (on.has("produce")) {
     lines.push(
-      "Produce: callout, zoom, keystroke_overlay, cursor, backdrop, overlay, title_card, xfade_transition, assemble_highlights, burn_subtitles, export_preset.",
+      "Produce: callout, zoom, keystroke_overlay, cursor, backdrop, overlay, compose, title_card, xfade_transition, assemble_highlights, burn_subtitles, export_preset.",
     );
   }
   if (on.has("produce")) {

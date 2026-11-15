@@ -2,7 +2,7 @@
 
 > An MCP server (stdio) that lets AI agents record the Windows screen, watch the footage as frames, and edit it with ffmpeg. Install: `npx -y @tmhs/screencast-mcp`. Capture is Windows-only; the watch and edit tools run anywhere ffmpeg runs.
 
-59 tools. Generated from the server's schemas; the same content is on https://tmhsdigital.github.io/screencast-mcp/tools/.
+60 tools. Generated from the server's schemas; the same content is on https://tmhsdigital.github.io/screencast-mcp/tools/.
 
 # Core toolset
 
@@ -927,6 +927,30 @@ Minimal call:
 
 ```json
 {"input":"recording.mp4","overlay":"…","x":0,"y":0}
+```
+
+## compose
+
+**Compose Videos** (since next release)
+
+Lay 2-9 videos out side by side, stacked, or in a grid (before/after, app and terminal), labelled and in sync.
+
+Parameters:
+
+- `inputs` (object[]; required, at least 2 items, at most 9 items): Videos in reading order, each with an optional label (e.g. "Before").
+- `inputs[].path` (string; required)
+- `inputs[].label` (string; at most 80 characters)
+- `layout` ("side_by_side" | "stack" | "grid"): side_by_side (default), stack, or grid.
+- `alignMarker` (string): Line inputs up on this add_marker label.
+- `endWith` ("longest" | "shortest"): longest (default; shorter ones hold their last frame) or shortest.
+- `audio` (integer | "mix" | "none"): Input index whose audio to keep (default 0), "mix", or "none".
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"inputs":[{"path":"recording.mp4"},{"path":"recording.mp4"}]}
 ```
 
 ## callout

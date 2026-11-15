@@ -1532,6 +1532,96 @@
     }
   },
   {
+    "name": "compose",
+    "toolset": "produce",
+    "title": "Compose Videos",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Lay 2-9 videos out side by side, stacked, or in a grid (before/after, app and terminal), labelled and in sync.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "inputs": {
+          "minItems": 2,
+          "maxItems": 9,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              }
+            },
+            "required": [
+              "path"
+            ]
+          },
+          "description": "Videos in reading order, each with an optional label (e.g. \"Before\")."
+        },
+        "layout": {
+          "description": "side_by_side (default), stack, or grid.",
+          "type": "string",
+          "enum": [
+            "side_by_side",
+            "stack",
+            "grid"
+          ]
+        },
+        "alignMarker": {
+          "description": "Line inputs up on this add_marker label.",
+          "type": "string",
+          "minLength": 1
+        },
+        "endWith": {
+          "description": "longest (default; shorter ones hold their last frame) or shortest.",
+          "type": "string",
+          "enum": [
+            "longest",
+            "shortest"
+          ]
+        },
+        "audio": {
+          "description": "Input index whose audio to keep (default 0), \"mix\", or \"none\".",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "string",
+              "enum": [
+                "mix",
+                "none"
+              ]
+            }
+          ]
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "inputs"
+      ]
+    }
+  },
+  {
     "name": "callout",
     "toolset": "produce",
     "title": "Add Callouts",
