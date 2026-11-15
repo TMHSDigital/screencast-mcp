@@ -160,7 +160,12 @@ describe.skipIf(!RUN)("capture smoke (RUN_CAPTURE_SMOKE)", { retry: RETRY }, () 
     expect(pts[0]!, summary).toBeLessThan(0.5);
     const gaps = pts.slice(1).map((t, i) => t - pts[i]!);
     const widest = Math.max(...gaps);
-    expect(widest, `widest gap ${widest}s; ${summary}`).toBeLessThan(1);
+    const at = pts[gaps.indexOf(widest)]!;
+    // A kept pause is a ~3 s jump. A loaded runner's gdigrab also stalls for
+    // a second or more mid-segment (#331: ~10 fps of the requested 15), so a
+    // 1 s bound failed on capture stalls rather than on the pause; 2 s still
+    // catches the pause with a wide margin either way.
+    expect(widest, `widest gap ${widest}s at ${at}s (pause at ${recorded}s); ${summary}`).toBeLessThan(2);
     // The container ends with the last frame: no padding where the pause was.
     expect(Math.abs(pts[pts.length - 1]! + frameSec - durationSec), summary).toBeLessThan(0.5);
     // Both segments are in it: the first, then at least 1 s of the second.
