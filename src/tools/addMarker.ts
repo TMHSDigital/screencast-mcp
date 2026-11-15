@@ -2,21 +2,12 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { requireInput } from "../utils/editTool.js";
-import { errorMessage, errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { looseOutput } from "../utils/toolSpec.js";
 import { assertOutputAllowed } from "../utils/paths.js";
-import {
-  cleanLabel,
-  insertMarker,
-  markerTimeSec,
-  markersPath,
-  readMarkers,
-  writeMarkers,
-  MAX_LABEL,
-  type Marker,
-} from "../utils/chapters.js";
+import { cleanLabel, insertMarker, markersPath, readMarkers, writeMarkers, MAX_LABEL } from "../utils/chapters.js";
 import { getStore } from "../context.js";
-import { recordedSec } from "../utils/pause.js";
+import { addSessionMarker } from "../utils/sessionMarker.js";
 
 /** Adds one marker to the session record and its sidecar: never replaces
  * anything, and each call adds another. */
@@ -54,43 +45,14 @@ export function register(server: McpServer): void {
       try {
         if (!args.sessionId && !args.input) throw new ScreencastError("Pass sessionId or input.");
         if (args.sessionId) {
-          const store = getStore();
-          const record = store.get(args.sessionId);
-          if (!record) throw new ScreencastError(`No session with id "${args.sessionId}".`);
-          let t = args.at;
-          if (t === undefined && record.status === "paused") {
-            // While paused, "now" is the pause point on the video clock (#200).
-            t = recordedSec(record.segments?.parts ?? []);
-          } else if (t === undefined) {
-            if (record.status !== "recording") {
-              throw new ScreencastError(
-                `Session "${args.sessionId}" is ${record.status}, so there is no "now" to mark.`,
-                "Pass at (video seconds) to mark a stopped recording.",
-              );
-            }
-            t = markerTimeSec(record.videoStartMs ?? Date.parse(record.startedAt), Date.now());
-          } else if (record.durationSec != null && t > record.durationSec) {
-            throw new ScreencastError(`at ${t}s is past the end of the recording (${record.durationSec}s).`);
-          }
-          const marker: Marker = { t, label: args.label, at: new Date().toISOString() };
-          // Patch only the markers field: the registry merges field by field,
-          // so a stop or event-log update meanwhile is kept (#235).
-          const markers = insertMarker(record.markers ?? [], marker);
-          store.update(args.sessionId, { markers });
-          let sidecar = markersPath(record.outputPath);
-          let warning: string | undefined;
-          try {
-            sidecar = writeMarkers(record.outputPath, markers, args.sessionId);
-          } catch (err) {
-            warning = `Saved in the session, but the sidecar ${sidecar} could not be written: ${errorMessage(err)}`;
-          }
+          const res = addSessionMarker(getStore(), args.sessionId, args.label, args.at);
           return okResponse({
             sessionId: args.sessionId,
-            marker: { t: Math.round(t * 1000) / 1000, label: cleanLabel(args.label) },
-            count: markers.length,
-            markersPath: sidecar,
-            ...(record.status === "recording" || record.status === "paused" ? { live: true } : {}),
-            ...(warning ? { warning } : {}),
+            marker: { t: Math.round(res.t * 1000) / 1000, label: cleanLabel(args.label) },
+            count: res.count,
+            markersPath: res.markersPath,
+            ...(res.live ? { live: true } : {}),
+            ...(res.warning ? { warning: res.warning } : {}),
           });
         }
         const input = args.input!;

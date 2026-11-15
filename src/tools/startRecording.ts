@@ -3,7 +3,9 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorMessage, errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
-import { requireFfmpeg, wgcAvailable } from "../utils/ffmpeg.js";
+import { probeDuration, requireFfmpeg, wgcAvailable } from "../utils/ffmpeg.js";
+import { stopSession } from "../utils/lifecycle.js";
+import { addSessionMarker } from "../utils/sessionMarker.js";
 import { wgcRecorderScript } from "../utils/packageRoot.js";
 import {
   buildCaptureArgs,
@@ -63,7 +65,9 @@ import {
 } from "../utils/replay.js";
 import {
   DEFAULT_KEY_MODE,
+  HOTKEYS,
   eventPaths,
+  hotkeysTaken,
   parseCaptureStart,
   prepareEventPaths,
   startEventLogger,
@@ -71,6 +75,7 @@ import {
   summarizeEvents,
   trackFinalizer,
   writeEventsFile,
+  type HotkeyAction,
   type KeyMode,
 } from "../utils/events.js";
 
@@ -144,6 +149,7 @@ const inputSchema = {
     .enum(["app", "title"])
     .optional()
     .describe("Log app switches (implies events); title adds window titles."),
+  hotkeys: z.boolean().optional().describe("Ctrl+Alt+Shift+M adds a marker, +S stops (implies events)."),
   elements: z.boolean().optional().describe('Name the UI element each click hits, e.g. "Save" button (implies events).'),
   cursor: z
     .enum(["os", "events"])
@@ -220,7 +226,7 @@ export function register(server: McpServer): void {
         const { ffmpeg } = requireFfmpeg();
         // A cursor left out of the video is redrawn from the event log (#170).
         const hideCursor = args.cursor === "events";
-        if (hideCursor || args.focus || args.elements) args.events = true;
+        if (hideCursor || args.focus || args.elements || args.hotkeys) args.events = true;
         const { target, monitors, window } = await resolveCaptureTarget(args.target, {
           exactTitle: args.exactTitle,
           backend: args.backend,
@@ -271,6 +277,7 @@ export function register(server: McpServer): void {
             (args.events ? ", logging mouse clicks and typing" : "") +
             (args.focus ? (args.focus === "title" ? " and which window is in front, with its title" : " and which app is in front") : "") +
             (args.elements ? ", naming the on-screen controls you click" : "") +
+            (args.hotkeys ? `, with hotkeys (${HOTKEYS.marker} marks, ${HOTKEYS.stop} stops)` : "") +
             (replay ? ", kept only until save_replay or stop_recording { save: true } writes it out?" : `, saved to ${output}?`),
           extra.signal,
         );
@@ -329,11 +336,14 @@ export function register(server: McpServer): void {
         let frame = args.events
           ? captureFrame(target, monitors)
           : null;
+        // Hotkeys (#337) act once the session exists; a press before that is ignored.
+        let onHotkey: (action: HotkeyAction) => void = () => {};
         const logger = evPaths
           ? await startEventLogger(evPaths.raw, keyMode, {
               ...(replay ? { rotateSec: replayEventRotateSec(replay.bufferSec) } : {}),
               ...(args.focus ? { focus: args.focus } : {}),
               ...(args.elements ? { elements: true } : {}),
+              ...(args.hotkeys ? { hotkeys: true, onHotkey: (a: HotkeyAction) => onHotkey(a) } : {}),
             })
           : null;
 
@@ -494,6 +504,25 @@ export function register(server: McpServer): void {
         // crash is "failed" with the stderr tail, a clean exit the cap or the
         // window closing (#240).
         attachExitHandler(store, id, child, { backend, maxDurationSec, spawnedAt, watch });
+        if (args.hotkeys) {
+          const { ffprobe } = requireFfmpeg();
+          onHotkey = (action) => {
+            const cur = store.get(id);
+            if (!cur || (cur.status !== "recording" && cur.status !== "paused")) return;
+            if (action === "marker") {
+              try {
+                addSessionMarker(store, id, "hotkey");
+              } catch (err) {
+                process.stderr.write(`Hotkey marker for ${id} failed: ${errorMessage(err)}\n`);
+              }
+            } else {
+              stopSession(store, cur, { reason: "stopped", probe: (path) => probeDuration(path, { ffprobe }) }).catch((err: unknown) =>
+                process.stderr.write(`Hotkey stop for ${id} failed: ${errorMessage(err)}\n`),
+              );
+            }
+          };
+        }
+        const taken = logger && args.hotkeys ? hotkeysTaken(logger) : [];
 
         return okResponse({
           sessionId: id,
@@ -511,6 +540,14 @@ export function register(server: McpServer): void {
           ...(webcamDevice ? { webcam: { device: webcamDevice, path: webcamOutputPath(output) } } : {}),
           ...(window ? windowMatchReport(window) : {}),
           ...(evPaths && !replay ? { eventsPath: evPaths.jsonl, keys: keyMode } : {}),
+          ...(args.hotkeys
+            ? {
+                hotkeys: {
+                  ...HOTKEYS,
+                  ...(taken.length ? { unavailable: taken, warning: `Another app holds ${taken.map((a) => HOTKEYS[a]).join(" and ")}.` } : {}),
+                },
+              }
+            : {}),
           ...(replay
             ? { replay: { bufferSec: replay.bufferSec, segmentSec: replay.segmentSec, dir: replay.dir, events: !!evPaths } }
             : {}),

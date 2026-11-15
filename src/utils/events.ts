@@ -359,6 +359,10 @@ public static class ScEvents{
  [DllImport("user32.dll")] static extern IntPtr GetKeyboardLayout(uint t);
  [DllImport("user32.dll",EntryPoint="GetWindowThreadProcessId")] static extern uint WindowPid(IntPtr h,out uint pid);
  [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr h,StringBuilder s,int n);
+ [DllImport("user32.dll")] static extern bool RegisterHotKey(IntPtr h,int id,uint mods,uint vk);
+ // Hotkeys (#337): Ctrl+Alt+Shift+M marks, +S stops; told to the server on stdout.
+ public static bool Hotkeys;
+ static void Say(string s){lock(Console.Out){Console.Out.WriteLine(s);Console.Out.Flush();}}
  [DllImport("user32.dll")] static extern int ToUnicodeEx(uint vk,uint scan,byte[] ks,[Out,MarshalAs(UnmanagedType.LPWStr)] StringBuilder b,int n,uint f,IntPtr hkl);
  struct LII{public uint cb;public uint t;}
  static Proc mp,kp;static StreamWriter w;static bool sc;static double lastMove;static int cx,cy;
@@ -441,13 +445,15 @@ public static class ScEvents{
   watch.IsBackground=true;watch.Start();
   var pump=new Thread(()=>Pump(path+".stop"));pump.IsBackground=true;pump.Start();
   if(Describer!=null){var ew=new Thread(Elements);ew.IsBackground=true;ew.Start();}
-  Console.Out.WriteLine("ready");Console.Out.Flush();
-  MSG msg;while(GetMessage(out msg,IntPtr.Zero,0,0)>0){}
+  if(Hotkeys){if(!RegisterHotKey(IntPtr.Zero,1,0x4007,0x4D))Say("hotkey-taken marker");if(!RegisterHotKey(IntPtr.Zero,2,0x4007,0x53))Say("hotkey-taken stop");}
+  Say("ready");
+  MSG msg;while(GetMessage(out msg,IntPtr.Zero,0,0)>0){if(msg.m==0x312){string a=msg.w.ToInt64()==1?"marker":"stop";Put("hotkey",cx,cy,a);Say("hotkey "+a);}}
  }
 }
 "@
 [ScEvents]::Rot=__ROTATE__
 [ScEvents]::Focus=__FOCUS__
+[ScEvents]::Hotkeys=$__HOTKEYS__
 __ELEMS__
 [ScEvents]::Run([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PATH__')), [bool]__MODE__, __PARENT__)
 `;
@@ -481,6 +487,21 @@ export interface HookOptions {
   focus?: FocusMode;
   /** The UI Automation element under each press (#333). */
   elements?: boolean;
+  /** Register the recording hotkeys (#337). */
+  hotkeys?: boolean;
+}
+
+export type HotkeyAction = "marker" | "stop";
+
+/** The recording hotkeys (#337), as a person presses them. */
+export const HOTKEYS: Record<HotkeyAction, string> = { marker: "Ctrl+Alt+Shift+M", stop: "Ctrl+Alt+Shift+S" };
+
+/** What a helper stdout line says about hotkeys, or null. Pure. */
+export function parseHotkeyLine(line: string): { pressed: HotkeyAction } | { taken: HotkeyAction } | null {
+  const m = /^(hotkey|hotkey-taken) (marker|stop)\s*$/.exec(line);
+  if (!m) return null;
+  const action = m[2] as HotkeyAction;
+  return m[1] === "hotkey" ? { pressed: action } : { taken: action };
 }
 
 export function buildHookScript(rawPath: string, mode: KeyMode, parentPid: number, opts: HookOptions = {}): string {
@@ -491,7 +512,8 @@ export function buildHookScript(rawPath: string, mode: KeyMode, parentPid: numbe
     .replace("__PARENT__", String(parentPid))
     .replace("__ROTATE__", String(rotateMs))
     .replace("__FOCUS__", focus === "title" ? "2" : focus === "app" ? "1" : "0")
-    .replace("__ELEMS__", opts.elements ? PS_ELEMENTS : "");
+    .replace("__ELEMS__", opts.elements ? PS_ELEMENTS : "")
+    .replace("__HOTKEYS__", opts.hotkeys ? "true" : "false");
 }
 
 /** Where a rotating log's previous period goes (#258): the helper renames the
@@ -552,7 +574,7 @@ export const LOGGER_READY_TIMEOUT_MS = 20_000;
 export async function startEventLogger(
   rawPath: string,
   mode: KeyMode,
-  opts: HookOptions = {},
+  opts: HookOptions & { onHotkey?: (action: HotkeyAction) => void } = {},
 ): Promise<ChildProcess> {
   if (process.platform !== "win32") {
     throw new ScreencastError("The input event log is implemented for Windows only.");
@@ -566,6 +588,28 @@ export async function startEventLogger(
   let stderr = "";
   child.stderr?.on("data", (d) => {
     stderr = (stderr + d.toString()).slice(-2000);
+  });
+  // Hotkey lines (#337): a press calls onHotkey; a chord another app holds is
+  // remembered for hotkeysTaken.
+  const taken: HotkeyAction[] = [];
+  takenHotkeys.set(child, taken);
+  let pending = "";
+  child.stdout?.on("data", (d) => {
+    pending += d.toString();
+    const lines = pending.split(/\r?\n/);
+    pending = lines.pop() ?? "";
+    for (const line of lines) {
+      const h = parseHotkeyLine(line);
+      if (!h) continue;
+      if ("taken" in h) taken.push(h.taken);
+      else {
+        try {
+          opts.onHotkey?.(h.pressed);
+        } catch {
+          /* a hotkey handler must never take the logger down */
+        }
+      }
+    }
   });
   await new Promise<void>((resolve, reject) => {
     let settled = false;
@@ -589,6 +633,13 @@ export async function startEventLogger(
   });
   stopFiles.set(child, `${rawPath}.stop`);
   return child;
+}
+
+const takenHotkeys = new WeakMap<ChildProcess, HotkeyAction[]>();
+
+/** Hotkeys the helper could not register because another app holds them. */
+export function hotkeysTaken(child: ChildProcess): HotkeyAction[] {
+  return [...(takenHotkeys.get(child) ?? [])];
 }
 
 /** Stop file per helper: when it appears, the helper writes out its buffer

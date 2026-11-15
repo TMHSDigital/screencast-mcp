@@ -91,6 +91,10 @@
             "title"
           ]
         },
+        "hotkeys": {
+          "description": "Ctrl+Alt+Shift+M adds a marker, +S stops (implies events).",
+          "type": "boolean"
+        },
         "elements": {
           "description": "Name the UI element each click hits, e.g. \"Save\" button (implies events).",
           "type": "boolean"
