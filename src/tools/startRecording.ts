@@ -25,7 +25,8 @@ import { confirmCapture, describeTarget } from "../utils/consent.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { beginStart, getStore } from "../context.js";
 import { killPid, serverIdentity, type SessionRecord } from "../utils/sessions.js";
-import { mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { LogTailer, MAX_LOG_SOURCES, convertLogLines, formatLogsJsonl, logsPath } from "../utils/logTail.js";
 import {
   buildDdaInputArgs,
   ddagrabWorks,
@@ -149,6 +150,12 @@ const inputSchema = {
     .enum(["app", "title"])
     .optional()
     .describe("Log app switches (implies events); title adds window titles."),
+  logs: z
+    .array(z.object({ path: z.string().min(1), label: z.string().min(1).max(40).optional() }))
+    .min(1)
+    .max(MAX_LOG_SOURCES)
+    .optional()
+    .describe("App log files to follow; new lines land on the video clock in <rec>.logs.jsonl."),
   hotkeys: z.boolean().optional().describe("Ctrl+Alt+Shift+M adds a marker, +S stops (implies events)."),
   elements: z.boolean().optional().describe('Name the UI element each click hits, e.g. "Save" button (implies events).'),
   cursor: z
@@ -336,6 +343,11 @@ export function register(server: McpServer): void {
         let frame = args.events
           ? captureFrame(target, monitors)
           : null;
+        // App logs (#334): note where each file ends now; following starts
+        // once the session exists, and reads from these marks.
+        if (args.logs && replay) throw new ScreencastError("logs are not supported with replayBufferSec yet.");
+        const tailer = args.logs ? new LogTailer(args.logs) : null;
+        await tailer?.mark();
         // Hotkeys (#337) act once the session exists; a press before that is ignored.
         let onHotkey: (action: HotkeyAction) => void = () => {};
         const logger = evPaths
@@ -504,6 +516,24 @@ export function register(server: McpServer): void {
         // crash is "failed" with the stderr tail, a clean exit the cap or the
         // window closing (#240).
         attachExitHandler(store, id, child, { backend, maxDurationSec, spawnedAt, watch });
+        if (tailer && args.logs) {
+          tailer.follow();
+          const sidecarPath = logsPath(output);
+          const sources = args.logs.map((l) => l.label ?? basename(l.path));
+          store.tryUpdate(id, { logs: { path: sidecarPath, sources } });
+          trackFinalizer(
+            id,
+            sessionEnded(id).then(async () => {
+              try {
+                const lines = convertLogLines(await tailer.stop(), eventClock(store.get(id)?.segments, startMs, Date.now()));
+                writeFileSync(sidecarPath, formatLogsJsonl(lines));
+                store.tryUpdate(id, { logs: { path: sidecarPath, sources, count: lines.length, errors: lines.filter((l) => l.level === "error").length } });
+              } catch (err) {
+                store.tryUpdate(id, { logs: { path: sidecarPath, sources, error: errorMessage(err) } });
+              }
+            }),
+          );
+        }
         if (args.hotkeys) {
           const { ffprobe } = requireFfmpeg();
           onHotkey = (action) => {
@@ -540,6 +570,12 @@ export function register(server: McpServer): void {
           ...(webcamDevice ? { webcam: { device: webcamDevice, path: webcamOutputPath(output) } } : {}),
           ...(window ? windowMatchReport(window) : {}),
           ...(evPaths && !replay ? { eventsPath: evPaths.jsonl, keys: keyMode } : {}),
+          ...(args.logs
+            ? {
+                logsPath: logsPath(output),
+                ...(args.logs.some((l) => !existsSync(l.path)) ? { logsNote: "A log file does not exist yet; it is read from its start once it appears." } : {}),
+              }
+            : {}),
           ...(args.hotkeys
             ? {
                 hotkeys: {

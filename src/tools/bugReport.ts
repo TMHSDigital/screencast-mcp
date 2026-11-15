@@ -30,11 +30,13 @@ import {
   clipWindow,
   errorFindings,
   maskSecrets,
+  logExcerpt,
   mergeRedactions,
   reconstructSteps,
   type BugReportData,
   resolveSource,
 } from "../utils/bugReport.js";
+import { logsPath, parseLogsJsonl } from "../utils/logTail.js";
 import { redactRegionSchema } from "../utils/media.js";
 
 const serverVersion = packageVersion();
@@ -204,6 +206,12 @@ export function register(server: McpServer): void {
               : undefined
             : "The recording has no input event log (record with start_recording events: true).";
 
+          // 4b. App logs around the clip (#334).
+          const logFile = logsPath(source.path);
+          const logs = existsSync(logFile)
+            ? logExcerpt(parseLogsJsonl(readFileSync(logFile, "utf8")), window, redact ? secretPattern : null)
+            : undefined;
+
           // 5. Environment.
           const ff = parseFfmpegVersion(versionText(ffmpeg) ?? "");
           const displays = await displayRows();
@@ -241,6 +249,7 @@ export function register(server: McpServer): void {
             ...(allSteps.length > MAX_STEPS ? { stepsOmitted: allSteps.length - MAX_STEPS } : {}),
             ...(stepsNote ? { stepsNote } : {}),
             errors,
+            ...(logs ? { logs } : {}),
             ocr,
             redaction: {
               scanned: scan !== null && redact,

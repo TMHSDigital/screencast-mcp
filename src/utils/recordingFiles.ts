@@ -6,6 +6,7 @@
 import { basename } from "node:path";
 import { markersPath } from "./chapters.js";
 import { eventPaths } from "./events.js";
+import { logsPath } from "./logTail.js";
 import { partsDir, webcamOutputPath } from "./pause.js";
 import { allowedOutputDirs, assertLocalPath, homeRoot, isWithin } from "./paths.js";
 import { ScreencastError } from "./errors.js";
@@ -26,6 +27,7 @@ export function recordingSidecars(video: string, siblings: readonly string[], ed
     indexSidecarPath(video),
     fallbackIndexPath(video, editsDir),
     markersPath(video),
+    logsPath(video),
     wgcStopFile(video),
     ...(transcript.path && !transcript.ambiguous ? [transcript.path] : []),
   ];

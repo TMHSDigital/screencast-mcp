@@ -67,6 +67,9 @@
           <tr><td><code>events</code></td><td><code class="type">boolean</code></td><td>Also log clicks, scroll, cursor, and typing (video-timed, video pixels) for read_events (default false; ~1 s slower start).</td></tr>
           <tr><td><code>keys</code></td><td><code class="type">&quot;masked&quot; | &quot;shortcuts&quot;</code></td><td>With events: masked (default) logs typing only as 0.5 s-grid bursts, never keys; shortcuts also names Ctrl/Alt/Win chords. Typed text is never logged.</td></tr>
           <tr><td><code>focus</code></td><td><code class="type">&quot;app&quot; | &quot;title&quot;</code></td><td>Log app switches (implies events); title adds window titles.</td></tr>
+          <tr><td><code>logs</code></td><td><code class="type">object[]</code></td><td>App log files to follow; new lines land on the video clock in &lt;rec&gt;.logs.jsonl. <span class="bounds">at least 1 items, at most 5 items</span></td></tr>
+          <tr class="nested d1"><td><code>logs[].path</code> <span class="req">required</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>logs[].label</code></td><td><code class="type">string</code></td><td> <span class="bounds">at most 40 characters</span></td></tr>
           <tr><td><code>hotkeys</code></td><td><code class="type">boolean</code></td><td>Ctrl+Alt+Shift+M adds a marker, +S stops (implies events).</td></tr>
           <tr><td><code>elements</code></td><td><code class="type">boolean</code></td><td>Name the UI element each click hits, e.g. &quot;Save&quot; button (implies events).</td></tr>
           <tr><td><code>cursor</code></td><td><code class="type">&quot;os&quot; | &quot;events&quot;</code></td><td>events: leave the OS cursor out and log it (implies events) for the cursor tool to redraw.</td></tr>

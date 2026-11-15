@@ -63,6 +63,8 @@ export interface IndexSegment {
   events?: TimedText[];
   markers?: TimedText[];
   transcript?: TimedText[];
+  /** App log lines (#334), secret-masked. */
+  logs?: TimedText[];
 }
 
 export interface Fingerprint {
@@ -86,7 +88,7 @@ export interface RecordingIndex {
   segments: IndexSegment[];
 }
 
-export type HitSource = "screen" | "event" | "marker" | "transcript";
+export type HitSource = "screen" | "event" | "marker" | "transcript" | "log";
 
 export interface SearchMatch {
   source: HitSource;
@@ -294,7 +296,7 @@ export function cueTexts(cues: readonly Cue[]): TimedText[] {
 
 /** Put each item in the segment that holds its time (the last segment also
  * takes anything at or past its end). Returns new segments. Pure. */
-export function attach(segments: IndexSegment[], items: TimedText[], field: "events" | "markers" | "transcript"): IndexSegment[] {
+export function attach(segments: IndexSegment[], items: TimedText[], field: "events" | "markers" | "transcript" | "logs"): IndexSegment[] {
   const out = segments.map((s) => {
     const { [field]: _old, ...rest } = s;
     return rest as IndexSegment;
@@ -370,7 +372,7 @@ function itemsOf(index: RecordingIndex): Item[] {
   const items: Item[] = [];
   index.segments.forEach((s, seg) => {
     for (const text of s.ocr) items.push({ seg, source: "screen", t: s.start, text });
-    for (const [source, list] of [["event", s.events], ["marker", s.markers], ["transcript", s.transcript]] as const) {
+    for (const [source, list] of [["event", s.events], ["marker", s.markers], ["transcript", s.transcript], ["log", s.logs]] as const) {
       for (const it of list ?? []) items.push({ seg, source, t: it.t, text: it.text });
     }
   });

@@ -11,6 +11,8 @@ import { buildSceneScanArgs, parseSceneScan, buildSampleAtTimestampArgs } from "
 import { readFrames } from "../utils/ocrScan.js";
 import { ocrStatus } from "../utils/capabilities.js";
 import { parseEventsJsonl } from "../utils/events.js";
+import { logsPath, parseLogsJsonl } from "../utils/logTail.js";
+import { maskSecrets, DEFAULT_SECRET_PATTERN } from "../utils/bugReport.js";
 import { resolveWhisperModel, buildTranscribeArgs, parseSrt, normalizeCues, type Cue } from "../utils/captions.js";
 import { subdir, tempPath } from "../utils/paths.js";
 import {
@@ -146,6 +148,13 @@ export function register(server: McpServer): void {
         const events = source.eventsPath ? eventTexts(parseEventsJsonl(readFileSync(source.eventsPath, "utf8"))) : [];
         segments = attach(segments, events, "events");
         segments = attach(segments, markerTexts(source.markers), "markers");
+        // App logs (#334), masked like screen text before they reach disk.
+        const logFile = logsPath(source.path);
+        if (existsSync(logFile)) {
+          const lines = parseLogsJsonl(readFileSync(logFile, "utf8"));
+          const masked = maskSecrets(lines.map((l) => `${l.source}: ${l.line}`), DEFAULT_SECRET_PATTERN);
+          segments = attach(segments, lines.map((l, i) => ({ t: l.t, text: masked[i] ?? "" })), "logs");
+        }
         const cues = await transcriptCues(args.transcript, source.path, info.audioCodec !== null, duration, extra.signal, notes);
         if (cues !== null) segments = attach(segments, cueTexts(cues), "transcript");
         else if (cached && prior) {

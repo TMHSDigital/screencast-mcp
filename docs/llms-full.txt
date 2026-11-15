@@ -61,6 +61,9 @@ Parameters:
 - `events` (boolean): Also log clicks, scroll, cursor, and typing (video-timed, video pixels) for read_events (default false; ~1 s slower start).
 - `keys` ("masked" | "shortcuts"): With events: masked (default) logs typing only as 0.5 s-grid bursts, never keys; shortcuts also names Ctrl/Alt/Win chords. Typed text is never logged.
 - `focus` ("app" | "title"): Log app switches (implies events); title adds window titles.
+- `logs` (object[]; at least 1 items, at most 5 items): App log files to follow; new lines land on the video clock in <rec>.logs.jsonl.
+- `logs[].path` (string; required)
+- `logs[].label` (string; at most 40 characters)
 - `hotkeys` (boolean): Ctrl+Alt+Shift+M adds a marker, +S stops (implies events).
 - `elements` (boolean): Name the UI element each click hits, e.g. "Save" button (implies events).
 - `cursor` ("os" | "events"): events: leave the OS cursor out and log it (implies events) for the cursor tool to redraw.
@@ -98,7 +101,7 @@ Minimal call:
 
 ## delete_recording
 
-**Delete Recording**
+**Delete Recording** (since next release)
 
 Delete a finished recording with its sidecars (event log, webcam, transcript, index, markers, pause parts) and registry entries; reports bytes freed. Asks the user first when the client supports it. Edits made from it are kept.
 

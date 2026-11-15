@@ -189,6 +189,8 @@ export interface BugReportData {
   /** Why there are no steps, when there are none. */
   stepsNote?: string;
   errors: ErrorFinding[];
+  /** App log lines around the clip (#334), times from the clip start. */
+  logs?: Array<{ t: number; source: string; line: string; level?: string }>;
   /** read: OCR ran; unavailable: no Windows OCR here. */
   ocr: "read" | "unavailable";
   redaction: {
@@ -244,6 +246,16 @@ export function buildReportMarkdown(r: BugReportData): string {
       out.push(`- \`${when}\` ${code(e.text)}`);
     }
     out.push("");
+  }
+
+  if (r.logs) {
+    out.push("## App logs", "");
+    if (r.logs.length === 0) out.push("_No log lines during the clip._", "");
+    else {
+      out.push("Lines the app logged during the clip (and the 5 s before it); times from the clip start.", "", "```text");
+      for (const l of r.logs) out.push(`${l.t < 0 ? "-" : ""}${formatTimecode(Math.abs(l.t))} [${l.source}] ${l.line.replace(/\x60{3}/g, "'''")}`);
+      out.push("```", "");
+    }
   }
 
   out.push("## Recording", "");
@@ -304,4 +316,22 @@ export async function resolveSource(args: { input?: string; sessionId?: string }
   if (!existsSync(path)) throw new ScreencastError(`Input file not found: ${path}`);
   const { jsonl } = eventPaths(path);
   return { path, eventsPath: existsSync(jsonl) ? jsonl : null };
+}
+
+/** Most log lines a report quotes. */
+export const MAX_REPORT_LOG_LINES = 40;
+
+/**
+ * The app log lines for a report (#334): those from 5 s before the clip to its
+ * end, timed from the clip start, the last MAX_REPORT_LOG_LINES of them (the
+ * failure is usually at the end), secret-masked when `pattern` is given. Pure.
+ */
+export function logExcerpt(
+  lines: ReadonlyArray<{ t: number; source: string; line: string; level?: string }>,
+  clip: { start: number; end: number },
+  pattern: string | null,
+): Array<{ t: number; source: string; line: string; level?: string }> {
+  const near = lines.filter((l) => l.t >= clip.start - 5 && l.t <= clip.end).slice(-MAX_REPORT_LOG_LINES);
+  const masked = pattern ? maskSecrets(near.map((l) => l.line), pattern) : near.map((l) => l.line);
+  return near.map((l, i) => ({ ...l, t: Math.round((l.t - clip.start) * 1000) / 1000, line: masked[i] ?? l.line }));
 }
