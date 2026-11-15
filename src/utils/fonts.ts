@@ -15,8 +15,8 @@
  */
 import { closeSync, existsSync, openSync, readSync, statSync } from "node:fs";
 import { basename, isAbsolute, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { ScreencastError } from "./errors.js";
+import { assetPath } from "./packageRoot.js";
 import { missingChars, parseCoverage, type ByteReader, type Coverage } from "./fontCoverage.js";
 
 export type FontWeight = "regular" | "bold";
@@ -26,12 +26,9 @@ const FONT_FILES: Record<FontWeight, string> = {
   bold: "Inter-Bold.ttf",
 };
 
-/** Absolute path to a bundled Inter weight. The compiled file lives at
- * dist/utils/fonts.js, so ../../assets/fonts is the package root. */
+/** Absolute path to a bundled Inter weight, under the package's assets/fonts. */
 export function bundledFontPath(weight: FontWeight = "bold"): string {
-  return fileURLToPath(
-    new URL(`../../assets/fonts/${FONT_FILES[weight]}`, import.meta.url),
-  );
+  return assetPath("fonts", FONT_FILES[weight]);
 }
 
 /** Escape a filesystem path for an ffmpeg filtergraph option value (e.g. a

@@ -20,8 +20,8 @@
  * TimeOps as markers and keystroke badges) and crops and scales. Everything
  * here is pure.
  */
-import { fileURLToPath } from "node:url";
 import { ScreencastError } from "./errors.js";
+import { assetPath } from "./packageRoot.js";
 import { escapeFilterPath } from "./fonts.js";
 import { MOVE_SAMPLE_MS, type InputEvent, eventPaths, parseEventsJsonl } from "./events.js";
 import type { TimeOp } from "./chapters.js";
@@ -34,9 +34,9 @@ import { existsSync, readFileSync } from "node:fs";
  * tip's pixel (the hotspot), and the arrow's height without outline/shadow. */
 export const CURSOR_SPRITE = { w: 114, h: 168, hotX: 9, hotY: 9, arrowH: 135 } as const;
 
-/** The bundled cursor sprite. Resolved from dist/utils/, like the fonts. */
+/** The bundled cursor sprite, under the package's assets/cursor. */
 export function cursorSpritePath(): string {
-  return fileURLToPath(new URL("../../assets/cursor/arrow.png", import.meta.url));
+  return assetPath("cursor", "arrow.png");
 }
 
 export interface PathPoint {

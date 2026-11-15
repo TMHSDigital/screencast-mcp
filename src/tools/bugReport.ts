@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { createRequire } from "node:module";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir, release, version as osVersion } from "node:os";
 import { join } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
+import { packageVersion } from "../utils/packageRoot.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
 import { runEditJob } from "../utils/jobs.js";
@@ -37,7 +37,7 @@ import {
 } from "../utils/bugReport.js";
 import { redactRegionSchema } from "../utils/media.js";
 
-const { version: serverVersion } = createRequire(import.meta.url)("../../package.json") as { version: string };
+const serverVersion = packageVersion();
 
 const inputSchema = {
   input: z.string().min(1).optional().describe("Recording path (uses its .events.jsonl)."),

@@ -12,7 +12,6 @@
  * index.ts only hands over when the first argument is a subcommand here.
  */
 import { spawn } from "node:child_process";
-import { createRequire } from "node:module";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -23,8 +22,9 @@ import { MAX_RECORDING_CAP_SEC } from "./utils/targets.js";
 import { DEFAULT_ERROR_PATTERN, DEFAULT_SECRET_PATTERN, MAX_ERROR_LINES, maskSecrets } from "./utils/bugReport.js";
 import { defaultSetupDeps, parseSetupArgs, runSetup, SETUP_USAGE, type SetupOptions } from "./setup.js";
 import { errorMessage } from "./utils/errors.js";
+import { packageVersion } from "./utils/packageRoot.js";
 
-const VERSION = (createRequire(import.meta.url)("../package.json") as { version: string }).version;
+const VERSION = packageVersion();
 
 /** When record makes the GIF and contact sheet: only after a failing
  * command (the default), after every run, or never. */

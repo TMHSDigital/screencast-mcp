@@ -1,9 +1,9 @@
-import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
+import { packageVersion } from "../utils/packageRoot.js";
 import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { detectFfmpeg, hasFilter, wgcAvailable, type FfmpegTools } from "../utils/ffmpeg.js";
 import { allowedOutputDirs, envAllowedDirs, homeRoot } from "../utils/paths.js";
@@ -22,7 +22,7 @@ import { parseToolsets, SELECTABLE_TOOLSETS } from "../utils/toolsets.js";
 import { ttsStatus } from "../utils/narrate.js";
 import { probeHwEncoders } from "../utils/gpu.js";
 
-const { version: serverVersion } = createRequire(import.meta.url)("../../package.json") as { version: string };
+const serverVersion = packageVersion();
 
 const binary = z.looseObject({
   found: z.boolean(),

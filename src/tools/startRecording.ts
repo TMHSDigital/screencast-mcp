@@ -4,7 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorMessage, errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, wgcAvailable } from "../utils/ffmpeg.js";
-import { fileURLToPath } from "node:url";
+import { wgcRecorderScript } from "../utils/packageRoot.js";
 import {
   buildCaptureArgs,
   captureFrame,
@@ -335,7 +335,7 @@ export function register(server: McpServer): void {
               ? spawn(
                   process.execPath,
                   [
-                    fileURLToPath(new URL("../wgcRecorder.js", import.meta.url)),
+                    wgcRecorderScript(),
                     JSON.stringify({ ffmpeg, hwnd: window!.hwnd, fps, encode: [...encoderArgs(p.encoder, quality), ...captureKeyframeArgs(fps)], output, maxDurationSec, cursor: !hideCursor }),
                   ],
                   { stdio: ["pipe", "ignore", "pipe"], windowsHide: true },

@@ -18,7 +18,7 @@ the integration suite, `ffmpeg` and `ffprobe` on `PATH`.
 git clone https://github.com/TMHSDigital/screencast-mcp.git
 cd screencast-mcp
 npm install
-npm run build      # tsc -> dist/
+npm run build      # tsc -> dist/, then bundles dist/index.js and dist/wgcRecorder.js (scripts/bundle.mjs)
 npm test           # vitest: unit tests, plus the ffmpeg integration suite when ffmpeg is on PATH
 npm run dev        # tsx watch
 npm run docs       # regenerate mcp-tools.json, the tool tables, docs/tools/, llms.txt

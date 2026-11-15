@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { existsSync, readFileSync, rmSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { assetPath } from "../utils/packageRoot.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
@@ -26,9 +26,9 @@ import {
 import { getStore } from "../context.js";
 import { markersOrChapters, readMarkers } from "../utils/chapters.js";
 
-const uiAsset = (name: string) => readFileSync(fileURLToPath(new URL(`../../assets/ui/${name}`, import.meta.url)), "utf8");
+const uiAsset = (name: string) => readFileSync(assetPath("ui", name), "utf8");
 
-/** The player page, shipped in assets/ui (dist/tools -> ../../assets), with
+/** The player page, shipped in assets/ui, with
  * player.js inlined in place of its script tag: the host loads the resource
  * as one document and its CSP allows no other fetch (#243). */
 export function playerHtml(): string {

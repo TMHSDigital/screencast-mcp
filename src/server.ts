@@ -3,7 +3,6 @@
  * no transport: index.ts connects it over stdio, and the tool-layer tests
  * connect it in memory (#192).
  */
-import { createRequire } from "node:module";
 import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   parseToolsets,
@@ -77,13 +76,11 @@ import { attachLogging } from "./utils/logging.js";
 import { trackClientRoots } from "./utils/roots.js";
 import { assertArgPaths } from "./utils/argPaths.js";
 import { errorResponse } from "./utils/errors.js";
+import { packageVersion } from "./utils/packageRoot.js";
 
-// Resolves from src/ in dev and dist/ in the published package alike; keeps
-// the advertised version from drifting from package.json (the hardcoded
-// string here had already fallen behind twice).
-const { version } = createRequire(import.meta.url)("../package.json") as {
-  version: string;
-};
+// Read from package.json so the advertised version never drifts from it (the
+// hardcoded string here had already fallen behind twice).
+const version = packageVersion();
 
 export function createServer(options: { toolsets?: string } = {}): McpServer {
   const selection = parseToolsets(options.toolsets ?? process.env.SCREENCAST_TOOLSETS);
