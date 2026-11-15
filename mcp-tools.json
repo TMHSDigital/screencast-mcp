@@ -83,6 +83,14 @@
             "shortcuts"
           ]
         },
+        "focus": {
+          "description": "Log app switches (implies events); title adds window titles.",
+          "type": "string",
+          "enum": [
+            "app",
+            "title"
+          ]
+        },
         "cursor": {
           "description": "events: leave the OS cursor out and log it (implies events) for the cursor tool to redraw.",
           "type": "string",
@@ -390,7 +398,8 @@
               "wheel",
               "key",
               "typing",
-              "gap"
+              "gap",
+              "focus"
             ]
           }
         },

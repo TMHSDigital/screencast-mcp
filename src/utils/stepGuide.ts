@@ -140,6 +140,7 @@ export function guideSteps(
       return { ...base, ...(s.inFrame === false ? {} : { x: s.x, y: s.y }), ...(label ? { text: `${s.text} over`, label: mask(label) } : {}) };
     }
     if (s.action === "shortcut") return s.keys ? { ...base, text: "Press", label: s.keys } : base;
+    if (s.action === "switch") return { ...base, text: mask(s.text) }; // a window title can show a secret
     return { ...base, text: "Type text" }; // typing: the keys are never logged
   });
 }

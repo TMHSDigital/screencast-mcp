@@ -26,6 +26,10 @@
  * input its hooks did not. Those become `gap` events, so a log that stopped
  * early says so instead of looking complete.
  *
+ * With `focus` (#323) it also notes foreground-window changes, checked every
+ * 250 ms, as `focus` events naming the app's exe; window titles (which can
+ * name documents, chats, or sites) only with focus "title".
+ *
  * Everything but `startEventLogger` is pure so it is unit-tested anywhere.
  */
 import { spawn, type ChildProcess } from "node:child_process";
@@ -34,8 +38,11 @@ import { ScreencastError } from "./errors.js";
 
 export type KeyMode = "masked" | "shortcuts";
 export const DEFAULT_KEY_MODE: KeyMode = "masked";
-export const EVENT_TYPES = ["down", "up", "move", "wheel", "key", "typing", "gap"] as const;
+export const EVENT_TYPES = ["down", "up", "move", "wheel", "key", "typing", "gap", "focus"] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
+/** What focus events log (#323): nothing, the foreground app's exe, or the
+ * exe and its window title. */
+export type FocusMode = "off" | "app" | "title";
 
 /** Cursor positions are sampled at most this often while the mouse moves. */
 export const MOVE_SAMPLE_MS = 33;
@@ -61,6 +68,10 @@ export interface InputEvent {
   durationSec?: number;
   /** gap: why events may be missing. */
   reason?: GapReason;
+  /** focus: the foreground app's executable (e.g. "notepad.exe"). */
+  app?: string;
+  /** focus: its window title, only with focus "title". */
+  title?: string;
 }
 
 /** input_not_seen: Windows saw input the hooks did not (hook removed, or input
@@ -122,6 +133,9 @@ export function convertEvents(
   const spans = opts.spans && opts.spans.length > 0 ? opts.spans : null;
   const out: InputEvent[] = [];
   const beats: number[] = [];
+  // The window in front when the video starts: the last focus change before
+  // the first frame, shown at t = 0.
+  let startFocus: InputEvent | null = null;
   let missFrom: { t: number; x: number; y: number } | null = null;
   const gap = (t: number, x: number, y: number, untilSec: number, reason: GapReason) => {
     const from = Math.max(0, t);
@@ -131,7 +145,9 @@ export function convertEvents(
   for (const line of raw.split(/\r?\n/)) {
     const parts = line.split(",");
     if (parts.length < 4) continue;
-    const [ms, type, xs, ys, data = ""] = parts;
+    const [ms, type, xs, ys] = parts;
+    // A window title can hold commas: data is everything after the fourth.
+    const data = parts.slice(4).join(",");
     const epoch = Number(ms);
     const dx = Number(xs);
     const dy = Number(ys);
@@ -154,6 +170,10 @@ export function convertEvents(
       continue;
     }
     if (type === undefined || type === "gap" || !(EVENT_TYPES as readonly string[]).includes(type)) continue;
+    if (type === "focus" && t < 0) {
+      startFocus = { t: 0, type: "focus", x: 0, y: 0, inFrame: false, ...focusData(data) };
+      continue;
+    }
     if (t < 0 || (opts.endSec !== undefined && t > opts.endSec)) continue;
     const x = dx - opts.frame.x;
     const y = dy - opts.frame.y;
@@ -172,8 +192,10 @@ export function convertEvents(
     }
     if (type === "key" && data) ev.keys = data;
     if (type === "typing") ev.durationSec = r3((Number(data) || 0) / 1000);
+    if (type === "focus") Object.assign(ev, focusData(data), { inFrame: false });
     out.push(ev);
   }
+  if (startFocus && !out.some((e) => e.type === "focus" && e.t === 0)) out.push(startFocus);
   const lastSec = opts.endSec ?? Math.max(0, ...out.map((e) => e.t), ...beats);
   if (missFrom) gap(missFrom.t, missFrom.x, missFrom.y, lastSec, "input_not_seen");
   // Heartbeats only exist in logs from helpers that write them.
@@ -190,6 +212,14 @@ export function convertEvents(
 }
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** A focus line's data, `<exe>` or `<exe>|<title>`. Pure. */
+function focusData(data: string): { app: string; title?: string } {
+  const bar = data.indexOf("|");
+  if (bar < 0) return { app: data || "unknown" };
+  const title = data.slice(bar + 1).trim();
+  return { app: data.slice(0, bar) || "unknown", ...(title ? { title } : {}) };
+}
 
 /** The gaps in a log, for a summary: where events may be missing. */
 export function eventGaps(events: InputEvent[]): Array<{ t: number; durationSec: number; reason: GapReason }> {
@@ -244,6 +274,7 @@ export function summarizeEvents(events: InputEvent[]): Record<string, number> {
       : e.type === "typing" ? "typingBursts"
       : e.type === "wheel" ? "scrolls"
       : e.type === "gap" ? "gaps"
+      : e.type === "focus" ? "appSwitches"
       : null;
     if (key) counts[key] = (counts[key] ?? 0) + 1;
   }
@@ -287,11 +318,19 @@ public static class ScEvents{
  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h,IntPtr p);
  [DllImport("user32.dll")] static extern IntPtr GetKeyboardLayout(uint t);
+ [DllImport("user32.dll",EntryPoint="GetWindowThreadProcessId")] static extern uint WindowPid(IntPtr h,out uint pid);
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr h,StringBuilder s,int n);
  [DllImport("user32.dll")] static extern int ToUnicodeEx(uint vk,uint scan,byte[] ks,[Out,MarshalAs(UnmanagedType.LPWStr)] StringBuilder b,int n,uint f,IntPtr hkl);
  struct LII{public uint cb;public uint t;}
  static Proc mp,kp;static StreamWriter w;static bool sc;static double lastMove;static int cx,cy;
  static readonly object wl=new object();static string P;public static int Rot;static int lastRot;
  static HashSet<uint> held=new HashSet<uint>();
+ // Focus (#323): 0 off, 1 the foreground app's exe, 2 also its title.
+ public static int Focus;static IntPtr lastFg;
+ static void CheckFocus(){if(Focus==0)return;IntPtr fg=GetForegroundWindow();if(fg==IntPtr.Zero||fg==lastFg)return;lastFg=fg;
+  uint pid;WindowPid(fg,out pid);string exe;try{exe=Process.GetProcessById((int)pid).ProcessName+".exe";}catch{exe="unknown";}
+  string d=exe;if(Focus==2){var t=new StringBuilder(512);GetWindowText(fg,t,512);d+="|"+t.ToString().Replace('\\r',' ').Replace('\\n',' ');}
+  Put("focus",cx,cy,d);}
  static readonly object q=new object();static StringBuilder buf=new StringBuilder();
  static double typeStart=-1,typeLast;static int lastHook=Environment.TickCount;static bool missing;
  static readonly IFormatProvider Inv=System.Globalization.CultureInfo.InvariantCulture;
@@ -310,8 +349,8 @@ public static class ScEvents{
  static void Quit(){EndTyping(true);Drain();lock(wl){w.Close();}Process.GetCurrentProcess().Kill();}
  // Replay buffers (#258): every Rot ms the log becomes path.1 (replacing the one before), so it never holds much more than two periods.
  static void Rotate(){lock(wl){w.Close();try{string old=P+".1";if(File.Exists(old))File.Delete(old);File.Move(P,old);}catch{}w=new StreamWriter(P,true,new UTF8Encoding(false));}}
- static void Pump(string stop){int tick=0;while(true){Thread.Sleep(250);tick++;
-  EndTyping(false);
+ static void Pump(string stop){int tick=0;CheckFocus();while(true){Thread.Sleep(250);tick++;
+  EndTyping(false);CheckFocus();
   lock(held){foreach(uint vk in new List<uint>(held)){if(!Down((int)vk))held.Remove(vk);}}
   LII li=new LII();li.cb=8;if(!missing&&GetLastInputInfo(ref li)&&unchecked((int)li.t-lastHook)>${MISSED_INPUT_MS}){missing=true;Put("miss",cx,cy,"");}
   if(tick%4==0)Put("hb",0,0,"");
@@ -362,16 +401,18 @@ public static class ScEvents{
 }
 "@
 [ScEvents]::Rot=__ROTATE__
+[ScEvents]::Focus=__FOCUS__
 [ScEvents]::Run([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PATH__')), [bool]__MODE__, __PARENT__)
 `;
 
 /** `rotateSec` > 0 rotates the log (see rotatedLogPath); 0 never does. */
-export function buildHookScript(rawPath: string, mode: KeyMode, parentPid: number, rotateSec = 0): string {
+export function buildHookScript(rawPath: string, mode: KeyMode, parentPid: number, rotateSec = 0, focus: FocusMode = "off"): string {
   const rotateMs = Math.max(0, Math.round(rotateSec * 1000));
   return PS_HOOK.replace("__PATH__", Buffer.from(rawPath, "utf8").toString("base64"))
     .replace("__MODE__", mode === "shortcuts" ? "1" : "0")
     .replace("__PARENT__", String(parentPid))
-    .replace("__ROTATE__", String(rotateMs));
+    .replace("__ROTATE__", String(rotateMs))
+    .replace("__FOCUS__", focus === "title" ? "2" : focus === "app" ? "1" : "0");
 }
 
 /** Where a rotating log's previous period goes (#258): the helper renames the
@@ -427,13 +468,18 @@ export function cleanPsError(stderr: string): string {
 export const LOGGER_READY_TIMEOUT_MS = 20_000;
 
 /** Start the hook helper and resolve once its hooks are installed. With
- * `rotateSec`, the log rotates (replay buffers, #258). */
-export async function startEventLogger(rawPath: string, mode: KeyMode, opts: { rotateSec?: number } = {}): Promise<ChildProcess> {
+ * `rotateSec`, the log rotates (replay buffers, #258); `focus` logs
+ * foreground-window changes (#323). */
+export async function startEventLogger(
+  rawPath: string,
+  mode: KeyMode,
+  opts: { rotateSec?: number; focus?: FocusMode } = {},
+): Promise<ChildProcess> {
   if (process.platform !== "win32") {
     throw new ScreencastError("The input event log is implemented for Windows only.");
   }
   rmSync(`${rawPath}.stop`, { force: true }); // a stale one would stop the helper at once
-  const encoded = Buffer.from(buildHookScript(rawPath, mode, process.pid, opts.rotateSec), "utf16le").toString("base64");
+  const encoded = Buffer.from(buildHookScript(rawPath, mode, process.pid, opts.rotateSec, opts.focus), "utf16le").toString("base64");
   const child = spawn("powershell", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded], {
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,

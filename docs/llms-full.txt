@@ -60,6 +60,7 @@ Parameters:
 - `maxDurationSec` (integer; ≥ 0, ≤ 604800): Auto-stop after this many seconds (default 3600 or SCREENCAST_MAX_RECORDING_SEC; max 7 days; 0 = no cap).
 - `events` (boolean): Also log clicks, scroll, cursor, and typing (video-timed, video pixels) for read_events (default false; ~1 s slower start).
 - `keys` ("masked" | "shortcuts"): With events: masked (default) logs typing only as 0.5 s-grid bursts, never keys; shortcuts also names Ctrl/Alt/Win chords. Typed text is never logged.
+- `focus` ("app" | "title"): Log app switches (implies events); title adds window titles.
 - `cursor` ("os" | "events"): events: leave the OS cursor out and log it (implies events) for the cursor tool to redraw.
 - `backend` ("gdigrab" | "wgc" | "ddagrab"): gdigrab (default): the screen rectangle. wgc (window: targets, FFmpeg 8+): the window's own surface, even when covered or moved; client area only, no audio. ddagrab: one display on the GPU, low CPU.
 - `encoder` ("auto" | "x264" | "nvenc" | "qsv" | "amf"): auto = first working GPU encoder, else x264 (default with ddagrab; else x264).
@@ -202,7 +203,7 @@ Parameters:
 - `input` (string): Or a recording path, or its .events.jsonl.
 - `from` (number; ≥ 0): Earliest video second.
 - `to` (number; ≥ 0): Latest video second.
-- `types` (("down" | "up" | "move" | "wheel" | "key" | "typing" | "gap")[]): down/up (mouse buttons; clicks are down), move (sampled cursor), wheel, key (shortcut), typing (burst), gap (events may be missing).
+- `types` (("down" | "up" | "move" | "wheel" | "key" | "typing" | "gap" | "focus")[]): down/up (mouse buttons; clicks are down), move (sampled cursor), wheel, key (shortcut), typing (burst), gap (events may be missing).
 - `inFrameOnly` (boolean): Drop events whose cursor was outside the recorded area.
 - `limit` (integer; ≥ 1, ≤ 5000): Most events to return (default 200).
 

@@ -194,7 +194,10 @@ export function register(server: McpServer): void {
           written.push(paths.sheet);
 
           // 4. Steps from the event log.
-          const allSteps = source.eventsPath ? reconstructSteps(parseEventsJsonl(readFileSync(source.eventsPath, "utf8"))) : [];
+          // Window titles from focus events (#323) can show a secret: mask steps like error text.
+          const allSteps = (source.eventsPath ? reconstructSteps(parseEventsJsonl(readFileSync(source.eventsPath, "utf8"))) : []).map(
+            (s) => (redact ? { ...s, text: maskSecrets([s.text], secretPattern)[0] ?? s.text } : s),
+          );
           const stepsNote = source.eventsPath
             ? allSteps.length === 0
               ? "The event log has no clicks, shortcuts, typing, or scrolls."

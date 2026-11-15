@@ -9,7 +9,7 @@
  */
 import type { InputEvent, GapReason } from "./events.js";
 
-export type StepAction = "click" | "double_click" | "shortcut" | "typing" | "scroll" | "gap";
+export type StepAction = "click" | "double_click" | "shortcut" | "typing" | "scroll" | "switch" | "gap";
 
 export interface ReproStep {
   /** Seconds on the recording's clock. */
@@ -114,6 +114,9 @@ export function inputSteps(events: InputEvent[]): InputStep[] {
     } else if (e.type === "typing") {
       const d = e.durationSec ?? 0;
       steps.push({ t: e.t, action: "typing", text: `Type${d > 0 ? ` for ${r3(d)} s` : ""} (keys are not logged)`, durationSec: d });
+    } else if (e.type === "focus") {
+      const app = e.app ?? "another app";
+      steps.push({ t: e.t, action: "switch", text: e.title ? `Switch to "${e.title}" (${app})` : `Switch to ${app}` });
     } else if (e.type === "gap") {
       const why = GAP_WHY[e.reason ?? "input_not_seen"];
       const d = r3(e.durationSec ?? 0);

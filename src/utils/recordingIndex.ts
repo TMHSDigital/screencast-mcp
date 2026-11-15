@@ -274,6 +274,7 @@ export function eventTexts(events: InputEvent[]): TimedText[] {
     else if (e.type === "typing") text = `typing ${r3(e.durationSec ?? 0)} s`;
     else if (e.type === "wheel") text = `scroll ${(e.delta ?? 0) > 0 ? "up" : "down"} ${at}`;
     else if (e.type === "gap") text = `event gap (${e.reason ?? "unknown"})`;
+    else if (e.type === "focus") text = `switch to ${e.app ?? "app"}${e.title ? ` ${e.title}` : ""}`;
     if (text) out.push({ t: r3(e.t), text });
   }
   return out;

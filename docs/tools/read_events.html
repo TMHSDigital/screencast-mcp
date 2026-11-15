@@ -58,7 +58,7 @@
           <tr><td><code>input</code></td><td><code class="type">string</code></td><td>Or a recording path, or its .events.jsonl.</td></tr>
           <tr><td><code>from</code></td><td><code class="type">number</code></td><td>Earliest video second. <span class="bounds">≥ 0</span></td></tr>
           <tr><td><code>to</code></td><td><code class="type">number</code></td><td>Latest video second. <span class="bounds">≥ 0</span></td></tr>
-          <tr><td><code>types</code></td><td><code class="type">(&quot;down&quot; | &quot;up&quot; | &quot;move&quot; | &quot;wheel&quot; | &quot;key&quot; | &quot;typing&quot; | &quot;gap&quot;)[]</code></td><td>down/up (mouse buttons; clicks are down), move (sampled cursor), wheel, key (shortcut), typing (burst), gap (events may be missing).</td></tr>
+          <tr><td><code>types</code></td><td><code class="type">(&quot;down&quot; | &quot;up&quot; | &quot;move&quot; | &quot;wheel&quot; | &quot;key&quot; | &quot;typing&quot; | &quot;gap&quot; | &quot;focus&quot;)[]</code></td><td>down/up (mouse buttons; clicks are down), move (sampled cursor), wheel, key (shortcut), typing (burst), gap (events may be missing).</td></tr>
           <tr><td><code>inFrameOnly</code></td><td><code class="type">boolean</code></td><td>Drop events whose cursor was outside the recorded area.</td></tr>
           <tr><td><code>limit</code></td><td><code class="type">integer</code></td><td>Most events to return (default 200). <span class="bounds">≥ 1, ≤ 5000</span></td></tr>
         </tbody>
