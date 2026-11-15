@@ -93,7 +93,7 @@ const PROBE_TIMEOUT_MS = 20_000;
 export function ffmpegRunner(ffmpeg: string): Runner {
   return async (args) => {
     try {
-      const res = await runCapture(ffmpeg, args, PROBE_TIMEOUT_MS, { closeStdin: true });
+      const res = await runCapture(ffmpeg, args, PROBE_TIMEOUT_MS);
       return res.code === 0;
     } catch {
       return false;

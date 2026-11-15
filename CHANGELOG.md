@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Fixed
+
+- Short ffmpeg and ffprobe jobs (edits, probes, frame reads, device listing) now start with no stdin instead of an open pipe nothing writes to, which could leave a job waiting until its timeout (#281).
+
 ### Internal
 
 - The H.264/AAC/faststart encode tail lives in one helper, `encodeTail` in `src/utils/targets.ts`, used by every edit builder. ffmpeg arguments are unchanged; the deliberate audio bitrate differences (192k for music beds and audio export, 128k for compress, ffmpeg's default for trim, clip and speed) are now explicit parameters (#312).

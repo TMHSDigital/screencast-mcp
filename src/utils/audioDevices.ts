@@ -148,7 +148,6 @@ async function enumerateDshow(): Promise<void> {
       ffmpeg,
       ["-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
       ENUM_TIMEOUT_MS,
-      { closeStdin: true },
     );
   } catch (err) {
     // runCapture rejects on timeout (and on spawn error); ffmpeg's by-design

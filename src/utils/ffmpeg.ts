@@ -118,14 +118,12 @@ export interface RunResult {
   stderr: string;
 }
 
+/** Short jobs get no stdin: none of them read it, and ffmpeg (and dshow
+ * device enumeration) can otherwise block on an open, never-written pipe until
+ * the job timeout (#281). */
+const SHORT_JOB_STDIO: ["ignore", "pipe", "pipe"] = ["ignore", "pipe", "pipe"];
+
 export interface RunCaptureOptions {
-  /**
-   * End the child's stdin immediately. dshow device enumeration
-   * (`-list_devices`) can block waiting on stdin on some setups; closing it
-   * removes that hang as a cause. Safe only for jobs that do not read stdin
-   * (which is every short job that goes through runCapture).
-   */
-  closeStdin?: boolean;
   /** Called with each stdout chunk as it arrives (e.g. `-progress pipe:1`). */
   onStdout?: (chunk: string) => void;
   /** Kill the child and reject when this signal aborts (a cancelled request). */
@@ -141,8 +139,7 @@ export function runCapture(
   opts: RunCaptureOptions = {},
 ): Promise<RunResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, { windowsHide: true });
-    if (opts.closeStdin) child.stdin?.end();
+    const child = spawn(bin, args, { windowsHide: true, stdio: SHORT_JOB_STDIO });
     let stdout = "";
     let stderr = "";
     // On a timeout or cancel, settle only once the child has actually exited:
@@ -290,7 +287,7 @@ function streamFfmpeg(
   const { ffmpeg } = requireFfmpeg();
   const { args, cleanup } = scriptLongFilters(rawArgs);
   return new Promise<void>((resolve, reject) => {
-    const child = spawn(ffmpeg, args, { windowsHide: true });
+    const child = spawn(ffmpeg, args, { windowsHide: true, stdio: SHORT_JOB_STDIO });
     let stderr = "";
     // As in runCapture: on a timeout, cancel, or onData error, settle only once
     // the child has exited, with a grace timer in case 'close' never arrives.
