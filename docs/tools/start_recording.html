@@ -81,6 +81,12 @@
           <tr class="nested d1"><td><code>webcam.size</code></td><td><code class="type">number</code></td><td>Share of width (0.25). <span class="bounds">≥ 0.1, ≤ 0.5</span></td></tr>
           <tr class="nested d1"><td><code>webcam.shape</code></td><td><code class="type">&quot;rect&quot; | &quot;circle&quot;</code></td><td></td></tr>
           <tr><td><code>replayBufferSec</code></td><td><code class="type">integer</code></td><td>Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab or ddagrab, not wgc. <span class="bounds">≥ 4, ≤ 3600</span></td></tr>
+          <tr><td><code>startWhen</code></td><td><code class="type">object</code></td><td>Arm instead: start once these hold; returns an arm id (stop_recording disarms).</td></tr>
+          <tr class="nested d1"><td><code>startWhen.window</code></td><td><code class="type">string</code></td><td>A window: target that must exist, e.g. &quot;window:Error&quot;.</td></tr>
+          <tr class="nested d1"><td><code>startWhen.text</code></td><td><code class="type">string</code></td><td>Text that must be on target (OCR). <span class="bounds">at most 200 characters</span></td></tr>
+          <tr class="nested d1"><td><code>startWhen.timeoutSec</code></td><td><code class="type">number</code></td><td>Give up after (default 600). <span class="bounds">&gt; 0, ≤ 86400</span></td></tr>
+          <tr><td><code>stopWhen</code></td><td><code class="type">object</code></td><td>Stop once this text is on target (OCR).</td></tr>
+          <tr class="nested d1"><td><code>stopWhen.text</code> <span class="req">required</span></td><td><code class="type">string</code></td><td> <span class="bounds">at most 200 characters</span></td></tr>
         </tbody>
       </table>
       </div>

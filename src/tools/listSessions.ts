@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
 import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { isAlive } from "../utils/sessions.js";
+import { listArms } from "../utils/triggers.js";
 import { getStore } from "../context.js";
 
 export function register(server: McpServer): void {
@@ -25,7 +26,9 @@ export function register(server: McpServer): void {
         const sessions = getStore()
           .list()
           .map((s) => ({ ...s, alive: s.status === "recording" && isAlive(s.pid) }));
-        return okResponse({ count: sessions.length, sessions });
+        // Triggered recordings still waiting, and what earlier ones became (#336).
+        const armed = listArms();
+        return okResponse({ count: sessions.length, sessions, ...(armed.length ? { armed } : {}) });
       } catch (error) {
         return errorResponse(error);
       }

@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { isAlive } from "../utils/sessions.js";
+import { getArm, isArmId } from "../utils/triggers.js";
 import { getStore } from "../context.js";
 
 const inputSchema = {
@@ -30,6 +31,12 @@ export function register(server: McpServer): void {
     },
     async (args) => {
       try {
+        if (isArmId(args.sessionId)) {
+          const arm = getArm(args.sessionId);
+          if (!arm) throw new ScreencastError(`No armed recording with id "${args.sessionId}".`);
+          // The schema's session fields: an arm has no file of its own.
+          return okResponse({ ...arm, outputPath: "", alive: false, fileExists: false, ...(arm.sessionId ? { note: `It started recording ${arm.sessionId}; get_session that id for it.` } : {}) });
+        }
         const record = getStore().get(args.sessionId);
         if (!record) {
           throw new ScreencastError(`No session with id "${args.sessionId}".`);

@@ -75,6 +75,12 @@ Parameters:
 - `webcam.size` (number; ≥ 0.1, ≤ 0.5): Share of width (0.25).
 - `webcam.shape` ("rect" | "circle")
 - `replayBufferSec` (integer; ≥ 4, ≤ 3600): Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab or ddagrab, not wgc.
+- `startWhen` (object): Arm instead: start once these hold; returns an arm id (stop_recording disarms).
+- `startWhen.window` (string): A window: target that must exist, e.g. "window:Error".
+- `startWhen.text` (string; at most 200 characters): Text that must be on target (OCR).
+- `startWhen.timeoutSec` (number; > 0, ≤ 86400): Give up after (default 600).
+- `stopWhen` (object): Stop once this text is on target (OCR).
+- `stopWhen.text` (string; required, at most 200 characters)
 
 Minimal call:
 

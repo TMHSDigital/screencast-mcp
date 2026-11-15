@@ -187,6 +187,43 @@
           "type": "integer",
           "minimum": 4,
           "maximum": 3600
+        },
+        "startWhen": {
+          "description": "Arm instead: start once these hold; returns an arm id (stop_recording disarms).",
+          "type": "object",
+          "properties": {
+            "window": {
+              "description": "A window: target that must exist, e.g. \"window:Error\".",
+              "type": "string",
+              "minLength": 1
+            },
+            "text": {
+              "description": "Text that must be on target (OCR).",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "timeoutSec": {
+              "description": "Give up after (default 600).",
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 86400
+            }
+          }
+        },
+        "stopWhen": {
+          "description": "Stop once this text is on target (OCR).",
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "required": [
+            "text"
+          ]
         }
       },
       "required": [

@@ -25,7 +25,13 @@ import { confirmCapture, describeTarget } from "../utils/consent.js";
 import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { beginStart, getStore } from "../context.js";
 import { killPid, serverIdentity, type SessionRecord } from "../utils/sessions.js";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { captureStill } from "../utils/still.js";
+import { readFrames } from "../utils/ocrScan.js";
+import { findMatches } from "../utils/ocr.js";
+import { armStart, describeConditions, waitForConditions, ARM_POLL_MS, DEFAULT_ARM_TIMEOUT_SEC, MAX_ARM_TIMEOUT_SEC } from "../utils/triggers.js";
 import { LogTailer, MAX_LOG_SOURCES, convertLogLines, formatLogsJsonl, logsPath } from "../utils/logTail.js";
 import {
   buildDdaInputArgs,
@@ -189,7 +195,43 @@ const inputSchema = {
     .max(MAX_REPLAY_SEC)
     .optional()
     .describe("Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab or ddagrab, not wgc."),
+  startWhen: z
+    .object({
+      window: z.string().min(1).optional().describe('A window: target that must exist, e.g. "window:Error".'),
+      text: z.string().min(1).max(200).optional().describe("Text that must be on target (OCR)."),
+      timeoutSec: z.number().positive().max(MAX_ARM_TIMEOUT_SEC).optional().describe(`Give up after (default ${DEFAULT_ARM_TIMEOUT_SEC}).`),
+    })
+    .optional()
+    .describe("Arm instead: start once these hold; returns an arm id (stop_recording disarms)."),
+  stopWhen: z.object({ text: z.string().min(1).max(200) }).optional().describe("Stop once this text is on target (OCR)."),
 };
+
+/** True when `text` is on the target now (one OCR read). */
+async function textOnTarget(target: string, exactTitle: boolean | undefined, text: string): Promise<boolean> {
+  const resolved = await resolveCaptureTarget(target, { exactTitle });
+  const work = mkdtempSync(join(tmpdir(), "screencast-trigger-"));
+  try {
+    const shot = join(work, "t.png");
+    await captureStill(resolved, shot);
+    const [frame] = await readFrames([shot], work);
+    return !!frame && findMatches(frame.lines, text).length > 0;
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+/** True when the window: target exists now. */
+async function windowExists(target: string): Promise<boolean> {
+  try {
+    await resolveCaptureTarget(target.startsWith("window:") ? target : `window:${target}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Calls an armed recording's start already approved, at arm time (#336). */
+const approvedAtArm = new WeakSet<object>();
 
 /** The capture's frame size, for the encoder's limits (#253); undefined when
  * it is not known up front. */
@@ -209,7 +251,7 @@ function webcamStart(watch: CaptureWatch, audio: boolean): { webcamStartMs?: num
 }
 
 export function register(server: McpServer): void {
-  server.registerTool(
+  const tool = server.registerTool(
     "start_recording",
     {
       title: "Start Recording",
@@ -226,6 +268,53 @@ export function register(server: McpServer): void {
       annotations: WRITES_FILE,
     },
     async (args, extra) => {
+      // Triggered recording (#336): arm now, start later with the same args.
+      if (args.startWhen) {
+        try {
+          const when = args.startWhen;
+          if (!when.window && !when.text) throw new ScreencastError("startWhen needs window and/or text.");
+          const timeoutSec = when.timeoutSec ?? DEFAULT_ARM_TIMEOUT_SEC;
+          const conditions = { ...(when.window ? { window: when.window } : {}), ...(when.text ? { text: when.text } : {}) };
+          await resolveCaptureTarget(args.target, { exactTitle: args.exactTitle, backend: args.backend });
+          await confirmCapture(
+            server,
+            `When ${describeConditions(conditions)} (within ${timeoutSec} s), start recording ${describeTarget(args.target)}` +
+              (args.events ? ", logging mouse clicks and typing" : "") + "?",
+            extra.signal,
+          );
+          const startArgs = { ...args, startWhen: undefined };
+          approvedAtArm.add(startArgs);
+          const arm = armStart({
+            conditions,
+            target: args.target,
+            timeoutSec,
+            checks: [
+              ...(when.window ? [() => windowExists(when.window!)] : []),
+              ...(when.text ? [() => textOnTarget(args.target, args.exactTitle, when.text!)] : []),
+            ],
+            fire: async () => {
+              const handler = tool.handler as (a: unknown, e: unknown) => Promise<CallToolResult>;
+              const res = await handler(startArgs, { ...extra, signal: new AbortController().signal });
+              const sc = res.structuredContent as { sessionId?: string } | undefined;
+              if (res.isError || !sc?.sessionId) {
+                throw new Error((res.content as Array<{ text?: string }>).map((c) => c.text ?? "").join(" ") || "start failed");
+              }
+              return sc.sessionId;
+            },
+          });
+          return okResponse({
+            sessionId: arm.id,
+            status: "armed",
+            backend: args.backend ?? "gdigrab",
+            outputPath: "",
+            waitingFor: describeConditions(conditions),
+            timeoutSec,
+            note: "Nothing is recorded yet. get_session with this id shows when it starts (and its recording's sessionId); stop_recording with it disarms.",
+          });
+        } catch (error) {
+          return errorResponse(error);
+        }
+      }
       // Shutdown waits for this call so it can stop what it spawns (#285).
       let release = (): void => {};
       try {
@@ -274,7 +363,7 @@ export function register(server: McpServer): void {
         const webcamDevice = args.webcam ? await resolveVideoDevice(args.webcam.device) : undefined;
         // ddagrab captures one display, picked by its DXGI output (#199).
         const dda = backend === "ddagrab" ? planDdaSource(captureFrame(target, monitors), await getDxgiOutputs()) : null;
-        await confirmCapture(
+        if (!approvedAtArm.has(args)) await confirmCapture(
           server,
           (replay ? `Keep a rolling ${replay.bufferSec} s replay buffer of ` : "Record ") +
             `${describeTarget(args.target, window)} ` +
@@ -551,6 +640,24 @@ export function register(server: McpServer): void {
               );
             }
           };
+        }
+        // stopWhen (#336): stop once the text is on target; ends with the session.
+        if (args.stopWhen) {
+          const done = new AbortController();
+          void sessionEnded(id).then(() => done.abort());
+          const { ffprobe } = requireFfmpeg();
+          void waitForConditions({
+            checks: [() => textOnTarget(args.target, args.exactTitle, args.stopWhen!.text)],
+            timeoutMs: Number.POSITIVE_INFINITY,
+            intervalMs: ARM_POLL_MS,
+            signal: done.signal,
+          }).then((outcome) => {
+            const cur = store.get(id);
+            if (outcome !== "met" || !cur || (cur.status !== "recording" && cur.status !== "paused")) return;
+            stopSession(store, cur, { reason: "stopped", probe: (path) => probeDuration(path, { ffprobe }) }).catch((err: unknown) =>
+              process.stderr.write(`stopWhen stop for ${id} failed: ${errorMessage(err)}\n`),
+            );
+          });
         }
         const taken = logger && args.hotkeys ? hotkeysTaken(logger) : [];
 

@@ -19,6 +19,7 @@ import { createServer } from "./server.js";
 import { pruneCaptures, retentionDays, RETENTION_ENV } from "./utils/retention.js";
 import { cleanupReplayDirs } from "./utils/replay.js";
 import { errorMessage } from "./utils/errors.js";
+import { disarmAll } from "./utils/triggers.js";
 
 /** How long shutdown waits for in-flight start_recording calls (#285). */
 const START_SETTLE_MS = 10_000;
@@ -118,6 +119,8 @@ async function shutdown(reason: string, exitCode = 0): Promise<void> {
     if (!(await startsSettled(START_SETTLE_MS))) {
       process.stderr.write(`Shutdown (${reason}): a start_recording call did not finish within ${START_SETTLE_MS / 1000}s.\n`);
     }
+    // Armed recordings (#336) must not start during or after shutdown.
+    disarmAll();
     const store = getStore();
     if (store.activeIds().length > 0) {
       let ffprobe: string | null = null;
