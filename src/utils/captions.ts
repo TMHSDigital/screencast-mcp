@@ -157,3 +157,33 @@ export function buildBurnSubtitlesArgs(
     output,
   ];
 }
+
+/** Longest translation of one cue, in characters. */
+export const MAX_TRANSLATED_CUE = 1000;
+
+/**
+ * Put translated text into a subtitle file's cues (#339): the same cues, same
+ * timing, one translation each, in order. A count that does not match or an
+ * empty line is rejected, since either means the cues drifted out of step
+ * with their times. Line breaks inside a translation are kept. Pure.
+ */
+export function applyTranslations(cues: readonly Cue[], translations: readonly string[]): Cue[] {
+  if (translations.length !== cues.length) {
+    throw new ScreencastError(
+      `Got ${translations.length} translations for ${cues.length} cues.`,
+      "Translate every cue, in order, one string per cue (merge or split nothing).",
+    );
+  }
+  return cues.map((c, i) => {
+    const text = translations[i]!.replace(/\r\n/g, "\n").trim();
+    if (!text) throw new ScreencastError(`Translation ${i + 1} is empty.`);
+    if (text.length > MAX_TRANSLATED_CUE) throw new ScreencastError(`Translation ${i + 1} is over ${MAX_TRANSLATED_CUE} characters.`);
+    // A blank line would end the cue early in the SRT.
+    return { start: c.start, end: c.end, text: text.replace(/\n\s*\n/g, "\n") };
+  });
+}
+
+/** `talk.srt` + "spa" -> `talk.spa.srt`. Pure. */
+export function translatedSrtPath(srt: string, language: string): string {
+  return srt.replace(/\.srt$/i, "") + `.${language}.srt`;
+}

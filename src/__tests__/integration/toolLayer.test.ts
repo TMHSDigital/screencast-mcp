@@ -110,6 +110,7 @@ const CASES: Case[] = [
   { name: "normalize_audio", args: (f) => ({ input: f.av }), expect: "media" },
   { name: "denoise", args: (f) => ({ input: f.av }), expect: "media" },
   { name: "burn_subtitles", args: (f) => ({ input: f.v, subtitles: f.srt }), expect: "media" },
+  { name: "translate_subtitles", args: (f) => ({ input: f.srt }), expect: "ok" },
   { name: "chapters", args: (f) => ({ input: f.av, chapters: [{ start: 0, title: "Intro" }, { start: 1.5, title: "Second" }] }), expect: "media" },
   { name: "clip", args: (f) => ({ input: f.av, segments: [{ start: 0, end: 1 }, { start: 1.5, end: 2.5 }] }), expect: "media" },
   { name: "cut_idle", args: (f) => ({ input: f.av, dryRun: true }), expect: "ok" },

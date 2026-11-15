@@ -23,6 +23,8 @@ import {
   type ChapterContainer,
   type ChapterPoint,
   type Marker,
+  type SubtitleTrack,
+  MAX_SUBTITLE_TRACKS,
 } from "../utils/chapters.js";
 import { getStore } from "../context.js";
 
@@ -51,6 +53,12 @@ const inputSchema = {
     .describe(`Shortest chapter (default 1; scenes ${YOUTUBE_MIN_CHAPTER_SEC}, transcript 30).`),
   subtitles: z.string().optional().describe("Also mux this .srt/.vtt/.ass as a soft subtitle track."),
   subtitleLanguage: z.string().regex(/^[a-z]{3}$/).optional().describe('ISO 639-2, e.g. "eng".'),
+  subtitleTracks: z
+    .array(z.object({ file: z.string().min(1), language: z.string().regex(/^[a-z]{3}$/).optional(), title: z.string().max(60).optional(), default: z.boolean().optional() }))
+    .min(1)
+    .max(MAX_SUBTITLE_TRACKS)
+    .optional()
+    .describe("Or several tracks, e.g. one per language (translate_subtitles makes them)."),
   textOnly: z.boolean().optional().describe("Return chapters and YouTube text only; write no file."),
   output: z.string().optional().describe("Optional .mp4/.mkv/.mov path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing output file."),
@@ -85,11 +93,14 @@ export function register(server: McpServer): void {
         }
         if (!input) throw new ScreencastError("Pass input or sessionId.");
         requireInput(input);
-        for (const f of [args.transcript, args.subtitles]) {
+        if (args.subtitles && args.subtitleTracks) throw new ScreencastError("Pass subtitles or subtitleTracks, not both.");
+        const tracks: SubtitleTrack[] =
+          args.subtitleTracks ?? (args.subtitles ? [{ file: args.subtitles, ...(args.subtitleLanguage ? { language: args.subtitleLanguage } : {}) }] : []);
+        for (const f of [args.transcript, ...tracks.map((t) => t.file)]) {
           if (f !== undefined && !existsSync(f)) throw new ScreencastError(`File not found: ${f}`);
         }
-        if (args.subtitles && !/\.(srt|vtt|ass|ssa)$/i.test(args.subtitles)) {
-          throw new ScreencastError("subtitles must be an .srt, .vtt, or .ass file.");
+        for (const t of tracks) {
+          if (!/\.(srt|vtt|ass|ssa)$/i.test(t.file)) throw new ScreencastError(`Subtitles must be .srt, .vtt, or .ass files, not ${t.file}.`);
         }
         const info = await probeMedia(input);
         const durationSec = info.durationSec;
@@ -155,7 +166,7 @@ export function register(server: McpServer): void {
           const meta = join(work, "chapters.txt");
           writeFileSync(meta, ffmetadata(chapters));
           await runEditJob(
-            buildChaptersMuxArgs(input, meta, output, { container: ext, subtitles: args.subtitles, language: args.subtitleLanguage }),
+            buildChaptersMuxArgs(input, meta, output, { container: ext, subtitles: tracks }),
             { output, durationSec, extra },
           );
         } finally {
@@ -164,9 +175,8 @@ export function register(server: McpServer): void {
         return okResponse({
           outputPath: output,
           ...result,
-          ...(args.subtitles
-            ? { subtitleTrack: { file: args.subtitles, codec: ext === ".mkv" ? "copy" : "mov_text", ...(args.subtitleLanguage ? { language: args.subtitleLanguage } : {}) } }
-            : {}),
+          ...(args.subtitles ? { subtitleTrack: { ...tracks[0]!, codec: ext === ".mkv" ? "copy" : "mov_text" } } : {}),
+          ...(args.subtitleTracks ? { subtitleTracks: tracks.map((t) => ({ ...t, codec: ext === ".mkv" ? "copy" : "mov_text" })) } : {}),
         });
       } catch (error) {
         return errorResponse(error);

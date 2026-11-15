@@ -1622,6 +1622,53 @@
     }
   },
   {
+    "name": "translate_subtitles",
+    "toolset": "produce",
+    "title": "Translate Subtitles",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Translate an SRT without breaking its timing: call once for the numbered cues, translate them, then call with translations to write <input>.<language>.srt for chapters' subtitleTracks.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The .srt to translate (e.g. from transcribe)."
+        },
+        "language": {
+          "description": "With translations: ISO 639-2 code, e.g. \"spa\".",
+          "type": "string",
+          "pattern": "^[a-z]{3}$"
+        },
+        "translations": {
+          "description": "One translated string per cue, in order. Omit to get the cues to translate.",
+          "maxItems": 2000,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "output": {
+          "description": "Default: <input>.<language>.srt.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing output file.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "input"
+      ]
+    }
+  },
+  {
     "name": "callout",
     "toolset": "produce",
     "title": "Add Callouts",
@@ -2409,6 +2456,35 @@
           "description": "ISO 639-2, e.g. \"eng\".",
           "type": "string",
           "pattern": "^[a-z]{3}$"
+        },
+        "subtitleTracks": {
+          "description": "Or several tracks, e.g. one per language (translate_subtitles makes them).",
+          "minItems": 1,
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "language": {
+                "type": "string",
+                "pattern": "^[a-z]{3}$"
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 60
+              },
+              "default": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "file"
+            ]
+          }
         },
         "textOnly": {
           "description": "Return chapters and YouTube text only; write no file.",

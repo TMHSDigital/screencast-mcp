@@ -162,7 +162,7 @@ describe("chapters (#174)", () => {
   });
 
   it("muxes with stream copy, chapters from input 1, soft subs as mov_text in mp4", () => {
-    const mp4 = buildChaptersMuxArgs("in.mp4", "meta.txt", "out.mp4", { container: ".mp4", subtitles: "s.srt", language: "eng" });
+    const mp4 = buildChaptersMuxArgs("in.mp4", "meta.txt", "out.mp4", { container: ".mp4", subtitles: [{ file: "s.srt", language: "eng" }] });
     expect(mp4.join(" ")).toBe(
       "-y -i in.mp4 -f ffmetadata -i meta.txt -i s.srt -map 0:v -map 0:a? -map 2:s:0 -map_metadata 0 -map_chapters 1 " +
         "-c copy -c:s mov_text -metadata:s:s:0 language=eng -movflags +faststart out.mp4",
@@ -170,7 +170,7 @@ describe("chapters (#174)", () => {
     const mkv = buildChaptersMuxArgs("in.mkv", "meta.txt", "out.mkv", { container: ".mkv" });
     expect(mkv).toContain("0:s?");
     expect(mkv).not.toContain("-movflags");
-    expect(buildChaptersMuxArgs("a.mkv", "m", "b.mkv", { container: ".mkv", subtitles: "s.ass" })).toEqual(expect.arrayContaining(["-c:s", "copy"]));
+    expect(buildChaptersMuxArgs("a.mkv", "m", "b.mkv", { container: ".mkv", subtitles: [{ file: "s.ass" }] })).toEqual(expect.arrayContaining(["-c:s", "copy"]));
   });
 
   it("parses ffprobe -show_chapters", () => {

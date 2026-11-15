@@ -33,7 +33,7 @@ const home = mkdtempSync(join(tmpdir(), "sc-chapters-it-"));
 process.env.SCREENCAST_HOME = home;
 const p = (name: string) => join(home, name);
 
-async function streams(path: string): Promise<Array<{ codec_type: string; codec_name: string; tags?: Record<string, string> }>> {
+async function streams(path: string): Promise<Array<{ codec_type: string; codec_name: string; tags?: Record<string, string>; disposition?: Record<string, number> }>> {
   const res = await runCapture(FFPROBE, ["-v", "quiet", "-print_format", "json", "-show_streams", path]);
   return JSON.parse(res.stdout).streams;
 }
@@ -83,7 +83,7 @@ describe.skipIf(!AVAILABLE)("markers and chapters against real ffmpeg (#174)", {
     const meta = p("meta.txt");
     writeFileSync(meta, ffmetadata(chapters));
     const out = p("chaptered.mp4");
-    await runFfmpeg(buildChaptersMuxArgs(av, meta, out, { container: ".mp4", subtitles: srt, language: "eng" }));
+    await runFfmpeg(buildChaptersMuxArgs(av, meta, out, { container: ".mp4", subtitles: [{ file: srt, language: "eng" }] }));
     const got = await probeChapters(out);
     expect(got.map((c) => c.title)).toEqual(["Intro", "Bug = here", "Fix"]);
     expect(got[1]!.start).toBeCloseTo(10, 2);
@@ -100,9 +100,24 @@ describe.skipIf(!AVAILABLE)("markers and chapters against real ffmpeg (#174)", {
     const meta = p("meta-mkv.txt");
     writeFileSync(meta, ffmetadata(buildChapters([{ start: 0, title: "A" }, { start: 15, title: "B" }], 30)));
     const out = p("chaptered.mkv");
-    await runFfmpeg(buildChaptersMuxArgs(av, meta, out, { container: ".mkv", subtitles: srt }));
+    await runFfmpeg(buildChaptersMuxArgs(av, meta, out, { container: ".mkv", subtitles: [{ file: srt }] }));
     expect((await probeChapters(out)).map((c) => [c.start, c.title])).toEqual([[0, "A"], [15, "B"]]);
     expect((await streams(out)).find((x) => x.codec_type === "subtitle")?.codec_name).toBe("subrip");
+  });
+
+  it("muxes one subtitle track per language, each tagged, the first on by default (#339)", async () => {
+    const meta = p("meta-langs.txt");
+    writeFileSync(meta, ffmetadata(buildChapters([{ start: 0, title: "A" }], 30)));
+    const out = p("langs.mp4");
+    await runFfmpeg(
+      buildChaptersMuxArgs(av, meta, out, {
+        container: ".mp4",
+        subtitles: [{ file: srt, language: "eng", title: "English", default: true }, { file: srt, language: "spa", title: "Español" }],
+      }),
+    );
+    const subs = (await streams(out)).filter((x) => x.codec_type === "subtitle");
+    expect(subs.map((x) => x.tags?.language)).toEqual(["eng", "spa"]);
+    expect(subs.map((x) => x.disposition?.default)).toEqual([1, 0]);
   });
 
   it("pipeline re-times markers through a trim and a speed change into chapters", async () => {

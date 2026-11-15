@@ -274,32 +274,52 @@ export function transcriptPoints(cues: readonly Cue[], opts: { gapSec?: number; 
 
 export type ChapterContainer = ".mp4" | ".mkv" | ".mov";
 
+/** A soft subtitle track to mux (#339). */
+export interface SubtitleTrack {
+  file: string;
+  /** ISO 639-2, e.g. "eng". */
+  language?: string;
+  /** Shown in players' track menus, e.g. "English". */
+  title?: string;
+  /** Turned on by default. */
+  default?: boolean;
+}
+
+/** At most this many soft subtitle tracks in one mux. */
+export const MAX_SUBTITLE_TRACKS = 8;
+
 /**
- * Mux chapters (and optionally a soft subtitle track) into a copy of the
- * video with stream copy: input 1 is the FFMETADATA file, input 2 the
- * subtitles. Global metadata stays the source's; chapters come only from the
- * file. A new subtitle track replaces the source's subtitle tracks; it is
- * mov_text in mp4/mov and copied as is into mkv. Pure.
+ * Mux chapters (and optionally soft subtitle tracks) into a copy of the
+ * video with stream copy: input 1 is the FFMETADATA file, inputs 2+ the
+ * subtitles, one track each (#339). Global metadata stays the source's;
+ * chapters come only from the file. New subtitle tracks replace the source's
+ * subtitle tracks; they are mov_text in mp4/mov and copied as is into mkv.
+ * Pure.
  */
 export function buildChaptersMuxArgs(
   input: string,
   metaFile: string,
   output: string,
-  opts: { container: ChapterContainer; subtitles?: string; language?: string },
+  opts: { container: ChapterContainer; subtitles?: readonly SubtitleTrack[] },
 ): string[] {
-  const subs = opts.subtitles;
+  const subs = opts.subtitles ?? [];
+  if (subs.length > MAX_SUBTITLE_TRACKS) throw new ScreencastError(`At most ${MAX_SUBTITLE_TRACKS} subtitle tracks.`);
   return [
     "-y",
     "-i", input,
     "-f", "ffmetadata", "-i", metaFile,
-    ...(subs ? ["-i", subs] : []),
+    ...subs.flatMap((s) => ["-i", s.file]),
     "-map", "0:v", "-map", "0:a?",
-    ...(subs ? ["-map", "2:s:0"] : ["-map", "0:s?"]),
+    ...(subs.length ? subs.flatMap((_, i) => ["-map", `${i + 2}:s:0`]) : ["-map", "0:s?"]),
     "-map_metadata", "0",
     "-map_chapters", "1",
     "-c", "copy",
-    ...(subs ? ["-c:s", opts.container === ".mkv" ? "copy" : "mov_text"] : []),
-    ...(subs && opts.language ? ["-metadata:s:s:0", `language=${opts.language}`] : []),
+    ...(subs.length ? ["-c:s", opts.container === ".mkv" ? "copy" : "mov_text"] : []),
+    ...subs.flatMap((s, i) => [
+      ...(s.language ? [`-metadata:s:s:${i}`, `language=${s.language}`] : []),
+      ...(s.title ? [`-metadata:s:s:${i}`, `title=${s.title}`] : []),
+      ...(subs.length > 1 || s.default !== undefined ? [`-disposition:s:${i}`, s.default ? "default" : "0"] : []),
+    ]),
     ...(opts.container === ".mkv" ? [] : ["-movflags", "+faststart"]),
     output,
   ];

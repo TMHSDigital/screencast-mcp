@@ -64,6 +64,11 @@
           <tr><td><code>minChapterSec</code></td><td><code class="type">number</code></td><td>Shortest chapter (default 1; scenes 10, transcript 30). <span class="bounds">≥ 0</span></td></tr>
           <tr><td><code>subtitles</code></td><td><code class="type">string</code></td><td>Also mux this .srt/.vtt/.ass as a soft subtitle track.</td></tr>
           <tr><td><code>subtitleLanguage</code></td><td><code class="type">string</code></td><td>ISO 639-2, e.g. &quot;eng&quot;.</td></tr>
+          <tr><td><code>subtitleTracks</code></td><td><code class="type">object[]</code></td><td>Or several tracks, e.g. one per language (translate_subtitles makes them). <span class="bounds">at least 1 items, at most 8 items</span></td></tr>
+          <tr class="nested d1"><td><code>subtitleTracks[].file</code> <span class="req">required</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>subtitleTracks[].language</code></td><td><code class="type">string</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>subtitleTracks[].title</code></td><td><code class="type">string</code></td><td> <span class="bounds">at most 60 characters</span></td></tr>
+          <tr class="nested d1"><td><code>subtitleTracks[].default</code></td><td><code class="type">boolean</code></td><td></td></tr>
           <tr><td><code>textOnly</code></td><td><code class="type">boolean</code></td><td>Return chapters and YouTube text only; write no file.</td></tr>
           <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional .mp4/.mkv/.mov path. Defaults under SCREENCAST_HOME/edits.</td></tr>
           <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing output file.</td></tr>

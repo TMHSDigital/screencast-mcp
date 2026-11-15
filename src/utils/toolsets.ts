@@ -65,6 +65,7 @@ export const TOOLSETS = {
     "assemble_highlights",
     "export_preset",
     "burn_subtitles",
+    "translate_subtitles",
     "chapters",
     "bug_report",
     "step_guide",

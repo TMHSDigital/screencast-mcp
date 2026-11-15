@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tools — Screencast MCP</title>
-  <meta name="description" content="Reference for all 60 screencast-mcp tools: parameters, example calls, and results, generated from the server's schemas.">
+  <meta name="description" content="Reference for all 61 screencast-mcp tools: parameters, example calls, and results, generated from the server's schemas.">
   <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/tools/">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
   <meta property="og:title" content="Tools — Screencast MCP">
-  <meta property="og:description" content="Reference for all 60 screencast-mcp tools: parameters, example calls, and results, generated from the server's schemas.">
+  <meta property="og:description" content="Reference for all 61 screencast-mcp tools: parameters, example calls, and results, generated from the server's schemas.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/tools/">
   <meta property="og:site_name" content="Screencast MCP">
@@ -43,7 +43,7 @@
     <section class="page-head">
       <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / TOOLS</p>
       <h1>Tools</h1>
-      <p class="lede">60 tools in 6 toolsets, each with its parameters, a minimal call, and what it returns. Generated from the server's own schemas, so this reference cannot drift from the code. Agents can read all of it in one file: <a href="../llms-full.txt">llms-full.txt</a>.</p>
+      <p class="lede">61 tools in 6 toolsets, each with its parameters, a minimal call, and what it returns. Generated from the server's own schemas, so this reference cannot drift from the code. Agents can read all of it in one file: <a href="../llms-full.txt">llms-full.txt</a>.</p>
     </section>
 
     <section class="chapter" id="core">
@@ -132,6 +132,7 @@
         <tbody>
           <tr><td><code><a href="overlay.html">overlay</a></code></td><td>Composite an image or video (logo, watermark, picture-in-picture) onto a video at a pixel position, optionally scaled and time-limited; keeps the base's audio and length.</td></tr>
           <tr><td><code><a href="compose.html">compose</a></code></td><td>Lay 2-9 videos out side by side, stacked, or in a grid (before/after, app and terminal), labelled and in sync.</td></tr>
+          <tr><td><code><a href="translate_subtitles.html">translate_subtitles</a></code></td><td>Translate an SRT without breaking its timing: call once for the numbered cues, translate them, then call with translations to write &lt;input&gt;.&lt;language&gt;.srt for chapters' subtitleTracks.</td></tr>
           <tr><td><code><a href="callout.html">callout</a></code></td><td>Annotate a video or screenshot with timed boxes, text labels, and arrows.</td></tr>
           <tr><td><code><a href="keystroke_overlay.html">keystroke_overlay</a></code></td><td>Burn keycast-style badges for shortcuts, clicks, and typing from the recording's input event log (start_recording events: true).</td></tr>
           <tr><td><code><a href="cursor.html">cursor</a></code></td><td>Draw a smoothed, scaled cursor that hides when idle from the event log of a start_recording cursor: &quot;events&quot; recording (no OS cursor in the video), with click ripples and an optional spotlight.</td></tr>

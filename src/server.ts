@@ -43,6 +43,7 @@ import { register as registerScale } from "./tools/scale.js";
 import { register as registerSpeed } from "./tools/speed.js";
 import { register as registerOverlay } from "./tools/overlay.js";
 import { register as registerCompose } from "./tools/compose.js";
+import { register as registerTranslateSubtitles } from "./tools/translateSubtitles.js";
 import { register as registerCallout } from "./tools/callout.js";
 import { register as registerKeystrokeOverlay } from "./tools/keystrokeOverlay.js";
 import { register as registerCursor } from "./tools/cursor.js";
@@ -132,6 +133,7 @@ export function createServer(options: { toolsets?: string } = {}): McpServer {
   registerSpeed(server);
   registerOverlay(server);
   registerCompose(server);
+  registerTranslateSubtitles(server);
   registerCallout(server);
   registerKeystrokeOverlay(server);
   registerCursor(server);
