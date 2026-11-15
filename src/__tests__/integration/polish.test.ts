@@ -94,6 +94,27 @@ describe.skipIf(!AVAILABLE)("pipeline polish ops and recipes against real ffmpeg
     expect(chapters[1]!.start).toBeCloseTo(5.2, 1);
   });
 
+  it("writes an edit spec and re-renders it from the source with an override (#340)", async () => {
+    const src = p("spec-src.mp4");
+    copyFileSync(raw, src);
+    const first = p("spec-a.mp4");
+    const a = await call({ input: src, steps: [{ op: "trim", start: 0, end: 4 }, { op: "scale", width: 160 }], quality: "draft", output: first });
+    expect(a.editSpecPath).toBe(`${first}.edit.json`);
+    const spec = JSON.parse(readFileSync(String(a.editSpecPath), "utf8")) as { steps: Array<{ op: string }>; source: { path: string } };
+    expect(spec.steps.map((s) => s.op)).toEqual(["trim", "scale"]);
+    expect(spec.source.path).toBe(src);
+    // Same trim, a new scale: rendered from the source, not from the first result.
+    const second = p("spec-b.mp4");
+    const b = await call({ fromEdit: a.editSpecPath, steps: [{ op: "scale", width: 240 }], output: second });
+    const info = await probeMedia(second);
+    expect(info.width).toBe(240);
+    expect(info.durationSec!).toBeCloseTo(4, 1);
+    expect(b.editSpecPath).toBe(`${second}.edit.json`);
+    // A changed source is refused rather than rendered with stale steps.
+    writeFileSync(src, "changed");
+    await expect(call({ fromEdit: a.editSpecPath, output: p("spec-c.mp4") })).rejects.toThrow(/changed since/);
+  });
+
   it("tutorial: one call cuts idle, zooms to the click, normalizes, and keeps A/V and chapters in step", async () => {
     const out = p("tutorial.mp4");
     const r = await call({ input: raw, recipe: "tutorial", chapters: true, quality: "draft", output: out });

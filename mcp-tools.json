@@ -3361,9 +3361,14 @@
       "type": "object",
       "properties": {
         "input": {
+          "description": "Path to the source video.",
           "type": "string",
-          "minLength": 1,
-          "description": "Path to the source video."
+          "minLength": 1
+        },
+        "fromEdit": {
+          "description": "Re-render an .edit.json; steps replace same-op steps.",
+          "type": "string",
+          "minLength": 1
         },
         "steps": {
           "description": "Edits in order, each { op, ...its tool's options }; export_preset/export_gif only last. Times and pixels are relative to the video as it is at that step (after earlier trims, speed, crops). zoom follow:\"clicks\" plans from the event log; burn_subtitles takes subtitles or transcribe:true.",
@@ -4182,10 +4187,7 @@
           "description": "Keep the input's markers as chapters, re-timed through trims and speed.",
           "type": "boolean"
         }
-      },
-      "required": [
-        "input"
-      ]
+      }
     }
   },
   {

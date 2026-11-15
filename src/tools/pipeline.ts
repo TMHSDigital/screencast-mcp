@@ -25,6 +25,9 @@ import { eventPaths } from "../utils/events.js";
 import { bundledFontPath } from "../utils/fonts.js";
 import { retimeAss, retimeCues, type Span } from "../utils/timeline.js";
 import { applyOverrides, recipeSteps, RECIPES } from "../utils/recipes.js";
+import { readEditSpec, sourceChange, sourceStamp, writeEditSpec } from "../utils/editSpec.js";
+import { packageVersion } from "../utils/packageRoot.js";
+import { samePath } from "../utils/recordingIndex.js";
 import { calloutItemSchema, fontFileSchema } from "../utils/callout.js";
 import { backdropOptionsSchema } from "../utils/backdrop.js";
 import { keystrokeOptionsSchema, loadBadges, prepareKeystrokeAssets } from "../utils/keystrokes.js";
@@ -108,7 +111,8 @@ const step = z.discriminatedUnion("op", [
 ]);
 
 const inputSchema = {
-  input: z.string().min(1).describe("Path to the source video."),
+  input: z.string().min(1).optional().describe("Path to the source video."),
+  fromEdit: z.string().min(1).optional().describe("Re-render an .edit.json; steps replace same-op steps."),
   steps: z
     .array(step)
     .max(MAX_PIPELINE_STEPS)
@@ -152,14 +156,28 @@ export function register(server: McpServer): void {
     async (args, extra) => {
       try {
         const { ffmpeg } = requireFfmpeg();
-        requireInput(args.input);
-        const info = await probeMedia(args.input);
+        // Re-render (#340): the spec gives the source, steps and options;
+        // given steps replace its same-op steps, like a recipe's.
+        const spec = args.fromEdit ? readEditSpec(args.fromEdit) : null;
+        if (spec) {
+          if (args.recipe) throw new ScreencastError("fromEdit already has its steps; leave recipe out.");
+          if (args.input && !samePath(args.input, spec.source.path)) throw new ScreencastError(`The spec is for ${spec.source.path}, not ${args.input}.`);
+          const changed = sourceChange(spec);
+          if (changed) throw new ScreencastError(`Cannot re-render ${args.fromEdit}: ${changed}.`, "Run pipeline on the source again with steps instead.");
+        }
+        const input = args.input ?? spec?.source.path;
+        if (!input) throw new ScreencastError("Pass input (or fromEdit).");
+        const quality = args.quality ?? spec?.quality ?? "standard";
+        const chapters = args.chapters ?? spec?.chapters ?? false;
+        requireInput(input);
+        const info = await probeMedia(input);
         const hasAudio = info.audioCodec !== null;
         const warnings: string[] = [];
         // A recipe (#244) is a list of steps; caller steps override it.
         let steps = (args.steps ?? []) as PipelineStep[];
+        if (spec) steps = applyOverrides(spec.steps, steps);
         if (args.recipe) {
-          const logged = readClicks(eventPaths(args.input).jsonl);
+          const logged = readClicks(eventPaths(input).jsonl);
           const r = recipeSteps(args.recipe, {
             hasAudio,
             hasClicks: !!logged && logged.length > 0,
@@ -170,7 +188,7 @@ export function register(server: McpServer): void {
         }
         if (steps.length === 0) throw new ScreencastError("Give steps, a recipe, or both.");
         if (steps.length > MAX_PIPELINE_STEPS) throw new ScreencastError(`At most ${MAX_PIPELINE_STEPS} steps.`);
-        if (!info.width || !info.height) throw new ScreencastError(`Could not read the size of ${args.input}.`);
+        if (!info.width || !info.height) throw new ScreencastError(`Could not read the size of ${input}.`);
         const src = {
           width: info.width,
           height: info.height,
@@ -206,7 +224,7 @@ export function register(server: McpServer): void {
         const clicks: Record<number, ClickPoint[]> = {};
         for (const [i, s] of steps.entries()) {
           if (s.op !== "zoom" || s.follow !== "clicks") continue;
-          const path = eventPaths(args.input).jsonl;
+          const path = eventPaths(input).jsonl;
           const logged = readClicks(path);
           if (!logged) throw new ScreencastError(`step ${i + 1}: no event log at ${path}; record with start_recording events: true.`);
           clicks[i] = logged;
@@ -218,11 +236,11 @@ export function register(server: McpServer): void {
         const idleStep = steps[idleAt];
         if (idleStep?.op === "cut_idle") {
           const total = info.durationSec;
-          if (total === null) throw new ScreencastError(`Could not read the duration of ${args.input}.`);
+          if (total === null) throw new ScreencastError(`Could not read the duration of ${input}.`);
           // A stretch minIdleSec long at the step is longer in the source after a speed-up.
           const speedUp = steps.slice(0, idleAt).reduce((f, x) => (x.op === "speed" && x.factor ? f * x.factor : f), 1);
           const useAudio = hasAudio;
-          const scan = await runCapture(ffmpeg, buildIdleScanArgs(args.input, (idleStep.minIdleSec ?? DEFAULT_MIN_IDLE_SEC) * speedUp, useAudio), timeout, {
+          const scan = await runCapture(ffmpeg, buildIdleScanArgs(input, (idleStep.minIdleSec ?? DEFAULT_MIN_IDLE_SEC) * speedUp, useAudio), timeout, {
             signal: extra.signal,
           });
           if (scan.code !== 0) throw new ScreencastError(`Idle scan failed (exit ${scan.code}): ${scan.stderr.trim().slice(-400)}`);
@@ -253,7 +271,7 @@ export function register(server: McpServer): void {
               throw new ScreencastError(`step ${i + 1}: background image not found: ${s.image}`);
             }
             if (s.op !== "keystroke_overlay") continue;
-            const { badges } = loadBadges(args.input, s.events, s);
+            const { badges } = loadBadges(input, s.events, s);
             const labels = [...new Set(badges.map((b) => b.label))];
             const k = prepareKeystrokeAssets(labels, args.dryRun ? null : work, `s${i}_`, s.fontFile);
             keystrokes[i] = { badges, fontFile: k.fontFile, textFiles: k.textFiles };
@@ -265,7 +283,7 @@ export function register(server: McpServer): void {
           for (const [i, s] of steps.entries()) {
             if (s.op !== "cursor") continue;
             cursor[i] = {
-              plan: loadCursor(args.input, s.events, s, info.durationSec),
+              plan: loadCursor(input, s.events, s, info.durationSec),
               sprite: cursorSpritePath(),
               commandsFile: args.dryRun ? `<cursor ${i}.cmd>` : join(work, `s${i}_cursor.cmd`),
             };
@@ -276,7 +294,7 @@ export function register(server: McpServer): void {
           const subtitles: Record<number, string> = {};
           const fontsDir = dirname(bundledFontPath("regular"));
           const planWith = (chaptersFile?: string) =>
-            planPipeline(args.input, target, steps, src, assets, args.quality ?? "standard", {
+            planPipeline(input, target, steps, src, assets, quality, {
               keystrokes, cursor, idle, clicks, audio: audioM, subtitles, fontsDir, chaptersFile,
             });
           let plan = planWith();
@@ -300,9 +318,9 @@ export function register(server: McpServer): void {
               }
             };
             if (p.kind === "noisefloor") {
-              audioM[p.step] = { ...audioM[p.step], floorDb: parseNoiseFloor((await capture(buildNoiseFloorArgs(args.input))).stdout) };
+              audioM[p.step] = { ...audioM[p.step], floorDb: parseNoiseFloor((await capture(buildNoiseFloorArgs(input))).stdout) };
             } else if (p.kind === "loudness" && s.op === "audio") {
-              const r = await capture(buildLoudnessMeasureArgs(args.input, loudnessTarget(s.normalize)));
+              const r = await capture(buildLoudnessMeasureArgs(input, loudnessTarget(s.normalize)));
               try {
                 audioM[p.step] = { ...audioM[p.step], loudness: parseLoudnorm(r.stderr) };
               } catch {
@@ -311,7 +329,7 @@ export function register(server: McpServer): void {
               }
             } else if (p.kind === "transcribe" && s.op === "burn_subtitles") {
               const raw = join(work, `s${p.step}_raw.srt`);
-              await runFfmpeg(probeArgs(buildTranscribeArgs(args.input, resolveWhisperModel(undefined), raw), p), timeout, {
+              await runFfmpeg(probeArgs(buildTranscribeArgs(input, resolveWhisperModel(undefined), raw), p), timeout, {
                 signal: extra.signal,
               });
               const cues = existsSync(raw) ? normalizeCues(parseSrt(readFileSync(raw, "utf8"))) : [];
@@ -340,8 +358,8 @@ export function register(server: McpServer): void {
           // trims and speed changes, muxed from an FFMETADATA input.
           let chapterList: Chapter[] = [];
           let retimed: Marker[] = [];
-          if (args.chapters) {
-            const found = plan.gif ? null : await markersOrChapters(args.input, extra.signal);
+          if (chapters) {
+            const found = plan.gif ? null : await markersOrChapters(input, extra.signal);
             if (!found) warnings.push("chapters: a GIF/WebP cannot hold chapters; none written.");
             else if (found.markers.length === 0) warnings.push("chapters: the input has no markers (add_marker) or chapters; none written.");
             else {
@@ -369,12 +387,30 @@ export function register(server: McpServer): void {
           };
           if (args.dryRun) return okResponse({ dryRun: true, ...result, ffmpegArgs: plan.args });
 
+          // The spec that made this output, for fromEdit (#340); best effort.
+          const saveSpec = (): { editSpecPath?: string } => {
+            try {
+              const recipe = args.recipe ?? spec?.recipe;
+              return {
+                editSpecPath: writeEditSpec(output, {
+                  serverVersion: packageVersion(),
+                  source: sourceStamp(input),
+                  steps,
+                  ...(recipe ? { recipe } : {}),
+                  quality,
+                  chapters,
+                }),
+              };
+            } catch {
+              return {};
+            }
+          };
           for (const f of plan.files) writeFileSync(f.path, f.content);
           // The timeout follows the input ffmpeg decodes, not the (maybe sped-up) output (#237).
           await runEditJob(plan.args, { output: target, durationSec: plan.durationSec, inputDurationSec: info.durationSec, extra });
           if (plan.gif) {
             const anim = await exportAnimation(target, output, plan.gif, extra);
-            return okResponse({ outputPath: output, ...result, animation: anim });
+            return okResponse({ outputPath: output, ...result, animation: anim, ...saveSpec() });
           }
           // A transcript made for captions goes next to the result, moved
           // through any speed, cut or trim after its step onto the output's timeline.
@@ -399,7 +435,7 @@ export function register(server: McpServer): void {
               /* best effort: the chapters are in the file */
             }
           }
-          return okResponse({ outputPath: output, ...result, ...(markersPath && { markersPath }), ...(subtitlesPath && { subtitlesPath }) });
+          return okResponse({ outputPath: output, ...result, ...(markersPath && { markersPath }), ...(subtitlesPath && { subtitlesPath }), ...saveSpec() });
         } finally {
           rmSync(work, { recursive: true, force: true });
         }

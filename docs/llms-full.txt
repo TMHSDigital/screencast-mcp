@@ -782,7 +782,8 @@ Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystrok
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string): Path to the source video.
+- `fromEdit` (string): Re-render an .edit.json; steps replace same-op steps.
 - `steps` (object[]; at most 30 items): Edits in order, each { op, ...its tool's options }; export_preset/export_gif only last. Times and pixels are relative to the video as it is at that step (after earlier trims, speed, crops). zoom follow:"clicks" plans from the event log; burn_subtitles takes subtitles or transcribe:true.
 - `steps[trim].start` (number; required, ≥ 0)
 - `steps[trim].end` (number; > 0)
@@ -896,7 +897,7 @@ Parameters:
 Minimal call:
 
 ```json
-{"input":"recording.mp4"}
+{}
 ```
 
 # Produce toolset

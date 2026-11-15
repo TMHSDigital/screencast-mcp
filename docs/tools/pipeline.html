@@ -54,7 +54,8 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video.</td></tr>
+          <tr><td><code>input</code></td><td><code class="type">string</code></td><td>Path to the source video.</td></tr>
+          <tr><td><code>fromEdit</code></td><td><code class="type">string</code></td><td>Re-render an .edit.json; steps replace same-op steps.</td></tr>
           <tr><td><code>steps</code></td><td><code class="type">object[]</code></td><td>Edits in order, each { op, ...its tool's options }; export_preset/export_gif only last. Times and pixels are relative to the video as it is at that step (after earlier trims, speed, crops). zoom follow:&quot;clicks&quot; plans from the event log; burn_subtitles takes subtitles or transcribe:true. <span class="bounds">at most 30 items</span></td></tr>
           <tr class="nested d1"><td><code>steps[trim].start</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
           <tr class="nested d1"><td><code>steps[trim].end</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
@@ -171,7 +172,7 @@
 
     <section class="chapter">
       <div class="tc-mark"><span class="tc">00:05</span><span>A MINIMAL CALL</span></div>
-      <pre class="copyable"><code>pipeline { &quot;input&quot;: &quot;recording.mp4&quot; }</code></pre>
+      <pre class="copyable"><code>pipeline {}</code></pre>
       <p>The required arguments only, with placeholder values. Everything else takes its default.</p>
     </section>
 
