@@ -481,7 +481,7 @@ Minimal call:
 
 **Search Recording** (since v0.46.0)
 
-Search an index_recording timeline (screen text, events, markers, transcript): timecoded hits, best first, secrets masked. No frames unless asked.
+Search an index_recording timeline (screen text, events, markers, transcript): timecoded hits, best first, secrets masked. No frames unless asked. No input: search all indexes.
 
 Parameters:
 

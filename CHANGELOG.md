@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- `search_recording` without `input` or `sessionId` searches every indexed recording under `SCREENCAST_HOME` (`recordings/`, `edits/`, `edits/indexes/`): the best hits overall, each naming its video, plus the matching recordings ranked by their best hit. When a video has several indexes, only the newest is used. Recordings whose file is gone are flagged `missing` (#325).
+
 ### Changed
 
 - **Capture consent is on by default.** In a client that supports MCP elicitation, every recording, screenshot, live `find_text`, and `wait_for_change` now asks you first. `SCREENCAST_CONFIRM_CAPTURE` is now a mode: `auto` (default; ask when the client can), `1`/`always` (ask, and refuse captures in clients that cannot, as before), `0`/`off` (never ask). If you relied on unset meaning "never ask", set it to `0`. The Claude Desktop bundle's "Confirm each capture" option is now a text field defaulting to `auto` (#266).

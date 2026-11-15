@@ -7,7 +7,7 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { READ_ONLY, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpeg } from "../utils/ffmpeg.js";
 import { buildSampleAtTimestampArgs } from "../utils/media.js";
-import { subdir } from "../utils/paths.js";
+import { homeRoot, subdir } from "../utils/paths.js";
 import { encodeInlineImages, clampInlineCount, MAX_INLINE_IMAGES } from "../utils/images.js";
 import {
   DEFAULT_SEARCH_LIMIT,
@@ -15,10 +15,12 @@ import {
   fingerprintFile,
   findIndex,
   keyframeTime,
+  listLibraryIndexes,
   readIndex,
   resolveRecording,
   sameFingerprint,
   searchIndex,
+  searchLibrary,
 } from "../utils/recordingIndex.js";
 
 /** Thumbnail width: enough to recognise the screen, cheap in tokens. */
@@ -40,13 +42,32 @@ export function register(server: McpServer): void {
       title: "Search Recording",
       description:
         "Search an index_recording timeline (screen text, events, markers, transcript): timecoded hits, " +
-        "best first, secrets masked. No frames unless asked.",
+        "best first, secrets masked. No frames unless asked. No input: search all indexes.",
       inputSchema,
       outputSchema: looseOutput({ total: z.number(), hits: z.array(z.unknown()) }),
       annotations: READ_ONLY,
     },
     async (args, extra) => {
       try {
+        if (args.input === undefined && args.sessionId === undefined) {
+          if ((args.images ?? 0) > 0) {
+            throw new ScreencastError("images needs one recording.", "Pass input or sessionId, or search the library with images: 0.");
+          }
+          const entries = listLibraryIndexes(homeRoot()).flatMap((indexPath) => {
+            const index = readIndex(indexPath);
+            return index ? [{ indexPath, index }] : [];
+          });
+          const res = searchLibrary(entries, args.query, { regex: args.regex === true, limit: args.limit });
+          const recordings = res.recordings.map((r) => ({ ...r, ...(existsSync(r.video) ? {} : { missing: true }) }));
+          return okResponse({
+            query: args.query,
+            searched: res.searched,
+            total: res.total,
+            hits: res.hits,
+            recordings,
+            ...(res.searched === 0 ? { note: "No indexed recordings under SCREENCAST_HOME; run index_recording first." } : {}),
+          });
+        }
         const source = await resolveRecording(args);
         const fingerprint = fingerprintFile(source.path);
         const indexPath = findIndex(source.path, subdir("edits"), fingerprint);

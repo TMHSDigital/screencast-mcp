@@ -18,7 +18,7 @@
  * enough to reuse for any other timeline built from the same sources.
  */
 import { createHash } from "node:crypto";
-import { closeSync, existsSync, openSync, readFileSync, readSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, readdirSync, readSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { ScreencastError } from "./errors.js";
 import { pickSceneFrames, type SceneChange } from "./media.js";
@@ -381,22 +381,28 @@ function itemsOf(index: RecordingIndex): Item[] {
  * neither snippets nor hits reveal a secret. Hits come back best first, then
  * earliest. Pure.
  */
+/** Reject a query search cannot use. Pure. */
+export function checkQuery(query: string, regex: boolean): void {
+  if (query.trim().length === 0) throw new ScreencastError("query must not be empty.");
+  if (query.length > MAX_QUERY_LENGTH) {
+    throw new ScreencastError(`The query is ${query.length} characters; at most ${MAX_QUERY_LENGTH} are allowed.`);
+  }
+  // normalizeForMatch folds "-", "_" and spaces into "_", which is in nearly
+  // every item: a query of only punctuation would match everything (#255).
+  if (!regex && !/[\p{L}\p{N}]/u.test(normalizeForMatch(query))) {
+    throw new ScreencastError("query needs at least one letter or digit.", "For punctuation, use regex: true.");
+  }
+  if (regex) regexRanges([""], query);
+}
+
 export function searchIndex(
   index: RecordingIndex,
   query: string,
   opts: { regex?: boolean; limit?: number; secretPattern?: string | null; video?: string; fingerprint?: Fingerprint } = {},
 ): { hits: SearchHit[]; total: number } {
-  if (query.trim().length === 0) throw new ScreencastError("query must not be empty.");
-  if (query.length > MAX_QUERY_LENGTH) {
-    throw new ScreencastError(`The query is ${query.length} characters; at most ${MAX_QUERY_LENGTH} are allowed.`);
-  }
+  checkQuery(query, opts.regex === true);
   if (opts.video !== undefined && !indexMatchesVideo(index, opts.video, opts.fingerprint)) {
     throw new ScreencastError(`The index found is for ${index.video}, not ${opts.video}.`, "Run index_recording on this recording.");
-  }
-  // normalizeForMatch folds "-", "_" and spaces into "_", which is in nearly
-  // every item: a query of only punctuation would match everything (#255).
-  if (!opts.regex && !/[\p{L}\p{N}]/u.test(normalizeForMatch(query))) {
-    throw new ScreencastError("query needs at least one letter or digit.", "For punctuation, use regex: true.");
   }
   // Match against masked text, so a regex shaped like a secret cannot confirm
   // one through hit counts and timecodes even in a sidecar written before
@@ -445,6 +451,82 @@ export function searchIndex(
     return { start: seg.start, end: seg.end, t: Math.min(...c.matches.map((m) => m.t)), score: c.score, matches };
   });
   return { hits, total: matched.size };
+}
+
+/** At most this many recordings in a library search's grouped results. */
+export const MAX_LIBRARY_RECORDINGS = 20;
+
+/** Where index files live under SCREENCAST_HOME: sidecars next to recordings
+ * and edits, and the fallback folder (the same places retention prunes). */
+export function libraryIndexDirs(root: string): string[] {
+  return [join(root, "recordings"), join(root, "edits"), join(root, "edits", "indexes")];
+}
+
+/** Every `*.index.json` in the library folders. */
+export function listLibraryIndexes(root: string): string[] {
+  const out: string[] = [];
+  for (const dir of libraryIndexDirs(root)) {
+    let names: string[];
+    try {
+      names = readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const n of names) if (n.endsWith(".index.json")) out.push(join(dir, n));
+  }
+  return out;
+}
+
+export interface LibraryEntry {
+  indexPath: string;
+  index: RecordingIndex;
+}
+
+export interface LibraryHit extends SearchHit {
+  video: string;
+}
+
+export interface LibraryRecording {
+  video: string;
+  indexPath: string;
+  /** Matching segments in this recording. */
+  total: number;
+  /** Score of its best hit. */
+  best: number;
+}
+
+/**
+ * Search many indexes at once (#325): one entry per recording (the newest
+ * index when a video has several, e.g. a legacy sidecar and a fallback),
+ * recordings ranked by their best hit, and the best `limit` hits overall,
+ * each naming its video. Pure.
+ */
+export function searchLibrary(
+  entries: LibraryEntry[],
+  query: string,
+  opts: { regex?: boolean; limit?: number } = {},
+): { hits: LibraryHit[]; total: number; recordings: LibraryRecording[]; searched: number } {
+  checkQuery(query, opts.regex === true);
+  const newest = new Map<string, LibraryEntry>();
+  for (const e of entries) {
+    const key = resolve(e.index.video).toLowerCase();
+    const prior = newest.get(key);
+    if (!prior || e.index.createdAt > prior.index.createdAt) newest.set(key, e);
+  }
+  const limit = opts.limit ?? DEFAULT_SEARCH_LIMIT;
+  const recordings: LibraryRecording[] = [];
+  const hits: LibraryHit[] = [];
+  let total = 0;
+  for (const e of newest.values()) {
+    const res = searchIndex(e.index, query, { regex: opts.regex, limit });
+    if (res.total === 0) continue;
+    total += res.total;
+    recordings.push({ video: e.index.video, indexPath: e.indexPath, total: res.total, best: res.hits[0]!.score });
+    for (const h of res.hits) hits.push({ video: e.index.video, ...h });
+  }
+  recordings.sort((a, b) => b.best - a.best || b.total - a.total);
+  hits.sort((a, b) => b.score - a.score);
+  return { hits: hits.slice(0, limit), total, recordings: recordings.slice(0, MAX_LIBRARY_RECORDINGS), searched: newest.size };
 }
 
 export interface RecordingSource {

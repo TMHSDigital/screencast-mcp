@@ -5,7 +5,7 @@
  * queries. #266: masked screen text. Pure, no ffmpeg.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -23,6 +23,8 @@ import {
   indexSidecarPath,
   indexWritePath,
   legacyIndexSidecarPath,
+  libraryIndexDirs,
+  listLibraryIndexes,
   maskSegmentText,
   writeIndex,
   keyframeTime,
@@ -32,6 +34,7 @@ import {
   planKeyframes,
   sameFingerprint,
   searchIndex,
+  searchLibrary,
   segmentsFrom,
   type IndexSegment,
   type RecordingIndex,
@@ -332,5 +335,56 @@ describe("defaultTranscriptPath (#255)", () => {
     expect(defaultTranscriptPath(video, ["demo.mp4", "demo.mkv", "demo.mp4.srt"]).path).toBe(`${video}.srt`);
     // Other files with the base name are fine.
     expect(defaultTranscriptPath(video, ["demo.mp4", "demo.mp4.index.json", "demo.srt"]).path).toBe(join("rec", "demo.srt"));
+  });
+});
+
+describe("library search (#325)", () => {
+  const at = (video: string, createdAt: string, ocr: string[]) => ({ ...makeIndex([{ start: 0, end: 5, ocr }]), video, createdAt });
+
+  it("groups hits by recording, best first, and names each hit's video", () => {
+    const res = searchLibrary(
+      [
+        { indexPath: "a.index.json", index: at("a.mp4", "2026-01-01", ["Build failed"]) },
+        { indexPath: "b.index.json", index: at("b.mp4", "2026-01-01", ["nothing here"]) },
+        { indexPath: "c.index.json", index: at("c.mp4", "2026-01-01", ["build", "failed later"]) },
+      ],
+      "build failed",
+    );
+    expect(res.searched).toBe(3);
+    expect(res.recordings.map((r) => r.video)).toEqual(["a.mp4", "c.mp4"]);
+    expect(res.hits[0]).toMatchObject({ video: "a.mp4", score: 2 });
+    expect(res.total).toBe(2);
+  });
+
+  it("uses only the newest index of a video that has several", () => {
+    const res = searchLibrary(
+      [
+        { indexPath: "old.index.json", index: at("v.mp4", "2026-01-01", ["Saved"]) },
+        { indexPath: "new.index.json", index: at("v.mp4", "2026-02-01", ["Opened"]) },
+      ],
+      "saved",
+    );
+    expect(res.searched).toBe(1);
+    expect(res.total).toBe(0);
+  });
+
+  it("rejects a bad query even with no indexes", () => {
+    expect(() => searchLibrary([], "---")).toThrow(/letter or digit/);
+    expect(() => searchLibrary([], "(", { regex: true })).toThrow(/Invalid regex/);
+  });
+
+  it("lists index files from recordings/, edits/ and edits/indexes/", () => {
+    const root = mkdtempSync(join(tmpdir(), "screencast-lib-"));
+    try {
+      for (const d of libraryIndexDirs(root)) mkdirSync(d, { recursive: true });
+      writeFileSync(join(root, "recordings", "r.mp4.index.json"), "{}");
+      writeFileSync(join(root, "edits", "indexes", "x-1.index.json"), "{}");
+      writeFileSync(join(root, "recordings", "r.mp4"), "");
+      expect(listLibraryIndexes(root).map((p) => p.slice(root.length + 1)).sort()).toEqual(
+        [join("edits", "indexes", "x-1.index.json"), join("recordings", "r.mp4.index.json")].sort(),
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

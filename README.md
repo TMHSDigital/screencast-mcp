@@ -121,7 +121,7 @@ Turn footage into something a model can read: frames, contact sheets, diffs, OCR
 | [`wait_for_change`](https://tmhsdigital.github.io/screencast-mcp/tools/wait_for_change.html) | Wait until part of the screen changes or settles, instead of guessing a sleep. Returns the elapsed time, changed regions (screenshot pixels; add `origin` for desktop), and the final state. |
 | [`find_text`](https://tmhsdigital.github.io/screencast-mcp/tools/find_text.html) | OCR (built into Windows) on the screen, an image, or video frames, with line and match boxes in image pixels (add `origin` for desktop coordinates). Locate UI text or secrets (e.g. regex 'sk-\|ghp_\|api.?key') to redact. Best-effort: review results. |
 | [`index_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/index_recording.html) | Build a recording's text timeline (<video>.index.json: OCR per scene, events, markers, transcript) for search_recording. |
-| [`search_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/search_recording.html) | Search an index_recording timeline (screen text, events, markers, transcript): timecoded hits, best first, secrets masked. No frames unless asked. |
+| [`search_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/search_recording.html) | Search an index_recording timeline (screen text, events, markers, transcript): timecoded hits, best first, secrets masked. No frames unless asked. No input: search all indexes. |
 
 ### Edit
 

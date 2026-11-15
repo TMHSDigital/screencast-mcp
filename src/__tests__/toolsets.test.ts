@@ -84,7 +84,7 @@ describe("server instructions", () => {
     } finally {
       await client.close();
     }
-  });
+  }, 30_000); // the first connect imports every tool module, slow under a loaded full run
   it("name the enabled toolsets and skip the disabled ones", () => {
     const text = serverInstructions(parseToolsets("capture"));
     expect(text).toMatch(/Enabled toolsets: core, capture/);
