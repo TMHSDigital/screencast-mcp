@@ -7,7 +7,7 @@
  * where events may be missing. Cursor moves and button releases are not steps.
  * Pure, so it is unit-tested without ffmpeg or Windows.
  */
-import type { InputEvent, GapReason } from "./events.js";
+import type { InputEvent, GapReason, UiElement } from "./events.js";
 
 export type StepAction = "click" | "double_click" | "shortcut" | "typing" | "scroll" | "switch" | "gap";
 
@@ -31,6 +31,8 @@ export interface InputStep extends ReproStep {
   keys?: string;
   /** Length of a typing burst or gap, in seconds. */
   durationSec?: number;
+  /** The UI element a click landed on, when the log has it (#333). */
+  element?: UiElement;
 }
 
 /** Two presses this close (s, px) with the same button read as a double-click. */
@@ -47,9 +49,23 @@ const GAP_WHY: Record<GapReason, string> = {
   helper_stopped: "the event logger stopped",
 };
 
+/** "MenuItem" -> "menu item". Pure. */
+export function roleWords(role: string): string {
+  return role.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+}
+
+/** How a step names a UI element: `the "Save" button in notepad.exe`, or
+ * `a button in notepad.exe` when it has no name (#333). Pure. */
+export function elementPhrase(el: UiElement): string {
+  const role = roleWords(el.role);
+  const app = el.app ? ` in ${el.app}` : "";
+  return el.name ? `the "${el.name}" ${role}${app}` : `${/^[aeiou]/.test(role) ? "an" : "a"} ${role}${app}`;
+}
+
 function clickText(button: string | undefined, double: boolean, e: InputEvent): string {
   const verb = double ? "double-click" : "click";
   const which = button && button !== "left" ? `${button.charAt(0).toUpperCase()}${button.slice(1)} ${verb}` : `${verb.charAt(0).toUpperCase()}${verb.slice(1)}`;
+  if (e.element?.name) return `${which} ${elementPhrase(e.element)}`;
   return e.inFrame ? `${which} at (${e.x}, ${e.y})` : `${which} outside the recorded area`;
 }
 
@@ -91,6 +107,7 @@ export function inputSteps(events: InputEvent[]): InputStep[] {
         y: e.y,
         button: e.button ?? "left",
         inFrame: e.inFrame,
+        ...(e.element ? { element: e.element } : {}),
       };
       steps.push(step);
       lastDown = { e, step };
@@ -128,5 +145,5 @@ export function inputSteps(events: InputEvent[]): InputStep[] {
 
 /** Numbered repro steps (bug_report's shape: no event details). Pure. */
 export function reconstructSteps(events: InputEvent[]): ReproStep[] {
-  return inputSteps(events).map(({ button: _b, inFrame: _i, keys: _k, durationSec: _d, ...step }) => step);
+  return inputSteps(events).map(({ button: _b, inFrame: _i, keys: _k, durationSec: _d, element: _e, ...step }) => step);
 }

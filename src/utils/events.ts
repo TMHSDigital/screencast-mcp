@@ -72,6 +72,19 @@ export interface InputEvent {
   app?: string;
   /** focus: its window title, only with focus "title". */
   title?: string;
+  /** down, with elements: the UI Automation element under the press (#333). */
+  element?: UiElement;
+}
+
+/** A UI element as UI Automation describes it. */
+export interface UiElement {
+  /** Control type, e.g. "Button", "MenuItem", "Edit". */
+  role: string;
+  /** Accessible name ("Save"); never logged for password fields. */
+  name?: string;
+  /** The owning app's executable. */
+  app?: string;
+  automationId?: string;
 }
 
 /** input_not_seen: Windows saw input the hooks did not (hook removed, or input
@@ -136,6 +149,7 @@ export function convertEvents(
   // The window in front when the video starts: the last focus change before
   // the first frame, shown at t = 0.
   let startFocus: InputEvent | null = null;
+  const elements = elementLines(raw);
   let missFrom: { t: number; x: number; y: number } | null = null;
   const gap = (t: number, x: number, y: number, untilSec: number, reason: GapReason) => {
     const from = Math.max(0, t);
@@ -185,6 +199,10 @@ export function convertEvents(
       inFrame: x >= 0 && y >= 0 && x < opts.frame.w && y < opts.frame.h,
     };
     if (type === "down" || type === "up") ev.button = data || "left";
+    if (type === "down") {
+      const el = elements.get(`${ms},${xs},${ys}`);
+      if (el) ev.element = el;
+    }
     if (type === "wheel") {
       const [axis, notches] = data.split(":");
       ev.axis = axis === "h" ? "horizontal" : "vertical";
@@ -212,6 +230,27 @@ export function convertEvents(
 }
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** The helper's `elem` lines, keyed by the time and position of the press
+ * they describe (written with the same values as its `down` line). Data is
+ * `<role>|<exe>|<automationId>|<name>`; the name can hold anything. Pure. */
+function elementLines(raw: string): Map<string, UiElement> {
+  const out = new Map<string, UiElement>();
+  for (const line of raw.split(/\r?\n/)) {
+    const parts = line.split(",");
+    if (parts[1] !== "elem" || parts.length < 5) continue;
+    const [role = "", app = "", automationId = "", ...rest] = parts.slice(4).join(",").split("|");
+    const name = rest.join("|").trim();
+    if (!role && !name) continue;
+    out.set(`${parts[0]},${parts[2]},${parts[3]}`, {
+      role: role || "Element",
+      ...(name ? { name } : {}),
+      ...(app ? { app } : {}),
+      ...(automationId ? { automationId } : {}),
+    });
+  }
+  return out;
+}
 
 /** A focus line's data, `<exe>` or `<exe>|<title>`. Pure. */
 function focusData(data: string): { app: string; title?: string } {
@@ -331,6 +370,12 @@ public static class ScEvents{
   uint pid;WindowPid(fg,out pid);string exe;try{exe=Process.GetProcessById((int)pid).ProcessName+".exe";}catch{exe="unknown";}
   string d=exe;if(Focus==2){var t=new StringBuilder(512);GetWindowText(fg,t,512);d+="|"+t.ToString().Replace('\\r',' ').Replace('\\n',' ');}
   Put("focus",cx,cy,d);}
+ // Elements (#333): each press is queued and described by UI Automation on
+ // its own thread. A UIA call into a busy app can take a while, which must
+ // never happen inside the hook.
+ public static Func<double,double,string> Describer;static readonly Queue<double[]> clicks=new Queue<double[]>();static readonly AutoResetEvent clickEv=new AutoResetEvent(false);
+ static void Press(int x,int y,string b){double t=Now();Line(t,"down",x,y,b);if(Describer!=null){lock(clicks){if(clicks.Count<32)clicks.Enqueue(new double[]{t,x,y});}clickEv.Set();}}
+ static void Elements(){while(true){clickEv.WaitOne();while(true){double[] c;lock(clicks){if(clicks.Count==0)break;c=clicks.Dequeue();}string d=null;try{d=Describer(c[1],c[2]);}catch{}if(d!=null)Line(c[0],"elem",(int)c[1],(int)c[2],d);}}}
  static readonly object q=new object();static StringBuilder buf=new StringBuilder();
  static double typeStart=-1,typeLast;static int lastHook=Environment.TickCount;static bool missing;
  static readonly IFormatProvider Inv=System.Globalization.CultureInfo.InvariantCulture;
@@ -360,10 +405,10 @@ public static class ScEvents{
  static IntPtr Mouse(int n,IntPtr wp,IntPtr lp){
   if(n>=0){Seen();MS s=(MS)Marshal.PtrToStructure(lp,typeof(MS));int m=(int)wp;cx=s.x;cy=s.y;
    if(m==0x200){double t=Now();if(t-lastMove>=${MOVE_SAMPLE_MS}){lastMove=t;Put("move",s.x,s.y,"");}}
-   else if(m==0x201)Put("down",s.x,s.y,"left");else if(m==0x202)Put("up",s.x,s.y,"left");
-   else if(m==0x204)Put("down",s.x,s.y,"right");else if(m==0x205)Put("up",s.x,s.y,"right");
-   else if(m==0x207)Put("down",s.x,s.y,"middle");else if(m==0x208)Put("up",s.x,s.y,"middle");
-   else if(m==0x20B||m==0x20C){string b=((s.data>>16)==1)?"x1":"x2";Put(m==0x20B?"down":"up",s.x,s.y,b);}
+   else if(m==0x201)Press(s.x,s.y,"left");else if(m==0x202)Put("up",s.x,s.y,"left");
+   else if(m==0x204)Press(s.x,s.y,"right");else if(m==0x205)Put("up",s.x,s.y,"right");
+   else if(m==0x207)Press(s.x,s.y,"middle");else if(m==0x208)Put("up",s.x,s.y,"middle");
+   else if(m==0x20B||m==0x20C){string b=((s.data>>16)==1)?"x1":"x2";if(m==0x20B)Press(s.x,s.y,b);else Put("up",s.x,s.y,b);}
    else if(m==0x20A||m==0x20E){short d=(short)(s.data>>16);Put("wheel",s.x,s.y,(m==0x20E?"h:":"v:")+(d/120.0).ToString(System.Globalization.CultureInfo.InvariantCulture));}}
   return CallNextHookEx(IntPtr.Zero,n,wp,lp);}
  static string Name(uint vk){
@@ -395,6 +440,7 @@ public static class ScEvents{
   var watch=new Thread(()=>{while(true){Thread.Sleep(500);bool gone;try{gone=Process.GetProcessById(parent).HasExited;}catch{gone=true;}if(gone)Quit();}});
   watch.IsBackground=true;watch.Start();
   var pump=new Thread(()=>Pump(path+".stop"));pump.IsBackground=true;pump.Start();
+  if(Describer!=null){var ew=new Thread(Elements);ew.IsBackground=true;ew.Start();}
   Console.Out.WriteLine("ready");Console.Out.Flush();
   MSG msg;while(GetMessage(out msg,IntPtr.Zero,0,0)>0){}
  }
@@ -402,17 +448,50 @@ public static class ScEvents{
 "@
 [ScEvents]::Rot=__ROTATE__
 [ScEvents]::Focus=__FOCUS__
+__ELEMS__
 [ScEvents]::Run([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PATH__')), [bool]__MODE__, __PARENT__)
 `;
 
-/** `rotateSec` > 0 rotates the log (see rotatedLogPath); 0 never does. */
-export function buildHookScript(rawPath: string, mode: KeyMode, parentPid: number, rotateSec = 0, focus: FocusMode = "off"): string {
-  const rotateMs = Math.max(0, Math.round(rotateSec * 1000));
+// Elements (#333), compiled only when asked for: loading UI Automation adds
+// about 0.4 s to every helper start. ScElems.At describes the element at a
+// desktop point as `<role>|<exe>|<automationId>|<name>`, with no name for a
+// password field; ScEvents calls it from its own thread, never in the hook.
+const PS_ELEMENTS = `
+Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes,WindowsBase
+$refs=@([System.Windows.Automation.AutomationElement].Assembly.Location,[System.Windows.Automation.ControlType].Assembly.Location,[System.Windows.Point].Assembly.Location)
+Add-Type -ReferencedAssemblies $refs @"
+using System;using System.Diagnostics;using System.Windows.Automation;
+public static class ScElems{
+ static string Clean(string s){return (s??"").Replace('\\r',' ').Replace('\\n',' ').Trim();}
+ public static string At(double x,double y){AutomationElement el=AutomationElement.FromPoint(new System.Windows.Point(x,y));if(el==null)return null;var cur=el.Current;
+  string role=cur.ControlType==null?"":cur.ControlType.ProgrammaticName.Replace("ControlType.","");
+  string name=cur.IsPassword?"":Clean(cur.Name);if(name.Length>200)name=name.Substring(0,200);
+  string exe;try{exe=Process.GetProcessById(cur.ProcessId).ProcessName+".exe";}catch{exe="";}
+  return role+"|"+exe+"|"+Clean(cur.AutomationId).Replace('|',' ')+"|"+name;}
+}
+"@
+[ScEvents]::Describer=[Delegate]::CreateDelegate([Func[double,double,string]],[ScElems].GetMethod('At'))
+`;
+
+/** Optional parts of the event log. */
+export interface HookOptions {
+  /** > 0 rotates the log (see rotatedLogPath); 0 never does. */
+  rotateSec?: number;
+  /** Foreground-window changes (#323). */
+  focus?: FocusMode;
+  /** The UI Automation element under each press (#333). */
+  elements?: boolean;
+}
+
+export function buildHookScript(rawPath: string, mode: KeyMode, parentPid: number, opts: HookOptions = {}): string {
+  const rotateMs = Math.max(0, Math.round((opts.rotateSec ?? 0) * 1000));
+  const focus = opts.focus ?? "off";
   return PS_HOOK.replace("__PATH__", Buffer.from(rawPath, "utf8").toString("base64"))
     .replace("__MODE__", mode === "shortcuts" ? "1" : "0")
     .replace("__PARENT__", String(parentPid))
     .replace("__ROTATE__", String(rotateMs))
-    .replace("__FOCUS__", focus === "title" ? "2" : focus === "app" ? "1" : "0");
+    .replace("__FOCUS__", focus === "title" ? "2" : focus === "app" ? "1" : "0")
+    .replace("__ELEMS__", opts.elements ? PS_ELEMENTS : "");
 }
 
 /** Where a rotating log's previous period goes (#258): the helper renames the
@@ -469,17 +548,17 @@ export const LOGGER_READY_TIMEOUT_MS = 20_000;
 
 /** Start the hook helper and resolve once its hooks are installed. With
  * `rotateSec`, the log rotates (replay buffers, #258); `focus` logs
- * foreground-window changes (#323). */
+ * foreground-window changes (#323); `elements` the UI element under each press (#333). */
 export async function startEventLogger(
   rawPath: string,
   mode: KeyMode,
-  opts: { rotateSec?: number; focus?: FocusMode } = {},
+  opts: HookOptions = {},
 ): Promise<ChildProcess> {
   if (process.platform !== "win32") {
     throw new ScreencastError("The input event log is implemented for Windows only.");
   }
   rmSync(`${rawPath}.stop`, { force: true }); // a stale one would stop the helper at once
-  const encoded = Buffer.from(buildHookScript(rawPath, mode, process.pid, opts.rotateSec, opts.focus), "utf16le").toString("base64");
+  const encoded = Buffer.from(buildHookScript(rawPath, mode, process.pid, opts), "utf16le").toString("base64");
   const child = spawn("powershell", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded], {
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,

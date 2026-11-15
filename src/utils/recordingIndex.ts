@@ -25,6 +25,7 @@ import { pickSceneFrames, type SceneChange } from "./media.js";
 import { normalizeForMatch, regexRanges, MAX_QUERY_LENGTH } from "./ocr.js";
 import { maskSecrets, DEFAULT_SECRET_PATTERN } from "./bugReport.js";
 import { eventPaths, whenFinalized, type InputEvent } from "./events.js";
+import { roleWords } from "./steps.js";
 import { readMarkers, type Marker } from "./chapters.js";
 import type { Cue } from "./captions.js";
 import { assertOutputAllowed } from "./paths.js";
@@ -269,7 +270,10 @@ export function eventTexts(events: InputEvent[]): TimedText[] {
   for (const e of events) {
     const at = `at ${Math.round(e.x)},${Math.round(e.y)}`;
     let text: string | null = null;
-    if (e.type === "down") text = `click ${e.button ?? "left"} ${at}`;
+    if (e.type === "down") {
+      const el = e.element;
+      text = `click ${e.button ?? "left"} ${at}` + (el ? ` ${roleWords(el.role)}${el.name ? ` ${el.name}` : ""}${el.app ? ` ${el.app}` : ""}` : "");
+    }
     else if (e.type === "key") text = `shortcut ${e.keys ?? "key"}`;
     else if (e.type === "typing") text = `typing ${r3(e.durationSec ?? 0)} s`;
     else if (e.type === "wheel") text = `scroll ${(e.delta ?? 0) > 0 ? "up" : "down"} ${at}`;

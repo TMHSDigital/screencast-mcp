@@ -27,7 +27,7 @@ describe("event log rotation (#258)", () => {
   });
 
   it("tells the helper how often to rotate, and never for a plain recording", () => {
-    expect(buildHookScript("p", "masked", 1, replayEventRotateSec(60))).toContain("[ScEvents]::Rot=120000");
+    expect(buildHookScript("p", "masked", 1, { rotateSec: replayEventRotateSec(60) })).toContain("[ScEvents]::Rot=120000");
     expect(buildHookScript("p", "masked", 1)).toContain("[ScEvents]::Rot=0");
     expect(buildHookScript("p", "masked", 1)).not.toContain("__ROTATE__");
   });

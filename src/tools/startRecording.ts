@@ -144,6 +144,7 @@ const inputSchema = {
     .enum(["app", "title"])
     .optional()
     .describe("Log app switches (implies events); title adds window titles."),
+  elements: z.boolean().optional().describe('Name the UI element each click hits, e.g. "Save" button (implies events).'),
   cursor: z
     .enum(["os", "events"])
     .optional()
@@ -219,7 +220,7 @@ export function register(server: McpServer): void {
         const { ffmpeg } = requireFfmpeg();
         // A cursor left out of the video is redrawn from the event log (#170).
         const hideCursor = args.cursor === "events";
-        if (hideCursor || args.focus) args.events = true;
+        if (hideCursor || args.focus || args.elements) args.events = true;
         const { target, monitors, window } = await resolveCaptureTarget(args.target, {
           exactTitle: args.exactTitle,
           backend: args.backend,
@@ -269,6 +270,7 @@ export function register(server: McpServer): void {
             (webcamDevice ? `, with the webcam (${webcamDevice})` : "") +
             (args.events ? ", logging mouse clicks and typing" : "") +
             (args.focus ? (args.focus === "title" ? " and which window is in front, with its title" : " and which app is in front") : "") +
+            (args.elements ? ", naming the on-screen controls you click" : "") +
             (replay ? ", kept only until save_replay or stop_recording { save: true } writes it out?" : `, saved to ${output}?`),
           extra.signal,
         );
@@ -331,6 +333,7 @@ export function register(server: McpServer): void {
           ? await startEventLogger(evPaths.raw, keyMode, {
               ...(replay ? { rotateSec: replayEventRotateSec(replay.bufferSec) } : {}),
               ...(args.focus ? { focus: args.focus } : {}),
+              ...(args.elements ? { elements: true } : {}),
             })
           : null;
 

@@ -13,7 +13,7 @@
 import type { Rect } from "./diff.js";
 import type { Marker } from "./chapters.js";
 import type { OcrLine } from "./ocr.js";
-import type { InputStep, StepAction } from "./steps.js";
+import { elementPhrase, type InputStep, type StepAction } from "./steps.js";
 import { maskSecrets, DEFAULT_SECRET_PATTERN } from "./bugReport.js";
 import { formatTimecode } from "./sheet.js";
 import { ringSize, DEFAULT_RING_COLOR } from "./zoom.js";
@@ -125,10 +125,13 @@ export function guideSteps(
     if (s.action === "gap") return { n: 0, t: s.t, action: s.action, text: s.text };
     n++;
     const base: GuideStep = { n, t: s.t, action: s.action, text: s.text, shotT: shotTime(s.t, opts.durationSec, opts.fps) };
-    const label = opts.labels?.[i];
+    // A click's UI Automation name (#333) beats the OCR'd label near it.
+    const label = s.element?.name ?? opts.labels?.[i];
     if (s.action === "click" || s.action === "double_click") {
       const verb = clickVerb(s);
-      if (s.inFrame === false) return { ...base, text: `${verb} outside the recorded area` };
+      if (s.inFrame === false) {
+        return { ...base, text: s.element?.name ? mask(`${verb} ${elementPhrase(s.element)}`) : `${verb} outside the recorded area` };
+      }
       return {
         ...base,
         x: s.x,

@@ -9,6 +9,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `start_recording` `elements: true` records which UI element each click lands on (control type, accessible name, app) through UI Automation, looked up on a worker thread so the input hook never waits. Steps read `Click the "Save" button in notepad.exe` instead of coordinates in `step_guide` (which also uses the name as the step's label) and `bug_report`, and `search_recording` finds clicks by control name. Password fields never contribute a name, and UI Automation is only loaded when asked for (#333).
 - `start_recording` `focus: "app"` logs which app is in front as `focus` events in the input event log (implies `events`), checked every 250 ms; `focus: "title"` also logs window titles. The app in front when the video starts is logged at 0 s. `step_guide` and `bug_report` show them as "Switch to ..." steps (secret-masked), `index_recording` makes them searchable, and `read_events` filters them with `types: ["focus"]` (#323).
 - `search_recording` without `input` or `sessionId` searches every indexed recording under `SCREENCAST_HOME` (`recordings/`, `edits/`, `edits/indexes/`): the best hits overall, each naming its video, plus the matching recordings ranked by their best hit. When a video has several indexes, only the newest is used. Recordings whose file is gone are flagged `missing` (#325).
 

@@ -91,6 +91,10 @@
             "title"
           ]
         },
+        "elements": {
+          "description": "Name the UI element each click hits, e.g. \"Save\" button (implies events).",
+          "type": "boolean"
+        },
         "cursor": {
           "description": "events: leave the OS cursor out and log it (implies events) for the cursor tool to redraw.",
           "type": "string",

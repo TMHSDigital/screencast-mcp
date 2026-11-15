@@ -49,7 +49,7 @@ describe("focus events (#323)", () => {
 
   it("passes the focus mode to the helper, off by default", () => {
     expect(buildHookScript("p", "masked", 1)).toContain("[ScEvents]::Focus=0");
-    expect(buildHookScript("p", "masked", 1, 0, "app")).toContain("[ScEvents]::Focus=1");
-    expect(buildHookScript("p", "masked", 1, 0, "title")).toContain("[ScEvents]::Focus=2");
+    expect(buildHookScript("p", "masked", 1, { focus: "app" })).toContain("[ScEvents]::Focus=1");
+    expect(buildHookScript("p", "masked", 1, { focus: "title" })).toContain("[ScEvents]::Focus=2");
   });
 });
