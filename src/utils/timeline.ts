@@ -12,16 +12,20 @@ import type { Cue } from "./captions.js";
 export interface Span {
   start: number;
   end: number;
+  /** A span played this many times faster instead of removed (#320). */
+  factor?: number;
 }
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 
-/** Seconds that sorted cut spans remove before time t. */
+/** Seconds that sorted spans take out before time t: all of a removed span,
+ * and 1 - 1/factor of a sped-up one, so a time inside a sped-up span lands
+ * proportionally inside its shorter self. */
 export function cutShift(t: number, spans: readonly Span[]): number {
   let removed = 0;
   for (const s of spans) {
     if (t <= s.start) break;
-    removed += Math.min(t, s.end) - s.start;
+    removed += (Math.min(t, s.end) - s.start) * (s.factor ? 1 - 1 / s.factor : 1);
   }
   return removed;
 }

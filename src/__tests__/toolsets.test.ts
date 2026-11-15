@@ -22,10 +22,12 @@ afterAll(() => rmSync(home, { recursive: true, force: true }));
  * about 91 KB, and 0.47.0's cursor, narrate, pause/resume_recording,
  * list_video_devices, and the GPU/webcam options to about 97.6 KB, and the
  * later delete_recording, still-image inputs, library search and focus events
- * to about 99.1 KB. Raise it only deliberately, after trying to say the new
- * thing in fewer words; SCREENCAST_TOOLSETS trims it per client.
+ * to about 99.1 KB, and ranged speed (a range schema in speed, cut_idle and
+ * pipeline), hotkeys, elements and text waits to about 100.7 KB. Raise it
+ * only deliberately, after trying to say the new thing in fewer words;
+ * SCREENCAST_TOOLSETS trims it per client.
  */
-const TOOLS_LIST_BUDGET_BYTES = 100_000;
+const TOOLS_LIST_BUDGET_BYTES = 101_000;
 
 const manifest = JSON.parse(readFileSync(join(process.cwd(), "mcp-tools.json"), "utf8")) as Array<{
   name: string;

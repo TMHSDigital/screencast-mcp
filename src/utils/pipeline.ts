@@ -33,7 +33,7 @@ import type { AnimExportOptions } from "./animExport.js";
 import type { TimeOp } from "./chapters.js";
 import { backdropSteps, type BackdropOptions } from "./backdrop.js";
 import { groupBadges, keystrokeSteps, retimeBadges, type Badge, type BadgePlanOptions, type BadgeStyle, type KeystrokeAssets } from "./keystrokes.js";
-import { cutFilters, cutsFor, DEFAULT_KEEP_SEC, DEFAULT_MIN_IDLE_SEC } from "./idle.js";
+import { checkSpeedRanges, cutFilters, cutsFor, rangesSavedSec, speedRangeFilters, DEFAULT_IDLE_FACTOR, DEFAULT_KEEP_SEC, DEFAULT_MIN_IDLE_SEC, type SpeedRange } from "./idle.js";
 import { denoiseFilter, loudnessTarget, loudnormFilter, type DenoiseStrength, type LoudnessMeasurement, type LoudnessPreset } from "./audio.js";
 import { subtitlesFilter, type CaptionStyle, type Cue } from "./captions.js";
 import { mapSpans, mapTime, retimeCues, type Span } from "./timeline.js";
@@ -61,7 +61,7 @@ export type PipelineStep =
   | { op: "trim"; start: number; end?: number; duration?: number }
   | { op: "crop"; x: number; y: number; width: number; height: number }
   | { op: "scale"; width?: number; height?: number }
-  | { op: "speed"; factor: number }
+  | { op: "speed"; factor?: number; segments?: SpeedRange[] }
   | ({ op: "redact"; regions: RedactRegion[] } & RedactOptions)
   | { op: "callout"; items: Callout[]; fontFile?: string }
   | { op: "reframe"; aspect: Aspect; fit?: ReframeFit }
@@ -74,7 +74,7 @@ export type PipelineStep =
       holdSec?: number;
       transitionSec?: number;
     }
-  | { op: "cut_idle"; minIdleSec?: number; keepSec?: number }
+  | { op: "cut_idle"; minIdleSec?: number; keepSec?: number; action?: "cut" | "speed"; factor?: number }
   | { op: "audio"; normalize?: LoudnessPreset | number; denoise?: DenoiseStrength }
   | { op: "burn_subtitles"; subtitles?: string; transcribe?: boolean; style?: CaptionStyle }
   | ({ op: "backdrop" } & BackdropOptions)
@@ -277,15 +277,31 @@ export function planPipeline(
         summary.push(`scale to ${W}x${H}`);
         break;
       }
-      case "speed":
-        if (!Number.isFinite(s.factor) || s.factor <= 0) throw new ScreencastError(`step ${at}: speed factor must be positive.`);
-        chain(`setpts=PTS/${s.factor}`);
-        audio.push(atempoChain(s.factor));
+      case "speed": {
+        if ((s.factor === undefined) === (s.segments === undefined)) throw new ScreencastError(`step ${at}: speed takes factor or segments.`);
+        if (s.segments) {
+          // Ranged fast-forward (#320), on this step's clock.
+          const ranges = checkSpeedRanges(s.segments, dur);
+          const f = speedRangeFilters(ranges, fps);
+          chain(f.video);
+          audio.push(f.audio);
+          audioReencode = true;
+          const saved = rangesSavedSec(ranges);
+          if (dur !== null) dur -= saved;
+          timeOps.push({ op: "cut", spans: ranges });
+          summary.push(`speed up ${ranges.length} range(s), ${r3(saved)}s saved`);
+          break;
+        }
+        const factor = s.factor!;
+        if (!Number.isFinite(factor) || factor <= 0) throw new ScreencastError(`step ${at}: speed factor must be positive.`);
+        chain(`setpts=PTS/${factor}`);
+        audio.push(atempoChain(factor));
         audioReencode = true;
-        if (dur !== null) dur /= s.factor;
-        timeOps.push({ op: "speed", factor: s.factor });
-        summary.push(`speed x${s.factor}`);
+        if (dur !== null) dur /= factor;
+        timeOps.push({ op: "speed", factor });
+        summary.push(`speed x${factor}`);
         break;
+      }
       case "redact": {
         const { steps: st, out: o } = redactSteps(s.regions, s, { width: W, height: H }, cur, tag);
         graph.push(...st);
@@ -354,6 +370,20 @@ export function planPipeline(
         const cuts = cutsFor(mapSpans(opts.idle, timeOps), s.minIdleSec ?? DEFAULT_MIN_IDLE_SEC, s.keepSec ?? DEFAULT_KEEP_SEC);
         if (cuts.length === 0) {
           summary.push("cut_idle: no idle stretches here; nothing cut");
+          break;
+        }
+        if (s.action === "speed") {
+          // Fast-forward the idle stretches instead of cutting them (#320).
+          const factor = s.factor ?? DEFAULT_IDLE_FACTOR;
+          const ranges = cuts.map((c) => ({ ...c, factor }));
+          const f = speedRangeFilters(ranges, fps);
+          chain(f.video);
+          audio.push(f.audio);
+          audioReencode = true;
+          const saved = rangesSavedSec(ranges);
+          if (dur !== null) dur -= saved;
+          timeOps.push({ op: "cut", spans: ranges });
+          summary.push(`cut_idle ${cuts.length} stretch(es) sped up x${factor}, ${r3(saved)}s saved`);
           break;
         }
         const f = cutFilters(cuts);

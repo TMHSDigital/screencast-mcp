@@ -5,6 +5,7 @@
  * and, if there is audio, it is also silent. Each idle stretch is cut except
  * for a short pad at both edges, in one select/aselect pass. Pure helpers.
  */
+import { z } from "zod";
 import { ScreencastError } from "./errors.js";
 import { encodeTail, type Quality } from "./targets.js";
 import { sumExpr } from "./expr.js";
@@ -105,6 +106,82 @@ export function cutFilters(cuts: Interval[]): { video: string; audio: string } {
     // small frames keep each cut within a few ms of the video's (#244).
     audio: `asetnsamples=n=256:p=0,aselect='not(${drop})',asetpts=N/SR/TB`,
   };
+}
+
+export interface SpeedRange extends Interval {
+  /** How many times faster the range plays (> 1). */
+  factor: number;
+}
+
+/** Fastest a range may play. */
+export const MAX_RANGE_FACTOR = 100;
+
+/** One fast-forward range, as speed and pipeline take it (#320). */
+export const speedRangeSchema = z.object({ start: z.number().min(0), end: z.number().positive(), factor: z.number().gt(1).max(MAX_RANGE_FACTOR) });
+
+/** cut_idle's fast-forward default. */
+export const DEFAULT_IDLE_FACTOR = 8;
+
+/** Check ranged speed changes: sorted, not overlapping, inside the video, and
+ * faster than real time. Returns them rounded. Pure. */
+export function checkSpeedRanges(ranges: SpeedRange[], durationSec: number | null): SpeedRange[] {
+  if (ranges.length === 0) throw new ScreencastError("segments needs at least one range.");
+  if (ranges.length > MAX_CUTS) throw new ScreencastError(`Too many ranges (${ranges.length}); at most ${MAX_CUTS}.`);
+  const out = [...ranges]
+    .sort((a, b) => a.start - b.start)
+    .map((r) => ({ start: Number(r.start.toFixed(3)), end: Number(r.end.toFixed(3)), factor: r.factor }));
+  out.forEach((r, i) => {
+    if (!(r.end > r.start) || r.start < 0) throw new ScreencastError(`Range ${r.start}-${r.end}s: end must be after start, from 0.`);
+    if (!(r.factor > 1) || r.factor > MAX_RANGE_FACTOR) {
+      throw new ScreencastError(`Range ${r.start}-${r.end}s: factor must be above 1 and at most ${MAX_RANGE_FACTOR} (for slow motion, use factor on the whole clip).`);
+    }
+    if (durationSec !== null && r.start >= durationSec) throw new ScreencastError(`Range ${r.start}-${r.end}s starts after the video ends (${durationSec}s).`);
+    const prev = out[i - 1];
+    if (prev && r.start < prev.end) throw new ScreencastError(`Ranges ${prev.start}-${prev.end}s and ${r.start}-${r.end}s overlap.`);
+  });
+  return out;
+}
+
+/** Seconds ranged speed changes save. Pure. */
+export function rangesSavedSec(ranges: readonly SpeedRange[]): number {
+  return ranges.reduce((s, r) => s + (r.end - r.start) * (1 - 1 / r.factor), 0);
+}
+
+/**
+ * Fast-forward ranges (#320) in one linear pass, like cutFilters: each video
+ * frame moves back by the time the ranges before it save, so a range plays
+ * `factor` times faster, and `fps` thins the packed frames back to the
+ * source's rate. Audio in a range keeps its first 1/factor at normal pitch
+ * (a sped-up stretch is usually idle or silent; pitched-up speech helps no
+ * one), so it stays as long as the video. Pure.
+ */
+export function speedRangeFilters(ranges: readonly SpeedRange[], fps: number | null): { video: string; audio: string } {
+  if (ranges.length === 0) throw new ScreencastError("Nothing to speed up.");
+  const k = (r: SpeedRange) => Number((1 - 1 / r.factor).toFixed(6));
+  const shift = sumExpr(ranges.map((r) => `clip(T-${r.start},0,${Number((r.end - r.start).toFixed(3))})*${k(r)}`));
+  const kept = (r: SpeedRange) => Number((r.start + (r.end - r.start) / r.factor).toFixed(3));
+  const drop = sumExpr(ranges.map((r) => `between(t,${kept(r)},${r.end})`));
+  return {
+    video: `setpts='(T-(${shift}))/TB'` + (fps ? `,fps=${Number(fps.toFixed(3))}` : ""),
+    audio: `asetnsamples=n=256:p=0,aselect='not(${drop})',asetpts=N/SR/TB`,
+  };
+}
+
+/** Speed up ranges of video (and audio) in one pass. Pure. */
+export function buildSpeedRangesArgs(
+  input: string,
+  output: string,
+  ranges: readonly SpeedRange[],
+  opts: { withAudio: boolean; fps: number | null; quality?: Quality },
+): string[] {
+  const f = speedRangeFilters(ranges, opts.fps);
+  return [
+    "-y", "-i", input,
+    "-vf", f.video,
+    ...(opts.withAudio ? ["-af", f.audio] : ["-an"]),
+    ...encodeTail({ quality: opts.quality ?? "standard", audio: opts.withAudio ? "aac" : "omit" }),
+    output,
+  ];
 }
 
 /** Remove the cut spans from video (and audio) in one pass. Timestamps are

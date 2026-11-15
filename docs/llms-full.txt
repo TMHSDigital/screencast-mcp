@@ -640,19 +640,23 @@ Minimal call:
 
 **Change Speed** (since v0.3.0)
 
-Change playback speed by a factor (>1 faster, <1 slower) and re-encode. Audio is retempo'd to match when the source has an audio track.
+Change playback speed, or fast-forward ranges, and re-encode. Audio is retempo'd to match.
 
 Parameters:
 
 - `input` (string; required): Path to the source video.
-- `factor` (number; required, > 0): Speed multiplier: >1 is faster, <1 is slower (e.g. 2 = double speed).
+- `factor` (number; > 0): Whole clip: >1 faster, <1 slower.
+- `segments` (object[]; at least 1 items): Or fast-forward just these ranges (audio shortened, not pitched).
+- `segments[].start` (number; required, ≥ 0)
+- `segments[].end` (number; required, > 0)
+- `segments[].factor` (number; required, > 1, ≤ 100)
 - `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
 - `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
 
 Minimal call:
 
 ```json
-{"input":"recording.mp4","factor":1}
+{"input":"recording.mp4"}
 ```
 
 ## compress
@@ -708,6 +712,8 @@ Parameters:
 - `minIdleSec` (number; > 0): Only cut still stretches at least this long (default 2).
 - `keepSec` (number; ≥ 0): Seconds kept at each edge of a cut (default 0.4).
 - `useAudio` (boolean): Require silent audio too (default true when there is audio).
+- `action` ("cut" | "speed"): cut (default), or speed: fast-forward them.
+- `factor` (number; > 1, ≤ 100): speed: times faster (default 8).
 - `dryRun` (boolean): Only report what would be cut.
 - `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
 - `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
@@ -787,7 +793,11 @@ Parameters:
 - `steps[crop].height` (integer; required, > 0, ≤ 9007199254740991)
 - `steps[scale].width` (integer; > 0, ≤ 9007199254740991)
 - `steps[scale].height` (integer; > 0, ≤ 9007199254740991)
-- `steps[speed].factor` (number; required, > 0)
+- `steps[speed].factor` (number; > 0)
+- `steps[speed].segments` (object[]; at least 1 items)
+- `steps[speed].segments[].start` (number; required, ≥ 0)
+- `steps[speed].segments[].end` (number; required, > 0)
+- `steps[speed].segments[].factor` (number; required, > 1, ≤ 100)
 - `steps[redact].regions` (object[]; required, at least 1 items)
 - `steps[redact].regions[].x` (integer; required, ≥ 0, ≤ 9007199254740991)
 - `steps[redact].regions[].y` (integer; required, ≥ 0, ≤ 9007199254740991)
@@ -840,6 +850,8 @@ Parameters:
 - `steps[zoom].transitionSec` (number; > 0, ≤ 5)
 - `steps[cut_idle].minIdleSec` (number; > 0)
 - `steps[cut_idle].keepSec` (number; ≥ 0)
+- `steps[cut_idle].action` ("cut" | "speed")
+- `steps[cut_idle].factor` (number; > 1, ≤ 100)
 - `steps[audio].normalize` ("youtube" | "podcast" | "broadcast" | number)
 - `steps[audio].denoise` ("light" | "medium" | "strong")
 - `steps[burn_subtitles].subtitles` (string)

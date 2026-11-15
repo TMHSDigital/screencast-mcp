@@ -79,6 +79,21 @@ describe.skipIf(!AVAILABLE)("pipeline polish ops and recipes against real ffmpeg
     expect(r.steps).toEqual(["cut_idle 1 stretch(es), 3.2s removed", "zoom 2 keyframe(s) from 1 click(s)", "audio: denoise light, normalize to -14 LUFS", "export_preset youtube"]);
   });
 
+  it("cut_idle action speed fast-forwards the idle stretch, keeping A/V and the marker in step (#320)", async () => {
+    const out = p("fast-idle.mp4");
+    const r = await call({ input: raw, steps: [{ op: "cut_idle", action: "speed", factor: 8 }], chapters: true, quality: "draft", output: out });
+    // The 3.2 s cut span plays 8x faster: 3.2 * (1 - 1/8) = 2.8 s saved.
+    expect(r.durationSec).toBeCloseTo(7.2, 1);
+    const info = await probeMedia(out);
+    expect(info.durationSec!).toBeCloseTo(7.2, 1);
+    expect(info.fps).toBeCloseTo(30, 0);
+    const d = await streams(out);
+    expect(Math.abs(d.video - d.audio)).toBeLessThan(1 / 30 + 0.025);
+    // The marker at source 8 s moves back by the 2.8 s saved.
+    const chapters = await probeChapters(out);
+    expect(chapters[1]!.start).toBeCloseTo(5.2, 1);
+  });
+
   it("tutorial: one call cuts idle, zooms to the click, normalizes, and keeps A/V and chapters in step", async () => {
     const out = p("tutorial.mp4");
     const r = await call({ input: raw, recipe: "tutorial", chapters: true, quality: "draft", output: out });

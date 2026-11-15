@@ -135,7 +135,7 @@ Cut, convert, compress, and redact. A tool that writes a file refuses to replace
 | [`export_gif`](https://tmhsdigital.github.io/screencast-mcp/tools/export_gif.html) | Export an animated GIF or WebP that fits a size budget (for PRs, issues, READMEs), stepping fps, width, and quality down until it fits. |
 | [`crop`](https://tmhsdigital.github.io/screencast-mcp/tools/crop.html) | Crop a video to a pixel rectangle; one running off the frame is rejected. |
 | [`scale`](https://tmhsdigital.github.io/screencast-mcp/tools/scale.html) | Resize a video to a target width and/or height and re-encode. Provide one side to keep the aspect ratio, or both to set an exact size. |
-| [`speed`](https://tmhsdigital.github.io/screencast-mcp/tools/speed.html) | Change playback speed by a factor (>1 faster, <1 slower) and re-encode. Audio is retempo'd to match when the source has an audio track. |
+| [`speed`](https://tmhsdigital.github.io/screencast-mcp/tools/speed.html) | Change playback speed, or fast-forward ranges, and re-encode. Audio is retempo'd to match. |
 | [`compress`](https://tmhsdigital.github.io/screencast-mcp/tools/compress.html) | Re-encode a video smaller (H.264 CRF ladder, optional width cap). For a platform target use export_preset. |
 | [`clip`](https://tmhsdigital.github.io/screencast-mcp/tools/clip.html) | Extract several frame-exact segments, each to its own file. For one segment, trim does the same. |
 | [`cut_idle`](https://tmhsdigital.github.io/screencast-mcp/tools/cut_idle.html) | Remove dead air: cut stretches where the screen is frozen (and silent), keeping a short pad. Returns the time saved. |

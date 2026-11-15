@@ -43,7 +43,8 @@ export interface Chapter {
 export type TimeOp =
   | { op: "trim"; start: number; end: number }
   | { op: "speed"; factor: number }
-  | { op: "cut"; spans: Array<{ start: number; end: number }> };
+  /** Spans removed, or with `factor`, played faster (#320). */
+  | { op: "cut"; spans: Array<{ start: number; end: number; factor?: number }> };
 
 export const MAX_MARKERS = 500;
 export const MAX_LABEL = 200;

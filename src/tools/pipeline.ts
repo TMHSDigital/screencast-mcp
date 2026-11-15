@@ -18,7 +18,7 @@ import { buildChapters, ffmetadata, markerPoints, markersOrChapters, retimeMarke
 import type { CursorStepAssets, KeystrokeStepAssets } from "../utils/pipeline.js";
 import { cursorSpritePath, cursorOptionsSchema, loadCursor } from "../utils/cursor.js";
 import { MAX_ZOOM, type ClickPoint, readClicks, zoomKeyframeSchema } from "../utils/zoom.js";
-import { buildIdleScanArgs, intersect, parseFreezes, parseSilences, DEFAULT_MIN_IDLE_SEC } from "../utils/idle.js";
+import { buildIdleScanArgs, intersect, parseFreezes, parseSilences, speedRangeSchema, DEFAULT_MIN_IDLE_SEC, MAX_RANGE_FACTOR } from "../utils/idle.js";
 import { buildLoudnessMeasureArgs, buildNoiseFloorArgs, loudnessTarget, parseLoudnorm, parseNoiseFloor, DENOISE_STRENGTHS, loudnessTargetSchema } from "../utils/audio.js";
 import { buildTranscribeArgs, formatSrt, normalizeCues, parseSrt, resolveWhisperModel, type Cue, CAPTION_STYLE_NAMES } from "../utils/captions.js";
 import { eventPaths } from "../utils/events.js";
@@ -58,7 +58,7 @@ const step = z.discriminatedUnion("op", [
     height: z.number().int().positive(),
   }),
   z.object({ op: z.literal("scale"), width: z.number().int().positive().optional(), height: z.number().int().positive().optional() }),
-  z.object({ op: z.literal("speed"), factor: z.number().positive() }),
+  z.object({ op: z.literal("speed"), factor: z.number().positive().optional(), segments: z.array(speedRangeSchema).min(1).optional() }),
   z.object({
     op: z.literal("redact"),
     regions: z.array(redactRegionSchema).min(1),
@@ -76,7 +76,13 @@ const step = z.discriminatedUnion("op", [
     holdSec: z.number().positive().max(30).optional(),
     transitionSec: z.number().positive().max(5).optional(),
   }),
-  z.object({ op: z.literal("cut_idle"), minIdleSec: z.number().positive().optional(), keepSec: z.number().min(0).optional() }),
+  z.object({
+    op: z.literal("cut_idle"),
+    minIdleSec: z.number().positive().optional(),
+    keepSec: z.number().min(0).optional(),
+    action: z.enum(["cut", "speed"]).optional(),
+    factor: z.number().gt(1).max(MAX_RANGE_FACTOR).optional(),
+  }),
   z.object({
     op: z.literal("audio"),
     normalize: loudnessTargetSchema.optional(),
@@ -214,7 +220,7 @@ export function register(server: McpServer): void {
           const total = info.durationSec;
           if (total === null) throw new ScreencastError(`Could not read the duration of ${args.input}.`);
           // A stretch minIdleSec long at the step is longer in the source after a speed-up.
-          const speedUp = steps.slice(0, idleAt).reduce((f, x) => (x.op === "speed" ? f * x.factor : f), 1);
+          const speedUp = steps.slice(0, idleAt).reduce((f, x) => (x.op === "speed" && x.factor ? f * x.factor : f), 1);
           const useAudio = hasAudio;
           const scan = await runCapture(ffmpeg, buildIdleScanArgs(args.input, (idleStep.minIdleSec ?? DEFAULT_MIN_IDLE_SEC) * speedUp, useAudio), timeout, {
             signal: extra.signal,

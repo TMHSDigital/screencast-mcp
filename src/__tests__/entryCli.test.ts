@@ -16,5 +16,5 @@ describe.skipIf(!existsSync(ENTRY))("entry point in CLI mode (#289)", () => {
     expect(res.status).toBe(0);
     expect(res.stdout).toContain("Usage:");
     expect(res.stderr).not.toContain("SCREENCAST_TOOLSETS");
-  });
+  }, 30_000); // a blocking node start; under a loaded full run it can pass 5 s
 });

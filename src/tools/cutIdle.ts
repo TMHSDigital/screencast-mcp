@@ -12,8 +12,12 @@ import {
   intersect,
   cutsFor,
   buildCutIdleArgs,
+  buildSpeedRangesArgs,
+  rangesSavedSec,
+  DEFAULT_IDLE_FACTOR,
   DEFAULT_MIN_IDLE_SEC,
   DEFAULT_KEEP_SEC,
+  MAX_RANGE_FACTOR,
 } from "../utils/idle.js";
 import { editOutputExt } from "../utils/media.js";
 
@@ -33,6 +37,8 @@ const inputSchema = {
     .boolean()
     .optional()
     .describe("Require silent audio too (default true when there is audio)."),
+  action: z.enum(["cut", "speed"]).optional().describe("cut (default), or speed: fast-forward them."),
+  factor: z.number().gt(1).max(MAX_RANGE_FACTOR).optional().describe(`speed: times faster (default ${DEFAULT_IDLE_FACTOR}).`),
   dryRun: z.boolean().optional().describe("Only report what would be cut."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
   overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
@@ -68,9 +74,13 @@ export function register(server: McpServer): void {
         const freezes = parseFreezes(scan.stderr, duration);
         const idle = useAudio ? intersect(freezes, parseSilences(scan.stderr, duration)) : freezes;
         const cuts = cutsFor(idle, minIdle, keep);
-        const removedSec = Number(cuts.reduce((s, c) => s + (c.end - c.start), 0).toFixed(2));
+        const speedUp = args.action === "speed";
+        const factor = args.factor ?? DEFAULT_IDLE_FACTOR;
+        const ranges = cuts.map((c) => ({ ...c, factor }));
+        const removedSec = Number((speedUp ? rangesSavedSec(ranges) : cuts.reduce((s, c) => s + (c.end - c.start), 0)).toFixed(2));
         const summary = {
           cuts,
+          ...(speedUp ? { action: "speed", factor } : {}),
           removedSec,
           originalSec: Number(duration.toFixed(2)),
           newDurationSec: Number((duration - removedSec).toFixed(2)),
@@ -81,7 +91,10 @@ export function register(server: McpServer): void {
         }
         const ext = editOutputExt(args.input);
         const output = editOutput(args.output, "trimmed-idle", ext, { overwrite: args.overwrite });
-        await runEditJob(buildCutIdleArgs(args.input, output, cuts, hasAudio), {
+        const ffArgs = speedUp
+          ? buildSpeedRangesArgs(args.input, output, ranges, { withAudio: hasAudio, fps: info.fps })
+          : buildCutIdleArgs(args.input, output, cuts, hasAudio);
+        await runEditJob(ffArgs, {
           output,
           durationSec: duration - removedSec,
           inputDurationSec: duration,

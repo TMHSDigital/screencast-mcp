@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>speed — Screencast MCP</title>
-  <meta name="description" content="Change playback speed by a factor (&gt;1 faster, &lt;1 slower) and re-encode.">
+  <meta name="description" content="Change playback speed, or fast-forward ranges, and re-encode.">
   <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/tools/speed.html">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
   <meta property="og:title" content="speed — Screencast MCP">
-  <meta property="og:description" content="Change playback speed by a factor (&gt;1 faster, &lt;1 slower) and re-encode.">
+  <meta property="og:description" content="Change playback speed, or fast-forward ranges, and re-encode.">
   <meta property="og:type" content="article">
   <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/tools/speed.html">
   <meta property="og:site_name" content="Screencast MCP">
@@ -44,7 +44,7 @@
       <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">TOOLS</a> / EDIT</p>
       <h1>Change Speed</h1>
       <p class="tool-id"><code>speed</code></p>
-      <p class="lede">Change playback speed by a factor (&gt;1 faster, &lt;1 slower) and re-encode. Audio is retempo'd to match when the source has an audio track.</p>
+      <p class="lede">Change playback speed, or fast-forward ranges, and re-encode. Audio is retempo'd to match.</p>
       <p class="chips"><span class="chip set">edit</span><span class="chip warn">writes</span><span class="chip warn">destructive</span><span class="chip">since v0.3.0</span></p>
     </section>
 
@@ -55,7 +55,11 @@
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
           <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video.</td></tr>
-          <tr><td><code>factor</code> <span class="req">required</span></td><td><code class="type">number</code></td><td>Speed multiplier: &gt;1 is faster, &lt;1 is slower (e.g. 2 = double speed). <span class="bounds">&gt; 0</span></td></tr>
+          <tr><td><code>factor</code></td><td><code class="type">number</code></td><td>Whole clip: &gt;1 faster, &lt;1 slower. <span class="bounds">&gt; 0</span></td></tr>
+          <tr><td><code>segments</code></td><td><code class="type">object[]</code></td><td>Or fast-forward just these ranges (audio shortened, not pitched). <span class="bounds">at least 1 items</span></td></tr>
+          <tr class="nested d1"><td><code>segments[].start</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr class="nested d1"><td><code>segments[].end</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d1"><td><code>segments[].factor</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 1, ≤ 100</span></td></tr>
           <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
           <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
         </tbody>
@@ -65,7 +69,7 @@
 
     <section class="chapter">
       <div class="tc-mark"><span class="tc">00:05</span><span>A MINIMAL CALL</span></div>
-      <pre class="copyable"><code>speed { &quot;input&quot;: &quot;recording.mp4&quot;, &quot;factor&quot;: 1 }</code></pre>
+      <pre class="copyable"><code>speed { &quot;input&quot;: &quot;recording.mp4&quot; }</code></pre>
       <p>The required arguments only, with placeholder values. Everything else takes its default.</p>
     </section>
 

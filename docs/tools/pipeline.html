@@ -65,7 +65,11 @@
           <tr class="nested d1"><td><code>steps[crop].height</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
           <tr class="nested d1"><td><code>steps[scale].width</code></td><td><code class="type">integer</code></td><td> <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
           <tr class="nested d1"><td><code>steps[scale].height</code></td><td><code class="type">integer</code></td><td> <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
-          <tr class="nested d1"><td><code>steps[speed].factor</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d1"><td><code>steps[speed].factor</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d1"><td><code>steps[speed].segments</code></td><td><code class="type">object[]</code></td><td> <span class="bounds">at least 1 items</span></td></tr>
+          <tr class="nested d2"><td><code>steps[speed].segments[].start</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[speed].segments[].end</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr class="nested d2"><td><code>steps[speed].segments[].factor</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 1, ≤ 100</span></td></tr>
           <tr class="nested d1"><td><code>steps[redact].regions</code> <span class="req">required</span></td><td><code class="type">object[]</code></td><td> <span class="bounds">at least 1 items</span></td></tr>
           <tr class="nested d2"><td><code>steps[redact].regions[].x</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
           <tr class="nested d2"><td><code>steps[redact].regions[].y</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
@@ -118,6 +122,8 @@
           <tr class="nested d1"><td><code>steps[zoom].transitionSec</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0, ≤ 5</span></td></tr>
           <tr class="nested d1"><td><code>steps[cut_idle].minIdleSec</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
           <tr class="nested d1"><td><code>steps[cut_idle].keepSec</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr class="nested d1"><td><code>steps[cut_idle].action</code></td><td><code class="type">&quot;cut&quot; | &quot;speed&quot;</code></td><td></td></tr>
+          <tr class="nested d1"><td><code>steps[cut_idle].factor</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 1, ≤ 100</span></td></tr>
           <tr class="nested d1"><td><code>steps[audio].normalize</code></td><td><code class="type">&quot;youtube&quot; | &quot;podcast&quot; | &quot;broadcast&quot; | number</code></td><td></td></tr>
           <tr class="nested d1"><td><code>steps[audio].denoise</code></td><td><code class="type">&quot;light&quot; | &quot;medium&quot; | &quot;strong&quot;</code></td><td></td></tr>
           <tr class="nested d1"><td><code>steps[burn_subtitles].subtitles</code></td><td><code class="type">string</code></td><td></td></tr>

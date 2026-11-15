@@ -81,7 +81,7 @@ describe("docs pages", () => {
       }
     }
     expect(broken).toEqual([]);
-  });
+  }, 30_000); // thousands of sync file checks; slow when the full suite loads the disk
   it("every srcset image exists (reduced-motion stills, #224)", () => {
     const broken: string[] = [];
     for (const page of pages) {

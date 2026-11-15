@@ -1392,7 +1392,7 @@
       "idempotentHint": false,
       "openWorldHint": false
     },
-    "description": "Change playback speed by a factor (>1 faster, <1 slower) and re-encode. Audio is retempo'd to match when the source has an audio track.",
+    "description": "Change playback speed, or fast-forward ranges, and re-encode. Audio is retempo'd to match.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1402,9 +1402,37 @@
           "description": "Path to the source video."
         },
         "factor": {
+          "description": "Whole clip: >1 faster, <1 slower.",
           "type": "number",
-          "exclusiveMinimum": 0,
-          "description": "Speed multiplier: >1 is faster, <1 is slower (e.g. 2 = double speed)."
+          "exclusiveMinimum": 0
+        },
+        "segments": {
+          "description": "Or fast-forward just these ranges (audio shortened, not pitched).",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "number",
+                "minimum": 0
+              },
+              "end": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "factor": {
+                "type": "number",
+                "exclusiveMinimum": 1,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "factor"
+            ]
+          }
         },
         "output": {
           "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
@@ -1416,8 +1444,7 @@
         }
       },
       "required": [
-        "input",
-        "factor"
+        "input"
       ]
     }
   },
@@ -2397,6 +2424,20 @@
           "description": "Require silent audio too (default true when there is audio).",
           "type": "boolean"
         },
+        "action": {
+          "description": "cut (default), or speed: fast-forward them.",
+          "type": "string",
+          "enum": [
+            "cut",
+            "speed"
+          ]
+        },
+        "factor": {
+          "description": "speed: times faster (default 8).",
+          "type": "number",
+          "exclusiveMinimum": 1,
+          "maximum": 100
+        },
         "dryRun": {
           "description": "Only report what would be cut.",
           "type": "boolean"
@@ -3257,11 +3298,37 @@
                   "factor": {
                     "type": "number",
                     "exclusiveMinimum": 0
+                  },
+                  "segments": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "start": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "end": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "factor": {
+                          "type": "number",
+                          "exclusiveMinimum": 1,
+                          "maximum": 100
+                        }
+                      },
+                      "required": [
+                        "start",
+                        "end",
+                        "factor"
+                      ]
+                    }
                   }
                 },
                 "required": [
-                  "op",
-                  "factor"
+                  "op"
                 ]
               },
               {
@@ -3611,6 +3678,18 @@
                   "keepSec": {
                     "type": "number",
                     "minimum": 0
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "cut",
+                      "speed"
+                    ]
+                  },
+                  "factor": {
+                    "type": "number",
+                    "exclusiveMinimum": 1,
+                    "maximum": 100
                   }
                 },
                 "required": [
