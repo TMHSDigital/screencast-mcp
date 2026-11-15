@@ -108,13 +108,14 @@ export function buildManifest(p, toolList) {
         min: 1,
       },
       confirm_capture: {
-        type: "boolean",
+        type: "string",
         title: "Confirm each capture",
         description:
           "Ask before every recording, screenshot, live find_text, and wait_for_change, showing what will be " +
-          "captured. Needs a client that supports MCP elicitation; others are refused.",
+          "captured. auto (default): ask when the client supports MCP elicitation. always: ask, and refuse in " +
+          "clients that cannot. off: never ask.",
         required: false,
-        default: false,
+        default: "auto",
       },
       toolsets: {
         type: "string",

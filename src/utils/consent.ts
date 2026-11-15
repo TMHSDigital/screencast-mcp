@@ -1,10 +1,15 @@
 /**
- * Opt-in capture consent (#222). With SCREENCAST_CONFIRM_CAPTURE set, every
- * live capture (start_recording, screenshot, find_text on a target,
- * wait_for_change) first asks the user through MCP elicitation, showing what
- * will be captured. The model cannot answer an elicitation, so a prompt
- * injection cannot approve its own capture. A client without elicitation
- * fails closed: nothing is captured.
+ * Capture consent (#222, #266). Every live capture (start_recording,
+ * screenshot, find_text on a target, wait_for_change) first asks the user
+ * through MCP elicitation, showing what will be captured. The model cannot
+ * answer an elicitation, so a prompt injection cannot approve its own capture.
+ *
+ * SCREENCAST_CONFIRM_CAPTURE picks the mode:
+ * - unset or `auto` (default): ask whenever the client supports elicitation;
+ *   a client that cannot ask captures without a prompt.
+ * - `1`/`true`/`yes`/`on`/`always`: ask every time, and fail closed (capture
+ *   nothing) in a client that cannot ask.
+ * - `0`/`false`/`no`/`off`/`never`: never ask.
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorMessage, ScreencastError } from "./errors.js";
@@ -14,9 +19,21 @@ export const CONFIRM_CAPTURE_ENV = "SCREENCAST_CONFIRM_CAPTURE";
 /** How long the user has to answer before the capture is refused. */
 export const CONFIRM_TIMEOUT_MS = 5 * 60 * 1000;
 
-/** True when SCREENCAST_CONFIRM_CAPTURE is 1/true/yes/on. */
-export function confirmCaptureEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return ["1", "true", "yes", "on"].includes((env[CONFIRM_CAPTURE_ENV] ?? "").trim().toLowerCase());
+export type ConfirmMode = "auto" | "always" | "off";
+
+/** The consent mode from SCREENCAST_CONFIRM_CAPTURE (see the module comment).
+ * Unrecognised values read as `auto`. */
+export function confirmCaptureMode(env: NodeJS.ProcessEnv = process.env): ConfirmMode {
+  const v = (env[CONFIRM_CAPTURE_ENV] ?? "").trim().toLowerCase();
+  if (["1", "true", "yes", "on", "always"].includes(v)) return "always";
+  if (["0", "false", "no", "off", "never"].includes(v)) return "off";
+  return "auto";
+}
+
+/** True when every confirmation is required, so a client that cannot ask is
+ * refused rather than let through. */
+export function confirmCaptureRequired(env: NodeJS.ProcessEnv = process.env): boolean {
+  return confirmCaptureMode(env) === "always";
 }
 
 /** A capture target as the user should see it: the matched window's title
@@ -27,17 +44,20 @@ export function describeTarget(target: string, window?: { matchedTitle: string }
 }
 
 /**
- * Ask the user to approve a capture, when SCREENCAST_CONFIRM_CAPTURE is on.
- * Resolves on approval; throws a ScreencastError on decline, cancel, timeout,
- * or a client that cannot ask. A no-op when the setting is off.
+ * Ask the user to approve a capture. Resolves on approval, and without asking
+ * when the mode is `off` or (in `auto`) the client cannot ask. Throws a
+ * ScreencastError on decline, cancel, timeout, or (in `always`) a client that
+ * cannot ask.
  */
 export async function confirmCapture(server: McpServer, request: string, signal?: AbortSignal): Promise<void> {
-  if (!confirmCaptureEnabled()) return;
+  const mode = confirmCaptureMode();
+  if (mode === "off") return;
   if (!server.server.getClientCapabilities()?.elicitation?.form) {
+    if (mode === "auto") return;
     throw new ScreencastError(
       `Capture blocked: ${CONFIRM_CAPTURE_ENV} requires the user to confirm each capture, ` +
         "but this client does not support MCP elicitation. Nothing was captured.",
-      `Use a client that supports elicitation, or unset ${CONFIRM_CAPTURE_ENV} to capture without confirmation.`,
+      `Use a client that supports elicitation, or set ${CONFIRM_CAPTURE_ENV}=auto to capture without confirmation in clients that cannot ask.`,
     );
   }
   let action: string;

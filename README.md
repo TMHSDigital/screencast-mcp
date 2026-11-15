@@ -197,7 +197,7 @@ Every capture tool takes one `target` string: `full`, `monitor:<index>`, `window
 | `SCREENCAST_WHISPER_MODEL` | none | whisper.cpp model for `transcribe` |
 | `SCREENCAST_RETENTION_DAYS` | off | Delete screenshots, frames, leftover raw event logs, and `index_recording` indexes older than this many days at startup (never recordings or edits; an index is rebuilt by running `index_recording` again) |
 | `SCREENCAST_PS_TIMEOUT_MS` | 20000 (OCR 60000) | Limit for the PowerShell helpers that list monitors and windows and run OCR |
-| `SCREENCAST_CONFIRM_CAPTURE` | off | Set to `1` to ask the user to confirm every live capture through MCP elicitation; clients without elicitation are refused |
+| `SCREENCAST_CONFIRM_CAPTURE` | `auto` | Asks you to confirm each live capture through MCP elicitation. `auto`: ask when the client supports elicitation. `1`/`always`: ask, and refuse captures in clients that cannot. `0`/`off`: never ask |
 | `SCREENCAST_TOOLSETS` | `all` | Comma-separated toolsets to expose; the rest are not loaded, which shrinks the tool list the agent pays for on every turn (`core` is always on) |
 | `FFMPEG_PATH` / `FFPROBE_PATH` | `PATH` lookup | Explicit ffmpeg / ffprobe binaries |
 
@@ -230,6 +230,8 @@ Every capture tool takes one `target` string: `full`, `monitor:<index>`, `window
 - **No network requests, no telemetry.** The server runs ffmpeg, ffprobe, and PowerShell locally and talks to your client over stdio. OCR (`find_text`) and speech (`narrate`) use the engines built into Windows.
 - **What a tool returns goes to your model provider.** Inline frames, OCR text, and event summaries reach your agent like any tool result; files on disk stay on disk unless a tool returns them or you share them.
 - **Everything is stored under `SCREENCAST_HOME`** (`recordings/`, `screenshots/`, `frames/`, `edits/`, `sessions.json`) unless a call names another path. `find_text` and `wait_for_change` delete their captures after the call by default (`keep: true` keeps them); `screen_diff` compares existing images and captures nothing.
+- **You confirm captures.** By default, every recording, screenshot, live `find_text`, and `wait_for_change` first asks you, through your client, what will be captured. The model cannot answer that prompt for you. Clients without MCP elicitation get no prompt unless `SCREENCAST_CONFIRM_CAPTURE=1`, which refuses captures there instead.
+- **Search runs on masked text.** `index_recording` masks secret-pattern matches before writing the index, and `search_recording` (including regex queries) only sees that masked text.
 - **The event log never records typed text.** Only with `start_recording` `events: true` (or `cursor: "events"`), and only while that recording runs: clicks, scrolls, and cursor positions system-wide, and typing as bursts on a 0.5 s grid with no key names (`keys: "shortcuts"` also names Ctrl/Alt/Win chords). There is no microphone capture; system audio only with `audio.source` = `system`.
 - **Deleting data.** `delete_recording` removes a recording with its sidecars (event log, webcam, transcript, index with its screen text, markers) and registry entry, asking you first when the client supports it. Otherwise delete files under `SCREENCAST_HOME`, or set `SCREENCAST_RETENTION_DAYS`; recordings and edits are never deleted automatically.
 

@@ -80,10 +80,10 @@
         },
         {
           "name": "SCREENCAST_CONFIRM_CAPTURE",
-          "description": "Set to 1 to ask the user to confirm every live capture through MCP elicitation; clients without elicitation are refused (off by default)",
+          "description": "Confirm each live capture through MCP elicitation: auto (default) asks when the client supports it, 1/always also refuses captures in clients that cannot ask, 0/off never asks",
           "isRequired": false,
           "isSecret": false,
-          "format": "boolean"
+          "format": "string"
         },
         {
           "name": "SCREENCAST_TOOLSETS",

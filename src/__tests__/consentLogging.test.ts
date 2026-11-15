@@ -18,7 +18,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Monitor } from "../utils/monitors.js";
 import type { WindowQuery } from "../utils/windows.js";
-import { CONFIRM_CAPTURE_ENV, confirmCaptureEnabled, describeTarget } from "../utils/consent.js";
+import { CONFIRM_CAPTURE_ENV, confirmCaptureMode, confirmCaptureRequired, describeTarget } from "../utils/consent.js";
 import { DROP_REPORT_INTERVAL_MS, ffmpegWarnings, logMessage, StderrWatch } from "../utils/logging.js";
 
 const MONITORS: Monitor[] = [{ index: 0, x: 0, y: 0, width: 1920, height: 1080, primary: true }];
@@ -108,16 +108,34 @@ async function call(client: Client, name: string, args: Record<string, unknown>)
 
 const SHOT = { target: "window:notes", returnImage: false };
 
-describe("capture consent (#222)", () => {
-  it("reads the opt-in setting", () => {
-    expect(confirmCaptureEnabled({})).toBe(false);
-    expect(confirmCaptureEnabled({ [CONFIRM_CAPTURE_ENV]: "0" })).toBe(false);
-    for (const v of ["1", "true", "YES", " on "]) expect(confirmCaptureEnabled({ [CONFIRM_CAPTURE_ENV]: v })).toBe(true);
+describe("capture consent (#222, #266)", () => {
+  it("reads the mode setting, auto by default", () => {
+    expect(confirmCaptureMode({})).toBe("auto");
+    expect(confirmCaptureMode({ [CONFIRM_CAPTURE_ENV]: "auto" })).toBe("auto");
+    expect(confirmCaptureMode({ [CONFIRM_CAPTURE_ENV]: "maybe" })).toBe("auto");
+    for (const v of ["0", "false", "No", " off ", "never"]) expect(confirmCaptureMode({ [CONFIRM_CAPTURE_ENV]: v })).toBe("off");
+    for (const v of ["1", "true", "YES", " on ", "always"]) expect(confirmCaptureMode({ [CONFIRM_CAPTURE_ENV]: v })).toBe("always");
+    expect(confirmCaptureRequired({})).toBe(false);
+    expect(confirmCaptureRequired({ [CONFIRM_CAPTURE_ENV]: "1" })).toBe(true);
     expect(describeTarget("full")).toMatch(/full screen/);
     expect(describeTarget("window:no", { matchedTitle: "notes.txt - Editor" })).toBe('window "notes.txt - Editor"');
   });
 
+  it("asks by default in a client that supports elicitation", async () => {
+    const res = await call(asker, "screenshot", SHOT);
+    expect(res.isError).toBe(false);
+    expect(asked).toHaveLength(1);
+    expect(captureStill).toHaveBeenCalledTimes(1);
+  });
+
+  it("captures without asking by default in a client that cannot ask", async () => {
+    const res = await call(plain, "screenshot", SHOT);
+    expect(res.isError).toBe(false);
+    expect(captureStill).toHaveBeenCalledTimes(1);
+  });
+
   it("captures without asking when the setting is off", async () => {
+    process.env[CONFIRM_CAPTURE_ENV] = "0";
     const res = await call(asker, "screenshot", SHOT);
     expect(res.isError).toBe(false);
     expect(asked).toEqual([]);
@@ -166,7 +184,7 @@ describe("capture consent (#222)", () => {
     const res = await call(plain, "screenshot", SHOT);
     expect(res.isError).toBe(true);
     expect(res.text).toMatch(/does not support MCP elicitation\. Nothing was captured/);
-    expect(res.text).toMatch(/unset SCREENCAST_CONFIRM_CAPTURE/);
+    expect(res.text).toMatch(/SCREENCAST_CONFIRM_CAPTURE=auto/);
     expect(captureStill).not.toHaveBeenCalled();
   });
 });

@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Changed
+
+- **Capture consent is on by default.** In a client that supports MCP elicitation, every recording, screenshot, live `find_text`, and `wait_for_change` now asks you first. `SCREENCAST_CONFIRM_CAPTURE` is now a mode: `auto` (default; ask when the client can), `1`/`always` (ask, and refuse captures in clients that cannot, as before), `0`/`off` (never ask). If you relied on unset meaning "never ask", set it to `0`. The Claude Desktop bundle's "Confirm each capture" option is now a text field defaulting to `auto` (#266).
+
 ### Fixed
 
 - Short ffmpeg and ffprobe jobs (edits, probes, frame reads, device listing) now start with no stdin instead of an open pipe nothing writes to, which could leave a job waiting until its timeout (#281).

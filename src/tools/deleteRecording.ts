@@ -9,7 +9,7 @@ import { isLive } from "../utils/sessions.js";
 import { samePath } from "../utils/recordingIndex.js";
 import { assertDeleteAllowed, recordingSidecars } from "../utils/recordingFiles.js";
 import { subdir } from "../utils/paths.js";
-import { CONFIRM_TIMEOUT_MS, confirmCaptureEnabled, CONFIRM_CAPTURE_ENV } from "../utils/consent.js";
+import { CONFIRM_TIMEOUT_MS, confirmCaptureRequired, CONFIRM_CAPTURE_ENV } from "../utils/consent.js";
 
 const inputSchema = {
   sessionId: z.string().min(1).optional().describe("Session id of the recording to delete."),
@@ -28,11 +28,11 @@ function sizeOf(path: string): number {
 }
 
 /** Ask the user before deleting when the client can ask. A client that cannot
- * is refused only when SCREENCAST_CONFIRM_CAPTURE asks for every confirmation;
+ * is refused only when SCREENCAST_CONFIRM_CAPTURE requires every confirmation;
  * otherwise the tool's destructiveHint lets the client gate the call. */
 async function confirmDelete(server: McpServer, message: string, signal: AbortSignal): Promise<boolean> {
   if (!server.server.getClientCapabilities()?.elicitation?.form) {
-    if (confirmCaptureEnabled()) {
+    if (confirmCaptureRequired()) {
       throw new ScreencastError(
         `Not deleted: ${CONFIRM_CAPTURE_ENV} requires the user to confirm, but this client does not support MCP elicitation.`,
       );
