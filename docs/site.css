@@ -389,6 +389,23 @@ figure.output figcaption .tc { color: var(--amber); }
 .hud-track { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; pointer-events: none; }
 .hud-fill { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--progress, 0) * 100%); background: var(--rec); }
 .hud-tick { position: absolute; top: -3px; width: 1px; height: 5px; background: var(--dim); }
+/* Chapter markers: a 1px tick with a wider hit area, labelled on hover/focus. */
+a.hud-tick { pointer-events: auto; top: -9px; width: 17px; height: 12px; margin-left: -8px; background: none; }
+a.hud-tick::before { content: ""; position: absolute; left: 8px; top: 6px; width: 1px; height: 5px; background: var(--dim); transition: background 0.15s, height 0.15s, top 0.15s; }
+a.hud-tick:hover::before, a.hud-tick:focus-visible::before { background: var(--amber); width: 3px; left: 7px; top: 2px; height: 10px; }
+a.hud-tick::after {
+  content: attr(data-label); position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  white-space: nowrap; padding: 0.2rem 0.5rem; border: 1px solid var(--line); border-radius: 4px;
+  background: var(--panel); color: var(--ink); font-size: 0.72rem; letter-spacing: 0.06em;
+  opacity: 0; pointer-events: none; transition: opacity 0.15s;
+}
+a.hud-tick:hover::after, a.hud-tick:focus-visible::after { opacity: 1; }
+a.hud-tick:focus-visible { outline: none; }
+a.hud-tick:first-of-type::after { left: 0; transform: none; }
+a.hud-tick:last-of-type::after { left: auto; right: 0; transform: none; }
+.hud-chapter { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 32ch; }
+.hud-chapter:not(:empty)::before { content: "/ "; color: var(--line); }
+@media (max-width: 720px) { .hud-chapter { display: none; } }
 
 /* ---- Tool finder ---- */
 .finder {

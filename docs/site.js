@@ -10,32 +10,44 @@
 
   // The page is a recording: scrolling scrubs it. The HUD timecode reads the
   // scroll position against each chapter's own timecode mark, and a track
-  // along the HUD fills as you go, with a tick at every chapter.
+  // along the HUD fills as you go, with a chapter marker at every chapter:
+  // click one (or Tab to it) to jump there, like a marker on a timeline.
   var tc = document.getElementById("tc");
   var hud = document.querySelector(".hud");
   if (tc && hud) {
     var marks = Array.prototype.slice.call(document.querySelectorAll(".tc-mark .tc")).map(function (el) {
       var p = el.textContent.trim().split(":").map(Number);
-      return { el: el.closest("section") || el, t: p[0] * 60 + p[1] };
+      var label = el.nextElementSibling ? el.nextElementSibling.textContent.trim() : "";
+      return { el: el.closest("section") || el, t: p[0] * 60 + p[1], tc: el.textContent.trim(), label: label };
     }).filter(function (m) { return !isNaN(m.t); });
-    var track = document.createElement("div");
+    var track = document.createElement("nav");
     track.className = "hud-track";
-    track.setAttribute("aria-hidden", "true");
-    track.innerHTML = '<span class="hud-fill"></span>';
+    track.setAttribute("aria-label", "Chapters");
+    track.innerHTML = '<span class="hud-fill" aria-hidden="true"></span>';
     hud.appendChild(track);
+    var chapter = document.createElement("span");
+    chapter.className = "hud-chapter";
+    chapter.setAttribute("aria-hidden", "true");
+    tc.insertAdjacentElement("afterend", chapter);
     var anchors = [];
     var measure = function () {
       var max = Math.max(1, document.documentElement.scrollHeight - innerHeight);
       anchors = [{ y: 0, t: 0 }].concat(marks.map(function (m) {
-        return { y: Math.min(max, m.el.getBoundingClientRect().top + scrollY - innerHeight * 0.3), t: m.t };
+        return { y: Math.min(max, m.el.getBoundingClientRect().top + scrollY - innerHeight * 0.3), t: m.t, mark: m };
       }));
       var last = anchors[anchors.length - 1];
       anchors.push({ y: max, t: last.t + 4 });
       track.querySelectorAll(".hud-tick").forEach(function (t) { t.remove(); });
       anchors.slice(1, -1).forEach(function (a) {
-        var tick = document.createElement("span");
+        var m = a.mark;
+        var tick = document.createElement(m.el.id ? "a" : "span");
         tick.className = "hud-tick";
         tick.style.left = (Math.max(0, a.y) / max) * 100 + "%";
+        if (m.el.id) {
+          tick.href = "#" + m.el.id;
+          tick.setAttribute("aria-label", m.label + " (" + m.tc + ")");
+          tick.setAttribute("data-label", m.tc + " " + m.label);
+        }
         track.appendChild(tick);
       });
       return max;
@@ -54,6 +66,9 @@
       }
       tc.textContent = timecode(t);
       track.style.setProperty("--progress", Math.min(1, y / max));
+      var current = "";
+      for (var j = 1; j < anchors.length - 1; j++) if (y >= anchors[j].y - 1) current = anchors[j].mark.label;
+      chapter.textContent = current;
     };
     addEventListener("scroll", function () { if (!pending) { pending = true; requestAnimationFrame(update); } }, { passive: true });
     addEventListener("resize", function () { max = measure(); update(); });
