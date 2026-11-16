@@ -39,6 +39,7 @@ export function page({ path, title, description, root, crumbs, body, type = "art
   <link rel="stylesheet" href="${root}site.css">
 </head>
 <body>
+  <a class="skip" href="#main">Skip to content</a>
   <header class="hud" aria-label="Recording status bar">
     <div class="hud-left">
       <span class="rec-dot" aria-hidden="true"></span>
@@ -54,7 +55,7 @@ export function page({ path, title, description, root, crumbs, body, type = "art
     </div>
   </header>
 
-  <main class="wrap">
+  <main class="wrap" id="main" tabindex="-1">
     <section class="page-head">
       <p class="crumbs">${crumbs}</p>
 ${body}

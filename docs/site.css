@@ -167,6 +167,22 @@ h1 .amber { color: var(--amber); }
   border-top: 1px solid var(--line); padding-top: 1.1rem;
 }
 .tc-mark .tc { color: var(--amber); }
+/* Copyable link to a chapter, added by site.js: quiet until the chapter is hovered. */
+.tc-link {
+  margin-left: auto; color: var(--dim); text-decoration: none; letter-spacing: 0.06em;
+  opacity: 0; transition: opacity 0.15s, color 0.15s;
+}
+.chapter:hover .tc-link, .tc-link:focus-visible, .tc-link.copied { opacity: 1; }
+.tc-link:hover, .tc-link.copied { color: var(--amber); }
+@media (hover: none) { .tc-link { opacity: 0.7; } }
+/* Skip link: off screen until focused. */
+.skip {
+  position: fixed; top: 0.5rem; left: 0.5rem; z-index: 20; transform: translateY(-200%);
+  padding: 0.45rem 0.8rem; border-radius: 4px; background: var(--amber); color: var(--desktop);
+  font-family: var(--mono); font-size: 0.85rem; text-decoration: none;
+}
+.skip:focus { transform: none; }
+#main:focus { outline: none; }
 h2 {
   font-family: var(--display); font-weight: 700;
   font-size: clamp(1.5rem, 3.4vw, 2.1rem);

@@ -218,6 +218,28 @@
     }
   }
 
+  // Chapter links: a "#link" on each chapter's timecode line. Clicking it
+  // moves to the chapter and copies its URL, so a section can be shared.
+  Array.prototype.slice.call(document.querySelectorAll(".chapter[id] > .tc-mark")).forEach(function (mark) {
+    var id = mark.parentElement.id;
+    var name = mark.lastElementChild ? mark.lastElementChild.textContent.trim().toLowerCase() : id;
+    var link = document.createElement("a");
+    link.className = "tc-link";
+    link.href = "#" + id;
+    link.textContent = "#link";
+    link.setAttribute("aria-label", "Copy a link to " + name);
+    link.addEventListener("click", function () {
+      if (!navigator.clipboard) return;
+      var url = location.href.split("#")[0] + "#" + id;
+      navigator.clipboard.writeText(url).then(function () {
+        link.textContent = "copied";
+        link.classList.add("copied");
+        setTimeout(function () { link.textContent = "#link"; link.classList.remove("copied"); }, 1500);
+      }, function () { /* clipboard blocked: the jump still happens */ });
+    });
+    mark.appendChild(link);
+  });
+
   // Tool finder: filter the tool tables as you type.
   var q = document.getElementById("tool-q");
   if (q) {
