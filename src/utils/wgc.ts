@@ -17,6 +17,7 @@
  * exits 0. Everything in this module is pure.
  */
 import { ScreencastError } from "./errors.js";
+import { aacArgs, buildAudioInputArgs } from "./targets.js";
 
 export interface WgcRecorderConfig {
   ffmpeg: string;
@@ -29,6 +30,8 @@ export interface WgcRecorderConfig {
   maxDurationSec: number;
   /** False leaves the cursor out of the frames (#170). */
   cursor?: boolean;
+  /** A resolved dshow loopback device to record system audio from (#316). */
+  audioDevice?: string;
   /** How long to wait for the window's first frame (default 10 s; tests
    * shorten it, #296). */
   firstFrameTimeoutMs?: number;
@@ -107,7 +110,13 @@ export function buildWgcEncodeArgs(width: number, height: number, cfg: WgcRecord
     "-hide_banner", "-nostats", "-loglevel", "error", "-y",
     "-f", "rawvideo", "-pix_fmt", "yuv420p", "-s", `${width}x${height}`, "-framerate", String(cfg.fps),
     "-i", "pipe:0",
+    // System audio (#316) from dshow, like gdigrab captures. It opens with the
+    // encoder, at the window's first frame, so both start together.
+    ...(cfg.audioDevice ? [...buildAudioInputArgs({ device: cfg.audioDevice }), "-map", "0:v", "-map", "1:a"] : []),
     ...cfg.encode,
+    // The recorder stops by closing stdin; a live device never ends, so the
+    // output ends with the video.
+    ...(cfg.audioDevice ? [...aacArgs(), "-shortest"] : []),
     "-movflags", "+frag_keyframe+empty_moov+default_base_moof",
     cfg.output,
   ];

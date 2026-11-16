@@ -10,7 +10,8 @@ describe("checkStartChoices (#307)", () => {
   it("accepts what works and names what does not", () => {
     expect(() => checkStartChoices(base, facts)).not.toThrow();
     expect(() => checkStartChoices({ ...base, backend: "wgc" }, { ...facts, windowHwnd: false })).toThrow(/one window/);
-    expect(() => checkStartChoices({ ...base, backend: "wgc", systemAudio: true }, facts)).toThrow(/Audio is not supported/);
+    // System audio works with wgc (#316).
+    expect(() => checkStartChoices({ ...base, backend: "wgc", systemAudio: true }, facts)).not.toThrow();
     expect(() => checkStartChoices({ ...base, backend: "wgc" }, { ...facts, wgcAvailable: false })).toThrow(/FFmpeg 8/);
     expect(() => checkStartChoices({ ...base, backend: "wgc", replay: true }, facts)).toThrow(/replayBufferSec/);
     expect(() => checkStartChoices({ ...base, replay: true, webcam: true }, facts)).toThrow(/webcam works with/);

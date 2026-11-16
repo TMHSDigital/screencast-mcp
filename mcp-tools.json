@@ -135,7 +135,7 @@
           ]
         },
         "backend": {
-          "description": "gdigrab (default): the screen rectangle. wgc (window: targets, FFmpeg 8+): the window's own surface, even when covered or moved; client area only, no audio. ddagrab: one display on the GPU, low CPU.",
+          "description": "gdigrab (default): the screen rectangle. wgc (window: targets, FFmpeg 8+): the window's own surface, even when covered or moved; client area only. ddagrab: one display on the GPU, low CPU.",
           "type": "string",
           "enum": [
             "gdigrab",

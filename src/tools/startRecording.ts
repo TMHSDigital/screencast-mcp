@@ -176,7 +176,7 @@ const inputSchema = {
     .optional()
     .describe(
       "gdigrab (default): the screen rectangle. wgc (window: targets, FFmpeg 8+): the window's own " +
-        "surface, even when covered or moved; client area only, no audio. ddagrab: one display on the GPU, low CPU.",
+        "surface, even when covered or moved; client area only. ddagrab: one display on the GPU, low CPU.",
     ),
   encoder: z
     .enum(["auto", "x264", "nvenc", "qsv", "amf"])
@@ -334,7 +334,7 @@ async function launchCapture(c: CapturePlan, p: EncoderPick) {
           process.execPath,
           [
             wgcRecorderScript(),
-            JSON.stringify({ ffmpeg: c.ffmpeg, hwnd: c.window!.hwnd, fps: c.fps, encode: [...encoderArgs(p.encoder, c.quality), ...captureKeyframeArgs(c.fps)], output: c.output, maxDurationSec: c.maxDurationSec, cursor: !c.hideCursor }),
+            JSON.stringify({ ffmpeg: c.ffmpeg, hwnd: c.window!.hwnd, fps: c.fps, encode: [...encoderArgs(p.encoder, c.quality), ...captureKeyframeArgs(c.fps)], output: c.output, maxDurationSec: c.maxDurationSec, cursor: !c.hideCursor, ...(c.audio ? { audioDevice: c.audio.device } : {}) }),
           ],
           { stdio: ["pipe", "ignore", "pipe"], windowsHide: true },
         )

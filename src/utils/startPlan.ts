@@ -29,7 +29,6 @@ export interface StartChoices {
 export function checkStartChoices(c: StartChoices, facts: { windowHwnd: boolean; wgcAvailable: boolean }): void {
   if (c.backend === "wgc") {
     if (!facts.windowHwnd) throw new ScreencastError('backend "wgc" records one window: use a window: target.');
-    if (c.systemAudio) throw new ScreencastError('Audio is not supported with backend "wgc" yet; use gdigrab.');
     if (!facts.wgcAvailable) throw new ScreencastError('backend "wgc" needs FFmpeg 8 or newer (the gfxcapture filter). Use gdigrab, or update ffmpeg.');
     if (c.replay) throw new ScreencastError('replayBufferSec is not supported with backend "wgc" yet; use gdigrab or ddagrab.');
   }

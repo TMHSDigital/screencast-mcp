@@ -9,6 +9,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `start_recording` `backend: "wgc"` now records system audio (`audio: { source: "system" }`), from the same dshow loopback device gdigrab captures use. It starts with the window's first frame and ends with the video (#316).
+
 - `perf_overlay` tool: draws a recording's performance track (`start_recording perf: true`) on the video as a small chart in a corner, with a playhead that moves with the video and stretches pinned at 90%+ CPU in red. It shows the app's CPU by default, or `sysCpu`, `rssMB`, `sysMem`. `index_recording` now also indexes CPU spikes ("cpu pinned 97% for 12 s"), so `search_recording` finds them (#335).
 
 ### Fixed

@@ -68,7 +68,7 @@ Parameters:
 - `hotkeys` (boolean): Ctrl+Alt+Shift+M adds a marker, +S stops (implies events).
 - `elements` (boolean): Name the UI element each click hits, e.g. "Save" button (implies events).
 - `cursor` ("os" | "events"): events: leave the OS cursor out and log it (implies events) for the cursor tool to redraw.
-- `backend` ("gdigrab" | "wgc" | "ddagrab"): gdigrab (default): the screen rectangle. wgc (window: targets, FFmpeg 8+): the window's own surface, even when covered or moved; client area only, no audio. ddagrab: one display on the GPU, low CPU.
+- `backend` ("gdigrab" | "wgc" | "ddagrab"): gdigrab (default): the screen rectangle. wgc (window: targets, FFmpeg 8+): the window's own surface, even when covered or moved; client area only. ddagrab: one display on the GPU, low CPU.
 - `encoder` ("auto" | "x264" | "nvenc" | "qsv" | "amf"): auto = first working GPU encoder, else x264 (default with ddagrab; else x264).
 - `webcam` (object): Also record a camera to <output>.webcam.mp4, aligned for overlay.
 - `webcam.device` (string): list_video_devices name (default: first).

@@ -33,6 +33,15 @@ describe("wgc recorder helpers", () => {
     expect(a.join(" ")).toContain("-f rawvideo -pix_fmt yuv420p -s 400x300 -framerate 15 -i pipe:0 -c:v libx264");
     expect(a).toContain("+frag_keyframe+empty_moov+default_base_moof");
     expect(a.at(-1)).toBe("o.mp4");
+    expect(a).not.toContain("dshow");
+  });
+
+  it("records system audio from dshow beside the frames when asked (#316)", () => {
+    const a = buildWgcEncodeArgs(400, 300, { ...CFG, audioDevice: "Stereo Mix (Realtek)" }).join(" ");
+    expect(a).toContain("-i pipe:0 -f dshow -i audio=Stereo Mix (Realtek) -map 0:v -map 1:a -c:v libx264");
+    expect(a).toContain("-c:a aac");
+    // The recorder stops by closing stdin; the endless device must not hold the encoder open.
+    expect(a).toContain("-shortest");
   });
 
   it("paces frames to wall-clock time", () => {
