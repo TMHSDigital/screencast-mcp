@@ -44,6 +44,10 @@ export interface RecordOptions {
   discardOnSuccess: boolean;
   /** OCR the end of a failing run for error lines (Windows OCR). */
   ocrErrors: boolean;
+  /** Blur on-screen secrets in the GIF and contact sheet (#322): OCR the
+   * recording for this pattern and redact matches before making them. */
+  redactSecrets: boolean;
+  secretPattern?: string;
   maxDurationSec?: number;
   /** The command to run, as given after `--` (or the one --command-env names). */
   command: string[];
@@ -88,6 +92,9 @@ record options:
   --no-contact-sheet      skip the contact sheet
   --discard-on-success    delete the recording when the command exits 0
   --ocr-errors            on failure, OCR the last <sec> seconds for error lines (Windows OCR)
+  --redact-secrets        OCR the recording and blur on-screen secrets (API keys, tokens,
+                          password: values) in the GIF and contact sheet (Windows OCR)
+  --secret-pattern <re>   with --redact-secrets, the regex to blur instead of the default
   --max-duration <sec>    stop recording after <sec> seconds, an integer 0-${MAX_RECORDING_CAP_SEC}
                           (0 = no cap; default SCREENCAST_MAX_RECORDING_SEC, else 3600)
   --command-env <NAME>    run the command line in environment variable NAME instead of
@@ -124,6 +131,7 @@ function parseRecord(argv: readonly string[], env: NodeJS.ProcessEnv): RecordOpt
     contactSheet: true,
     discardOnSuccess: false,
     ocrErrors: false,
+    redactSecrets: false,
     command: dash === -1 ? [] : argv.slice(dash + 1),
   };
   let commandEnv: string | undefined;
@@ -177,6 +185,12 @@ function parseRecord(argv: readonly string[], env: NodeJS.ProcessEnv): RecordOpt
         break;
       case "--discard-on-success":
         options.discardOnSuccess = true;
+        break;
+      case "--redact-secrets":
+        options.redactSecrets = true;
+        break;
+      case "--secret-pattern":
+        options.secretPattern = value();
         break;
       case "--ocr-errors":
         options.ocrErrors = true;
@@ -413,6 +427,8 @@ export interface Evidence {
   contactSheet: string | null;
   /** OCR'd error lines from the end of a failing run (--ocr-errors), else null. */
   errors: string[] | null;
+  /** With --redact-secrets: secret regions blurred in the GIF and contact sheet. */
+  redactions?: number;
   warnings: string[];
 }
 
@@ -509,8 +525,22 @@ export async function runRecord(opts: RecordOptions, io: CliIo = defaultIo, deps
     const failed = evidence.exitCode !== 0;
     const wanted = opts.artifacts === "always" || (opts.artifacts === "failure" && failed);
     if (evidence.recording && wanted) {
-      const input = evidence.recording;
-      if (opts.gif) {
+      // Blurred copy for the shareable files (#322); the raw recording stays
+      // as is. If the scan fails, the files are skipped, never made unblurred.
+      let input: string | null = evidence.recording;
+      let redactedPath: string | null = null;
+      if (opts.redactSecrets) {
+        try {
+          const redacted = await redactCopy(client, evidence.recording, evidence.durationSec, opts.secretPattern, outDir, warn);
+          evidence.redactions = redacted?.regions ?? 0;
+          redactedPath = redacted?.path ?? null;
+          if (redactedPath) input = redactedPath;
+        } catch (err) {
+          warn(`secret scan failed, so the GIF and contact sheet were skipped: ${errorMessage(err)}`);
+          input = null;
+        }
+      }
+      if (input && opts.gif) {
         try {
           const gif = await mustCall(client, "export_gif", {
             input,
@@ -523,7 +553,7 @@ export async function runRecord(opts: RecordOptions, io: CliIo = defaultIo, deps
           warn(`export_gif failed: ${errorMessage(err)}`);
         }
       }
-      if (opts.contactSheet) {
+      if (input && opts.contactSheet) {
         try {
           const sheet = await mustCall(client, "contact_sheet", {
             input,
@@ -536,6 +566,7 @@ export async function runRecord(opts: RecordOptions, io: CliIo = defaultIo, deps
           warn(`contact_sheet failed: ${errorMessage(err)}`);
         }
       }
+      if (redactedPath) rmSync(redactedPath, { force: true });
     }
     if (evidence.recording && failed && opts.ocrErrors) {
       evidence.errors = await ocrErrors(client, evidence.recording, evidence.durationSec, opts.lastSec, outDir, warn);
@@ -555,6 +586,47 @@ export async function runRecord(opts: RecordOptions, io: CliIo = defaultIo, deps
       "\n",
   );
   return evidence.exitCode;
+}
+
+/** Most frames the secret scan reads, spread over the recording. */
+const REDACT_SCAN_FRAMES = 120;
+
+/**
+ * A copy of the recording with on-screen secrets blurred (#322), for the GIF
+ * and contact sheet: find_text scans it for the secret pattern (whole lines,
+ * as bug_report does) and redact_region blurs each match while it shows.
+ * Returns null when nothing was found (the original is used) and throws the
+ * scan's failure, so evidence is never shared unredacted by mistake.
+ */
+async function redactCopy(
+  client: ToolClient,
+  recording: string,
+  durationSec: number | null,
+  pattern: string | undefined,
+  outDir: string,
+  warn: (msg: string) => void,
+): Promise<{ path: string; regions: number } | null> {
+  const every = Math.max(1, Math.ceil((durationSec ?? 0) / REDACT_SCAN_FRAMES));
+  const found = await mustCall(client, "find_text", {
+    input: recording,
+    scanEverySec: every,
+    maxFrames: REDACT_SCAN_FRAMES,
+    query: pattern ?? DEFAULT_SECRET_PATTERN,
+    regex: true,
+    redact: true,
+    returnImage: false,
+  });
+  const regions = Array.isArray(found.redactRegions) ? (found.redactRegions as Array<Record<string, unknown>>) : [];
+  if (regions.length === 0) return null;
+  const out = await mustCall(client, "redact_region", {
+    input: recording,
+    regions,
+    style: "blur",
+    output: join(outDir, ".redacted.mp4"),
+    overwrite: true,
+  });
+  warn(`blurred ${regions.length} on-screen secret region(s) in the shared files`);
+  return { path: String(out.outputPath), regions: regions.length };
 }
 
 /** OCR the same tail the GIF covers for error lines: find_text scans a whole

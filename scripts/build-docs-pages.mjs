@@ -332,6 +332,7 @@ ${pre("npx -y @tmhs/screencast-mcp record --target full -- npm run test:e2e")}
         <li><code>--max-duration</code>: whole seconds, 0 to 604800 (0 = no cap; default 3600).</li>
         <li><code>--command-env NAME</code>: run the command line stored in an environment variable, so quotes and <code>&amp;</code> reach the shell unchanged.</li>
         <li><code>--ocr-errors</code>: on failure, OCR the end of the run and add the error lines it finds (secrets masked) to <code>evidence.json</code>.</li>
+        <li><code>--redact-secrets</code> (Action input <code>redact-secrets: true</code>): OCR the recording and blur on-screen API keys, tokens and <code>password:</code> values in the GIF and contact sheet before they are uploaded; <code>--secret-pattern</code> sets your own regex. If the scan fails, those files are skipped rather than uploaded unblurred. Worth turning on for public repos.</li>
       </ul>
       <p>Everything lands in <code>screencast-evidence/</code> with an <code>evidence.json</code> summary. Any single tool works the same way: <code>npx -y @tmhs/screencast-mcp call doctor</code>, or <code>call pipeline @recipe.json</code>.</p>
     </section>

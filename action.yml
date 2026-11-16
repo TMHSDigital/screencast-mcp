@@ -54,6 +54,12 @@ inputs:
   ocr-errors:
     description: "On failure, OCR the GIF's window for error lines (Windows OCR) into evidence.json: true, false, or empty to follow comment."
     default: ""
+  redact-secrets:
+    description: "OCR the recording and blur on-screen secrets (API keys, tokens, password: values) in evidence.gif and contact-sheet.png before upload (Windows OCR). If the scan fails they are skipped, not uploaded unblurred."
+    default: "false"
+  secret-pattern:
+    description: With redact-secrets, the regex to blur instead of the default.
+    default: ""
   comment:
     description: "On pull_request events, keep one sticky PR comment per job with the exit code, how the recording ended, OCR'd errors, and a link to the evidence artifact. Created when the command fails, updated on later runs. Needs `permissions: pull-requests: write`."
     default: "false"
@@ -172,6 +178,8 @@ runs:
         SC_PACKAGE: ${{ steps.resolve.outputs.package }}
         SC_CLI_PATH: ${{ inputs.cli-path }}
         SC_OCR: ${{ inputs.ocr-errors }}
+        SC_REDACT: ${{ inputs.redact-secrets }}
+        SC_SECRET_PATTERN: ${{ inputs.secret-pattern }}
         SC_COMMENT: ${{ inputs.comment }}
       run: |
         $PSNativeCommandArgumentPassing = 'Windows'
@@ -180,6 +188,8 @@ runs:
         if ($env:SC_MAX_DURATION) { $cliArgs += @('--max-duration', $env:SC_MAX_DURATION) }
         if ($env:SC_DISCARD -eq 'true') { $cliArgs += '--discard-on-success' }
         if ($env:SC_OCR -eq 'true' -or (-not $env:SC_OCR -and $env:SC_COMMENT -eq 'true')) { $cliArgs += '--ocr-errors' }
+        if ($env:SC_REDACT -eq 'true') { $cliArgs += '--redact-secrets' }
+        if ($env:SC_SECRET_PATTERN) { $cliArgs += @('--secret-pattern', $env:SC_SECRET_PATTERN) }
         if ($env:SC_CLI_PATH) { & node $env:SC_CLI_PATH @cliArgs } else { & npx -y $env:SC_PACKAGE @cliArgs }
         $code = $LASTEXITCODE
         "exit-code=$code" >> $env:GITHUB_OUTPUT

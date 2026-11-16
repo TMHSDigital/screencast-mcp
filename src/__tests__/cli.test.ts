@@ -42,8 +42,12 @@ describe("parseCliArgs record", () => {
       contactSheet: true,
       discardOnSuccess: false,
       ocrErrors: false,
+      redactSecrets: false,
       command: ["npm", "test"],
     });
+  });
+  it("reads --redact-secrets and --secret-pattern (#322)", () => {
+    expect(recordOpts(["record", "--redact-secrets", "--secret-pattern=sk-[a-z]+", "--", "x"])).toMatchObject({ redactSecrets: true, secretPattern: "sk-[a-z]+" });
   });
   it("reads every option, in both --flag value and --flag=value forms", () => {
     const o = recordOpts([

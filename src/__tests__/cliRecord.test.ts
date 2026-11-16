@@ -192,6 +192,47 @@ describe("runRecord evidence", () => {
     expect(r.evidence.errors).toEqual(["AssertionError: expected 1"]);
   });
 
+  it("--redact-secrets makes the GIF and contact sheet from a blurred copy (#322)", async () => {
+    const regions = [{ x: 10, y: 20, width: 100, height: 12, start: 1, end: 4 }];
+    const r = await run(
+      {
+        start_recording: started,
+        stop_recording: { sessionId: "s1", status: "stopped", outputPath: "rec.mp4", durationSec: 600 },
+        find_text: { matches: [], redactRegions: regions },
+        redact_region: { outputPath: "redacted.mp4" },
+        export_gif: { outputPath: "evidence.gif" },
+        contact_sheet: { outputPath: "contact-sheet.png" },
+      },
+      1,
+      { redactSecrets: true, secretPattern: "sk-[a-z]+" },
+    );
+    // A 600 s recording is sampled every 5 s to stay within 120 frames.
+    expect(r.calls.find((c) => c.name === "find_text")?.args).toMatchObject({ input: "rec.mp4", query: "sk-[a-z]+", regex: true, redact: true, scanEverySec: 5 });
+    expect(r.calls.find((c) => c.name === "redact_region")?.args).toMatchObject({ input: "rec.mp4", regions, style: "blur" });
+    expect(r.calls.find((c) => c.name === "export_gif")?.args).toMatchObject({ input: "redacted.mp4" });
+    expect(r.calls.find((c) => c.name === "contact_sheet")?.args).toMatchObject({ input: "redacted.mp4" });
+    expect(r.evidence.redactions).toBe(1);
+  });
+
+  it("--redact-secrets uses the recording as is when nothing is found, and skips the files when the scan fails", async () => {
+    const clean = await run(
+      { start_recording: started, stop_recording: { sessionId: "s1", status: "stopped", outputPath: "rec.mp4", durationSec: 5 }, find_text: { redactRegions: [] }, export_gif: { outputPath: "g.gif" }, contact_sheet: { outputPath: "c.png" } },
+      1,
+      { redactSecrets: true },
+    );
+    expect(clean.calls.some((c) => c.name === "redact_region")).toBe(false);
+    expect(clean.calls.find((c) => c.name === "export_gif")?.args).toMatchObject({ input: "rec.mp4" });
+    expect(clean.evidence.redactions).toBe(0);
+    const broken = await run(
+      { start_recording: started, stop_recording: { sessionId: "s1", status: "stopped", outputPath: "rec.mp4", durationSec: 5 }, find_text: new Error("no OCR"), export_gif: { outputPath: "g.gif" }, contact_sheet: { outputPath: "c.png" } },
+      1,
+      { redactSecrets: true },
+    );
+    expect(broken.calls.some((c) => c.name === "export_gif" || c.name === "contact_sheet")).toBe(false);
+    expect(broken.evidence.gif).toBeNull();
+    expect(broken.evidence.warnings.join(" ")).toMatch(/secret scan failed/);
+  });
+
   it("does not OCR a passing run", async () => {
     const r = await run(
       { start_recording: started, stop_recording: { sessionId: "s1", status: "stopped", outputPath: "rec.mp4", durationSec: 5 } },
