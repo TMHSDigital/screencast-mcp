@@ -327,8 +327,8 @@ describe("buildExtractAudioArgs", () => {
 describe("buildClipArgs", () => {
   it("re-encodes a frame-accurate segment with -ss + -t", () => {
     const s = buildClipArgs("in.mp4", "o.mp4", { start: 2, end: 6 }).join(" ");
-    expect(s).toContain("-ss 2");
-    expect(s).toContain("-t 4");
+    // Input seek: -ss before -i (output-side -ss could hang on Windows CI, #281).
+    expect(s).toContain("-ss 2 -i in.mp4 -t 4");
     expect(s).toContain("libx264");
     expect(s).not.toContain("-c copy");
   });

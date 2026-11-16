@@ -715,8 +715,11 @@ export interface Segment {
 }
 
 /** Extract one frame-accurate sub-segment. Unlike trim (stream copy, snaps to a
- * keyframe), clip re-encodes so the cut lands exactly on start/end. Output -ss
- * plus -t (a duration) avoids the -to seek ambiguity. */
+ * keyframe), clip re-encodes so the cut lands exactly on start/end: an input
+ * -ss with a re-encode decodes from the keyframe before and drops what comes
+ * before start. -t (a duration) avoids the -to seek ambiguity. Output-side
+ * -ss gave the same frames but sometimes never produced one on Windows CI
+ * runners, decoding until the job timed out (#281). */
 export function buildClipArgs(
   input: string,
   output: string,
@@ -730,8 +733,9 @@ export function buildClipArgs(
     throw new ScreencastError("clip end must be greater than start.");
   }
   return [
-    "-y", "-i", input,
+    "-y",
     "-ss", String(seg.start),
+    "-i", input,
     "-t", String(seg.end - seg.start),
     ...encodeTail({ quality, audio: "aac", bitrate: null }),
     output,
