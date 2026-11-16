@@ -419,6 +419,11 @@ a.hud-tick:last-of-type::after { left: auto; right: 0; transform: none; }
   background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 0.55rem 0.8rem;
 }
 .finder input::placeholder { color: var(--dim); }
+.finder-key {
+  font-family: var(--mono); font-size: 0.75rem; color: var(--dim);
+  border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 0.4rem;
+}
+@media (hover: none) { .finder-key { display: none; } }
 #tool-count { font-family: var(--mono); font-size: 0.8rem; color: var(--dim); }
 .finder-empty { color: var(--dim); margin: 1.4rem 0 0; }
 #tools .chapter:first-child { padding-top: 2rem; }

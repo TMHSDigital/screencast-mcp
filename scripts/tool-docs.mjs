@@ -417,6 +417,14 @@ export function renderToolsIndex(tools) {
       <p class="lede">${tools.length} tools in ${groups.length} toolsets, each with its parameters, a minimal call, and what it returns. Generated from the server's own schemas, so this reference cannot drift from the code. Agents can read all of it in one file: <a href="../llms-full.txt">llms-full.txt</a>.</p>
     </section>
 
+    <div class="finder" role="search">
+      <label for="tool-q">Find a tool</label>
+      <input id="tool-q" type="search" placeholder="Try trim, OCR, GIF, redact" autocomplete="off" spellcheck="false" aria-keyshortcuts="/">
+      <kbd class="finder-key" title="Press / to search" aria-hidden="true">/</kbd>
+      <span id="tool-count" aria-live="polite"></span>
+    </div>
+    <p class="finder-empty" id="tool-empty" hidden></p>
+    <div id="tools">
 ${groups
   .map(
     (g, i) => `    <section class="chapter" id="${g.set}">
@@ -424,12 +432,13 @@ ${groups
 ${g.blurb ? `      <p>${mdInline(g.blurb)}</p>\n` : ""}      <table>
         <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
         <tbody>
-${g.tools.map((t) => `          <tr><td><code><a href="${t.name}.html">${t.name}</a></code></td><td>${mdInline(summary(t.description))}</td></tr>`).join("\n")}
+${g.tools.map((t) => `          <tr data-search="${esc(`${t.name} ${t.description ?? ""}`.toLowerCase())}"><td><code><a href="${t.name}.html">${t.name}</a></code></td><td>${mdInline(summary(t.description))}</td></tr>`).join("\n")}
         </tbody>
       </table>
     </section>`,
   )
   .join("\n\n")}
+    </div>
 `;
   return page({
     path: "tools/index.html",

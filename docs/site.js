@@ -32,7 +32,9 @@
     var anchors = [];
     var measure = function () {
       var max = Math.max(1, document.documentElement.scrollHeight - innerHeight);
-      anchors = [{ y: 0, t: 0 }].concat(marks.map(function (m) {
+      // Chapters hidden by the tool finder have no box; leave them out.
+      var visible = marks.filter(function (m) { return m.el.getClientRects().length > 0; });
+      anchors = [{ y: 0, t: 0 }].concat(visible.map(function (m) {
         return { y: Math.min(max, m.el.getBoundingClientRect().top + scrollY - innerHeight * 0.3), t: m.t, mark: m };
       }));
       var last = anchors[anchors.length - 1];
@@ -226,7 +228,8 @@
       var terms = q.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
       var shown = 0;
       rows.forEach(function (r) {
-        var text = r.textContent.toLowerCase().replace(/_/g, " ") + " " + r.textContent.toLowerCase();
+        var raw = (r.getAttribute("data-search") || r.textContent).toLowerCase();
+        var text = raw.replace(/_/g, " ") + " " + raw;
         var ok = terms.every(function (t) { return text.indexOf(t) >= 0; });
         r.hidden = !ok;
         if (ok) shown++;
@@ -235,8 +238,30 @@
       count.textContent = terms.length ? shown + " of " + rows.length + " tools" : rows.length + " tools";
       empty.hidden = shown > 0;
       empty.textContent = shown ? "" : "No tool matches “" + q.value.trim() + "”. Try a word like trim, OCR, GIF, or zoom.";
+      // Keep the query in the URL so a filtered list can be shared, and let
+      // the HUD re-measure its chapter markers for the new page height.
+      try {
+        var url = new URL(location.href);
+        if (q.value.trim()) url.searchParams.set("q", q.value.trim()); else url.searchParams.delete("q");
+        history.replaceState(null, "", url);
+      } catch (e) { /* file:// or old browser: the filter still works */ }
+      dispatchEvent(new Event("resize"));
     };
     q.addEventListener("input", run);
+    // "/" jumps to the finder from anywhere on the page; Escape clears it.
+    addEventListener("keydown", function (e) {
+      var t = e.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+      if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        q.focus();
+        q.select();
+      } else if (e.key === "Escape" && t === q && q.value) {
+        q.value = "";
+        run();
+      }
+    });
+    var initial = new URLSearchParams(location.search).get("q");
+    if (initial) q.value = initial;
     run();
   }
 })();

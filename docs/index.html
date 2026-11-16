@@ -120,7 +120,8 @@
 
     <div class="finder" role="search">
       <label for="tool-q">Find a tool</label>
-      <input id="tool-q" type="search" placeholder="Try trim, OCR, GIF, redact" autocomplete="off" spellcheck="false">
+      <input id="tool-q" type="search" placeholder="Try trim, OCR, GIF, redact" autocomplete="off" spellcheck="false" aria-keyshortcuts="/">
+      <kbd class="finder-key" title="Press / to search" aria-hidden="true">/</kbd>
       <span id="tool-count" aria-live="polite"></span>
     </div>
     <p class="finder-empty" id="tool-empty" hidden></p>
