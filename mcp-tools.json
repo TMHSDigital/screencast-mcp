@@ -1686,6 +1686,69 @@
     }
   },
   {
+    "name": "perf_overlay",
+    "toolset": "produce",
+    "title": "Performance Overlay",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Draw a recording's CPU or memory track as a small chart with a moving playhead (spikes in red).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A recording made with perf: true."
+        },
+        "perf": {
+          "description": "Its .perf.jsonl (default: next to input).",
+          "type": "string"
+        },
+        "metric": {
+          "description": "Default cpu (the app's) if sampled, else sysCpu.",
+          "type": "string",
+          "enum": [
+            "cpu",
+            "sysCpu",
+            "rssMB",
+            "sysMem"
+          ]
+        },
+        "corner": {
+          "description": "Default top_right.",
+          "type": "string",
+          "enum": [
+            "top_left",
+            "top_right",
+            "bottom_left",
+            "bottom_right"
+          ]
+        },
+        "width": {
+          "description": "Chart width px (default video/4).",
+          "type": "integer",
+          "minimum": 80,
+          "maximum": 1920
+        },
+        "output": {
+          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Allow replacing an existing file at the output path (default false).",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "input"
+      ]
+    }
+  },
+  {
     "name": "translate_subtitles",
     "toolset": "produce",
     "title": "Translate Subtitles",

@@ -100,6 +100,7 @@ const CASES: Case[] = [
   { name: "scale", args: (f) => ({ input: f.v, width: 160 }), expect: "media" },
   { name: "speed", args: (f) => ({ input: f.av, factor: 2 }), expect: "media" },
   { name: "overlay", args: (f) => ({ input: f.av, overlay: f.png, x: 10, y: 10, width: 32 }), expect: "media" },
+  { name: "perf_overlay", args: (f) => ({ input: f.av }), expect: "media" },
   { name: "compose", args: (f) => ({ inputs: [{ path: f.av, label: "Before" }, { path: f.av2 }], layout: "stack" }), expect: "media" },
   { name: "callout", args: (f) => ({ input: f.v, items: [{ type: "box", x: 20, y: 20, width: 80, height: 60 }] }), expect: "media" },
   { name: "keystroke_overlay", args: (f) => ({ input: f.av }), expect: "media" },
@@ -278,6 +279,8 @@ describe.skipIf(!AVAILABLE)("every non-capture tool through the MCP client (#261
     ffmpeg(dir, ["-f", "lavfi", "-i", "color=c=blue:size=64x64", "-frames:v", "1", "logo2.png"]);
     ffmpeg(dir, ["-f", "lavfi", "-i", "sine=frequency=220:duration=4:sample_rate=48000", "music.wav"]);
     writeFileSync(join(dir, "subs.srt"), SRT);
+    // A performance track for av.mp4, as start_recording perf: true writes it (#335).
+    writeFileSync(join(dir, "av.perf.jsonl"), [0, 1, 2].map((t) => JSON.stringify({ t, sysCpu: 30, sysMem: 50, cpu: t === 1 ? 95 : 20, rssMB: 200 })).join("\n") + "\n");
     const events: InputEvent[] = [
       { t: 0.3, type: "move", x: 40, y: 40, inFrame: true },
       { t: 0.8, type: "down", x: 120, y: 80, inFrame: true, button: "left" },

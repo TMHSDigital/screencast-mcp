@@ -2,7 +2,7 @@
 
 > An MCP server (stdio) that lets AI agents record the Windows screen, watch the footage as frames, and edit it with ffmpeg. Install: `npx -y @tmhs/screencast-mcp`. Capture is Windows-only; the watch and edit tools run anywhere ffmpeg runs.
 
-61 tools. Generated from the server's schemas; the same content is on https://tmhsdigital.github.io/screencast-mcp/tools/.
+62 tools. Generated from the server's schemas; the same content is on https://tmhsdigital.github.io/screencast-mcp/tools/.
 
 # Core toolset
 
@@ -962,6 +962,28 @@ Minimal call:
 
 ```json
 {"inputs":[{"path":"recording.mp4"},{"path":"recording.mp4"}]}
+```
+
+## perf_overlay
+
+**Performance Overlay** (since next release)
+
+Draw a recording's CPU or memory track as a small chart with a moving playhead (spikes in red).
+
+Parameters:
+
+- `input` (string; required): A recording made with perf: true.
+- `perf` (string): Its .perf.jsonl (default: next to input).
+- `metric` ("cpu" | "sysCpu" | "rssMB" | "sysMem"): Default cpu (the app's) if sampled, else sysCpu.
+- `corner` ("top_left" | "top_right" | "bottom_left" | "bottom_right"): Default top_right.
+- `width` (integer; ≥ 80, ≤ 1920): Chart width px (default video/4).
+- `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Allow replacing an existing file at the output path (default false).
+
+Minimal call:
+
+```json
+{"input":"recording.mp4"}
 ```
 
 ## translate_subtitles

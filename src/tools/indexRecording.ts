@@ -12,6 +12,7 @@ import { readFrames } from "../utils/ocrScan.js";
 import { ocrStatus } from "../utils/capabilities.js";
 import { parseEventsJsonl } from "../utils/events.js";
 import { logsPath, parseLogsJsonl } from "../utils/logTail.js";
+import { parsePerfJsonl, perfPath, summarizePerf } from "../utils/perf.js";
 import { maskSecrets, DEFAULT_SECRET_PATTERN } from "../utils/bugReport.js";
 import { resolveWhisperModel, buildTranscribeArgs, parseSrt, normalizeCues, type Cue } from "../utils/captions.js";
 import { subdir, tempPath } from "../utils/paths.js";
@@ -148,6 +149,17 @@ export function register(server: McpServer): void {
         const events = source.eventsPath ? eventTexts(parseEventsJsonl(readFileSync(source.eventsPath, "utf8"))) : [];
         segments = attach(segments, events, "events");
         segments = attach(segments, markerTexts(source.markers), "markers");
+        // CPU spikes from the performance track (#335), as searchable text.
+        const perfFile = perfPath(source.path);
+        if (existsSync(perfFile)) {
+          const samples = parsePerfJsonl(readFileSync(perfFile, "utf8"));
+          const { busy } = summarizePerf(samples);
+          const spikes = busy.map((b) => {
+            const peak = Math.max(...samples.filter((x) => x.t >= b.start && x.t <= b.end).map((x) => x.cpu ?? x.sysCpu));
+            return { t: b.start, text: `cpu pinned ${Math.round(peak)}% for ${Math.round(b.end - b.start)} s (performance spike)` };
+          });
+          if (spikes.length) segments = attach(segments, [...segments.flatMap((x) => x.events ?? []), ...spikes], "events");
+        }
         // App logs (#334), masked like screen text before they reach disk.
         const logFile = logsPath(source.path);
         if (existsSync(logFile)) {

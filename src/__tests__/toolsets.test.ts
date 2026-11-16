@@ -25,11 +25,12 @@ afterAll(() => rmSync(home, { recursive: true, force: true }));
  * to about 99.1 KB, and ranged speed (a range schema in speed, cut_idle and
  * pipeline), hotkeys, elements and text waits to about 100.7 KB, and the
  * compose tool to about 102.5 KB, translate_subtitles with chapters'
- * subtitleTracks to about 103.9 KB, and pipeline fromEdit to about 104 KB.
- * Raise it only deliberately, after trying to say the new thing in fewer
- * words; SCREENCAST_TOOLSETS trims it per client.
+ * subtitleTracks to about 103.9 KB, pipeline fromEdit to about 104 KB, and
+ * 0.51's perf_overlay tool to about 106.3 KB. Raise it only deliberately,
+ * after trying to say the new thing in fewer words; SCREENCAST_TOOLSETS trims
+ * it per client.
  */
-const TOOLS_LIST_BUDGET_BYTES = 105_000;
+const TOOLS_LIST_BUDGET_BYTES = 107_000;
 
 const manifest = JSON.parse(readFileSync(join(process.cwd(), "mcp-tools.json"), "utf8")) as Array<{
   name: string;

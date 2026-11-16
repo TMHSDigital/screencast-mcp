@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- `perf_overlay` tool: draws a recording's performance track (`start_recording perf: true`) on the video as a small chart in a corner, with a playhead that moves with the video and stretches pinned at 90%+ CPU in red. It shows the app's CPU by default, or `sysCpu`, `rssMB`, `sysMem`. `index_recording` now also indexes CPU spikes ("cpu pinned 97% for 12 s"), so `search_recording` finds them (#335).
+
 ### Fixed
 
 - A `start_recording` that failed after its input event logger started (but before the session was registered) could leave the logger, its raw log, a replay buffer folder or webcam parts behind; every failure after the first resource is taken now goes through one cleanup (#307).

@@ -58,6 +58,7 @@ export const TOOLSETS = {
     "backdrop",
     "overlay",
     "compose",
+    "perf_overlay",
     "zoom",
     "reframe",
     "title_card",
