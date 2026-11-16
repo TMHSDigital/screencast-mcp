@@ -16,6 +16,7 @@ import { existsSync } from "node:fs";
 import { eventPaths, whenFinalized } from "./events.js";
 import { getStore } from "../context.js";
 import type { SessionRecord } from "./sessions.js";
+import { summarizePerf, type PerfSample } from "./perf.js";
 
 /** Seconds of the recording's end the clip keeps by default. */
 export const DEFAULT_CLIP_SEC = 30;
@@ -189,6 +190,8 @@ export interface BugReportData {
   /** Why there are no steps, when there are none. */
   stepsNote?: string;
   errors: ErrorFinding[];
+  /** Resource usage summary lines (#335), when the recording had perf. */
+  perf?: string[];
   /** App log lines around the clip (#334), times from the clip start. */
   logs?: Array<{ t: number; source: string; line: string; level?: string }>;
   /** read: OCR ran; unavailable: no Windows OCR here. */
@@ -246,6 +249,10 @@ export function buildReportMarkdown(r: BugReportData): string {
       out.push(`- \`${when}\` ${code(e.text)}`);
     }
     out.push("");
+  }
+
+  if (r.perf && r.perf.length > 0) {
+    out.push("## Resource usage", "", ...r.perf.map((l) => `- ${l}`), "");
   }
 
   if (r.logs) {
@@ -334,4 +341,26 @@ export function logExcerpt(
   const near = lines.filter((l) => l.t >= clip.start - 5 && l.t <= clip.end).slice(-MAX_REPORT_LOG_LINES);
   const masked = pattern ? maskSecrets(near.map((l) => l.line), pattern) : near.map((l) => l.line);
   return near.map((l, i) => ({ ...l, t: Math.round((l.t - clip.start) * 1000) / 1000, line: masked[i] ?? l.line }));
+}
+
+/**
+ * Resource usage lines for a report (#335), from the samples inside the clip:
+ * the peaks, memory growth, and stretches where CPU was pinned, timed from
+ * the clip start. Empty when there are no samples there. Pure.
+ */
+export function perfLines(
+  samples: readonly PerfSample[],
+  clip: { start: number; end: number },
+  proc?: { exe?: string },
+): string[] {
+  const inClip = samples.filter((s) => s.t >= clip.start && s.t <= clip.end).map((s) => ({ ...s, t: s.t - clip.start }));
+  if (inClip.length === 0) return [];
+  const sum = summarizePerf(inClip);
+  const who = proc?.exe ?? "the app";
+  return [
+    ...(sum.peakCpu !== undefined ? [`${who} CPU peaked at ${sum.peakCpu}% of the machine`] : []),
+    ...(sum.peakRssMB !== undefined ? [`${who} memory peaked at ${sum.peakRssMB} MB (${sum.rssGrowthMB! >= 0 ? "+" : ""}${sum.rssGrowthMB} MB over the clip)`] : []),
+    `Machine CPU peaked at ${sum.peakSysCpu}%`,
+    ...sum.busy.map((b) => `CPU pinned (>= 90%) from ${formatTimecode(b.start)} to ${formatTimecode(b.end)}`),
+  ];
 }

@@ -32,6 +32,7 @@ import type { ReplayBuffer } from "./replay.js";
 import type { Marker } from "./chapters.js";
 import type { VideoEncoder } from "./gpu.js";
 import type { SegmentCapture, SegmentState, WebcamInfo } from "./pause.js";
+import type { PerfSummary } from "./perf.js";
 
 /** gdigrab (screen rectangle), wgc (one window, #113), or ddagrab (Desktop
  * Duplication on the GPU, #199). */
@@ -106,6 +107,8 @@ export interface SessionRecord {
     summary?: Record<string, number>;
     error?: string;
   };
+  /** CPU and memory sampled during the recording (#335). */
+  perf?: { path: string; summary?: PerfSummary; error?: string };
   /** App logs followed during the recording (#334), on the video clock. */
   logs?: { path: string; sources: string[]; count?: number; errors?: number; error?: string };
   /** Epoch ms of the first captured frame (ffmpeg's input start), the zero of

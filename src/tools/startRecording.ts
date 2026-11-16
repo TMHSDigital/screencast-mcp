@@ -33,6 +33,7 @@ import { readFrames } from "../utils/ocrScan.js";
 import { findMatches } from "../utils/ocr.js";
 import { armStart, describeConditions, waitForConditions, ARM_POLL_MS, DEFAULT_ARM_TIMEOUT_SEC, MAX_ARM_TIMEOUT_SEC } from "../utils/triggers.js";
 import { LogTailer, MAX_LOG_SOURCES, convertLogLines, formatLogsJsonl, logsPath } from "../utils/logTail.js";
+import { PerfSampler, convertPerfSamples, formatPerfJsonl, perfPath, summarizePerf } from "../utils/perf.js";
 import {
   buildDdaInputArgs,
   ddagrabWorks,
@@ -161,7 +162,8 @@ const inputSchema = {
     .min(1)
     .max(MAX_LOG_SOURCES)
     .optional()
-    .describe("App log files to follow; new lines land on the video clock in <rec>.logs.jsonl."),
+    .describe("Log files to follow onto the video clock."),
+  perf: z.boolean().optional().describe("Sample CPU/memory (and a window's app) to <rec>.perf.jsonl."),
   hotkeys: z.boolean().optional().describe("Ctrl+Alt+Shift+M adds a marker, +S stops (implies events)."),
   elements: z.boolean().optional().describe('Name the UI element each click hits, e.g. "Save" button (implies events).'),
   cursor: z
@@ -199,11 +201,11 @@ const inputSchema = {
     .object({
       window: z.string().min(1).optional().describe('A window: target that must exist, e.g. "window:Error".'),
       text: z.string().min(1).max(200).optional().describe("Text that must be on target (OCR)."),
-      timeoutSec: z.number().positive().max(MAX_ARM_TIMEOUT_SEC).optional().describe(`Give up after (default ${DEFAULT_ARM_TIMEOUT_SEC}).`),
+      timeoutSec: z.number().positive().max(MAX_ARM_TIMEOUT_SEC).optional().describe(`Default ${DEFAULT_ARM_TIMEOUT_SEC}.`),
     })
     .optional()
-    .describe("Arm instead: start once these hold; returns an arm id (stop_recording disarms)."),
-  stopWhen: z.object({ text: z.string().min(1).max(200) }).optional().describe("Stop once this text is on target (OCR)."),
+    .describe("Arm: start once these hold (stop_recording disarms)."),
+  stopWhen: z.object({ text: z.string().min(1).max(200) }).optional().describe("Stop once this text shows (OCR)."),
 };
 
 /** True when `text` is on the target now (one OCR read). */
@@ -434,7 +436,7 @@ export function register(server: McpServer): void {
           : null;
         // App logs (#334): note where each file ends now; following starts
         // once the session exists, and reads from these marks.
-        if (args.logs && replay) throw new ScreencastError("logs are not supported with replayBufferSec yet.");
+        if ((args.logs || args.perf) && replay) throw new ScreencastError("logs and perf are not supported with replayBufferSec yet.");
         const tailer = args.logs ? new LogTailer(args.logs) : null;
         await tailer?.mark();
         // Hotkeys (#337) act once the session exists; a press before that is ignored.
@@ -605,6 +607,27 @@ export function register(server: McpServer): void {
         // crash is "failed" with the stderr tail, a clean exit the cap or the
         // window closing (#240).
         attachExitHandler(store, id, child, { backend, maxDurationSec, spawnedAt, watch });
+        // Performance track (#335): from now until the session ends.
+        if (args.perf) {
+          const sampler = new PerfSampler(window?.pid);
+          sampler.start();
+          const sidecarPath = perfPath(output);
+          store.tryUpdate(id, { perf: { path: sidecarPath } });
+          trackFinalizer(
+            id,
+            sessionEnded(id).then(async () => {
+              try {
+                const samples = convertPerfSamples(sampler.stop(), eventClock(store.get(id)?.segments, startMs, Date.now()));
+                writeFileSync(sidecarPath, formatPerfJsonl(samples));
+                const proc = window?.pid !== undefined ? { pid: window.pid, ...(window.exe ? { exe: window.exe } : {}) } : undefined;
+                store.tryUpdate(id, { perf: { path: sidecarPath, summary: summarizePerf(samples, proc) } });
+              } catch (err) {
+                sampler.stop();
+                store.tryUpdate(id, { perf: { path: sidecarPath, error: errorMessage(err) } });
+              }
+            }),
+          );
+        }
         if (tailer && args.logs) {
           tailer.follow();
           const sidecarPath = logsPath(output);

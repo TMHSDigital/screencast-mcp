@@ -61,9 +61,10 @@ Parameters:
 - `events` (boolean): Also log clicks, scroll, cursor, and typing (video-timed, video pixels) for read_events (default false; ~1 s slower start).
 - `keys` ("masked" | "shortcuts"): With events: masked (default) logs typing only as 0.5 s-grid bursts, never keys; shortcuts also names Ctrl/Alt/Win chords. Typed text is never logged.
 - `focus` ("app" | "title"): Log app switches (implies events); title adds window titles.
-- `logs` (object[]; at least 1 items, at most 5 items): App log files to follow; new lines land on the video clock in <rec>.logs.jsonl.
+- `logs` (object[]; at least 1 items, at most 5 items): Log files to follow onto the video clock.
 - `logs[].path` (string; required)
 - `logs[].label` (string; at most 40 characters)
+- `perf` (boolean): Sample CPU/memory (and a window's app) to <rec>.perf.jsonl.
 - `hotkeys` (boolean): Ctrl+Alt+Shift+M adds a marker, +S stops (implies events).
 - `elements` (boolean): Name the UI element each click hits, e.g. "Save" button (implies events).
 - `cursor` ("os" | "events"): events: leave the OS cursor out and log it (implies events) for the cursor tool to redraw.
@@ -75,11 +76,11 @@ Parameters:
 - `webcam.size` (number; ≥ 0.1, ≤ 0.5): Share of width (0.25).
 - `webcam.shape` ("rect" | "circle")
 - `replayBufferSec` (integer; ≥ 4, ≤ 3600): Instant replay: keep only the last N s (bounded disk) for save_replay. gdigrab or ddagrab, not wgc.
-- `startWhen` (object): Arm instead: start once these hold; returns an arm id (stop_recording disarms).
+- `startWhen` (object): Arm: start once these hold (stop_recording disarms).
 - `startWhen.window` (string): A window: target that must exist, e.g. "window:Error".
 - `startWhen.text` (string; at most 200 characters): Text that must be on target (OCR).
-- `startWhen.timeoutSec` (number; > 0, ≤ 86400): Give up after (default 600).
-- `stopWhen` (object): Stop once this text is on target (OCR).
+- `startWhen.timeoutSec` (number; > 0, ≤ 86400): Default 600.
+- `stopWhen` (object): Stop once this text shows (OCR).
 - `stopWhen.text` (string; required, at most 200 characters)
 
 Minimal call:

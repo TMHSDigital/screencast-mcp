@@ -31,12 +31,14 @@ import {
   errorFindings,
   maskSecrets,
   logExcerpt,
+  perfLines,
   mergeRedactions,
   reconstructSteps,
   type BugReportData,
   resolveSource,
 } from "../utils/bugReport.js";
 import { logsPath, parseLogsJsonl } from "../utils/logTail.js";
+import { parsePerfJsonl, perfPath } from "../utils/perf.js";
 import { redactRegionSchema } from "../utils/media.js";
 
 const serverVersion = packageVersion();
@@ -212,6 +214,10 @@ export function register(server: McpServer): void {
             ? logExcerpt(parseLogsJsonl(readFileSync(logFile, "utf8")), window, redact ? secretPattern : null)
             : undefined;
 
+          // 4c. Resource usage during the clip (#335).
+          const perfFile = perfPath(source.path);
+          const perf = existsSync(perfFile) ? perfLines(parsePerfJsonl(readFileSync(perfFile, "utf8")), window, source.record?.perf?.summary?.process) : [];
+
           // 5. Environment.
           const ff = parseFfmpegVersion(versionText(ffmpeg) ?? "");
           const displays = await displayRows();
@@ -250,6 +256,7 @@ export function register(server: McpServer): void {
             ...(stepsNote ? { stepsNote } : {}),
             errors,
             ...(logs ? { logs } : {}),
+            ...(perf.length ? { perf } : {}),
             ocr,
             redaction: {
               scanned: scan !== null && redact,

@@ -66,6 +66,9 @@ export interface WindowBounds {
   client?: { x: number; y: number };
   /** Set when the matched window is cloaked (only with allowCloaked, #227). */
   cloaked?: true;
+  /** The owning process, when enumeration provided it (perf tracks, #335). */
+  pid?: number;
+  exe?: string;
 }
 
 export interface SelectWindowOptions {
@@ -213,6 +216,8 @@ function toBounds(query: WindowQuery, matches: RawWindow[], matchKind: WindowBou
     x, y, width, height,
     matchedTitle: chosen.title,
     ...(chosen.hwnd !== undefined ? { hwnd: chosen.hwnd } : {}),
+    ...(chosen.pid !== undefined ? { pid: chosen.pid } : {}),
+    ...(chosen.exe !== undefined ? { exe: chosen.exe } : {}),
     ...(chosen.clientX !== undefined && chosen.clientY !== undefined ? { client: { x: chosen.clientX, y: chosen.clientY } } : {}),
     matchCount: matches.length,
     matchKind,

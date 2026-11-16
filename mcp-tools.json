@@ -92,7 +92,7 @@
           ]
         },
         "logs": {
-          "description": "App log files to follow; new lines land on the video clock in <rec>.logs.jsonl.",
+          "description": "Log files to follow onto the video clock.",
           "minItems": 1,
           "maxItems": 5,
           "type": "array",
@@ -113,6 +113,10 @@
               "path"
             ]
           }
+        },
+        "perf": {
+          "description": "Sample CPU/memory (and a window's app) to <rec>.perf.jsonl.",
+          "type": "boolean"
         },
         "hotkeys": {
           "description": "Ctrl+Alt+Shift+M adds a marker, +S stops (implies events).",
@@ -189,7 +193,7 @@
           "maximum": 3600
         },
         "startWhen": {
-          "description": "Arm instead: start once these hold; returns an arm id (stop_recording disarms).",
+          "description": "Arm: start once these hold (stop_recording disarms).",
           "type": "object",
           "properties": {
             "window": {
@@ -204,7 +208,7 @@
               "maxLength": 200
             },
             "timeoutSec": {
-              "description": "Give up after (default 600).",
+              "description": "Default 600.",
               "type": "number",
               "exclusiveMinimum": 0,
               "maximum": 86400
@@ -212,7 +216,7 @@
           }
         },
         "stopWhen": {
-          "description": "Stop once this text is on target (OCR).",
+          "description": "Stop once this text shows (OCR).",
           "type": "object",
           "properties": {
             "text": {
