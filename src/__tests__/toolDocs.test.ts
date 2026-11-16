@@ -135,6 +135,9 @@ describe("renderers", () => {
     expect(md.indexOf("### Core")).toBeLessThan(md.indexOf("### Watch"));
     expect(md).toContain("| [`trim`](https://tmhsdigital.github.io/screencast-mcp/tools/trim.html) | Cut \\| a clip. |");
     expect(md).toContain("app-only");
+    // Tables fold behind a summary naming the tools; only core starts open.
+    expect(md).toContain("<details open><summary><code>doctor</code> (1)</summary>");
+    expect(md).toContain("<details><summary><code>trim</code> (1)</summary>");
     expect(g.renderReadmeToolsets(tools).split("\n").slice(2)).toEqual(["| `watch` | `player_frames` |", "| `edit` | `trim` |", "| `core` (always) | `doctor` |"]);
   });
   it("writes the manifest without the JSON Schema dialect line and flags app-only tools", () => {

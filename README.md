@@ -18,13 +18,6 @@ Capture the desktop, a monitor, a window, or a region; sample a recording into f
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-listed-6E56CF)](https://registry.modelcontextprotocol.io/v0/servers?search=screencast-mcp)
 [![CI](https://github.com/TMHSDigital/screencast-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/TMHSDigital/screencast-mcp/actions/workflows/ci.yml)
 [![License: CC BY-NC-ND 4.0](https://img.shields.io/badge/license-CC--BY--NC--ND--4.0-green)](LICENSE)
-![Last commit](https://img.shields.io/github/last-commit/TMHSDigital/screencast-mcp)
-
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js_%E2%89%A522-339933?logo=node.js&logoColor=white)
-![Model Context Protocol](https://img.shields.io/badge/MCP-stdio-6E56CF)
-![ffmpeg](https://img.shields.io/badge/ffmpeg-required-007808?logo=ffmpeg&logoColor=white)
-![Capture](https://img.shields.io/badge/capture-Windows_10%2F11-0078D6?logo=windows&logoColor=white)
 
 <br />
 
@@ -32,19 +25,29 @@ Capture the desktop, a monitor, a window, or a region; sample a recording into f
 
 <sub>Made with the tool: <code>start_recording</code> with <code>events: true</code>, one click, then <code>zoom { highlightClicks: true }</code> and <code>export_gif</code>. <a href="https://tmhsdigital.github.io/screencast-mcp/workflows/zoom-clicks.html">How it was made</a> · <a href="https://tmhsdigital.github.io/screencast-mcp/workflows/">more workflows</a></sub>
 
-[Quick start](#quick-start) · [Tools](#tools) · [Configuration](#configuration) · [More docs](#more-docs) · [Privacy](#privacy)
+[Quick start](#quick-start) · [Tools](#tools) · [Configuration](#configuration) · [Troubleshooting](#troubleshooting) · [More docs](#more-docs) · [Privacy](#privacy)
 
 </div>
 
 ## Quick start
 
-The fastest path: `npx -y @tmhs/screencast-mcp setup` checks FFmpeg 8, OCR, and speech, offers `winget install Gyan.FFmpeg` when FFmpeg is missing, and adds the server to Claude Desktop, Claude Code, Cursor, and VS Code (backing up each config). `--dry-run` shows the changes first; `--test` records a 3-second GIF to prove it works. Or set it up by hand:
+**You need** Windows 10 or 11, [Node.js](https://nodejs.org) 22+, and **FFmpeg 8 or newer** on `PATH`. Capture is Windows-only; the watch, edit, and produce tools work anywhere ffmpeg runs.
 
-**You need** Windows 10 or 11, [Node.js](https://nodejs.org) 22+, and **FFmpeg 8 or newer** on `PATH` (`winget install Gyan.FFmpeg`, the full build). Older builds run most tools, but `transcribe` (the `whisper` filter) and `backend: "wgc"` (`gfxcapture`) need FFmpeg 8, and essentials or distro builds can lack them (Ubuntu LTS `apt install ffmpeg` gives 6.x). Capture is Windows-only; the watch, edit, and produce tools work anywhere ffmpeg runs. After connecting, ask the agent to run `doctor`: it reports the ffmpeg version, the filters and devices it has, OCR, and anything missing.
+**1. Run setup.** It checks FFmpeg 8, OCR, and speech, offers `winget install Gyan.FFmpeg` when FFmpeg is missing, and adds the server to Claude Desktop, Claude Code, Cursor, and VS Code, backing up each config:
 
-**Windows on ARM64** is supported (#246): CI builds and runs the full test suite on `windows-11-arm`. gyan.dev ships no arm64 FFmpeg, so use BtbN's `winarm64-gpl` FFmpeg 8 build; it has `gdigrab`, `gfxcapture` and `drawtext` but no `whisper` or libvpx, so `transcribe` and `.webm` output need another build. `doctor` reports `arch` and what is missing.
+```sh
+npx -y @tmhs/screencast-mcp setup
+```
 
-**Add it to your client:**
+`--dry-run` shows the changes first; `--test` records a 3-second GIF to prove it works.
+
+**2. Ask your agent:**
+
+> Record my VS Code window for five seconds while I reproduce the bug, then show me the frames where something changed.
+
+More in the [workflows](https://tmhsdigital.github.io/screencast-mcp/workflows/): a bug-repro GIF for a PR, a README demo, a UI verification loop, a social clip, a cheap review of a long recording, zoom toward clicks, and the whole edit in one call.
+
+### Or add it by hand
 
 | Client | How |
 | --- | --- |
@@ -56,11 +59,7 @@ The fastest path: `npx -y @tmhs/screencast-mcp setup` checks FFmpeg 8, OCR, and 
 { "mcpServers": { "screencast": { "command": "npx", "args": ["-y", "@tmhs/screencast-mcp"] } } }
 ```
 
-**Then ask your agent:**
-
-> Record my VS Code window for five seconds while I reproduce the bug, then show me the frames where something changed.
-
-More in the [workflows](https://tmhsdigital.github.io/screencast-mcp/workflows/): a bug-repro GIF for a PR, a README demo, a UI verification loop, a social clip, a cheap review of a long recording, zoom toward clicks, and the whole edit in one call.
+For FFmpeg use the full build (`winget install Gyan.FFmpeg`). If something is missing, see [Troubleshooting](#troubleshooting).
 
 ## Why not just...
 
@@ -81,14 +80,20 @@ The core is the **watch loop**: the agent records, samples the footage into fram
 
 Always loaded, whatever `SCREENCAST_TOOLSETS` selects.
 
+<details open><summary><code>get_media_info</code>, <code>doctor</code> (2)</summary>
+
 | Tool | What it does |
 | --- | --- |
 | [`get_media_info`](https://tmhsdigital.github.io/screencast-mcp/tools/get_media_info.html) | Probe a media file with ffprobe and return duration, resolution, frame rate, codecs, container format, and size. |
 | [`doctor`](https://tmhsdigital.github.io/screencast-mcp/tools/doctor.html) | Check the setup: ffmpeg/ffprobe (FFmpeg 8+?), optional filters, capture devices, Windows OCR, settings, and enabled toolsets; `problems` says what is missing and how to fix it. Call on first use or when a tool reports a missing feature. |
 
+</details>
+
 ### Capture
 
 Record or screenshot the desktop, a monitor, a window, or a region. Every capture is an explicit tool call: nothing records on its own.
+
+<details><summary><code>start_recording</code>, <code>stop_recording</code>, <code>delete_recording</code>, <code>pause_recording</code>, <code>resume_recording</code>, <code>save_replay</code>, <code>list_sessions</code>, <code>get_session</code>, <code>read_events</code>, <code>add_marker</code>, <code>screenshot</code>, <code>list_audio_devices</code>, <code>list_video_devices</code>, <code>list_targets</code> (14)</summary>
 
 | Tool | What it does |
 | --- | --- |
@@ -107,9 +112,13 @@ Record or screenshot the desktop, a monitor, a window, or a region. Every captur
 | [`list_video_devices`](https://tmhsdigital.github.io/screencast-mcp/tools/list_video_devices.html) | List DirectShow cameras for start_recording's webcam.device. |
 | [`list_targets`](https://tmhsdigital.github.io/screencast-mcp/tools/list_targets.html) | List the desktop, monitors, and visible windows (topmost first, with capturability per backend). Each entry has a `target` string to pass as-is to capture tools; use it instead of guessing a title. |
 
+</details>
+
 ### Watch
 
 Turn footage into something a model can read: frames, contact sheets, diffs, OCR, and a searchable text timeline.
+
+<details><summary><code>review_recording</code>, <code>player_frames</code>, <code>sample_frames</code>, <code>contact_sheet</code>, <code>screen_diff</code>, <code>wait_for_change</code>, <code>find_text</code>, <code>index_recording</code>, <code>search_recording</code> (9)</summary>
 
 | Tool | What it does |
 | --- | --- |
@@ -123,9 +132,13 @@ Turn footage into something a model can read: frames, contact sheets, diffs, OCR
 | [`index_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/index_recording.html) | Build a recording's text timeline (<video>.index.json: OCR per scene, events, markers, transcript) for search_recording. |
 | [`search_recording`](https://tmhsdigital.github.io/screencast-mcp/tools/search_recording.html) | Search an index_recording timeline (screen text, events, markers, transcript): timecoded hits, best first, secrets masked. No frames unless asked. No input: search all indexes. |
 
+</details>
+
 ### Edit
 
 Cut, convert, compress, and redact. A tool that writes a file refuses to replace an existing `output` unless `overwrite: true`; default output paths are always unique.
+
+<details><summary><code>trim</code>, <code>concat</code>, <code>convert</code>, <code>export_gif</code>, <code>crop</code>, <code>scale</code>, <code>speed</code>, <code>compress</code>, <code>clip</code>, <code>cut_idle</code>, <code>cut_by_transcript</code>, <code>redact_region</code>, <code>pipeline</code> (13)</summary>
 
 | Tool | What it does |
 | --- | --- |
@@ -143,9 +156,13 @@ Cut, convert, compress, and redact. A tool that writes a file refuses to replace
 | [`redact_region`](https://tmhsdigital.github.io/screencast-mcp/tools/redact_region.html) | Cover given rectangles in a video or screenshot (e.g. secrets on screen). Not automatic detection: find them with find_text redact: true. Off-frame regions are rejected. |
 | [`pipeline`](https://tmhsdigital.github.io/screencast-mcp/tools/pipeline.html) | Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call. |
 
+</details>
+
 ### Produce
 
 Annotate, frame, and assemble a finished piece. Tools that combine clips normalize each input to a common resolution, fps, and audio rate first.
+
+<details><summary><code>overlay</code>, <code>compose</code>, <code>perf_overlay</code>, <code>translate_subtitles</code>, <code>callout</code>, <code>keystroke_overlay</code>, <code>cursor</code>, <code>backdrop</code>, <code>burn_subtitles</code>, <code>chapters</code>, <code>xfade_transition</code>, <code>assemble_highlights</code>, <code>title_card</code>, <code>reframe</code>, <code>zoom</code>, <code>export_preset</code>, <code>bug_report</code>, <code>step_guide</code> (18)</summary>
 
 | Tool | What it does |
 | --- | --- |
@@ -168,9 +185,13 @@ Annotate, frame, and assemble a finished piece. Tools that combine clips normali
 | [`bug_report`](https://tmhsdigital.github.io/screencast-mcp/tools/bug_report.html) | Package a recording as a paste-ready repro folder: secret-scanned, redacted clip and GIF, contact sheet, steps from the event log, OCR'd errors, environment, report.md for gh issue create --body-file. |
 | [`step_guide`](https://tmhsdigital.github.io/screencast-mcp/tools/step_guide.html) | Turn a recording's event log into a numbered how-to: a ringed screenshot and caption per step, marker headings; Markdown and/or one HTML file. Never includes typed text. |
 
+</details>
+
 ### Audio
 
 Extract, clean up, level, transcribe, and score the soundtrack.
+
+<details><summary><code>extract_audio</code>, <code>normalize_audio</code>, <code>denoise</code>, <code>transcribe</code>, <code>music_bed</code>, <code>narrate</code> (6)</summary>
 
 | Tool | What it does |
 | --- | --- |
@@ -180,6 +201,8 @@ Extract, clean up, level, transcribe, and score the soundtrack.
 | [`transcribe`](https://tmhsdigital.github.io/screencast-mcp/tools/transcribe.html) | Transcribe a recording's speech to an SRT subtitle file, locally, with FFmpeg 8's whisper filter (needs a whisper.cpp model file). Returns the SRT path and the text. Pair with burn_subtitles to caption the video. |
 | [`music_bed`](https://tmhsdigital.github.io/screencast-mcp/tools/music_bed.html) | Lay music under a video: looped or trimmed to length, faded, leveled, and mixed with any existing audio. Video is stream-copied. |
 | [`narrate`](https://tmhsdigital.github.io/screencast-mcp/tools/narrate.html) | Offline voiceover with the built-in Windows voices: speaks each line at its time or marker over the audio, plus an SRT. |
+
+</details>
 <!-- tools:end -->
 
 > [!IMPORTANT]
@@ -214,6 +237,21 @@ Every capture tool takes one `target` string: `full`, `monitor:<index>`, `window
 | `audio` | `extract_audio`, `normalize_audio`, `denoise`, `transcribe`, `music_bed`, `narrate` |
 | `core` (always) | `get_media_info`, `doctor` |
 <!-- toolsets:end -->
+
+## Troubleshooting
+
+Start by asking your agent to run **`doctor`**: it reports the ffmpeg version and architecture, the filters and capture devices it found, OCR, the settings in effect, and under `problems` what is missing and how to fix it.
+
+- **A tool says a filter is missing.** Older FFmpeg builds run most tools, but `transcribe` (the `whisper` filter) and `backend: "wgc"` (`gfxcapture`) need FFmpeg 8, and "essentials" or distro builds can lack them (Ubuntu LTS `apt install ffmpeg` gives 6.x). Install the full build: `winget install Gyan.FFmpeg`.
+- **ffmpeg is installed but not found.** Put it on `PATH`, or set `FFMPEG_PATH` / `FFPROBE_PATH` in the server's `env` (see [Configuration](#configuration)).
+- **Captures are refused or never start.** By default each capture asks you to confirm it through your client; see `SCREENCAST_CONFIRM_CAPTURE` under [Configuration](#configuration).
+
+<details>
+<summary><b>Windows on ARM64</b></summary>
+
+Supported (#246): CI builds and runs the full test suite on `windows-11-arm`. gyan.dev ships no arm64 FFmpeg, so use BtbN's `winarm64-gpl` FFmpeg 8 build; it has `gdigrab`, `gfxcapture` and `drawtext` but no `whisper` or libvpx, so `transcribe` and `.webm` output need another build. `doctor` reports `arch` and what is missing.
+
+</details>
 
 ## More docs
 

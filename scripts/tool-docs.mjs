@@ -287,11 +287,16 @@ export function renderReadmeTools(tools) {
   const lines = [
     `${tools.length} tools in ${groups.length} toolsets, generated from the server's own schemas by \`npm run docs\` (do not edit between the markers). Each name links to its reference page with every parameter, an example call, and what it returns; [\`mcp-tools.json\`](mcp-tools.json) is the same list as JSON, and [\`llms-full.txt\`](${SITE}llms-full.txt) all of it in one file.`,
   ];
+  // Each toolset's table folds away behind a summary that names its tools, so
+  // the README reads top to bottom without 60+ rows in the way. Core stays open.
   for (const g of groups) {
     lines.push("", `### ${g.title}`, "");
     if (g.blurb) lines.push(g.blurb, "");
+    const names = g.tools.map((t) => `<code>${t.name}</code>`).join(", ");
+    lines.push(`<details${g.set === "core" ? " open" : ""}><summary>${names} (${g.tools.length})</summary>`, "");
     lines.push("| Tool | What it does |", "| --- | --- |");
     for (const t of g.tools) lines.push(`| [\`${t.name}\`](${toolUrl(t.name)}) | ${mdCell(t.description ?? "")}${isAppOnly(t) ? " *(app-only: called by the review player, not the agent)*" : ""} |`);
+    lines.push("", "</details>");
   }
   return lines.join("\n");
 }
