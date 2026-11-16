@@ -282,7 +282,7 @@
         var url = new URL(location.href);
         if (q.value.trim()) url.searchParams.set("q", q.value.trim()); else url.searchParams.delete("q");
         history.replaceState(null, "", url);
-      } catch (e) { /* file:// or old browser: the filter still works */ }
+      } catch { /* file:// or old browser: the filter still works */ }
       dispatchEvent(new Event("resize"));
     };
     q.addEventListener("input", run);
