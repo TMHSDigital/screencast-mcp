@@ -163,10 +163,10 @@ jobs:
   # not covered here. Lint and typecheck are arch-independent and run above.
   windows-arm64:
     runs-on: windows-11-arm
-    # Not yet proven green on the hosted ARM runner (#246). release.yml waits
-    # for a successful CI run, so until it is, a failure here must not block
-    # releases. Drop this once the leg has passed.
-    continue-on-error: true
+    # Windows on ARM64 (#246): the full suite runs on the hosted ARM runner
+    # with a native arm64 ffmpeg. Required like the other legs since it
+    # passed on 71ba9cd and 06c7340 (the 2026-09-30 ffmpeg build crashed on
+    # start there, 0xC0000005).
     env:
       FFMPEG_ARM64_RELEASE: autobuild-2026-11-14-12-37
       FFMPEG_ARM64_ASSET: ffmpeg-n8.1.3-35-gf1acb0a266-winarm64-gpl-8.1

@@ -42,7 +42,7 @@ The fastest path: `npx -y @tmhs/screencast-mcp setup` checks FFmpeg 8, OCR, and 
 
 **You need** Windows 10 or 11, [Node.js](https://nodejs.org) 22+, and **FFmpeg 8 or newer** on `PATH` (`winget install Gyan.FFmpeg`, the full build). Older builds run most tools, but `transcribe` (the `whisper` filter) and `backend: "wgc"` (`gfxcapture`) need FFmpeg 8, and essentials or distro builds can lack them (Ubuntu LTS `apt install ffmpeg` gives 6.x). Capture is Windows-only; the watch, edit, and produce tools work anywhere ffmpeg runs. After connecting, ask the agent to run `doctor`: it reports the ffmpeg version, the filters and devices it has, OCR, and anything missing.
 
-**Windows on ARM64** is in progress (#246): CI runs a non-blocking `windows-11-arm` job. gyan.dev ships no arm64 FFmpeg, so use BtbN's `winarm64-gpl` FFmpeg 8 build; it has `gdigrab`, `gfxcapture` and `drawtext` but no `whisper` or libvpx, so `transcribe` and `.webm` output need another build. `doctor` reports `arch` and what is missing.
+**Windows on ARM64** is supported (#246): CI builds and runs the full test suite on `windows-11-arm`. gyan.dev ships no arm64 FFmpeg, so use BtbN's `winarm64-gpl` FFmpeg 8 build; it has `gdigrab`, `gfxcapture` and `drawtext` but no `whisper` or libvpx, so `transcribe` and `.webm` output need another build. `doctor` reports `arch` and what is missing.
 
 **Add it to your client:**
 
