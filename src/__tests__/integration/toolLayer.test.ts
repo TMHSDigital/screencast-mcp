@@ -31,6 +31,9 @@ const WIN = process.platform === "win32";
 const OCR = AVAILABLE && WIN && (await ocrStatus()).available;
 const TTS = AVAILABLE && WIN && (await ttsStatus()).available;
 const WHISPER = !!process.env.SCREENCAST_WHISPER_MODEL;
+// Trace edit jobs on stderr: the clip case hangs now and then on Windows CI,
+// and the trace shows whether ffmpeg was working, done, or silent (#281).
+process.env.SCREENCAST_DEBUG_JOBS = "1";
 
 /** Tools with no case here, why, and where they are covered instead. */
 const SKIPPED: Record<string, string> = {

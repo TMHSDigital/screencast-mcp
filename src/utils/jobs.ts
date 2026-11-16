@@ -153,17 +153,23 @@ export async function runEditJob(args: string[], job: EditJob): Promise<void> {
   let finish!: () => void;
   const active: ActiveJob = { partial, controller, done: new Promise((r) => (finish = r)) };
   activeJobs.add(active);
+  // Opt-in tracing (#281): start, a heartbeat while it runs, and the end, so a
+  // hang shows whether ffmpeg was still working, done, or silent.
+  const trace = traceJob(job.output);
   try {
     const run = () =>
       runFfmpeg(ffArgs, jobTimeoutMs(decoded), {
         signal,
         stallMs: EDIT_STALL_MS,
-        onStdout: report && duration
-          ? (chunk) => {
-              const t = parse(chunk);
-              if (t !== null) report(t / duration);
-            }
-          : undefined,
+        onStdout: (chunk) => {
+          trace?.output(chunk.length);
+          if (!report || !duration) return;
+          const t = parse(chunk);
+          if (t !== null) {
+            trace?.progress(t);
+            report(t / duration);
+          }
+        },
       });
     // -progress writes every half second while ffmpeg works, so a job silent
     // for EDIT_STALL_MS is hung (seen on loaded CI runners, #281): kill it and
@@ -178,13 +184,47 @@ export async function runEditJob(args: string[], job: EditJob): Promise<void> {
     }
     renameSync(partial, job.output);
     report?.(1);
+    trace?.end("done");
   } catch (error) {
+    trace?.end(`failed: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`);
     rmSync(partial, { force: true });
     throw error;
   } finally {
+    trace?.stop();
     activeJobs.delete(active);
     finish();
   }
+}
+
+/** Set to 1 to trace edit jobs on stderr (#281). */
+export const DEBUG_JOBS_ENV = "SCREENCAST_DEBUG_JOBS";
+
+/** A job tracer, or undefined when tracing is off. */
+function traceJob(output: string) {
+  if (process.env[DEBUG_JOBS_ENV] !== "1") return undefined;
+  const name = basename(output);
+  const started = Date.now();
+  let bytes = 0;
+  let lastOutputAt = started;
+  let lastT: number | null = null;
+  const log = (msg: string) => process.stderr.write(`[job ${name}] ${((Date.now() - started) / 1000).toFixed(1)}s ${msg}\n`);
+  log("start");
+  const beat = setInterval(
+    () => log(`running: ${bytes} B of progress output, last ${((Date.now() - lastOutputAt) / 1000).toFixed(1)}s ago, out_time ${lastT ?? "none"}`),
+    30_000,
+  );
+  beat.unref();
+  return {
+    output: (n: number) => {
+      bytes += n;
+      lastOutputAt = Date.now();
+    },
+    progress: (t: number) => {
+      lastT = t;
+    },
+    end: (how: string) => log(how),
+    stop: () => clearInterval(beat),
+  };
 }
 
 /** Number of edit jobs in flight. */
