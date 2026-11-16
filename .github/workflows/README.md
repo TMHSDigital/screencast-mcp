@@ -12,7 +12,7 @@
 | `screencast-action.yml` (Screencast action) | PR touching `action.yml` or the CLI, dispatch | Runs the composite action in `action.yml` on `windows-latest` with this checkout's CLI: records the capture smoke test and uploads the GIF, contact sheet, and video. |
 | `stale.yml` | weekly | Labels inactive issues (never closes them) and closes stale PRs. |
 
-Every `uses:` is pinned to a commit SHA with its version in a comment; Dependabot keeps them current. Each workflow sets top-level permissions to `{}` (`ci.yml`: `contents: read`) and grants what a job needs on that job.
+Every `uses:` is pinned to a commit SHA with its version in a comment; bump them by hand (Dependabot is off). Each workflow sets top-level permissions to `{}` (`ci.yml`: `contents: read`) and grants what a job needs on that job.
 
 ## Repository rules
 
