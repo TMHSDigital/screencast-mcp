@@ -56,9 +56,14 @@
       footage into frames an agent can actually look at, and cuts the result with
       ffmpeg &mdash; from a quick trim to a platform-ready export. It speaks MCP
       over stdio, so it plugs into any MCP client.</p>
+      <div class="install-switch vf-toggle" role="group" aria-label="Install for" hidden>
+        <button type="button" aria-pressed="true" data-cmd="claude mcp add screencast -- cmd /c npx -y @tmhs/screencast-mcp" data-label="the Claude Code install command">Claude Code</button>
+        <button type="button" aria-pressed="false" data-cmd="npx -y @tmhs/screencast-mcp setup" data-label="the setup command" title="Checks FFmpeg, OCR, and speech, then adds the server to Claude Desktop, Claude Code, Cursor, and VS Code">Any client: setup</button>
+      </div>
       <div class="cta-row" id="install">
         <span class="install-cmd"><span class="dollar">$</span><span id="cmd">claude mcp add screencast -- cmd /c npx -y @tmhs/screencast-mcp</span><button id="copy" type="button" aria-label="Copy the Claude Code install command">copy</button></span>
       </div>
+      <p class="install-note" id="install-note" hidden>Checks FFmpeg 8, OCR, and speech, offers to install FFmpeg, and adds the server to Claude Desktop, Claude Code, Cursor, and VS Code, backing up each config. Add <code>--dry-run</code> to see the changes first.</p>
       <p class="cta-links">
         <a href="connect.html">Set up Claude Desktop, Cursor, or VS Code</a>
         <a href="workflows/">See the workflows</a>

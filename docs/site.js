@@ -91,6 +91,22 @@
   var cmd = document.getElementById("cmd");
   if (copy && cmd) {
     copy.addEventListener("click", function () { copyText(copy, cmd.textContent); });
+    // Switch between the Claude Code command and the setup wizard (any client).
+    var sw = document.querySelector(".install-switch");
+    var installNote = document.getElementById("install-note");
+    if (sw) {
+      var opts = Array.prototype.slice.call(sw.querySelectorAll("button"));
+      opts.forEach(function (b, i) {
+        b.addEventListener("click", function () {
+          opts.forEach(function (o) { o.setAttribute("aria-pressed", o === b ? "true" : "false"); });
+          cmd.textContent = b.getAttribute("data-cmd");
+          cmd.scrollLeft = 0;
+          copy.setAttribute("aria-label", "Copy " + b.getAttribute("data-label"));
+          if (installNote) installNote.hidden = i === 0;
+        });
+      });
+      sw.hidden = false;
+    }
   }
 
   // Any <pre class="copyable"> gets a copy button.

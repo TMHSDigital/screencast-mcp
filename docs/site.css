@@ -154,6 +154,9 @@ h1 .amber { color: var(--amber); }
 .gh-link { font-family: var(--mono); font-size: 0.9rem; }
 .install-cmd { max-width: 100%; }
 .install-cmd #cmd { white-space: nowrap; overflow-x: auto; min-width: 0; scrollbar-width: thin; }
+.install-switch { margin: 0 0 0.6rem; }
+.install-switch[hidden] { display: none; }
+.install-note { color: var(--dim); font-size: 0.92rem; margin: 0.7rem 0 0; max-width: 44rem; }
 .cta-links { display: flex; flex-wrap: wrap; gap: 0.6rem 1.4rem; margin: 1rem 0 0; font-family: var(--mono); font-size: 0.9rem; }
 .hero-demo { margin: 2.4rem 0 1rem; }
 .sub.small { font-size: 0.95rem; margin-top: 1.6rem; }
