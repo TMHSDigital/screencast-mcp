@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.51.1] - 2026-11-16
+
 ### Fixed
 
 - `clip` could hang until its job timeout on some Windows machines: the segment seek was done after decoding (`-i input -ss start`), and ffmpeg sometimes never produced a frame. It now seeks on the input, giving the same frames (checked frame by frame) without that hang (#281).
