@@ -7,6 +7,14 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Fixed
+
+- A `start_recording` that failed after its input event logger started (but before the session was registered) could leave the logger, its raw log, a replay buffer folder or webcam parts behind; every failure after the first resource is taken now goes through one cleanup (#307).
+
+### Internal
+
+- `start_recording`'s handler is split from 464 lines to about 100: option checks, the consent prompt, the session record and the result are pure functions in `src/utils/startPlan.ts` with their own tests, and arming, launching, sidecars and controls are named functions (#307).
+
 ## [0.50.0] - 2026-11-15
 
 ### Added

@@ -17,18 +17,29 @@ import type { Monitor } from "../utils/monitors.js";
 const FAKE_PID = 424242;
 const spawned: string[][] = [];
 const killed: number[] = [];
+/** When set, the next capture exits at once (a bad device, a busy window). */
+let exitAtOnce = false;
 
 vi.mock("node:child_process", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:child_process")>()),
   spawn: (_cmd: string, args: string[]) => {
     spawned.push(args);
-    // A capture that keeps running: it never exits on its own.
-    return Object.assign(new EventEmitter(), {
+    // A capture that keeps running: it never exits on its own (unless told to).
+    const child = Object.assign(new EventEmitter(), {
       pid: FAKE_PID,
       stdin: new PassThrough(),
       stderr: new PassThrough(),
       kill: () => true,
     });
+    if (exitAtOnce) {
+      setImmediate(() => {
+        child.stderr.write("Could not open the capture device\n");
+        Object.assign(child, { exitCode: 1 });
+        child.emit("exit", 1, null);
+        child.emit("close", 1, null);
+      });
+    }
+    return child;
   },
 }));
 vi.mock("../utils/monitors.js", async (importOriginal) => ({
@@ -85,6 +96,27 @@ describe("start_recording session registry failure (#207)", () => {
       expect(getStore().list()).toEqual([]);
     } finally {
       create.mockRestore();
+    }
+  }, 15_000);
+});
+
+describe("start_recording rollback (#307)", () => {
+  it("gives back the replay ring when the capture exits at once", async () => {
+    const { existsSync, readdirSync } = await import("node:fs");
+    const { replayRoot } = await import("../utils/replay.js");
+    exitAtOnce = true;
+    try {
+      const res = await client.callTool({
+        name: "start_recording",
+        arguments: { target: "region:0,0,640,480", quality: "draft", replayBufferSec: 30 },
+      });
+      const text = (res.content as Array<{ text?: string }>).map((c) => c.text).join("\n");
+      expect(res.isError).toBe(true);
+      expect(text).toMatch(/exited immediately/);
+      // The ring prepared before the spawn is gone, not left on disk.
+      expect(existsSync(replayRoot()) ? readdirSync(replayRoot()) : []).toEqual([]);
+    } finally {
+      exitAtOnce = false;
     }
   }, 15_000);
 });
