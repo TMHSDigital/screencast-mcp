@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.50.0] - 2026-11-15
+
 ### Added
 
 - `start_recording` `perf: true` records a performance track: the machine's CPU and memory every second and, for a `window:` target, its app's CPU share and working set. They go on the video clock into `<recording>.perf.jsonl`, and the session gets a summary (peaks, memory growth, stretches pinned at 90%+ CPU). `bug_report` adds a "Resource usage" section for the clip ("CPU pinned (>= 90%) from 0:12.0 to 0:31.0"), and `delete_recording` removes the sidecar. Resolved windows now also report their process id and exe (#335).
