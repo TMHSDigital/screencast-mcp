@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.51.0] - 2026-11-16
+
 ### Added
 
 - `start_recording` `backend: "wgc"` now records system audio (`audio: { source: "system" }`), from the same dshow loopback device gdigrab captures use. It starts with the window's first frame and ends with the video (#316).
