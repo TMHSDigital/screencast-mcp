@@ -168,9 +168,9 @@ jobs:
     # releases. Drop this once the leg has passed.
     continue-on-error: true
     env:
-      FFMPEG_ARM64_RELEASE: autobuild-2026-09-30-13-08
-      FFMPEG_ARM64_ASSET: ffmpeg-n8.1.3-9-g29e619e767-winarm64-gpl-8.1
-      FFMPEG_ARM64_SHA256: 061a770557c30bbf8e0b6ca3810288a60f72b85088378b84be03277746f34f17
+      FFMPEG_ARM64_RELEASE: autobuild-2026-11-14-12-37
+      FFMPEG_ARM64_ASSET: ffmpeg-n8.1.3-35-gf1acb0a266-winarm64-gpl-8.1
+      FFMPEG_ARM64_SHA256: 800562484f4f227805842c8756f8b7f572c4e07330b62938cc03691d5d7c638e
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Use Node.js 22
