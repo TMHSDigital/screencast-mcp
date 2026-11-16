@@ -34,6 +34,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- An edit job whose ffmpeg writes nothing at all (not even its progress lines, which normally come every half second) for 90 s is now treated as hung: it is stopped and run once more instead of waiting out the whole job timeout, and the stall is logged (#281).
 - Short ffmpeg and ffprobe jobs (edits, probes, frame reads, device listing) now start with no stdin instead of an open pipe nothing writes to, which could leave a job waiting until its timeout (#281).
 
 ### Internal

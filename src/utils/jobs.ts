@@ -21,7 +21,7 @@ import { renameSync, rmSync } from "node:fs";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type { ServerNotification, ServerRequest } from "@modelcontextprotocol/sdk/types.js";
 import { ScreencastError } from "./errors.js";
-import { runFfmpeg } from "./ffmpeg.js";
+import { runFfmpeg, StallError } from "./ffmpeg.js";
 
 /** The `extra` argument the SDK passes to every tool callback. */
 export type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
@@ -30,6 +30,9 @@ export type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 export const JOB_TIMEOUT_ENV = "SCREENCAST_JOB_TIMEOUT_MS";
 /** Floor for a duration-scaled timeout. */
 export const BASE_TIMEOUT_MS = 10 * 60_000;
+/** An edit job whose ffmpeg writes nothing (not even -progress) this long is
+ * hung, not slow (#281). */
+export const EDIT_STALL_MS = 90_000;
 /** Timeout when the media's duration could not be probed. */
 export const UNKNOWN_DURATION_TIMEOUT_MS = 30 * 60_000;
 /** Allow this many seconds of wall-clock time per second of media. A slow
@@ -151,15 +154,28 @@ export async function runEditJob(args: string[], job: EditJob): Promise<void> {
   const active: ActiveJob = { partial, controller, done: new Promise((r) => (finish = r)) };
   activeJobs.add(active);
   try {
-    await runFfmpeg(ffArgs, jobTimeoutMs(decoded), {
-      signal,
-      onStdout: report && duration
-        ? (chunk) => {
-            const t = parse(chunk);
-            if (t !== null) report(t / duration);
-          }
-        : undefined,
-    });
+    const run = () =>
+      runFfmpeg(ffArgs, jobTimeoutMs(decoded), {
+        signal,
+        stallMs: EDIT_STALL_MS,
+        onStdout: report && duration
+          ? (chunk) => {
+              const t = parse(chunk);
+              if (t !== null) report(t / duration);
+            }
+          : undefined,
+      });
+    // -progress writes every half second while ffmpeg works, so a job silent
+    // for EDIT_STALL_MS is hung (seen on loaded CI runners, #281): kill it and
+    // run it once more rather than wait out the whole job timeout.
+    try {
+      await run();
+    } catch (error) {
+      if (!(error instanceof StallError) || signal.aborted) throw error;
+      process.stderr.write(`${error.message} Retrying the edit once.\n`);
+      rmSync(partial, { force: true });
+      await run();
+    }
     renameSync(partial, job.output);
     report?.(1);
   } catch (error) {

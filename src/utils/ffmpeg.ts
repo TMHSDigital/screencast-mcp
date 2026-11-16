@@ -128,7 +128,13 @@ export interface RunCaptureOptions {
   onStdout?: (chunk: string) => void;
   /** Kill the child and reject when this signal aborts (a cancelled request). */
   signal?: AbortSignal;
+  /** Kill the child and reject with a StallError when it writes nothing at
+   * all (stdout or stderr) for this long. For jobs that report progress. */
+  stallMs?: number;
 }
+
+/** A child that went silent for RunCaptureOptions.stallMs and was killed. */
+export class StallError extends ScreencastError {}
 
 /** Run a binary to completion, capturing stdout/stderr. Used for ffprobe and
  * short ffmpeg edit jobs (not for long-running captures). */
@@ -159,19 +165,35 @@ export function runCapture(
       () => kill(new ScreencastError(`${bin} timed out after ${Math.round(timeoutMs / 1000)}s.`)),
       timeoutMs,
     );
+    // Silence watchdog: any output pushes it back.
+    let stallTimer: NodeJS.Timeout | undefined;
+    const armStall = () => {
+      if (!opts.stallMs) return;
+      clearTimeout(stallTimer);
+      stallTimer = setTimeout(
+        () => kill(new StallError(`${bin} wrote nothing for ${Math.round(opts.stallMs! / 1000)}s and was stopped.`)),
+        opts.stallMs,
+      );
+    };
+    armStall();
     const cleanup = () => {
       clearTimeout(timer);
+      clearTimeout(stallTimer);
       clearTimeout(graceTimer);
       opts.signal?.removeEventListener("abort", onAbort);
     };
     if (opts.signal?.aborted) onAbort();
     else opts.signal?.addEventListener("abort", onAbort, { once: true });
     child.stdout?.on("data", (d) => {
+      armStall();
       const s = d.toString();
       stdout += s;
       opts.onStdout?.(s);
     });
-    child.stderr?.on("data", (d) => (stderr += d.toString()));
+    child.stderr?.on("data", (d) => {
+      armStall();
+      stderr += d.toString();
+    });
     child.on("error", (err) => {
       cleanup();
       reject(err);
