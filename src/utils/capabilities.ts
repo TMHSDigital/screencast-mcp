@@ -119,7 +119,34 @@ export const ENV_SETTINGS = [
   "SCREENCAST_RETENTION_DAYS",
   "SCREENCAST_CONFIRM_CAPTURE",
   "SCREENCAST_TOOLSETS",
+  "SCREENCAST_DEBUG_JOBS",
 ] as const;
+
+/** What each module does with a bad value, for the doctor message. */
+const NUMERIC_SETTINGS: Array<{ name: string; ok: (n: number) => boolean; want: string; otherwise: string }> = [
+  { name: "SCREENCAST_MAX_RECORDING_SEC", ok: (n) => Number.isInteger(n) && n >= 0 && n <= 7 * 24 * 3600, want: "an integer from 0 (no cap) to 604800", otherwise: "start_recording fails until it is fixed" },
+  { name: "SCREENCAST_JOB_TIMEOUT_MS", ok: (n) => Number.isInteger(n) && n > 0, want: "a positive integer (milliseconds)", otherwise: "edits use the default timeout" },
+  { name: "SCREENCAST_PS_TIMEOUT_MS", ok: (n) => Number.isInteger(n) && n > 0, want: "a positive integer (milliseconds)", otherwise: "the PowerShell helpers use their default limits" },
+  { name: "SCREENCAST_RETENTION_DAYS", ok: (n) => Number.isFinite(n) && n >= 0, want: "a number of days (0 = off)", otherwise: "nothing is pruned" },
+];
+const CONFIRM_VALUES = ["auto", "1", "true", "yes", "on", "always", "0", "false", "no", "off", "never"];
+
+/** Settings whose value the server cannot use as written, one message each
+ * (#361): a typo such as "7d" or "10m" is otherwise ignored without a word.
+ * Pure. */
+export function settingProblems(env: NodeJS.ProcessEnv = process.env): string[] {
+  const out: string[] = [];
+  for (const s of NUMERIC_SETTINGS) {
+    const raw = env[s.name];
+    if (raw === undefined || raw.trim() === "") continue;
+    if (!s.ok(Number(raw.trim()))) out.push(`${s.name}="${raw}" is not ${s.want}, so ${s.otherwise}.`);
+  }
+  const confirm = env.SCREENCAST_CONFIRM_CAPTURE;
+  if (confirm !== undefined && confirm.trim() !== "" && !CONFIRM_VALUES.includes(confirm.trim().toLowerCase())) {
+    out.push(`SCREENCAST_CONFIRM_CAPTURE="${confirm}" is not auto, always (1/true/yes/on) or off (0/false/no/never), so captures follow auto.`);
+  }
+  return out;
+}
 
 /** The set ones, with their values; unset ones as null. Pure. */
 export function envSettings(env: NodeJS.ProcessEnv = process.env): Record<string, string | null> {

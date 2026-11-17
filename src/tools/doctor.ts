@@ -12,6 +12,7 @@ import {
   KEY_FILTERS,
   devicesText,
   envSettings,
+  settingProblems,
   locate,
   ocrStatus,
   parseDevices,
@@ -144,6 +145,7 @@ export function register(server: McpServer): void {
         if (toolsets.unknown.length > 0) {
           problems.push(`SCREENCAST_TOOLSETS names unknown toolsets (ignored): ${toolsets.unknown.join(", ")}.`);
         }
+        problems.push(...settingProblems());
 
         return okResponse({
           ok: problems.length === 0,

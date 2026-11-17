@@ -4,7 +4,7 @@ import { buildTargetList } from "../utils/targetList.js";
 import { parseTarget } from "../utils/targets.js";
 import { selectWindow, type WindowQuery } from "../utils/windows.js";
 import { parseMonitors, type Monitor } from "../utils/monitors.js";
-import { envSettings, parseDevices, parseFfmpegVersion } from "../utils/capabilities.js";
+import { envSettings, parseDevices, parseFfmpegVersion, settingProblems } from "../utils/capabilities.js";
 
 const MONITORS: Monitor[] = [
   { index: 0, x: 0, y: 0, width: 2560, height: 1440, primary: true, dpi: 144 },
@@ -121,5 +121,20 @@ describe("capabilities parsing (#195)", () => {
     expect(env.SCREENCAST_HOME).toBe("C:\\sc");
     expect(env.FFMPEG_PATH).toBeNull();
     expect(env.SCREENCAST_WHISPER_MODEL).toBeNull();
+  });
+
+  it("names settings the server cannot use as written (#361)", () => {
+    expect(settingProblems({})).toEqual([]);
+    expect(settingProblems({ SCREENCAST_RETENTION_DAYS: "7", SCREENCAST_JOB_TIMEOUT_MS: " 600000 ", SCREENCAST_MAX_RECORDING_SEC: "0", SCREENCAST_CONFIRM_CAPTURE: "Always" })).toEqual([]);
+    const bad = settingProblems({
+      SCREENCAST_RETENTION_DAYS: "7d",
+      SCREENCAST_JOB_TIMEOUT_MS: "10m",
+      SCREENCAST_PS_TIMEOUT_MS: "-5",
+      SCREENCAST_MAX_RECORDING_SEC: "1.5",
+      SCREENCAST_CONFIRM_CAPTURE: "alwyas",
+    });
+    expect(bad).toHaveLength(5);
+    expect(bad.join("\n")).toMatch(/RETENTION_DAYS="7d"[\s\S]*nothing is pruned/);
+    expect(bad.join("\n")).toMatch(/CONFIRM_CAPTURE="alwyas"[\s\S]*follow auto/);
   });
 });

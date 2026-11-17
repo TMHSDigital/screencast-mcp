@@ -18,6 +18,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - Masking secrets with the built-in pattern no longer shares the 1 s regex budget across every line, so `index_recording` and `search_recording` no longer fail on a recording with a large app log, with an error blaming a regex the caller never wrote (#347). Caller-supplied regexes keep the budget.
 - `search_recording` is much cheaper on large indexes: a multi-word query no longer copies a segment's item list per item (quadratic), the masked and normalized text is computed once per index, and a library search reuses parsed index files until they change (#346).
 - An edit job whose ffmpeg keeps reporting progress but never produces a frame is now stopped after 90 s and retried once, instead of running until the job timeout. Seen on the Windows arm64 runner (#281).
+- `doctor` lists settings it cannot use as written under `problems` (for example `SCREENCAST_RETENTION_DAYS=7d`, `SCREENCAST_JOB_TIMEOUT_MS=10m`, or a misspelled `SCREENCAST_CONFIRM_CAPTURE`), saying what happens instead, and reports `SCREENCAST_DEBUG_JOBS`. `FFMPEG_PATH`/`FFPROBE_PATH` are trimmed the same way everywhere (#361).
 - `screencast-mcp record -- "C:\Program Files\...\app.exe" ...` quotes the program path on Windows, so cmd no longer splits it at the space (#357, thanks @bfs2021 in #369).
 
 ## [0.51.1] - 2026-11-16

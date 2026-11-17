@@ -25,8 +25,10 @@ export interface FfmpegTools {
 }
 
 function resolveBinary(envVar: string, fallback: string): string {
-  const override = process.env[envVar];
-  return override && override.trim().length > 0 ? override : fallback;
+  // Trimmed like doctor reads it, so a stray space cannot make the two
+  // disagree about which binary is in use (#361).
+  const override = process.env[envVar]?.trim();
+  return override ? override : fallback;
 }
 
 /** Return true if `bin -version` runs and exits 0. */
