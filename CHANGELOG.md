@@ -13,6 +13,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - The per-call path check now also covers `compose` `inputs[].path`, `start_recording` `logs[].path`, `chapters` `subtitleTracks[].file`, `perf_overlay` `perf`, `pipeline` `fromEdit`, and the source and step files inside a loaded `.edit.json`. A test fails if any tool adds a path field the check does not cover.
 - Stopping a triggered recording (`startWhen`) while its start is under way now waits for the start and stops that recording, instead of reporting "nothing was recorded" while it went on recording (#342).
 - `pause_recording` and `resume_recording` called while the other one is still finishing now return "a pause/resume of it is in progress; retry" instead of "Already recording/paused", which was wrong by the time the first call finished (#343).
+- A recording that ends on its own (its `maxDurationSec` cap, or the window closing) now gets its `durationSec`, so `stop_recording` reports it and the CLI's `--last` window works on a capped run (#344).
 - `screencast-mcp record -- "C:\Program Files\...\app.exe" ...` quotes the program path on Windows, so cmd no longer splits it at the space (#357, thanks @bfs2021 in #369).
 
 ## [0.51.1] - 2026-11-16

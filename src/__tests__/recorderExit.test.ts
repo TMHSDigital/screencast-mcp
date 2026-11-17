@@ -133,6 +133,15 @@ describe("unrequested exits (#297)", () => {
     expect(store.get(rec.id)?.error).toBeUndefined();
   });
 
+  it("a session that ends on its own gets its durationSec (#344)", async () => {
+    const store = newStore();
+    const { rec, child } = running(store, {}, { maxDurationSec: 10, spawnedAt: Date.now() - 10_000 });
+    exit(child, 0);
+    for (let i = 0; i < 50 && store.get(rec.id)?.durationSec === undefined; i++) await new Promise((r) => setTimeout(r, 5));
+    expect(store.get(rec.id)).toMatchObject({ status: "stopped", endReason: "max_duration", durationSec: 12.5 });
+    expect(joinMock).not.toHaveBeenCalled();
+  });
+
   it("the window recorder's window-closed code ends the session as window_closed", () => {
     const store = newStore();
     const { rec, child } = running(store, { backend: "wgc" }, { backend: "wgc" });

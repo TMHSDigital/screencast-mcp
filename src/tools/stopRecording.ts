@@ -110,12 +110,19 @@ export function register(server: McpServer): void {
                   tools: requireFfmpeg,
                 })
               : undefined;
+          // The exit handler probes the length in the background (#344); if
+          // this call beat it, probe now. A segmented one is still joining.
+          let durationSec = record.durationSec ?? null;
+          if (durationSec === null && !record.segments?.parts.length && existsSync(record.outputPath)) {
+            durationSec = await probeDuration(record.outputPath, { ffprobe: requireFfmpeg().ffprobe }).catch(() => null);
+            if (durationSec !== null) store.tryUpdate(record.id, { durationSec });
+          }
           return okResponse({
             ...(replay ? { replay: replayReport(replay) } : {}),
             sessionId: record.id,
             status: record.status,
             outputPath: record.outputPath,
-            durationSec: record.durationSec ?? null,
+            durationSec,
             endReason: record.endReason ?? null,
             note:
               record.endReason === "max_duration"

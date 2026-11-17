@@ -137,8 +137,20 @@ export function attachExitHandler(
       void finalizeSegments(store, cur).catch((err: unknown) => {
         process.stderr.write(`Joining ${id}'s segments failed: ${errorMessage(err)}\n`);
       });
+    } else {
+      // No stop_recording will probe it, so record the length here (#344):
+      // stop_recording and the CLI's --last window read durationSec.
+      void probeEnded(store, cur).catch((err: unknown) => {
+        process.stderr.write(`Reading ${id}'s duration failed: ${errorMessage(err)}\n`);
+      });
     }
   });
+}
+
+async function probeEnded(store: SessionStore, record: SessionRecord): Promise<void> {
+  const { ffprobe } = requireFfmpeg();
+  const durationSec = await probeDuration(record.outputPath, { ffprobe });
+  if (durationSec !== null) store.tryUpdate(record.id, { durationSec });
 }
 
 async function finalizeSegments(store: SessionStore, record: SessionRecord): Promise<void> {
