@@ -55,13 +55,13 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>A recording made with perf: true.</td></tr>
-          <tr><td><code>perf</code></td><td><code class="type">string</code></td><td>Its .perf.jsonl (default: next to input).</td></tr>
-          <tr><td><code>metric</code></td><td><code class="type">&quot;cpu&quot; | &quot;sysCpu&quot; | &quot;rssMB&quot; | &quot;sysMem&quot;</code></td><td>Default cpu (the app's) if sampled, else sysCpu.</td></tr>
-          <tr><td><code>corner</code></td><td><code class="type">&quot;top_left&quot; | &quot;top_right&quot; | &quot;bottom_left&quot; | &quot;bottom_right&quot;</code></td><td>Default top_right.</td></tr>
-          <tr><td><code>width</code></td><td><code class="type">integer</code></td><td>Chart width px (default video/4). <span class="bounds">≥ 80, ≤ 1920</span></td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>A recording made with perf: true.</td></tr>
+          <tr id="p-perf"><td><a class="param-link" href="#p-perf"><code>perf</code></a></td><td><code class="type">string</code></td><td>Its .perf.jsonl (default: next to input).</td></tr>
+          <tr id="p-metric"><td><a class="param-link" href="#p-metric"><code>metric</code></a></td><td><code class="type">&quot;cpu&quot; | &quot;sysCpu&quot; | &quot;rssMB&quot; | &quot;sysMem&quot;</code></td><td>Default cpu (the app's) if sampled, else sysCpu.</td></tr>
+          <tr id="p-corner"><td><a class="param-link" href="#p-corner"><code>corner</code></a></td><td><code class="type">&quot;top_left&quot; | &quot;top_right&quot; | &quot;bottom_left&quot; | &quot;bottom_right&quot;</code></td><td>Default top_right.</td></tr>
+          <tr id="p-width"><td><a class="param-link" href="#p-width"><code>width</code></a></td><td><code class="type">integer</code></td><td>Chart width px (default video/4). <span class="bounds">≥ 80, ≤ 1920</span></td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
         </tbody>
       </table>
       </div>
@@ -80,7 +80,7 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
+          <tr id="out-outputPath"><td><a class="param-link" href="#out-outputPath"><code>outputPath</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
         </tbody>
       </table>
       </div>

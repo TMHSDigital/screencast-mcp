@@ -55,16 +55,16 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the recording.</td></tr>
-          <tr><td><code>events</code></td><td><code class="type">string</code></td><td>Event log (default: the input's .events.jsonl).</td></tr>
-          <tr><td><code>size</code></td><td><code class="type">number</code></td><td>Times a typical cursor's size (default 1.5). <span class="bounds">≥ 0.25, ≤ 8</span></td></tr>
-          <tr><td><code>smoothing</code></td><td><code class="type">number</code></td><td>0 = as logged, 1 = floaty (default 0.5). <span class="bounds">≥ 0, ≤ 1</span></td></tr>
-          <tr><td><code>hideAfterSec</code></td><td><code class="type">number</code></td><td>Hide when the mouse rests this long; 0 = never (default 2). <span class="bounds">≥ 0, ≤ 600</span></td></tr>
-          <tr><td><code>clicks</code></td><td><code class="type">boolean</code></td><td>Ripple on clicks (default true).</td></tr>
-          <tr><td><code>spotlight</code></td><td><code class="type">boolean</code></td><td>Dim all but the area around the cursor.</td></tr>
-          <tr><td><code>dryRun</code></td><td><code class="type">boolean</code></td><td>Return the plan; write nothing.</td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the recording.</td></tr>
+          <tr id="p-events"><td><a class="param-link" href="#p-events"><code>events</code></a></td><td><code class="type">string</code></td><td>Event log (default: the input's .events.jsonl).</td></tr>
+          <tr id="p-size"><td><a class="param-link" href="#p-size"><code>size</code></a></td><td><code class="type">number</code></td><td>Times a typical cursor's size (default 1.5). <span class="bounds">≥ 0.25, ≤ 8</span></td></tr>
+          <tr id="p-smoothing"><td><a class="param-link" href="#p-smoothing"><code>smoothing</code></a></td><td><code class="type">number</code></td><td>0 = as logged, 1 = floaty (default 0.5). <span class="bounds">≥ 0, ≤ 1</span></td></tr>
+          <tr id="p-hideAfterSec"><td><a class="param-link" href="#p-hideAfterSec"><code>hideAfterSec</code></a></td><td><code class="type">number</code></td><td>Hide when the mouse rests this long; 0 = never (default 2). <span class="bounds">≥ 0, ≤ 600</span></td></tr>
+          <tr id="p-clicks"><td><a class="param-link" href="#p-clicks"><code>clicks</code></a></td><td><code class="type">boolean</code></td><td>Ripple on clicks (default true).</td></tr>
+          <tr id="p-spotlight"><td><a class="param-link" href="#p-spotlight"><code>spotlight</code></a></td><td><code class="type">boolean</code></td><td>Dim all but the area around the cursor.</td></tr>
+          <tr id="p-dryRun"><td><a class="param-link" href="#p-dryRun"><code>dryRun</code></a></td><td><code class="type">boolean</code></td><td>Return the plan; write nothing.</td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
         </tbody>
       </table>
       </div>
@@ -83,7 +83,7 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>segments</code> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
+          <tr id="out-segments"><td><a class="param-link" href="#out-segments"><code>segments</code></a> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
         </tbody>
       </table>
       </div>

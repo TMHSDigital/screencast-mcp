@@ -55,17 +55,17 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video or image (png/jpg).</td></tr>
-          <tr><td><code>preset</code></td><td><code class="type">&quot;desktop&quot; | &quot;rec&quot; | &quot;amber&quot; | &quot;light&quot;</code></td><td>Gradient: desktop (default, dark slate), rec (red), amber, light.</td></tr>
-          <tr><td><code>colors</code></td><td><code class="type">string[]</code></td><td>Instead: 1 color = solid, 2-4 = diagonal gradient. <span class="bounds">at least 1 items, at most 4 items</span></td></tr>
-          <tr><td><code>image</code></td><td><code class="type">string</code></td><td>Instead: a wallpaper image, scaled to cover.</td></tr>
-          <tr><td><code>padding</code></td><td><code class="type">integer</code></td><td>px around the content (default 6% of the longer side). <span class="bounds">≥ 0, ≤ 2000</span></td></tr>
-          <tr><td><code>radius</code></td><td><code class="type">integer</code></td><td>Corner radius px (default ~1.2% of the longer side; 0 = square). <span class="bounds">≥ 0, ≤ 1000</span></td></tr>
-          <tr><td><code>shadow</code></td><td><code class="type">integer</code></td><td>Shadow blur px (default ~2.5%; 0 = none). <span class="bounds">≥ 0, ≤ 200</span></td></tr>
-          <tr><td><code>shadowOpacity</code></td><td><code class="type">number</code></td><td>Default 0.5. <span class="bounds">≥ 0, ≤ 1</span></td></tr>
-          <tr><td><code>aspect</code></td><td><code class="type">&quot;16:9&quot; | &quot;9:16&quot; | &quot;1:1&quot; | &quot;4:5&quot;</code></td><td>Output on this aspect's canvas (1920x1080, ...), content scaled to fit.</td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits (screenshots for an image).</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video or image (png/jpg).</td></tr>
+          <tr id="p-preset"><td><a class="param-link" href="#p-preset"><code>preset</code></a></td><td><code class="type">&quot;desktop&quot; | &quot;rec&quot; | &quot;amber&quot; | &quot;light&quot;</code></td><td>Gradient: desktop (default, dark slate), rec (red), amber, light.</td></tr>
+          <tr id="p-colors"><td><a class="param-link" href="#p-colors"><code>colors</code></a></td><td><code class="type">string[]</code></td><td>Instead: 1 color = solid, 2-4 = diagonal gradient. <span class="bounds">at least 1 items, at most 4 items</span></td></tr>
+          <tr id="p-image"><td><a class="param-link" href="#p-image"><code>image</code></a></td><td><code class="type">string</code></td><td>Instead: a wallpaper image, scaled to cover.</td></tr>
+          <tr id="p-padding"><td><a class="param-link" href="#p-padding"><code>padding</code></a></td><td><code class="type">integer</code></td><td>px around the content (default 6% of the longer side). <span class="bounds">≥ 0, ≤ 2000</span></td></tr>
+          <tr id="p-radius"><td><a class="param-link" href="#p-radius"><code>radius</code></a></td><td><code class="type">integer</code></td><td>Corner radius px (default ~1.2% of the longer side; 0 = square). <span class="bounds">≥ 0, ≤ 1000</span></td></tr>
+          <tr id="p-shadow"><td><a class="param-link" href="#p-shadow"><code>shadow</code></a></td><td><code class="type">integer</code></td><td>Shadow blur px (default ~2.5%; 0 = none). <span class="bounds">≥ 0, ≤ 200</span></td></tr>
+          <tr id="p-shadowOpacity"><td><a class="param-link" href="#p-shadowOpacity"><code>shadowOpacity</code></a></td><td><code class="type">number</code></td><td>Default 0.5. <span class="bounds">≥ 0, ≤ 1</span></td></tr>
+          <tr id="p-aspect"><td><a class="param-link" href="#p-aspect"><code>aspect</code></a></td><td><code class="type">&quot;16:9&quot; | &quot;9:16&quot; | &quot;1:1&quot; | &quot;4:5&quot;</code></td><td>Output on this aspect's canvas (1920x1080, ...), content scaled to fit.</td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits (screenshots for an image).</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
         </tbody>
       </table>
       </div>
@@ -84,9 +84,9 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
-          <tr><td><code>width</code> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
-          <tr><td><code>height</code> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
+          <tr id="out-outputPath"><td><a class="param-link" href="#out-outputPath"><code>outputPath</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="out-width"><td><a class="param-link" href="#out-width"><code>width</code></a> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
+          <tr id="out-height"><td><a class="param-link" href="#out-height"><code>height</code></a> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
         </tbody>
       </table>
       </div>

@@ -55,19 +55,19 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>target</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>What to watch: full | monitor:&lt;i&gt; | window:&lt;title&gt; (or exe=/hwnd=) | region:&lt;x&gt;,&lt;y&gt;,&lt;w&gt;,&lt;h&gt;.</td></tr>
-          <tr><td><code>exactTitle</code></td><td><code class="type">boolean</code></td><td>window: targets match the whole title only (default false).</td></tr>
-          <tr><td><code>mode</code></td><td><code class="type">&quot;change&quot; | &quot;settle&quot; | &quot;text&quot;</code></td><td>change (default): return once it differs from the start. settle: once it has been still for settleSec. text: once text appears (OCR, re-read only after a change).</td></tr>
-          <tr><td><code>text</code></td><td><code class="type">string</code></td><td>Mode text: what to wait for; tolerates OCR misreads. <span class="bounds">at most 500 characters</span></td></tr>
-          <tr><td><code>regex</code></td><td><code class="type">boolean</code></td><td>Mode text: text is a regex.</td></tr>
-          <tr><td><code>gone</code></td><td><code class="type">boolean</code></td><td>Mode text: wait until it disappears instead.</td></tr>
-          <tr><td><code>backend</code></td><td><code class="type">&quot;gdigrab&quot; | &quot;wgc&quot;</code></td><td>wgc: watch a window even when covered (window: targets; 1-2 s per check).</td></tr>
-          <tr><td><code>timeoutSec</code></td><td><code class="type">number</code></td><td>Give up after this many seconds (default 30; a timeout is a result, not an error). <span class="bounds">&gt; 0, ≤ 600</span></td></tr>
-          <tr><td><code>settleSec</code></td><td><code class="type">number</code></td><td>Mode settle: seconds of stillness (default 1). <span class="bounds">&gt; 0, ≤ 60</span></td></tr>
-          <tr><td><code>intervalMs</code></td><td><code class="type">integer</code></td><td>Pause between checks in ms (default 250; 1000 with wgc). <span class="bounds">≥ 100, ≤ 5000</span></td></tr>
-          <tr><td><code>pixelThreshold</code></td><td><code class="type">number</code></td><td>Mean 0-255 difference for a ~32x32 cell to count as changed (default 12). <span class="bounds">≥ 0, ≤ 255</span></td></tr>
-          <tr><td><code>returnImage</code></td><td><code class="type">boolean</code></td><td>Return the final state inline (default true).</td></tr>
-          <tr><td><code>keep</code></td><td><code class="type">boolean</code></td><td>Keep the final screenshot on disk and return its path (default false).</td></tr>
+          <tr id="p-target"><td><a class="param-link" href="#p-target"><code>target</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>What to watch: full | monitor:&lt;i&gt; | window:&lt;title&gt; (or exe=/hwnd=) | region:&lt;x&gt;,&lt;y&gt;,&lt;w&gt;,&lt;h&gt;.</td></tr>
+          <tr id="p-exactTitle"><td><a class="param-link" href="#p-exactTitle"><code>exactTitle</code></a></td><td><code class="type">boolean</code></td><td>window: targets match the whole title only (default false).</td></tr>
+          <tr id="p-mode"><td><a class="param-link" href="#p-mode"><code>mode</code></a></td><td><code class="type">&quot;change&quot; | &quot;settle&quot; | &quot;text&quot;</code></td><td>change (default): return once it differs from the start. settle: once it has been still for settleSec. text: once text appears (OCR, re-read only after a change).</td></tr>
+          <tr id="p-text"><td><a class="param-link" href="#p-text"><code>text</code></a></td><td><code class="type">string</code></td><td>Mode text: what to wait for; tolerates OCR misreads. <span class="bounds">at most 500 characters</span></td></tr>
+          <tr id="p-regex"><td><a class="param-link" href="#p-regex"><code>regex</code></a></td><td><code class="type">boolean</code></td><td>Mode text: text is a regex.</td></tr>
+          <tr id="p-gone"><td><a class="param-link" href="#p-gone"><code>gone</code></a></td><td><code class="type">boolean</code></td><td>Mode text: wait until it disappears instead.</td></tr>
+          <tr id="p-backend"><td><a class="param-link" href="#p-backend"><code>backend</code></a></td><td><code class="type">&quot;gdigrab&quot; | &quot;wgc&quot;</code></td><td>wgc: watch a window even when covered (window: targets; 1-2 s per check).</td></tr>
+          <tr id="p-timeoutSec"><td><a class="param-link" href="#p-timeoutSec"><code>timeoutSec</code></a></td><td><code class="type">number</code></td><td>Give up after this many seconds (default 30; a timeout is a result, not an error). <span class="bounds">&gt; 0, ≤ 600</span></td></tr>
+          <tr id="p-settleSec"><td><a class="param-link" href="#p-settleSec"><code>settleSec</code></a></td><td><code class="type">number</code></td><td>Mode settle: seconds of stillness (default 1). <span class="bounds">&gt; 0, ≤ 60</span></td></tr>
+          <tr id="p-intervalMs"><td><a class="param-link" href="#p-intervalMs"><code>intervalMs</code></a></td><td><code class="type">integer</code></td><td>Pause between checks in ms (default 250; 1000 with wgc). <span class="bounds">≥ 100, ≤ 5000</span></td></tr>
+          <tr id="p-pixelThreshold"><td><a class="param-link" href="#p-pixelThreshold"><code>pixelThreshold</code></a></td><td><code class="type">number</code></td><td>Mean 0-255 difference for a ~32x32 cell to count as changed (default 12). <span class="bounds">≥ 0, ≤ 255</span></td></tr>
+          <tr id="p-returnImage"><td><a class="param-link" href="#p-returnImage"><code>returnImage</code></a></td><td><code class="type">boolean</code></td><td>Return the final state inline (default true).</td></tr>
+          <tr id="p-keep"><td><a class="param-link" href="#p-keep"><code>keep</code></a></td><td><code class="type">boolean</code></td><td>Keep the final screenshot on disk and return its path (default false).</td></tr>
         </tbody>
       </table>
       </div>
@@ -86,13 +86,13 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th></tr></thead>
         <tbody>
-          <tr><td><code>outcome</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
-          <tr><td><code>mode</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
-          <tr><td><code>elapsedSec</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
-          <tr><td><code>regions</code> <span class="req">always</span></td><td><code class="type">any[]</code></td></tr>
-          <tr><td><code>origin</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
-          <tr class="nested d1"><td><code>origin.x</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
-          <tr class="nested d1"><td><code>origin.y</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr id="out-outcome"><td><a class="param-link" href="#out-outcome"><code>outcome</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-mode"><td><a class="param-link" href="#out-mode"><code>mode</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-elapsedSec"><td><a class="param-link" href="#out-elapsedSec"><code>elapsedSec</code></a> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr id="out-regions"><td><a class="param-link" href="#out-regions"><code>regions</code></a> <span class="req">always</span></td><td><code class="type">any[]</code></td></tr>
+          <tr id="out-origin"><td><a class="param-link" href="#out-origin"><code>origin</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-origin.x" class="nested d1"><td><a class="param-link" href="#out-origin.x"><code>origin.x</code></a> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr id="out-origin.y" class="nested d1"><td><a class="param-link" href="#out-origin.y"><code>origin.y</code></a> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
         </tbody>
       </table>
       </div>

@@ -55,19 +55,19 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the recording.</td></tr>
-          <tr><td><code>events</code></td><td><code class="type">string</code></td><td>Event log (default: the input's .events.jsonl).</td></tr>
-          <tr><td><code>clicks</code></td><td><code class="type">boolean</code></td><td>Show clicks (default true).</td></tr>
-          <tr><td><code>typing</code></td><td><code class="type">boolean</code></td><td>Show typing as &quot;Typing…&quot; (default true).</td></tr>
-          <tr><td><code>keys</code></td><td><code class="type">&quot;shortcuts&quot; | &quot;masked&quot;</code></td><td>shortcuts (default): the chord (Ctrl + S); masked: modifiers only (Ctrl + …).</td></tr>
-          <tr><td><code>lingerSec</code></td><td><code class="type">number</code></td><td>Seconds a badge stays up (default 1.2). <span class="bounds">&gt; 0, ≤ 10</span></td></tr>
-          <tr><td><code>position</code></td><td><code class="type">&quot;bottom&quot; | &quot;bottom-left&quot; | &quot;bottom-right&quot; | &quot;top&quot; | &quot;top-left&quot; | &quot;top-right&quot;</code></td><td>Default bottom (centred).</td></tr>
-          <tr><td><code>size</code></td><td><code class="type">number</code></td><td>Font px (default 4.5% of the frame height). <span class="bounds">≥ 8, ≤ 400</span></td></tr>
-          <tr><td><code>color</code></td><td><code class="type">string</code></td><td>Text color (default white).</td></tr>
-          <tr><td><code>fontFile</code></td><td><code class="type">string</code></td><td>Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).</td></tr>
-          <tr><td><code>dryRun</code></td><td><code class="type">boolean</code></td><td>Return the planned badges; write nothing.</td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the recording.</td></tr>
+          <tr id="p-events"><td><a class="param-link" href="#p-events"><code>events</code></a></td><td><code class="type">string</code></td><td>Event log (default: the input's .events.jsonl).</td></tr>
+          <tr id="p-clicks"><td><a class="param-link" href="#p-clicks"><code>clicks</code></a></td><td><code class="type">boolean</code></td><td>Show clicks (default true).</td></tr>
+          <tr id="p-typing"><td><a class="param-link" href="#p-typing"><code>typing</code></a></td><td><code class="type">boolean</code></td><td>Show typing as &quot;Typing…&quot; (default true).</td></tr>
+          <tr id="p-keys"><td><a class="param-link" href="#p-keys"><code>keys</code></a></td><td><code class="type">&quot;shortcuts&quot; | &quot;masked&quot;</code></td><td>shortcuts (default): the chord (Ctrl + S); masked: modifiers only (Ctrl + …).</td></tr>
+          <tr id="p-lingerSec"><td><a class="param-link" href="#p-lingerSec"><code>lingerSec</code></a></td><td><code class="type">number</code></td><td>Seconds a badge stays up (default 1.2). <span class="bounds">&gt; 0, ≤ 10</span></td></tr>
+          <tr id="p-position"><td><a class="param-link" href="#p-position"><code>position</code></a></td><td><code class="type">&quot;bottom&quot; | &quot;bottom-left&quot; | &quot;bottom-right&quot; | &quot;top&quot; | &quot;top-left&quot; | &quot;top-right&quot;</code></td><td>Default bottom (centred).</td></tr>
+          <tr id="p-size"><td><a class="param-link" href="#p-size"><code>size</code></a></td><td><code class="type">number</code></td><td>Font px (default 4.5% of the frame height). <span class="bounds">≥ 8, ≤ 400</span></td></tr>
+          <tr id="p-color"><td><a class="param-link" href="#p-color"><code>color</code></a></td><td><code class="type">string</code></td><td>Text color (default white).</td></tr>
+          <tr id="p-fontFile"><td><a class="param-link" href="#p-fontFile"><code>fontFile</code></a></td><td><code class="type">string</code></td><td>Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).</td></tr>
+          <tr id="p-dryRun"><td><a class="param-link" href="#p-dryRun"><code>dryRun</code></a></td><td><code class="type">boolean</code></td><td>Return the planned badges; write nothing.</td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
         </tbody>
       </table>
       </div>
@@ -86,7 +86,7 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>badges</code> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
+          <tr id="out-badges"><td><a class="param-link" href="#out-badges"><code>badges</code></a> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
         </tbody>
       </table>
       </div>

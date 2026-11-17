@@ -342,7 +342,9 @@ function paramTable(rows, emptyText, { output = false } = {}) {
     const req = r.required ? ` <span class="req">${output ? "always" : "required"}</span>` : "";
     const notes = r.constraints.length ? ` <span class="bounds">${esc(r.constraints.join(", "))}</span>` : "";
     const desc = described ? `<td>${mdInline(r.description)}${notes}</td>` : "";
-    return `          <tr${depth ? ` class="nested d${Math.min(depth, 3)}"` : ""}><td><code>${esc(r.name)}</code>${req}</td><td><code class="type">${esc(r.type)}</code></td>${desc}</tr>`;
+    // Every row is linkable (trim.html#p-exact) so a parameter can be cited.
+    const id = `${output ? "out" : "p"}-${r.name.replace(/\[\]/g, "").replace(/[^\w.-]+/g, "-").replace(/-+\./g, ".").replace(/-+$/, "")}`;
+    return `          <tr id="${esc(id)}"${depth ? ` class="nested d${Math.min(depth, 3)}"` : ""}><td><a class="param-link" href="#${esc(id)}"><code>${esc(r.name)}</code></a>${req}</td><td><code class="type">${esc(r.type)}</code></td>${desc}</tr>`;
   };
   return `      <div class="table-scroll">
       <table class="params">

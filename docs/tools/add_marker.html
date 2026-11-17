@@ -55,10 +55,10 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>label</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>e.g. &quot;bug appears&quot;. <span class="bounds">at most 200 characters</span></td></tr>
-          <tr><td><code>sessionId</code></td><td><code class="type">string</code></td><td>Recording to mark (a stopped one needs at).</td></tr>
-          <tr><td><code>input</code></td><td><code class="type">string</code></td><td>Or a video path (needs at).</td></tr>
-          <tr><td><code>at</code></td><td><code class="type">number</code></td><td>Video second (default: now, while recording). <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-label"><td><a class="param-link" href="#p-label"><code>label</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>e.g. &quot;bug appears&quot;. <span class="bounds">at most 200 characters</span></td></tr>
+          <tr id="p-sessionId"><td><a class="param-link" href="#p-sessionId"><code>sessionId</code></a></td><td><code class="type">string</code></td><td>Recording to mark (a stopped one needs at).</td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a></td><td><code class="type">string</code></td><td>Or a video path (needs at).</td></tr>
+          <tr id="p-at"><td><a class="param-link" href="#p-at"><code>at</code></a></td><td><code class="type">number</code></td><td>Video second (default: now, while recording). <span class="bounds">≥ 0</span></td></tr>
         </tbody>
       </table>
       </div>
@@ -77,8 +77,8 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>count</code> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
-          <tr><td><code>markersPath</code> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="out-count"><td><a class="param-link" href="#out-count"><code>count</code></a> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
+          <tr id="out-markersPath"><td><a class="param-link" href="#out-markersPath"><code>markersPath</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
         </tbody>
       </table>
       </div>

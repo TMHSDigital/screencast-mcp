@@ -55,15 +55,15 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>inputs</code> <span class="req">required</span></td><td><code class="type">object[]</code></td><td>Videos in reading order, each with an optional label (e.g. &quot;Before&quot;). <span class="bounds">at least 2 items, at most 9 items</span></td></tr>
-          <tr class="nested d1"><td><code>inputs[].path</code> <span class="req">required</span></td><td><code class="type">string</code></td><td></td></tr>
-          <tr class="nested d1"><td><code>inputs[].label</code></td><td><code class="type">string</code></td><td> <span class="bounds">at most 80 characters</span></td></tr>
-          <tr><td><code>layout</code></td><td><code class="type">&quot;side_by_side&quot; | &quot;stack&quot; | &quot;grid&quot;</code></td><td>side_by_side (default), stack, or grid.</td></tr>
-          <tr><td><code>alignMarker</code></td><td><code class="type">string</code></td><td>Line inputs up on this add_marker label.</td></tr>
-          <tr><td><code>endWith</code></td><td><code class="type">&quot;longest&quot; | &quot;shortest&quot;</code></td><td>longest (default; shorter ones hold their last frame) or shortest.</td></tr>
-          <tr><td><code>audio</code></td><td><code class="type">integer | &quot;mix&quot; | &quot;none&quot;</code></td><td>Input index whose audio to keep (default 0), &quot;mix&quot;, or &quot;none&quot;.</td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-inputs"><td><a class="param-link" href="#p-inputs"><code>inputs</code></a> <span class="req">required</span></td><td><code class="type">object[]</code></td><td>Videos in reading order, each with an optional label (e.g. &quot;Before&quot;). <span class="bounds">at least 2 items, at most 9 items</span></td></tr>
+          <tr id="p-inputs.path" class="nested d1"><td><a class="param-link" href="#p-inputs.path"><code>inputs[].path</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="p-inputs.label" class="nested d1"><td><a class="param-link" href="#p-inputs.label"><code>inputs[].label</code></a></td><td><code class="type">string</code></td><td> <span class="bounds">at most 80 characters</span></td></tr>
+          <tr id="p-layout"><td><a class="param-link" href="#p-layout"><code>layout</code></a></td><td><code class="type">&quot;side_by_side&quot; | &quot;stack&quot; | &quot;grid&quot;</code></td><td>side_by_side (default), stack, or grid.</td></tr>
+          <tr id="p-alignMarker"><td><a class="param-link" href="#p-alignMarker"><code>alignMarker</code></a></td><td><code class="type">string</code></td><td>Line inputs up on this add_marker label.</td></tr>
+          <tr id="p-endWith"><td><a class="param-link" href="#p-endWith"><code>endWith</code></a></td><td><code class="type">&quot;longest&quot; | &quot;shortest&quot;</code></td><td>longest (default; shorter ones hold their last frame) or shortest.</td></tr>
+          <tr id="p-audio"><td><a class="param-link" href="#p-audio"><code>audio</code></a></td><td><code class="type">integer | &quot;mix&quot; | &quot;none&quot;</code></td><td>Input index whose audio to keep (default 0), &quot;mix&quot;, or &quot;none&quot;.</td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
         </tbody>
       </table>
       </div>
@@ -82,7 +82,7 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
+          <tr id="out-outputPath"><td><a class="param-link" href="#out-outputPath"><code>outputPath</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
         </tbody>
       </table>
       </div>

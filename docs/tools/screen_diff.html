@@ -55,10 +55,10 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>a</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Before image (or video: first frame).</td></tr>
-          <tr><td><code>b</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>After image (or video); scaled to a's size.</td></tr>
-          <tr><td><code>pixelThreshold</code></td><td><code class="type">number</code></td><td>Mean 0-255 difference for a ~32x32 cell to count as changed (default 12). <span class="bounds">≥ 0, ≤ 255</span></td></tr>
-          <tr><td><code>returnImage</code></td><td><code class="type">boolean</code></td><td>Return b inline with changes outlined (default true).</td></tr>
+          <tr id="p-a"><td><a class="param-link" href="#p-a"><code>a</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Before image (or video: first frame).</td></tr>
+          <tr id="p-b"><td><a class="param-link" href="#p-b"><code>b</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>After image (or video); scaled to a's size.</td></tr>
+          <tr id="p-pixelThreshold"><td><a class="param-link" href="#p-pixelThreshold"><code>pixelThreshold</code></a></td><td><code class="type">number</code></td><td>Mean 0-255 difference for a ~32x32 cell to count as changed (default 12). <span class="bounds">≥ 0, ≤ 255</span></td></tr>
+          <tr id="p-returnImage"><td><a class="param-link" href="#p-returnImage"><code>returnImage</code></a></td><td><code class="type">boolean</code></td><td>Return b inline with changes outlined (default true).</td></tr>
         </tbody>
       </table>
       </div>
@@ -77,11 +77,11 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th></tr></thead>
         <tbody>
-          <tr><td><code>identical</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr><td><code>ssim</code> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
-          <tr><td><code>meanDiff</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
-          <tr><td><code>changedFraction</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
-          <tr><td><code>regions</code> <span class="req">always</span></td><td><code class="type">any[]</code></td></tr>
+          <tr id="out-identical"><td><a class="param-link" href="#out-identical"><code>identical</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-ssim"><td><a class="param-link" href="#out-ssim"><code>ssim</code></a> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
+          <tr id="out-meanDiff"><td><a class="param-link" href="#out-meanDiff"><code>meanDiff</code></a> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr id="out-changedFraction"><td><a class="param-link" href="#out-changedFraction"><code>changedFraction</code></a> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr id="out-regions"><td><a class="param-link" href="#out-regions"><code>regions</code></a> <span class="req">always</span></td><td><code class="type">any[]</code></td></tr>
         </tbody>
       </table>
       </div>

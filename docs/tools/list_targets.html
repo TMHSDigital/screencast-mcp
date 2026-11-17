@@ -55,9 +55,9 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>exe</code></td><td><code class="type">string</code></td><td>Only list windows of this executable, e.g. 'Code.exe' or 'code'.</td></tr>
-          <tr><td><code>titleContains</code></td><td><code class="type">string</code></td><td>Only list windows whose title contains this text (case-insensitive).</td></tr>
-          <tr><td><code>capturableOnly</code></td><td><code class="type">boolean</code></td><td>Leave out windows neither backend can capture (minimized, off screen). Default false.</td></tr>
+          <tr id="p-exe"><td><a class="param-link" href="#p-exe"><code>exe</code></a></td><td><code class="type">string</code></td><td>Only list windows of this executable, e.g. 'Code.exe' or 'code'.</td></tr>
+          <tr id="p-titleContains"><td><a class="param-link" href="#p-titleContains"><code>titleContains</code></a></td><td><code class="type">string</code></td><td>Only list windows whose title contains this text (case-insensitive).</td></tr>
+          <tr id="p-capturableOnly"><td><a class="param-link" href="#p-capturableOnly"><code>capturableOnly</code></a></td><td><code class="type">boolean</code></td><td>Leave out windows neither backend can capture (minimized, off screen). Default false.</td></tr>
         </tbody>
       </table>
       </div>
@@ -76,29 +76,29 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th></tr></thead>
         <tbody>
-          <tr><td><code>full</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
-          <tr class="nested d1"><td><code>full.target</code> <span class="req">always</span></td><td><code class="type">&quot;full&quot;</code></td></tr>
-          <tr class="nested d1"><td><code>full.bounds</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
-          <tr><td><code>monitors</code> <span class="req">always</span></td><td><code class="type">object[]</code></td></tr>
-          <tr class="nested d1"><td><code>monitors[].target</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
-          <tr class="nested d1"><td><code>monitors[].index</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
-          <tr class="nested d1"><td><code>monitors[].primary</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr class="nested d1"><td><code>monitors[].bounds</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
-          <tr class="nested d1"><td><code>monitors[].dpi</code> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
-          <tr class="nested d1"><td><code>monitors[].scale</code> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
-          <tr><td><code>windows</code> <span class="req">always</span></td><td><code class="type">object[]</code></td></tr>
-          <tr class="nested d1"><td><code>windows[].target</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
-          <tr class="nested d1"><td><code>windows[].title</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
-          <tr class="nested d1"><td><code>windows[].exe</code> <span class="req">always</span></td><td><code class="type">string | null</code></td></tr>
-          <tr class="nested d1"><td><code>windows[].pid</code> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
-          <tr class="nested d1"><td><code>windows[].hwnd</code> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
-          <tr class="nested d1"><td><code>windows[].bounds</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
-          <tr class="nested d1"><td><code>windows[].minimized</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr class="nested d1"><td><code>windows[].cloaked</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr class="nested d1"><td><code>windows[].capturable</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr class="nested d1"><td><code>windows[].wgcCapturable</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr><td><code>wgcAvailable</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr><td><code>note</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-full"><td><a class="param-link" href="#out-full"><code>full</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-full.target" class="nested d1"><td><a class="param-link" href="#out-full.target"><code>full.target</code></a> <span class="req">always</span></td><td><code class="type">&quot;full&quot;</code></td></tr>
+          <tr id="out-full.bounds" class="nested d1"><td><a class="param-link" href="#out-full.bounds"><code>full.bounds</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-monitors"><td><a class="param-link" href="#out-monitors"><code>monitors</code></a> <span class="req">always</span></td><td><code class="type">object[]</code></td></tr>
+          <tr id="out-monitors.target" class="nested d1"><td><a class="param-link" href="#out-monitors.target"><code>monitors[].target</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-monitors.index" class="nested d1"><td><a class="param-link" href="#out-monitors.index"><code>monitors[].index</code></a> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr id="out-monitors.primary" class="nested d1"><td><a class="param-link" href="#out-monitors.primary"><code>monitors[].primary</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-monitors.bounds" class="nested d1"><td><a class="param-link" href="#out-monitors.bounds"><code>monitors[].bounds</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-monitors.dpi" class="nested d1"><td><a class="param-link" href="#out-monitors.dpi"><code>monitors[].dpi</code></a> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
+          <tr id="out-monitors.scale" class="nested d1"><td><a class="param-link" href="#out-monitors.scale"><code>monitors[].scale</code></a> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
+          <tr id="out-windows"><td><a class="param-link" href="#out-windows"><code>windows</code></a> <span class="req">always</span></td><td><code class="type">object[]</code></td></tr>
+          <tr id="out-windows.target" class="nested d1"><td><a class="param-link" href="#out-windows.target"><code>windows[].target</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-windows.title" class="nested d1"><td><a class="param-link" href="#out-windows.title"><code>windows[].title</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-windows.exe" class="nested d1"><td><a class="param-link" href="#out-windows.exe"><code>windows[].exe</code></a> <span class="req">always</span></td><td><code class="type">string | null</code></td></tr>
+          <tr id="out-windows.pid" class="nested d1"><td><a class="param-link" href="#out-windows.pid"><code>windows[].pid</code></a> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
+          <tr id="out-windows.hwnd" class="nested d1"><td><a class="param-link" href="#out-windows.hwnd"><code>windows[].hwnd</code></a> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
+          <tr id="out-windows.bounds" class="nested d1"><td><a class="param-link" href="#out-windows.bounds"><code>windows[].bounds</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-windows.minimized" class="nested d1"><td><a class="param-link" href="#out-windows.minimized"><code>windows[].minimized</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-windows.cloaked" class="nested d1"><td><a class="param-link" href="#out-windows.cloaked"><code>windows[].cloaked</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-windows.capturable" class="nested d1"><td><a class="param-link" href="#out-windows.capturable"><code>windows[].capturable</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-windows.wgcCapturable" class="nested d1"><td><a class="param-link" href="#out-windows.wgcCapturable"><code>windows[].wgcCapturable</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-wgcAvailable"><td><a class="param-link" href="#out-wgcAvailable"><code>wgcAvailable</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-note"><td><a class="param-link" href="#out-note"><code>note</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
         </tbody>
       </table>
       </div>

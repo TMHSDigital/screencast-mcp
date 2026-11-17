@@ -69,6 +69,8 @@ pre code { border: 0; padding: 0; background: none; font-size: 0.875em; }
 }
 .rec-label { color: var(--rec); font-weight: 500; }
 .hud #tc { color: var(--ink); font-variant-numeric: tabular-nums; }
+.hud #tc[role="button"] { cursor: pointer; }
+.hud #tc[role="button"]:hover { color: var(--amber); }
 .hud-right { display: flex; align-items: center; gap: 1.1rem; }
 .hud-right a { color: var(--dim); text-decoration: none; }
 .hud-right a:hover { color: var(--amber); }
@@ -186,6 +188,12 @@ h1 .amber { color: var(--amber); }
 }
 .skip:focus { transform: none; }
 #main:focus { outline: none; }
+/* Linkable parameter rows on tool pages: the name is the link; the linked row glows amber. */
+.param-link { text-decoration: none; }
+.param-link:hover code { border-color: var(--amber); }
+.params tr { scroll-margin-top: 5rem; }
+.params tr:target td { background: color-mix(in srgb, var(--amber) 12%, transparent); }
+.params tr:target td:first-child { box-shadow: inset 2px 0 0 var(--amber); }
 h2 {
   font-family: var(--display); font-weight: 700;
   font-size: clamp(1.5rem, 3.4vw, 2.1rem);

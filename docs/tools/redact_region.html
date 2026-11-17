@@ -55,19 +55,19 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video or image (png/jpg; time ranges are ignored for an image).</td></tr>
-          <tr><td><code>regions</code> <span class="req">required</span></td><td><code class="type">object[]</code></td><td>Pixel rectangles (x, y, width, height), each optionally limited to start..end seconds. <span class="bounds">at least 1 items</span></td></tr>
-          <tr class="nested d1"><td><code>regions[].x</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
-          <tr class="nested d1"><td><code>regions[].y</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
-          <tr class="nested d1"><td><code>regions[].width</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
-          <tr class="nested d1"><td><code>regions[].height</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
-          <tr class="nested d1"><td><code>regions[].start</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
-          <tr class="nested d1"><td><code>regions[].end</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
-          <tr><td><code>style</code></td><td><code class="type">&quot;box&quot; | &quot;blur&quot; | &quot;pixelate&quot;</code></td><td>box (default): irreversible fill; blur/pixelate are partially recoverable.</td></tr>
-          <tr><td><code>pad</code></td><td><code class="type">integer</code></td><td>Grow each region by this many px (default 0). <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
-          <tr><td><code>color</code></td><td><code class="type">string</code></td><td>Box fill color (default black).</td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video or image (png/jpg; time ranges are ignored for an image).</td></tr>
+          <tr id="p-regions"><td><a class="param-link" href="#p-regions"><code>regions</code></a> <span class="req">required</span></td><td><code class="type">object[]</code></td><td>Pixel rectangles (x, y, width, height), each optionally limited to start..end seconds. <span class="bounds">at least 1 items</span></td></tr>
+          <tr id="p-regions.x" class="nested d1"><td><a class="param-link" href="#p-regions.x"><code>regions[].x</code></a> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
+          <tr id="p-regions.y" class="nested d1"><td><a class="param-link" href="#p-regions.y"><code>regions[].y</code></a> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
+          <tr id="p-regions.width" class="nested d1"><td><a class="param-link" href="#p-regions.width"><code>regions[].width</code></a> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
+          <tr id="p-regions.height" class="nested d1"><td><a class="param-link" href="#p-regions.height"><code>regions[].height</code></a> <span class="req">required</span></td><td><code class="type">integer</code></td><td> <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
+          <tr id="p-regions.start" class="nested d1"><td><a class="param-link" href="#p-regions.start"><code>regions[].start</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-regions.end" class="nested d1"><td><a class="param-link" href="#p-regions.end"><code>regions[].end</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr id="p-style"><td><a class="param-link" href="#p-style"><code>style</code></a></td><td><code class="type">&quot;box&quot; | &quot;blur&quot; | &quot;pixelate&quot;</code></td><td>box (default): irreversible fill; blur/pixelate are partially recoverable.</td></tr>
+          <tr id="p-pad"><td><a class="param-link" href="#p-pad"><code>pad</code></a></td><td><code class="type">integer</code></td><td>Grow each region by this many px (default 0). <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
+          <tr id="p-color"><td><a class="param-link" href="#p-color"><code>color</code></a></td><td><code class="type">string</code></td><td>Box fill color (default black).</td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
         </tbody>
       </table>
       </div>
@@ -86,7 +86,7 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
+          <tr id="out-outputPath"><td><a class="param-link" href="#out-outputPath"><code>outputPath</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
         </tbody>
       </table>
       </div>

@@ -55,13 +55,13 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>target</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>full | monitor:&lt;i&gt; (0 = primary) | window:&lt;title&gt; (or window:exe=&lt;app.exe&gt; / window:hwnd=&lt;n&gt;) | region:&lt;x&gt;,&lt;y&gt;,&lt;w&gt;,&lt;h&gt;. Titles match exactly, else as a substring; topmost wins.</td></tr>
-          <tr><td><code>exactTitle</code></td><td><code class="type">boolean</code></td><td>window: targets match the whole title only, never a substring (default false).</td></tr>
-          <tr><td><code>backend</code></td><td><code class="type">&quot;gdigrab&quot; | &quot;wgc&quot;</code></td><td>gdigrab (default, ~0.2 s): what is visible. wgc (window:, FFmpeg 8+, ~1-2 s): the window even if covered.</td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output .png path. Defaults to a file under SCREENCAST_HOME/screenshots.</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
-          <tr><td><code>returnImage</code></td><td><code class="type">boolean</code></td><td>Return the image inline (default true; the PNG on disk stays full size).</td></tr>
-          <tr><td><code>maxImageWidth</code></td><td><code class="type">integer</code></td><td>Max inline image width (default 1280). <span class="bounds">≥ 16, ≤ 9007199254740991</span></td></tr>
+          <tr id="p-target"><td><a class="param-link" href="#p-target"><code>target</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>full | monitor:&lt;i&gt; (0 = primary) | window:&lt;title&gt; (or window:exe=&lt;app.exe&gt; / window:hwnd=&lt;n&gt;) | region:&lt;x&gt;,&lt;y&gt;,&lt;w&gt;,&lt;h&gt;. Titles match exactly, else as a substring; topmost wins.</td></tr>
+          <tr id="p-exactTitle"><td><a class="param-link" href="#p-exactTitle"><code>exactTitle</code></a></td><td><code class="type">boolean</code></td><td>window: targets match the whole title only, never a substring (default false).</td></tr>
+          <tr id="p-backend"><td><a class="param-link" href="#p-backend"><code>backend</code></a></td><td><code class="type">&quot;gdigrab&quot; | &quot;wgc&quot;</code></td><td>gdigrab (default, ~0.2 s): what is visible. wgc (window:, FFmpeg 8+, ~1-2 s): the window even if covered.</td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional output .png path. Defaults to a file under SCREENCAST_HOME/screenshots.</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-returnImage"><td><a class="param-link" href="#p-returnImage"><code>returnImage</code></a></td><td><code class="type">boolean</code></td><td>Return the image inline (default true; the PNG on disk stays full size).</td></tr>
+          <tr id="p-maxImageWidth"><td><a class="param-link" href="#p-maxImageWidth"><code>maxImageWidth</code></a></td><td><code class="type">integer</code></td><td>Max inline image width (default 1280). <span class="bounds">≥ 16, ≤ 9007199254740991</span></td></tr>
         </tbody>
       </table>
       </div>
@@ -80,10 +80,10 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
-          <tr><td><code>target</code> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
-          <tr><td><code>backend</code> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
-          <tr><td><code>inlineImages</code> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
+          <tr id="out-outputPath"><td><a class="param-link" href="#out-outputPath"><code>outputPath</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="out-target"><td><a class="param-link" href="#out-target"><code>target</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="out-backend"><td><a class="param-link" href="#out-backend"><code>backend</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="out-inlineImages"><td><a class="param-link" href="#out-inlineImages"><code>inlineImages</code></a> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
         </tbody>
       </table>
       </div>

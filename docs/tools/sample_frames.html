@@ -55,17 +55,17 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video file.</td></tr>
-          <tr><td><code>mode</code></td><td><code class="type">&quot;fps&quot; | &quot;timestamps&quot; | &quot;scenes&quot;</code></td><td>scenes: only frames where the screen changed (strongest first), usually the cheapest review. Default: fps or timestamps, whichever is given.</td></tr>
-          <tr><td><code>fps</code></td><td><code class="type">number</code></td><td>Frames per second (mode fps). <span class="bounds">&gt; 0</span></td></tr>
-          <tr><td><code>timestamps</code></td><td><code class="type">number[]</code></td><td>Seconds to grab a frame at (mode timestamps).</td></tr>
-          <tr><td><code>sceneThreshold</code></td><td><code class="type">number</code></td><td>Mode scenes: change needed to count, 0-1 (default 0.1). <span class="bounds">&gt; 0, &lt; 1</span></td></tr>
-          <tr><td><code>dedupe</code></td><td><code class="type">boolean</code></td><td>Mode fps: drop near-duplicate frames (default false).</td></tr>
-          <tr><td><code>outputDir</code></td><td><code class="type">string</code></td><td>Optional folder for the frames (a relative path resolves under SCREENCAST_HOME/frames). Defaults to SCREENCAST_HOME/frames/&lt;id&gt;.</td></tr>
-          <tr><td><code>maxFrames</code></td><td><code class="type">integer</code></td><td>Frame cap (default 100); fps is lowered to fit while still spanning the video. <span class="bounds">≥ 1, ≤ 1000</span></td></tr>
-          <tr><td><code>returnImages</code></td><td><code class="type">boolean</code></td><td>Return the first maxInlineImages frames inline (default true).</td></tr>
-          <tr><td><code>maxInlineImages</code></td><td><code class="type">integer</code></td><td>Frames to embed inline (default 8); all are listed by path. <span class="bounds">≥ 0, ≤ 20</span></td></tr>
-          <tr><td><code>maxImageWidth</code></td><td><code class="type">integer</code></td><td>Max inline image width (default 1280). <span class="bounds">≥ 16, ≤ 9007199254740991</span></td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video file.</td></tr>
+          <tr id="p-mode"><td><a class="param-link" href="#p-mode"><code>mode</code></a></td><td><code class="type">&quot;fps&quot; | &quot;timestamps&quot; | &quot;scenes&quot;</code></td><td>scenes: only frames where the screen changed (strongest first), usually the cheapest review. Default: fps or timestamps, whichever is given.</td></tr>
+          <tr id="p-fps"><td><a class="param-link" href="#p-fps"><code>fps</code></a></td><td><code class="type">number</code></td><td>Frames per second (mode fps). <span class="bounds">&gt; 0</span></td></tr>
+          <tr id="p-timestamps"><td><a class="param-link" href="#p-timestamps"><code>timestamps</code></a></td><td><code class="type">number[]</code></td><td>Seconds to grab a frame at (mode timestamps).</td></tr>
+          <tr id="p-sceneThreshold"><td><a class="param-link" href="#p-sceneThreshold"><code>sceneThreshold</code></a></td><td><code class="type">number</code></td><td>Mode scenes: change needed to count, 0-1 (default 0.1). <span class="bounds">&gt; 0, &lt; 1</span></td></tr>
+          <tr id="p-dedupe"><td><a class="param-link" href="#p-dedupe"><code>dedupe</code></a></td><td><code class="type">boolean</code></td><td>Mode fps: drop near-duplicate frames (default false).</td></tr>
+          <tr id="p-outputDir"><td><a class="param-link" href="#p-outputDir"><code>outputDir</code></a></td><td><code class="type">string</code></td><td>Optional folder for the frames (a relative path resolves under SCREENCAST_HOME/frames). Defaults to SCREENCAST_HOME/frames/&lt;id&gt;.</td></tr>
+          <tr id="p-maxFrames"><td><a class="param-link" href="#p-maxFrames"><code>maxFrames</code></a></td><td><code class="type">integer</code></td><td>Frame cap (default 100); fps is lowered to fit while still spanning the video. <span class="bounds">≥ 1, ≤ 1000</span></td></tr>
+          <tr id="p-returnImages"><td><a class="param-link" href="#p-returnImages"><code>returnImages</code></a></td><td><code class="type">boolean</code></td><td>Return the first maxInlineImages frames inline (default true).</td></tr>
+          <tr id="p-maxInlineImages"><td><a class="param-link" href="#p-maxInlineImages"><code>maxInlineImages</code></a></td><td><code class="type">integer</code></td><td>Frames to embed inline (default 8); all are listed by path. <span class="bounds">≥ 0, ≤ 20</span></td></tr>
+          <tr id="p-maxImageWidth"><td><a class="param-link" href="#p-maxImageWidth"><code>maxImageWidth</code></a></td><td><code class="type">integer</code></td><td>Max inline image width (default 1280). <span class="bounds">≥ 16, ≤ 9007199254740991</span></td></tr>
         </tbody>
       </table>
       </div>
@@ -84,10 +84,10 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>frameDir</code> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
-          <tr><td><code>frameCount</code> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
-          <tr><td><code>frames</code> <span class="req">always</span></td><td><code class="type">string[]</code></td><td></td></tr>
-          <tr><td><code>mode</code> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="out-frameDir"><td><a class="param-link" href="#out-frameDir"><code>frameDir</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="out-frameCount"><td><a class="param-link" href="#out-frameCount"><code>frameCount</code></a> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
+          <tr id="out-frames"><td><a class="param-link" href="#out-frames"><code>frames</code></a> <span class="req">always</span></td><td><code class="type">string[]</code></td><td></td></tr>
+          <tr id="out-mode"><td><a class="param-link" href="#out-mode"><code>mode</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
         </tbody>
       </table>
       </div>

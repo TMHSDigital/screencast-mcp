@@ -72,6 +72,16 @@
       for (var j = 1; j < anchors.length - 1; j++) if (y >= anchors[j].y - 1) current = anchors[j].mark.label;
       chapter.textContent = current;
     };
+    // The timecode rewinds: click it (or Enter/Space on it) to go back to 00:00.
+    tc.setAttribute("role", "button");
+    tc.tabIndex = 0;
+    tc.title = "Rewind to the top";
+    tc.setAttribute("aria-label", "Rewind to the top of the page");
+    var rewind = function () { window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" }); };
+    tc.addEventListener("click", rewind);
+    tc.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); rewind(); }
+    });
     addEventListener("scroll", function () { if (!pending) { pending = true; requestAnimationFrame(update); } }, { passive: true });
     addEventListener("resize", function () { max = measure(); update(); });
     addEventListener("load", function () { max = measure(); update(); });
@@ -255,6 +265,60 @@
     });
     mark.appendChild(link);
   });
+
+  // 404: suggest the closest page by name (a mistyped tool, an old URL), read
+  // from the tools and workflows indexes, plus a tool search for the word.
+  var nearest = document.getElementById("nearest");
+  if (nearest && window.fetch && window.DOMParser) {
+    var base = "/screencast-mcp/";
+    var slug = decodeURIComponent(location.pathname.replace(/\/+$/, "").split("/").pop() || "")
+      .replace(/\.html?$/i, "").toLowerCase();
+    var distance = function (a, b) {
+      var row = [];
+      for (var j = 0; j <= b.length; j++) row[j] = j;
+      for (var i = 1; i <= a.length; i++) {
+        var prev = row[0];
+        row[0] = i;
+        for (var k = 1; k <= b.length; k++) {
+          var tmp = row[k];
+          row[k] = Math.min(row[k] + 1, row[k - 1] + 1, prev + (a[i - 1] === b[k - 1] ? 0 : 1));
+          prev = tmp;
+        }
+      }
+      return row[b.length];
+    };
+    var pages = function (dir) {
+      return window.fetch(base + dir).then(function (r) { return r.ok ? r.text() : ""; }).then(function (html) {
+        var doc = new window.DOMParser().parseFromString(html, "text/html");
+        return Array.prototype.slice.call(doc.querySelectorAll("main a[href$='.html']")).map(function (a) {
+          var href = a.getAttribute("href");
+          return { name: href.replace(/^.*\//, "").replace(/\.html$/, ""), url: base + dir + href, text: a.textContent.trim() };
+        }).filter(function (p) { return !/^(index|\.\.)/.test(p.name); });
+      }, function () { return []; });
+    };
+    if (slug && slug !== "screencast-mcp") {
+      Promise.all([pages("tools/"), pages("workflows/")]).then(function (lists) {
+        var best = null;
+        lists[0].concat(lists[1]).forEach(function (p) {
+          var d = distance(slug, p.name.toLowerCase());
+          if (!best || d < best.d) best = { d: d, p: p };
+        });
+        var link = function (href, text) {
+          var a = document.createElement("a");
+          a.href = href;
+          a.textContent = text;
+          return a;
+        };
+        nearest.textContent = "";
+        if (best && best.d <= Math.max(2, Math.floor(slug.length / 3))) {
+          nearest.append("Looking for ", link(best.p.url, best.p.name.indexOf("_") >= 0 ? best.p.name : best.p.text), "? ");
+        }
+        var word = slug.replace(/[-_]+/g, " ").trim();
+        if (word) nearest.append("Or ", link(base + "tools/?q=" + encodeURIComponent(word), "search the tools for “" + word + "”"), ".");
+        nearest.hidden = !nearest.textContent;
+      });
+    }
+  }
 
   // Tool finder: filter the tool tables as you type.
   var q = document.getElementById("tool-q");

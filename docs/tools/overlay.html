@@ -55,17 +55,17 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the base video.</td></tr>
-          <tr><td><code>overlay</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Overlay image or video path.</td></tr>
-          <tr><td><code>x</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td>Left, px. <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
-          <tr><td><code>y</code> <span class="req">required</span></td><td><code class="type">integer</code></td><td>Top, px. <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
-          <tr><td><code>width</code></td><td><code class="type">integer</code></td><td>Scale to this width (other side keeps aspect). <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
-          <tr><td><code>height</code></td><td><code class="type">integer</code></td><td>Scale to this height. <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
-          <tr><td><code>start</code></td><td><code class="type">number</code></td><td>Show from this second. <span class="bounds">≥ 0</span></td></tr>
-          <tr><td><code>end</code></td><td><code class="type">number</code></td><td>Hide after this second. <span class="bounds">&gt; 0</span></td></tr>
-          <tr><td><code>shape</code></td><td><code class="type">&quot;rect&quot; | &quot;circle&quot;</code></td><td>circle: centre square masked round (webcam).</td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the base video.</td></tr>
+          <tr id="p-overlay"><td><a class="param-link" href="#p-overlay"><code>overlay</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Overlay image or video path.</td></tr>
+          <tr id="p-x"><td><a class="param-link" href="#p-x"><code>x</code></a> <span class="req">required</span></td><td><code class="type">integer</code></td><td>Left, px. <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
+          <tr id="p-y"><td><a class="param-link" href="#p-y"><code>y</code></a> <span class="req">required</span></td><td><code class="type">integer</code></td><td>Top, px. <span class="bounds">≥ 0, ≤ 9007199254740991</span></td></tr>
+          <tr id="p-width"><td><a class="param-link" href="#p-width"><code>width</code></a></td><td><code class="type">integer</code></td><td>Scale to this width (other side keeps aspect). <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
+          <tr id="p-height"><td><a class="param-link" href="#p-height"><code>height</code></a></td><td><code class="type">integer</code></td><td>Scale to this height. <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
+          <tr id="p-start"><td><a class="param-link" href="#p-start"><code>start</code></a></td><td><code class="type">number</code></td><td>Show from this second. <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-end"><td><a class="param-link" href="#p-end"><code>end</code></a></td><td><code class="type">number</code></td><td>Hide after this second. <span class="bounds">&gt; 0</span></td></tr>
+          <tr id="p-shape"><td><a class="param-link" href="#p-shape"><code>shape</code></a></td><td><code class="type">&quot;rect&quot; | &quot;circle&quot;</code></td><td>circle: centre square masked round (webcam).</td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
         </tbody>
       </table>
       </div>
@@ -84,7 +84,7 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
+          <tr id="out-outputPath"><td><a class="param-link" href="#out-outputPath"><code>outputPath</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
         </tbody>
       </table>
       </div>

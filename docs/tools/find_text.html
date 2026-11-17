@@ -55,18 +55,18 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>target</code></td><td><code class="type">string</code></td><td>Live screen target (full | monitor:&lt;i&gt; | window:... | region:...), or pass input.</td></tr>
-          <tr><td><code>input</code></td><td><code class="type">string</code></td><td>Image or video file to read instead of a live target.</td></tr>
-          <tr><td><code>timestamp</code></td><td><code class="type">number</code></td><td>Video input: second to read (default 0). <span class="bounds">≥ 0</span></td></tr>
-          <tr><td><code>scanEverySec</code></td><td><code class="type">number</code></td><td>Video input: scan a frame every N s across the clip (e.g. for secrets before sharing); matches and redactRegions get times. Widens to stay within maxFrames. <span class="bounds">&gt; 0</span></td></tr>
-          <tr><td><code>maxFrames</code></td><td><code class="type">integer</code></td><td>scanEverySec frame cap (default 30; ~1 s each). <span class="bounds">≥ 1, ≤ 120</span></td></tr>
-          <tr><td><code>exactTitle</code></td><td><code class="type">boolean</code></td><td>window: targets match the whole title only (default false).</td></tr>
-          <tr><td><code>backend</code></td><td><code class="type">&quot;gdigrab&quot; | &quot;wgc&quot;</code></td><td>Live target: gdigrab (default) = what is visible; wgc (window:, FFmpeg 8+) = the window even if covered.</td></tr>
-          <tr><td><code>query</code></td><td><code class="type">string</code></td><td>Text to find (case-insensitive, tolerates OCR misreads like I/l, O/0, _/-). Omit to return all text.</td></tr>
-          <tr><td><code>regex</code></td><td><code class="type">boolean</code></td><td>Treat query as a regular expression (case-insensitive).</td></tr>
-          <tr><td><code>redact</code></td><td><code class="type">boolean</code></td><td>Also return padded match rectangles ready for redact_region's regions.</td></tr>
-          <tr><td><code>keep</code></td><td><code class="type">boolean</code></td><td>Live target: keep the capture and return its path (default false: deleted after reading).</td></tr>
-          <tr><td><code>returnImage</code></td><td><code class="type">boolean</code></td><td>Return the image with matches outlined (default: true with a query).</td></tr>
+          <tr id="p-target"><td><a class="param-link" href="#p-target"><code>target</code></a></td><td><code class="type">string</code></td><td>Live screen target (full | monitor:&lt;i&gt; | window:... | region:...), or pass input.</td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a></td><td><code class="type">string</code></td><td>Image or video file to read instead of a live target.</td></tr>
+          <tr id="p-timestamp"><td><a class="param-link" href="#p-timestamp"><code>timestamp</code></a></td><td><code class="type">number</code></td><td>Video input: second to read (default 0). <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-scanEverySec"><td><a class="param-link" href="#p-scanEverySec"><code>scanEverySec</code></a></td><td><code class="type">number</code></td><td>Video input: scan a frame every N s across the clip (e.g. for secrets before sharing); matches and redactRegions get times. Widens to stay within maxFrames. <span class="bounds">&gt; 0</span></td></tr>
+          <tr id="p-maxFrames"><td><a class="param-link" href="#p-maxFrames"><code>maxFrames</code></a></td><td><code class="type">integer</code></td><td>scanEverySec frame cap (default 30; ~1 s each). <span class="bounds">≥ 1, ≤ 120</span></td></tr>
+          <tr id="p-exactTitle"><td><a class="param-link" href="#p-exactTitle"><code>exactTitle</code></a></td><td><code class="type">boolean</code></td><td>window: targets match the whole title only (default false).</td></tr>
+          <tr id="p-backend"><td><a class="param-link" href="#p-backend"><code>backend</code></a></td><td><code class="type">&quot;gdigrab&quot; | &quot;wgc&quot;</code></td><td>Live target: gdigrab (default) = what is visible; wgc (window:, FFmpeg 8+) = the window even if covered.</td></tr>
+          <tr id="p-query"><td><a class="param-link" href="#p-query"><code>query</code></a></td><td><code class="type">string</code></td><td>Text to find (case-insensitive, tolerates OCR misreads like I/l, O/0, _/-). Omit to return all text.</td></tr>
+          <tr id="p-regex"><td><a class="param-link" href="#p-regex"><code>regex</code></a></td><td><code class="type">boolean</code></td><td>Treat query as a regular expression (case-insensitive).</td></tr>
+          <tr id="p-redact"><td><a class="param-link" href="#p-redact"><code>redact</code></a></td><td><code class="type">boolean</code></td><td>Also return padded match rectangles ready for redact_region's regions.</td></tr>
+          <tr id="p-keep"><td><a class="param-link" href="#p-keep"><code>keep</code></a></td><td><code class="type">boolean</code></td><td>Live target: keep the capture and return its path (default false: deleted after reading).</td></tr>
+          <tr id="p-returnImage"><td><a class="param-link" href="#p-returnImage"><code>returnImage</code></a></td><td><code class="type">boolean</code></td><td>Return the image with matches outlined (default: true with a query).</td></tr>
         </tbody>
       </table>
       </div>
@@ -85,9 +85,9 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th></tr></thead>
         <tbody>
-          <tr><td><code>imageSize</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
-          <tr class="nested d1"><td><code>imageSize.width</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
-          <tr class="nested d1"><td><code>imageSize.height</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr id="out-imageSize"><td><a class="param-link" href="#out-imageSize"><code>imageSize</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-imageSize.width" class="nested d1"><td><a class="param-link" href="#out-imageSize.width"><code>imageSize.width</code></a> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr id="out-imageSize.height" class="nested d1"><td><a class="param-link" href="#out-imageSize.height"><code>imageSize.height</code></a> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
         </tbody>
       </table>
       </div>

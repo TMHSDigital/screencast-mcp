@@ -55,14 +55,14 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>video</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the video.</td></tr>
-          <tr><td><code>music</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Music audio file.</td></tr>
-          <tr><td><code>musicVolume</code></td><td><code class="type">number</code></td><td>0..1 (default 0.25 over existing audio, 0.8 alone). <span class="bounds">≥ 0</span></td></tr>
-          <tr><td><code>fadeIn</code></td><td><code class="type">number</code></td><td>Fade-in seconds (default 1). <span class="bounds">≥ 0</span></td></tr>
-          <tr><td><code>fadeOut</code></td><td><code class="type">number</code></td><td>Fade-out seconds (default 2). <span class="bounds">≥ 0</span></td></tr>
-          <tr><td><code>duck</code></td><td><code class="type">boolean</code></td><td>Duck the music under the original audio (default false).</td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-video"><td><a class="param-link" href="#p-video"><code>video</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the video.</td></tr>
+          <tr id="p-music"><td><a class="param-link" href="#p-music"><code>music</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Music audio file.</td></tr>
+          <tr id="p-musicVolume"><td><a class="param-link" href="#p-musicVolume"><code>musicVolume</code></a></td><td><code class="type">number</code></td><td>0..1 (default 0.25 over existing audio, 0.8 alone). <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-fadeIn"><td><a class="param-link" href="#p-fadeIn"><code>fadeIn</code></a></td><td><code class="type">number</code></td><td>Fade-in seconds (default 1). <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-fadeOut"><td><a class="param-link" href="#p-fadeOut"><code>fadeOut</code></a></td><td><code class="type">number</code></td><td>Fade-out seconds (default 2). <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-duck"><td><a class="param-link" href="#p-duck"><code>duck</code></a></td><td><code class="type">boolean</code></td><td>Duck the music under the original audio (default false).</td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
         </tbody>
       </table>
       </div>
@@ -81,7 +81,7 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
+          <tr id="out-outputPath"><td><a class="param-link" href="#out-outputPath"><code>outputPath</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
         </tbody>
       </table>
       </div>

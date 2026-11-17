@@ -55,13 +55,13 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code></td><td><code class="type">string</code></td><td>Recording path (uses its .events.jsonl).</td></tr>
-          <tr><td><code>sessionId</code></td><td><code class="type">string</code></td><td>Or a stopped session's id.</td></tr>
-          <tr><td><code>title</code></td><td><code class="type">string</code></td><td>Guide title. <span class="bounds">at most 200 characters</span></td></tr>
-          <tr><td><code>format</code></td><td><code class="type">&quot;md&quot; | &quot;html&quot; | &quot;both&quot;</code></td><td>md + images/, self-contained html, or both (default).</td></tr>
-          <tr><td><code>ocr</code></td><td><code class="type">boolean</code></td><td>OCR shots for captions and secret boxes (default true; needs Windows OCR).</td></tr>
-          <tr><td><code>outputDir</code></td><td><code class="type">string</code></td><td>Guide folder (default: new in SCREENCAST_HOME/edits).</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Replace a guide already in outputDir.</td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a></td><td><code class="type">string</code></td><td>Recording path (uses its .events.jsonl).</td></tr>
+          <tr id="p-sessionId"><td><a class="param-link" href="#p-sessionId"><code>sessionId</code></a></td><td><code class="type">string</code></td><td>Or a stopped session's id.</td></tr>
+          <tr id="p-title"><td><a class="param-link" href="#p-title"><code>title</code></a></td><td><code class="type">string</code></td><td>Guide title. <span class="bounds">at most 200 characters</span></td></tr>
+          <tr id="p-format"><td><a class="param-link" href="#p-format"><code>format</code></a></td><td><code class="type">&quot;md&quot; | &quot;html&quot; | &quot;both&quot;</code></td><td>md + images/, self-contained html, or both (default).</td></tr>
+          <tr id="p-ocr"><td><a class="param-link" href="#p-ocr"><code>ocr</code></a></td><td><code class="type">boolean</code></td><td>OCR shots for captions and secret boxes (default true; needs Windows OCR).</td></tr>
+          <tr id="p-outputDir"><td><a class="param-link" href="#p-outputDir"><code>outputDir</code></a></td><td><code class="type">string</code></td><td>Guide folder (default: new in SCREENCAST_HOME/edits).</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Replace a guide already in outputDir.</td></tr>
         </tbody>
       </table>
       </div>
@@ -80,7 +80,7 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th></tr></thead>
         <tbody>
-          <tr><td><code>outputDir</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-outputDir"><td><a class="param-link" href="#out-outputDir"><code>outputDir</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
         </tbody>
       </table>
       </div>

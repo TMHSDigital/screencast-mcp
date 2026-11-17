@@ -55,24 +55,24 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code></td><td><code class="type">string</code></td><td>Path to the video.</td></tr>
-          <tr><td><code>sessionId</code></td><td><code class="type">string</code></td><td>Or a stopped recording's id.</td></tr>
-          <tr><td><code>from</code></td><td><code class="type">&quot;markers&quot; | &quot;scenes&quot; | &quot;transcript&quot;</code></td><td>markers (default; add_marker, else the file's chapters), scenes (screen changes), or transcript (SRT sections).</td></tr>
-          <tr><td><code>chapters</code></td><td><code class="type">object[]</code></td><td>Or explicit { start, title } chapters. <span class="bounds">at least 1 items, at most 200 items</span></td></tr>
-          <tr class="nested d1"><td><code>chapters[].start</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
-          <tr class="nested d1"><td><code>chapters[].title</code> <span class="req">required</span></td><td><code class="type">string</code></td><td> <span class="bounds">at most 100 characters</span></td></tr>
-          <tr><td><code>transcript</code></td><td><code class="type">string</code></td><td>The .srt for from: transcript.</td></tr>
-          <tr><td><code>minChapterSec</code></td><td><code class="type">number</code></td><td>Shortest chapter (default 1; scenes 10, transcript 30). <span class="bounds">≥ 0</span></td></tr>
-          <tr><td><code>subtitles</code></td><td><code class="type">string</code></td><td>Also mux this .srt/.vtt/.ass as a soft subtitle track.</td></tr>
-          <tr><td><code>subtitleLanguage</code></td><td><code class="type">string</code></td><td>ISO 639-2, e.g. &quot;eng&quot;.</td></tr>
-          <tr><td><code>subtitleTracks</code></td><td><code class="type">object[]</code></td><td>Or several tracks, e.g. one per language (translate_subtitles makes them). <span class="bounds">at least 1 items, at most 8 items</span></td></tr>
-          <tr class="nested d1"><td><code>subtitleTracks[].file</code> <span class="req">required</span></td><td><code class="type">string</code></td><td></td></tr>
-          <tr class="nested d1"><td><code>subtitleTracks[].language</code></td><td><code class="type">string</code></td><td></td></tr>
-          <tr class="nested d1"><td><code>subtitleTracks[].title</code></td><td><code class="type">string</code></td><td> <span class="bounds">at most 60 characters</span></td></tr>
-          <tr class="nested d1"><td><code>subtitleTracks[].default</code></td><td><code class="type">boolean</code></td><td></td></tr>
-          <tr><td><code>textOnly</code></td><td><code class="type">boolean</code></td><td>Return chapters and YouTube text only; write no file.</td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional .mp4/.mkv/.mov path. Defaults under SCREENCAST_HOME/edits.</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing output file.</td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a></td><td><code class="type">string</code></td><td>Path to the video.</td></tr>
+          <tr id="p-sessionId"><td><a class="param-link" href="#p-sessionId"><code>sessionId</code></a></td><td><code class="type">string</code></td><td>Or a stopped recording's id.</td></tr>
+          <tr id="p-from"><td><a class="param-link" href="#p-from"><code>from</code></a></td><td><code class="type">&quot;markers&quot; | &quot;scenes&quot; | &quot;transcript&quot;</code></td><td>markers (default; add_marker, else the file's chapters), scenes (screen changes), or transcript (SRT sections).</td></tr>
+          <tr id="p-chapters"><td><a class="param-link" href="#p-chapters"><code>chapters</code></a></td><td><code class="type">object[]</code></td><td>Or explicit { start, title } chapters. <span class="bounds">at least 1 items, at most 200 items</span></td></tr>
+          <tr id="p-chapters.start" class="nested d1"><td><a class="param-link" href="#p-chapters.start"><code>chapters[].start</code></a> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-chapters.title" class="nested d1"><td><a class="param-link" href="#p-chapters.title"><code>chapters[].title</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td> <span class="bounds">at most 100 characters</span></td></tr>
+          <tr id="p-transcript"><td><a class="param-link" href="#p-transcript"><code>transcript</code></a></td><td><code class="type">string</code></td><td>The .srt for from: transcript.</td></tr>
+          <tr id="p-minChapterSec"><td><a class="param-link" href="#p-minChapterSec"><code>minChapterSec</code></a></td><td><code class="type">number</code></td><td>Shortest chapter (default 1; scenes 10, transcript 30). <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-subtitles"><td><a class="param-link" href="#p-subtitles"><code>subtitles</code></a></td><td><code class="type">string</code></td><td>Also mux this .srt/.vtt/.ass as a soft subtitle track.</td></tr>
+          <tr id="p-subtitleLanguage"><td><a class="param-link" href="#p-subtitleLanguage"><code>subtitleLanguage</code></a></td><td><code class="type">string</code></td><td>ISO 639-2, e.g. &quot;eng&quot;.</td></tr>
+          <tr id="p-subtitleTracks"><td><a class="param-link" href="#p-subtitleTracks"><code>subtitleTracks</code></a></td><td><code class="type">object[]</code></td><td>Or several tracks, e.g. one per language (translate_subtitles makes them). <span class="bounds">at least 1 items, at most 8 items</span></td></tr>
+          <tr id="p-subtitleTracks.file" class="nested d1"><td><a class="param-link" href="#p-subtitleTracks.file"><code>subtitleTracks[].file</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="p-subtitleTracks.language" class="nested d1"><td><a class="param-link" href="#p-subtitleTracks.language"><code>subtitleTracks[].language</code></a></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="p-subtitleTracks.title" class="nested d1"><td><a class="param-link" href="#p-subtitleTracks.title"><code>subtitleTracks[].title</code></a></td><td><code class="type">string</code></td><td> <span class="bounds">at most 60 characters</span></td></tr>
+          <tr id="p-subtitleTracks.default" class="nested d1"><td><a class="param-link" href="#p-subtitleTracks.default"><code>subtitleTracks[].default</code></a></td><td><code class="type">boolean</code></td><td></td></tr>
+          <tr id="p-textOnly"><td><a class="param-link" href="#p-textOnly"><code>textOnly</code></a></td><td><code class="type">boolean</code></td><td>Return chapters and YouTube text only; write no file.</td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional .mp4/.mkv/.mov path. Defaults under SCREENCAST_HOME/edits.</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing output file.</td></tr>
         </tbody>
       </table>
       </div>
@@ -91,11 +91,11 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th></tr></thead>
         <tbody>
-          <tr><td><code>chapters</code> <span class="req">always</span></td><td><code class="type">object[]</code></td></tr>
-          <tr class="nested d1"><td><code>chapters[].start</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
-          <tr class="nested d1"><td><code>chapters[].end</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
-          <tr class="nested d1"><td><code>chapters[].title</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
-          <tr><td><code>youtube</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-chapters"><td><a class="param-link" href="#out-chapters"><code>chapters</code></a> <span class="req">always</span></td><td><code class="type">object[]</code></td></tr>
+          <tr id="out-chapters.start" class="nested d1"><td><a class="param-link" href="#out-chapters.start"><code>chapters[].start</code></a> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr id="out-chapters.end" class="nested d1"><td><a class="param-link" href="#out-chapters.end"><code>chapters[].end</code></a> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr id="out-chapters.title" class="nested d1"><td><a class="param-link" href="#out-chapters.title"><code>chapters[].title</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-youtube"><td><a class="param-link" href="#out-youtube"><code>youtube</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
         </tbody>
       </table>
       </div>

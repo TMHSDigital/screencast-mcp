@@ -55,11 +55,11 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>sessionId</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Session id of a replay buffer.</td></tr>
-          <tr><td><code>lastSec</code></td><td><code class="type">number</code></td><td>Seconds back from now (default and max: the buffer length). <span class="bounds">&gt; 0, ≤ 3600</span></td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Output .mp4 path (default under SCREENCAST_HOME/recordings).</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
-          <tr><td><code>reencode</code></td><td><code class="type">boolean</code></td><td>Frame-exact re-encode. Default: instant stream copy that may hide up to 2 s of earlier frames.</td></tr>
+          <tr id="p-sessionId"><td><a class="param-link" href="#p-sessionId"><code>sessionId</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Session id of a replay buffer.</td></tr>
+          <tr id="p-lastSec"><td><a class="param-link" href="#p-lastSec"><code>lastSec</code></a></td><td><code class="type">number</code></td><td>Seconds back from now (default and max: the buffer length). <span class="bounds">&gt; 0, ≤ 3600</span></td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Output .mp4 path (default under SCREENCAST_HOME/recordings).</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-reencode"><td><a class="param-link" href="#p-reencode"><code>reencode</code></a></td><td><code class="type">boolean</code></td><td>Frame-exact re-encode. Default: instant stream copy that may hide up to 2 s of earlier frames.</td></tr>
         </tbody>
       </table>
       </div>
@@ -78,9 +78,9 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th></tr></thead>
         <tbody>
-          <tr><td><code>sessionId</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
-          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
-          <tr><td><code>durationSec</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr id="out-sessionId"><td><a class="param-link" href="#out-sessionId"><code>sessionId</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-outputPath"><td><a class="param-link" href="#out-outputPath"><code>outputPath</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-durationSec"><td><a class="param-link" href="#out-durationSec"><code>durationSec</code></a> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
         </tbody>
       </table>
       </div>

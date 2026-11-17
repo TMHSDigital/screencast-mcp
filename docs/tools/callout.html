@@ -55,36 +55,36 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video or image (png/jpg; from/to are ignored for an image).</td></tr>
-          <tr><td><code>items</code> <span class="req">required</span></td><td><code class="type">object[]</code></td><td>Boxes, text labels, and arrows, drawn in order (later on top), in video pixels. Each shows from..to seconds (default: whole video); color is a name, #RRGGBB, or name@alpha. <span class="bounds">at least 1 items, at most 50 items</span></td></tr>
-          <tr class="nested d1"><td><code>items[box].x</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
-          <tr class="nested d1"><td><code>items[box].y</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
-          <tr class="nested d1"><td><code>items[box].width</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
-          <tr class="nested d1"><td><code>items[box].height</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
-          <tr class="nested d1"><td><code>items[box].thickness</code></td><td><code class="type">number</code></td><td>Outline px (default 4). <span class="bounds">&gt; 0</span></td></tr>
-          <tr class="nested d1"><td><code>items[box].fill</code></td><td><code class="type">boolean</code></td><td>Fill instead of outline.</td></tr>
-          <tr class="nested d1"><td><code>items[box].from</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
-          <tr class="nested d1"><td><code>items[box].to</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
-          <tr class="nested d1"><td><code>items[box].color</code></td><td><code class="type">string</code></td><td></td></tr>
-          <tr class="nested d1"><td><code>items[text].x</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
-          <tr class="nested d1"><td><code>items[text].y</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
-          <tr class="nested d1"><td><code>items[text].text</code> <span class="req">required</span></td><td><code class="type">string</code></td><td></td></tr>
-          <tr class="nested d1"><td><code>items[text].size</code></td><td><code class="type">number</code></td><td>Font size px (default 32). <span class="bounds">&gt; 0</span></td></tr>
-          <tr class="nested d1"><td><code>items[text].background</code></td><td><code class="type">boolean</code></td><td>Dark panel behind the text (default true).</td></tr>
-          <tr class="nested d1"><td><code>items[text].from</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
-          <tr class="nested d1"><td><code>items[text].to</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
-          <tr class="nested d1"><td><code>items[text].color</code></td><td><code class="type">string</code></td><td></td></tr>
-          <tr class="nested d1"><td><code>items[arrow].x1</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
-          <tr class="nested d1"><td><code>items[arrow].y1</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
-          <tr class="nested d1"><td><code>items[arrow].x2</code> <span class="req">required</span></td><td><code class="type">number</code></td><td>Head (x2,y2) is the point the arrow points at.</td></tr>
-          <tr class="nested d1"><td><code>items[arrow].y2</code> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
-          <tr class="nested d1"><td><code>items[arrow].thickness</code></td><td><code class="type">number</code></td><td>Shaft px (default 8). <span class="bounds">&gt; 0</span></td></tr>
-          <tr class="nested d1"><td><code>items[arrow].from</code></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
-          <tr class="nested d1"><td><code>items[arrow].to</code></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
-          <tr class="nested d1"><td><code>items[arrow].color</code></td><td><code class="type">string</code></td><td></td></tr>
-          <tr><td><code>fontFile</code></td><td><code class="type">string</code></td><td>Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).</td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video or image (png/jpg; from/to are ignored for an image).</td></tr>
+          <tr id="p-items"><td><a class="param-link" href="#p-items"><code>items</code></a> <span class="req">required</span></td><td><code class="type">object[]</code></td><td>Boxes, text labels, and arrows, drawn in order (later on top), in video pixels. Each shows from..to seconds (default: whole video); color is a name, #RRGGBB, or name@alpha. <span class="bounds">at least 1 items, at most 50 items</span></td></tr>
+          <tr id="p-items-box.x" class="nested d1"><td><a class="param-link" href="#p-items-box.x"><code>items[box].x</code></a> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
+          <tr id="p-items-box.y" class="nested d1"><td><a class="param-link" href="#p-items-box.y"><code>items[box].y</code></a> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
+          <tr id="p-items-box.width" class="nested d1"><td><a class="param-link" href="#p-items-box.width"><code>items[box].width</code></a> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr id="p-items-box.height" class="nested d1"><td><a class="param-link" href="#p-items-box.height"><code>items[box].height</code></a> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr id="p-items-box.thickness" class="nested d1"><td><a class="param-link" href="#p-items-box.thickness"><code>items[box].thickness</code></a></td><td><code class="type">number</code></td><td>Outline px (default 4). <span class="bounds">&gt; 0</span></td></tr>
+          <tr id="p-items-box.fill" class="nested d1"><td><a class="param-link" href="#p-items-box.fill"><code>items[box].fill</code></a></td><td><code class="type">boolean</code></td><td>Fill instead of outline.</td></tr>
+          <tr id="p-items-box.from" class="nested d1"><td><a class="param-link" href="#p-items-box.from"><code>items[box].from</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-items-box.to" class="nested d1"><td><a class="param-link" href="#p-items-box.to"><code>items[box].to</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr id="p-items-box.color" class="nested d1"><td><a class="param-link" href="#p-items-box.color"><code>items[box].color</code></a></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="p-items-text.x" class="nested d1"><td><a class="param-link" href="#p-items-text.x"><code>items[text].x</code></a> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
+          <tr id="p-items-text.y" class="nested d1"><td><a class="param-link" href="#p-items-text.y"><code>items[text].y</code></a> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
+          <tr id="p-items-text.text" class="nested d1"><td><a class="param-link" href="#p-items-text.text"><code>items[text].text</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="p-items-text.size" class="nested d1"><td><a class="param-link" href="#p-items-text.size"><code>items[text].size</code></a></td><td><code class="type">number</code></td><td>Font size px (default 32). <span class="bounds">&gt; 0</span></td></tr>
+          <tr id="p-items-text.background" class="nested d1"><td><a class="param-link" href="#p-items-text.background"><code>items[text].background</code></a></td><td><code class="type">boolean</code></td><td>Dark panel behind the text (default true).</td></tr>
+          <tr id="p-items-text.from" class="nested d1"><td><a class="param-link" href="#p-items-text.from"><code>items[text].from</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-items-text.to" class="nested d1"><td><a class="param-link" href="#p-items-text.to"><code>items[text].to</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr id="p-items-text.color" class="nested d1"><td><a class="param-link" href="#p-items-text.color"><code>items[text].color</code></a></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="p-items-arrow.x1" class="nested d1"><td><a class="param-link" href="#p-items-arrow.x1"><code>items[arrow].x1</code></a> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
+          <tr id="p-items-arrow.y1" class="nested d1"><td><a class="param-link" href="#p-items-arrow.y1"><code>items[arrow].y1</code></a> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
+          <tr id="p-items-arrow.x2" class="nested d1"><td><a class="param-link" href="#p-items-arrow.x2"><code>items[arrow].x2</code></a> <span class="req">required</span></td><td><code class="type">number</code></td><td>Head (x2,y2) is the point the arrow points at.</td></tr>
+          <tr id="p-items-arrow.y2" class="nested d1"><td><a class="param-link" href="#p-items-arrow.y2"><code>items[arrow].y2</code></a> <span class="req">required</span></td><td><code class="type">number</code></td><td></td></tr>
+          <tr id="p-items-arrow.thickness" class="nested d1"><td><a class="param-link" href="#p-items-arrow.thickness"><code>items[arrow].thickness</code></a></td><td><code class="type">number</code></td><td>Shaft px (default 8). <span class="bounds">&gt; 0</span></td></tr>
+          <tr id="p-items-arrow.from" class="nested d1"><td><a class="param-link" href="#p-items-arrow.from"><code>items[arrow].from</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-items-arrow.to" class="nested d1"><td><a class="param-link" href="#p-items-arrow.to"><code>items[arrow].to</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr id="p-items-arrow.color" class="nested d1"><td><a class="param-link" href="#p-items-arrow.color"><code>items[arrow].color</code></a></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="p-fontFile"><td><a class="param-link" href="#p-fontFile"><code>fontFile</code></a></td><td><code class="type">string</code></td><td>Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).</td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
         </tbody>
       </table>
       </div>
@@ -103,7 +103,7 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
+          <tr id="out-outputPath"><td><a class="param-link" href="#out-outputPath"><code>outputPath</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
         </tbody>
       </table>
       </div>

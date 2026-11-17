@@ -55,17 +55,17 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video.</td></tr>
-          <tr><td><code>count</code></td><td><code class="type">integer</code></td><td>Frames to tile (default 12). <span class="bounds">≥ 1, ≤ 48</span></td></tr>
-          <tr><td><code>mode</code></td><td><code class="type">&quot;even&quot; | &quot;scenes&quot;</code></td><td>even (default) or scenes (strongest changes; static stretches take no tiles).</td></tr>
-          <tr><td><code>sceneThreshold</code></td><td><code class="type">number</code></td><td>Mode scenes: change needed, 0-1 (default 0.1). <span class="bounds">&gt; 0, &lt; 1</span></td></tr>
-          <tr><td><code>columns</code></td><td><code class="type">integer</code></td><td>Tiles per row (default: roughly square). <span class="bounds">≥ 1, ≤ 12</span></td></tr>
-          <tr><td><code>tileWidth</code></td><td><code class="type">integer</code></td><td>Tile width in px (default 320). <span class="bounds">≥ 64, ≤ 1920</span></td></tr>
-          <tr><td><code>poster</code></td><td><code class="type">boolean</code></td><td>Write one representative poster frame instead of a sheet.</td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output .png path. Defaults under SCREENCAST_HOME/frames.</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
-          <tr><td><code>returnImage</code></td><td><code class="type">boolean</code></td><td>Return the sheet inline (default true).</td></tr>
-          <tr><td><code>maxImageWidth</code></td><td><code class="type">integer</code></td><td>Max inline image width (default 1280). <span class="bounds">≥ 16, ≤ 9007199254740991</span></td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video.</td></tr>
+          <tr id="p-count"><td><a class="param-link" href="#p-count"><code>count</code></a></td><td><code class="type">integer</code></td><td>Frames to tile (default 12). <span class="bounds">≥ 1, ≤ 48</span></td></tr>
+          <tr id="p-mode"><td><a class="param-link" href="#p-mode"><code>mode</code></a></td><td><code class="type">&quot;even&quot; | &quot;scenes&quot;</code></td><td>even (default) or scenes (strongest changes; static stretches take no tiles).</td></tr>
+          <tr id="p-sceneThreshold"><td><a class="param-link" href="#p-sceneThreshold"><code>sceneThreshold</code></a></td><td><code class="type">number</code></td><td>Mode scenes: change needed, 0-1 (default 0.1). <span class="bounds">&gt; 0, &lt; 1</span></td></tr>
+          <tr id="p-columns"><td><a class="param-link" href="#p-columns"><code>columns</code></a></td><td><code class="type">integer</code></td><td>Tiles per row (default: roughly square). <span class="bounds">≥ 1, ≤ 12</span></td></tr>
+          <tr id="p-tileWidth"><td><a class="param-link" href="#p-tileWidth"><code>tileWidth</code></a></td><td><code class="type">integer</code></td><td>Tile width in px (default 320). <span class="bounds">≥ 64, ≤ 1920</span></td></tr>
+          <tr id="p-poster"><td><a class="param-link" href="#p-poster"><code>poster</code></a></td><td><code class="type">boolean</code></td><td>Write one representative poster frame instead of a sheet.</td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional output .png path. Defaults under SCREENCAST_HOME/frames.</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-returnImage"><td><a class="param-link" href="#p-returnImage"><code>returnImage</code></a></td><td><code class="type">boolean</code></td><td>Return the sheet inline (default true).</td></tr>
+          <tr id="p-maxImageWidth"><td><a class="param-link" href="#p-maxImageWidth"><code>maxImageWidth</code></a></td><td><code class="type">integer</code></td><td>Max inline image width (default 1280). <span class="bounds">≥ 16, ≤ 9007199254740991</span></td></tr>
         </tbody>
       </table>
       </div>
@@ -84,8 +84,8 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
-          <tr><td><code>inlineImages</code> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
+          <tr id="out-outputPath"><td><a class="param-link" href="#out-outputPath"><code>outputPath</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="out-inlineImages"><td><a class="param-link" href="#out-inlineImages"><code>inlineImages</code></a> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
         </tbody>
       </table>
       </div>

@@ -67,38 +67,38 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th></tr></thead>
         <tbody>
-          <tr><td><code>ok</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr><td><code>problems</code> <span class="req">always</span></td><td><code class="type">string[]</code></td></tr>
-          <tr><td><code>server</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
-          <tr class="nested d1"><td><code>server.version</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
-          <tr class="nested d1"><td><code>server.node</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
-          <tr class="nested d1"><td><code>server.platform</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
-          <tr class="nested d1"><td><code>server.arch</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
-          <tr><td><code>ffmpeg</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
-          <tr class="nested d1"><td><code>ffmpeg.found</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr class="nested d1"><td><code>ffmpeg.path</code> <span class="req">always</span></td><td><code class="type">string | null</code></td></tr>
-          <tr class="nested d1"><td><code>ffmpeg.version</code> <span class="req">always</span></td><td><code class="type">string | null</code></td></tr>
-          <tr class="nested d1"><td><code>ffmpeg.major</code> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
-          <tr class="nested d1"><td><code>ffmpeg.meetsFfmpeg8</code> <span class="req">always</span></td><td><code class="type">boolean | null</code></td></tr>
-          <tr><td><code>ffprobe</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
-          <tr class="nested d1"><td><code>ffprobe.found</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr class="nested d1"><td><code>ffprobe.path</code> <span class="req">always</span></td><td><code class="type">string | null</code></td></tr>
-          <tr class="nested d1"><td><code>ffprobe.version</code> <span class="req">always</span></td><td><code class="type">string | null</code></td></tr>
-          <tr class="nested d1"><td><code>ffprobe.major</code> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
-          <tr><td><code>filters</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
-          <tr><td><code>devices</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
-          <tr class="nested d1"><td><code>devices.gdigrab</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr class="nested d1"><td><code>devices.dshow</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr><td><code>wgc</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
-          <tr class="nested d1"><td><code>wgc.available</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr><td><code>ocr</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
-          <tr class="nested d1"><td><code>ocr.available</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr class="nested d1"><td><code>ocr.language</code> <span class="req">always</span></td><td><code class="type">string | null</code></td></tr>
-          <tr class="nested d1"><td><code>ocr.languages</code> <span class="req">always</span></td><td><code class="type">string[]</code></td></tr>
-          <tr><td><code>storage</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
-          <tr class="nested d1"><td><code>storage.home</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
-          <tr class="nested d1"><td><code>storage.homeExists</code> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
-          <tr><td><code>env</code> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-ok"><td><a class="param-link" href="#out-ok"><code>ok</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-problems"><td><a class="param-link" href="#out-problems"><code>problems</code></a> <span class="req">always</span></td><td><code class="type">string[]</code></td></tr>
+          <tr id="out-server"><td><a class="param-link" href="#out-server"><code>server</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-server.version" class="nested d1"><td><a class="param-link" href="#out-server.version"><code>server.version</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-server.node" class="nested d1"><td><a class="param-link" href="#out-server.node"><code>server.node</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-server.platform" class="nested d1"><td><a class="param-link" href="#out-server.platform"><code>server.platform</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-server.arch" class="nested d1"><td><a class="param-link" href="#out-server.arch"><code>server.arch</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-ffmpeg"><td><a class="param-link" href="#out-ffmpeg"><code>ffmpeg</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-ffmpeg.found" class="nested d1"><td><a class="param-link" href="#out-ffmpeg.found"><code>ffmpeg.found</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-ffmpeg.path" class="nested d1"><td><a class="param-link" href="#out-ffmpeg.path"><code>ffmpeg.path</code></a> <span class="req">always</span></td><td><code class="type">string | null</code></td></tr>
+          <tr id="out-ffmpeg.version" class="nested d1"><td><a class="param-link" href="#out-ffmpeg.version"><code>ffmpeg.version</code></a> <span class="req">always</span></td><td><code class="type">string | null</code></td></tr>
+          <tr id="out-ffmpeg.major" class="nested d1"><td><a class="param-link" href="#out-ffmpeg.major"><code>ffmpeg.major</code></a> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
+          <tr id="out-ffmpeg.meetsFfmpeg8" class="nested d1"><td><a class="param-link" href="#out-ffmpeg.meetsFfmpeg8"><code>ffmpeg.meetsFfmpeg8</code></a> <span class="req">always</span></td><td><code class="type">boolean | null</code></td></tr>
+          <tr id="out-ffprobe"><td><a class="param-link" href="#out-ffprobe"><code>ffprobe</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-ffprobe.found" class="nested d1"><td><a class="param-link" href="#out-ffprobe.found"><code>ffprobe.found</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-ffprobe.path" class="nested d1"><td><a class="param-link" href="#out-ffprobe.path"><code>ffprobe.path</code></a> <span class="req">always</span></td><td><code class="type">string | null</code></td></tr>
+          <tr id="out-ffprobe.version" class="nested d1"><td><a class="param-link" href="#out-ffprobe.version"><code>ffprobe.version</code></a> <span class="req">always</span></td><td><code class="type">string | null</code></td></tr>
+          <tr id="out-ffprobe.major" class="nested d1"><td><a class="param-link" href="#out-ffprobe.major"><code>ffprobe.major</code></a> <span class="req">always</span></td><td><code class="type">number | null</code></td></tr>
+          <tr id="out-filters"><td><a class="param-link" href="#out-filters"><code>filters</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-devices"><td><a class="param-link" href="#out-devices"><code>devices</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-devices.gdigrab" class="nested d1"><td><a class="param-link" href="#out-devices.gdigrab"><code>devices.gdigrab</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-devices.dshow" class="nested d1"><td><a class="param-link" href="#out-devices.dshow"><code>devices.dshow</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-wgc"><td><a class="param-link" href="#out-wgc"><code>wgc</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-wgc.available" class="nested d1"><td><a class="param-link" href="#out-wgc.available"><code>wgc.available</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-ocr"><td><a class="param-link" href="#out-ocr"><code>ocr</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-ocr.available" class="nested d1"><td><a class="param-link" href="#out-ocr.available"><code>ocr.available</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-ocr.language" class="nested d1"><td><a class="param-link" href="#out-ocr.language"><code>ocr.language</code></a> <span class="req">always</span></td><td><code class="type">string | null</code></td></tr>
+          <tr id="out-ocr.languages" class="nested d1"><td><a class="param-link" href="#out-ocr.languages"><code>ocr.languages</code></a> <span class="req">always</span></td><td><code class="type">string[]</code></td></tr>
+          <tr id="out-storage"><td><a class="param-link" href="#out-storage"><code>storage</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
+          <tr id="out-storage.home" class="nested d1"><td><a class="param-link" href="#out-storage.home"><code>storage.home</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-storage.homeExists" class="nested d1"><td><a class="param-link" href="#out-storage.homeExists"><code>storage.homeExists</code></a> <span class="req">always</span></td><td><code class="type">boolean</code></td></tr>
+          <tr id="out-env"><td><a class="param-link" href="#out-env"><code>env</code></a> <span class="req">always</span></td><td><code class="type">object</code></td></tr>
         </tbody>
       </table>
       </div>

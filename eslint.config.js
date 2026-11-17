@@ -71,7 +71,7 @@ export default tseslint.config(
         window: "readonly", document: "readonly", navigator: "readonly", location: "readonly",
         history: "readonly", performance: "readonly", requestAnimationFrame: "readonly", setTimeout: "readonly", clearTimeout: "readonly",
         IntersectionObserver: "readonly", scrollY: "readonly", innerHeight: "readonly", addEventListener: "readonly",
-        dispatchEvent: "readonly", Event: "readonly", URL: "readonly", URLSearchParams: "readonly",
+        dispatchEvent: "readonly", Event: "readonly", URL: "readonly", URLSearchParams: "readonly", Promise: "readonly",
       },
     },
   },

@@ -55,12 +55,12 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code></td><td><code class="type">string</code></td><td>Recording path.</td></tr>
-          <tr><td><code>sessionId</code></td><td><code class="type">string</code></td><td>Or a stopped session id.</td></tr>
-          <tr><td><code>sceneThreshold</code></td><td><code class="type">number</code></td><td>Change starting a segment (default 0.03). <span class="bounds">&gt; 0, &lt; 1</span></td></tr>
-          <tr><td><code>maxFrames</code></td><td><code class="type">integer</code></td><td>Keyframes to OCR (default 120). <span class="bounds">≥ 1, ≤ 600</span></td></tr>
-          <tr><td><code>transcript</code></td><td><code class="type">string</code></td><td>An .srt, or 'whisper' to transcribe. Default: &lt;video&gt;.srt if any.</td></tr>
-          <tr><td><code>force</code></td><td><code class="type">boolean</code></td><td>Re-OCR despite a matching cached index.</td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a></td><td><code class="type">string</code></td><td>Recording path.</td></tr>
+          <tr id="p-sessionId"><td><a class="param-link" href="#p-sessionId"><code>sessionId</code></a></td><td><code class="type">string</code></td><td>Or a stopped session id.</td></tr>
+          <tr id="p-sceneThreshold"><td><a class="param-link" href="#p-sceneThreshold"><code>sceneThreshold</code></a></td><td><code class="type">number</code></td><td>Change starting a segment (default 0.03). <span class="bounds">&gt; 0, &lt; 1</span></td></tr>
+          <tr id="p-maxFrames"><td><a class="param-link" href="#p-maxFrames"><code>maxFrames</code></a></td><td><code class="type">integer</code></td><td>Keyframes to OCR (default 120). <span class="bounds">≥ 1, ≤ 600</span></td></tr>
+          <tr id="p-transcript"><td><a class="param-link" href="#p-transcript"><code>transcript</code></a></td><td><code class="type">string</code></td><td>An .srt, or 'whisper' to transcribe. Default: &lt;video&gt;.srt if any.</td></tr>
+          <tr id="p-force"><td><a class="param-link" href="#p-force"><code>force</code></a></td><td><code class="type">boolean</code></td><td>Re-OCR despite a matching cached index.</td></tr>
         </tbody>
       </table>
       </div>
@@ -79,8 +79,8 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th></tr></thead>
         <tbody>
-          <tr><td><code>indexPath</code> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
-          <tr><td><code>segments</code> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
+          <tr id="out-indexPath"><td><a class="param-link" href="#out-indexPath"><code>indexPath</code></a> <span class="req">always</span></td><td><code class="type">string</code></td></tr>
+          <tr id="out-segments"><td><a class="param-link" href="#out-segments"><code>segments</code></a> <span class="req">always</span></td><td><code class="type">number</code></td></tr>
         </tbody>
       </table>
       </div>

@@ -55,12 +55,12 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>input</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video.</td></tr>
-          <tr><td><code>segments</code> <span class="req">required</span></td><td><code class="type">object[]</code></td><td>{start, end} segments in seconds; each becomes its own file. <span class="bounds">at least 1 items</span></td></tr>
-          <tr class="nested d1"><td><code>segments[].start</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
-          <tr class="nested d1"><td><code>segments[].end</code> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Only honored for a single segment; multi-segment output lands under SCREENCAST_HOME/edits.</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-input"><td><a class="param-link" href="#p-input"><code>input</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the source video.</td></tr>
+          <tr id="p-segments"><td><a class="param-link" href="#p-segments"><code>segments</code></a> <span class="req">required</span></td><td><code class="type">object[]</code></td><td>{start, end} segments in seconds; each becomes its own file. <span class="bounds">at least 1 items</span></td></tr>
+          <tr id="p-segments.start" class="nested d1"><td><a class="param-link" href="#p-segments.start"><code>segments[].start</code></a> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-segments.end" class="nested d1"><td><a class="param-link" href="#p-segments.end"><code>segments[].end</code></a> <span class="req">required</span></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional output path. Only honored for a single segment; multi-segment output lands under SCREENCAST_HOME/edits.</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
         </tbody>
       </table>
       </div>
@@ -79,8 +79,8 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>outputs</code> <span class="req">always</span></td><td><code class="type">string[]</code></td><td></td></tr>
-          <tr><td><code>count</code> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
+          <tr id="out-outputs"><td><a class="param-link" href="#out-outputs"><code>outputs</code></a> <span class="req">always</span></td><td><code class="type">string[]</code></td><td></td></tr>
+          <tr id="out-count"><td><a class="param-link" href="#out-count"><code>count</code></a> <span class="req">always</span></td><td><code class="type">integer</code></td><td> <span class="bounds">≥ -9007199254740991, ≤ 9007199254740991</span></td></tr>
         </tbody>
       </table>
       </div>

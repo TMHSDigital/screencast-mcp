@@ -55,16 +55,16 @@
       <table class="params">
         <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>video</code> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the video.</td></tr>
-          <tr><td><code>lines</code> <span class="req">required</span></td><td><code class="type">object[]</code></td><td> <span class="bounds">at least 1 items</span></td></tr>
-          <tr class="nested d1"><td><code>lines[].t</code></td><td><code class="type">number</code></td><td>Seconds. <span class="bounds">≥ 0</span></td></tr>
-          <tr class="nested d1"><td><code>lines[].marker</code></td><td><code class="type">string</code></td><td>Or a marker label.</td></tr>
-          <tr class="nested d1"><td><code>lines[].text</code> <span class="req">required</span></td><td><code class="type">string</code></td><td></td></tr>
-          <tr><td><code>voice</code></td><td><code class="type">string</code></td><td>Voice name or part (doctor lists them).</td></tr>
-          <tr><td><code>rate</code></td><td><code class="type">number</code></td><td>Default 1. <span class="bounds">≥ 0.5, ≤ 3</span></td></tr>
-          <tr><td><code>duck</code></td><td><code class="type">boolean</code></td><td>Duck the original audio (default true).</td></tr>
-          <tr><td><code>output</code></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
-          <tr><td><code>overwrite</code></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-video"><td><a class="param-link" href="#p-video"><code>video</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td>Path to the video.</td></tr>
+          <tr id="p-lines"><td><a class="param-link" href="#p-lines"><code>lines</code></a> <span class="req">required</span></td><td><code class="type">object[]</code></td><td> <span class="bounds">at least 1 items</span></td></tr>
+          <tr id="p-lines.t" class="nested d1"><td><a class="param-link" href="#p-lines.t"><code>lines[].t</code></a></td><td><code class="type">number</code></td><td>Seconds. <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-lines.marker" class="nested d1"><td><a class="param-link" href="#p-lines.marker"><code>lines[].marker</code></a></td><td><code class="type">string</code></td><td>Or a marker label.</td></tr>
+          <tr id="p-lines.text" class="nested d1"><td><a class="param-link" href="#p-lines.text"><code>lines[].text</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="p-voice"><td><a class="param-link" href="#p-voice"><code>voice</code></a></td><td><code class="type">string</code></td><td>Voice name or part (doctor lists them).</td></tr>
+          <tr id="p-rate"><td><a class="param-link" href="#p-rate"><code>rate</code></a></td><td><code class="type">number</code></td><td>Default 1. <span class="bounds">≥ 0.5, ≤ 3</span></td></tr>
+          <tr id="p-duck"><td><a class="param-link" href="#p-duck"><code>duck</code></a></td><td><code class="type">boolean</code></td><td>Duck the original audio (default true).</td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
         </tbody>
       </table>
       </div>
@@ -83,7 +83,7 @@
       <table class="params">
         <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>outputPath</code> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
+          <tr id="out-outputPath"><td><a class="param-link" href="#out-outputPath"><code>outputPath</code></a> <span class="req">always</span></td><td><code class="type">string</code></td><td>Path of the file written.</td></tr>
         </tbody>
       </table>
       </div>
