@@ -37,6 +37,12 @@ describe("record options", () => {
     }
   });
 
+  it("parses --events, --perf and repeatable --log (#355)", () => {
+    const o = recordOpts(["record", "--events", "--perf", "--log", "app.log", "--log=server.log", "--", "x"]);
+    expect(o).toMatchObject({ events: true, perf: true, logs: ["app.log", "server.log"] });
+    expect(recordOpts(["record", "--", "x"]).logs).toBeUndefined();
+  });
+
   it("reads the command from --command-env verbatim", () => {
     const env = { SC_COMMAND: 'npx playwright test -g "a & b"' };
     const o = recordOpts(["record", "--command-env", "SC_COMMAND", "--ocr-errors"], env);
@@ -147,6 +153,17 @@ describe("runRecord evidence", () => {
   }
 
   const started = { sessionId: "s1", outputPath: "rec.mp4" };
+
+  it("passes --events, --perf and --log to start_recording (#355)", async () => {
+    const r = await run(
+      { start_recording: started, stop_recording: { sessionId: "s1", status: "stopped", outputPath: "rec.mp4", durationSec: 5 } },
+      0,
+      { events: true, perf: true, logs: ["app.log"] },
+    );
+    expect(r.calls.find((c) => c.name === "start_recording")?.args).toMatchObject({ events: true, perf: true, logs: [{ path: "app.log" }] });
+    const plain = await run({ start_recording: started, stop_recording: { sessionId: "s1", status: "stopped", outputPath: "rec.mp4", durationSec: 5 } }, 0);
+    expect(plain.calls.find((c) => c.name === "start_recording")?.args).not.toHaveProperty("events");
+  });
 
   it("records endReason stopped and no warning for a normal run", async () => {
     const r = await run(

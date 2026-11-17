@@ -60,6 +60,15 @@ inputs:
   secret-pattern:
     description: With redact-secrets, the regex to blur instead of the default.
     default: ""
+  events:
+    description: Also log clicks, scrolls and typing bursts to recording.events.jsonl, on the recording's clock.
+    default: "false"
+  perf:
+    description: Also sample CPU and memory to recording.perf.jsonl, to line a slow step up with the video.
+    default: "false"
+  logs:
+    description: App log files to follow into recording.logs.jsonl, one path per line (at most 5).
+    default: ""
   comment:
     description: "On pull_request events, keep one sticky PR comment per job with the exit code, how the recording ended, OCR'd errors, and a link to the evidence artifact. Created when the command fails, updated on later runs. Needs `permissions: pull-requests: write`."
     default: "false"
@@ -181,6 +190,9 @@ runs:
         SC_REDACT: ${{ inputs.redact-secrets }}
         SC_SECRET_PATTERN: ${{ inputs.secret-pattern }}
         SC_COMMENT: ${{ inputs.comment }}
+        SC_EVENTS: ${{ inputs.events }}
+        SC_PERF: ${{ inputs.perf }}
+        SC_LOGS: ${{ inputs.logs }}
       run: |
         $PSNativeCommandArgumentPassing = 'Windows'
         $cliArgs = @('record', '--target', $env:SC_TARGET, '--fps', $env:SC_FPS, '--out', $env:SC_OUT,
@@ -190,6 +202,9 @@ runs:
         if ($env:SC_OCR -eq 'true' -or (-not $env:SC_OCR -and $env:SC_COMMENT -eq 'true')) { $cliArgs += '--ocr-errors' }
         if ($env:SC_REDACT -eq 'true') { $cliArgs += '--redact-secrets' }
         if ($env:SC_SECRET_PATTERN) { $cliArgs += @('--secret-pattern', $env:SC_SECRET_PATTERN) }
+        if ($env:SC_EVENTS -eq 'true') { $cliArgs += '--events' }
+        if ($env:SC_PERF -eq 'true') { $cliArgs += '--perf' }
+        foreach ($log in ($env:SC_LOGS -split "`r?`n")) { if ($log.Trim()) { $cliArgs += @('--log', $log.Trim()) } }
         if ($env:SC_CLI_PATH) { & node $env:SC_CLI_PATH @cliArgs } else { & npx -y $env:SC_PACKAGE @cliArgs }
         $code = $LASTEXITCODE
         "exit-code=$code" >> $env:GITHUB_OUTPUT

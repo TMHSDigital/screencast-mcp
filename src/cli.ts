@@ -49,6 +49,11 @@ export interface RecordOptions {
   redactSecrets: boolean;
   secretPattern?: string;
   maxDurationSec?: number;
+  /** Also log input events, follow app logs, and sample CPU/memory onto the
+   * recording's clock (#355): the sidecars bug_report and index_recording read. */
+  events?: boolean;
+  perf?: boolean;
+  logs?: string[];
   /** The command to run, as given after `--` (or the one --command-env names). */
   command: string[];
 }
@@ -97,6 +102,9 @@ record options:
   --secret-pattern <re>   with --redact-secrets, the regex to blur instead of the default
   --max-duration <sec>    stop recording after <sec> seconds, an integer 0-${MAX_RECORDING_CAP_SEC}
                           (0 = no cap; default SCREENCAST_MAX_RECORDING_SEC, else 3600)
+  --events                also log clicks, scrolls and typing bursts to recording.events.jsonl
+  --perf                  also sample CPU and memory to recording.perf.jsonl
+  --log <path>            follow an app log into recording.logs.jsonl (repeatable)
   --command-env <NAME>    run the command line in environment variable NAME instead of
                           the arguments after --, so quotes and & survive any shell
 
@@ -194,6 +202,15 @@ function parseRecord(argv: readonly string[], env: NodeJS.ProcessEnv): RecordOpt
         break;
       case "--ocr-errors":
         options.ocrErrors = true;
+        break;
+      case "--events":
+        options.events = true;
+        break;
+      case "--perf":
+        options.perf = true;
+        break;
+      case "--log":
+        options.logs = [...(options.logs ?? []), value()];
         break;
       default:
         throw new CliUsageError(`Unknown record option "${raw}". Run screencast-mcp --help.`);
@@ -499,6 +516,9 @@ export async function runRecord(opts: RecordOptions, io: CliIo = defaultIo, deps
         output: join(outDir, "recording.mp4"),
         overwrite: true,
         ...(opts.maxDurationSec !== undefined ? { maxDurationSec: opts.maxDurationSec } : {}),
+        ...(opts.events ? { events: true } : {}),
+        ...(opts.perf ? { perf: true } : {}),
+        ...(opts.logs?.length ? { logs: opts.logs.map((path) => ({ path })) } : {}),
       });
       sessionId = String(started.sessionId);
       io.err(`screencast-mcp: recording ${opts.target} to ${String(started.outputPath)}\n`);

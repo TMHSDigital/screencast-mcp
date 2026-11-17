@@ -58,6 +58,7 @@
         <li><code>--out</code>, <code>--fps</code>, <code>--no-gif</code>, <code>--no-contact-sheet</code>, <code>--discard-on-success</code>.</li>
         <li><code>--max-duration</code>: whole seconds, 0 to 604800 (0 = no cap; default 3600).</li>
         <li><code>--command-env NAME</code>: run the command line stored in an environment variable, so quotes and <code>&amp;</code> reach the shell unchanged.</li>
+        <li><code>--events</code>, <code>--perf</code>, <code>--log &lt;path&gt;</code> (Action inputs <code>events</code>, <code>perf</code>, <code>logs</code>): also keep the input-event log, CPU and memory samples, and app log lines on the recording&apos;s clock (<code>recording.events.jsonl</code>, <code>.perf.jsonl</code>, <code>.logs.jsonl</code>), so a failure can be lined up with what the app logged.</li>
         <li><code>--ocr-errors</code>: on failure, OCR the end of the run and add the error lines it finds (secrets masked) to <code>evidence.json</code>.</li>
         <li><code>--redact-secrets</code> (Action input <code>redact-secrets: true</code>): OCR the recording and blur on-screen API keys, tokens and <code>password:</code> values in the GIF and contact sheet before they are uploaded; <code>--secret-pattern</code> sets your own regex. If the scan fails, those files are skipped rather than uploaded unblurred. Worth turning on for public repos.</li>
       </ul>
@@ -103,6 +104,9 @@
           <tr><td><code>ocr-errors</code></td><td></td><td>On failure, OCR the GIF's window for error lines (Windows OCR) into evidence.json: true, false, or empty to follow comment.</td></tr>
           <tr><td><code>redact-secrets</code></td><td><code>false</code></td><td>OCR the recording and blur on-screen secrets (API keys, tokens, password: values) in evidence.gif and contact-sheet.png before upload (Windows OCR). If the scan fails they are skipped, not uploaded unblurred.</td></tr>
           <tr><td><code>secret-pattern</code></td><td></td><td>With redact-secrets, the regex to blur instead of the default.</td></tr>
+          <tr><td><code>events</code></td><td><code>false</code></td><td>Also log clicks, scrolls and typing bursts to recording.events.jsonl, on the recording's clock.</td></tr>
+          <tr><td><code>perf</code></td><td><code>false</code></td><td>Also sample CPU and memory to recording.perf.jsonl, to line a slow step up with the video.</td></tr>
+          <tr><td><code>logs</code></td><td></td><td>App log files to follow into recording.logs.jsonl, one path per line (at most 5).</td></tr>
           <tr><td><code>comment</code></td><td><code>false</code></td><td>On pull_request events, keep one sticky PR comment per job with the exit code, how the recording ended, OCR'd errors, and a link to the evidence artifact. Created when the command fails, updated on later runs. Needs <code>permissions: pull-requests: write</code>.</td></tr>
           <tr><td><code>github-token</code></td><td><code>${{ github.token }}</code></td><td>Token for the PR comment.</td></tr>
         </tbody>

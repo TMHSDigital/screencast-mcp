@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- `screencast-mcp record` takes `--events`, `--perf` and a repeatable `--log <path>`, and the Action takes `events`, `perf` and `logs` inputs, so a CI recording keeps the input-event log, CPU and memory samples, and app log lines on the video's clock (#355).
+
 ### Changed
 
 - `list_sessions` returns a short summary of each session, newest first (id, status, target, output path, times, duration, end reason, the error's first line, alive), instead of every full record; `full: true` gives the whole records, as `get_session` does for one. New `status` and `limit` filters (#366).
