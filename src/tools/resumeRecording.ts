@@ -4,6 +4,7 @@ import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { resumeSession } from "../utils/recorder.js";
+import { assertNoOtherSessionOp } from "../utils/lifecycle.js";
 import { logMessage } from "../utils/logging.js";
 import { recordedSec } from "../utils/pause.js";
 import { getStore } from "../context.js";
@@ -25,6 +26,7 @@ export function register(server: McpServer): void {
         const store = getStore();
         const record = store.get(args.sessionId);
         if (!record) throw new ScreencastError(`No session with id "${args.sessionId}".`);
+        assertNoOtherSessionOp(store, record.id, "resume");
         if (record.status === "recording") {
           return okResponse({
             sessionId: record.id,

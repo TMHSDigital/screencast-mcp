@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { STOPS_SESSION, looseOutput } from "../utils/toolSpec.js";
 import { probeDuration, requireFfmpeg } from "../utils/ffmpeg.js";
-import { pauseSession } from "../utils/lifecycle.js";
+import { assertNoOtherSessionOp, pauseSession } from "../utils/lifecycle.js";
 import { recordedSec } from "../utils/pause.js";
 import { getStore } from "../context.js";
 
@@ -25,6 +25,7 @@ export function register(server: McpServer): void {
         const store = getStore();
         const record = store.get(args.sessionId);
         if (!record) throw new ScreencastError(`No session with id "${args.sessionId}".`);
+        assertNoOtherSessionOp(store, record.id, "pause");
         if (record.status === "paused") {
           return okResponse({
             sessionId: record.id,

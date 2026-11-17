@@ -18,7 +18,7 @@ vi.mock("../utils/ffmpeg.js", async (orig) => ({
 }));
 
 import { SessionStore, type SessionRecord } from "../utils/sessions.js";
-import { pauseSession, sessionOpInFlight, stopSession } from "../utils/lifecycle.js";
+import { assertNoOtherSessionOp, pauseSession, sessionOpInFlight, stopSession } from "../utils/lifecycle.js";
 import { attachExitHandler, resumeSession, type CaptureWatch } from "../utils/recorder.js";
 import { partPath, partsDir } from "../utils/pause.js";
 
@@ -146,6 +146,21 @@ describe("double resume (#252)", () => {
     await pause;
     expect(spawnMock).not.toHaveBeenCalled();
     expect(store.get(rec.id)?.status).toBe("paused");
+  });
+
+  it("the tools' pre-check rejects a resume while a pause still shows 'recording' (#343)", async () => {
+    const store = newStore();
+    const rec = recording();
+    store.create(rec);
+    store.attachChild(rec.id, asChild(fakeChild()));
+    const pause = pauseSession(store, rec, { probe: async () => 5 });
+    // The pause has not written "paused" yet: resume_recording used to read
+    // "recording" here and answer "Already recording."
+    expect(store.get(rec.id)?.status).toBe("recording");
+    expect(() => assertNoOtherSessionOp(store, rec.id, "resume")).toThrow(/pause of it is in progress/);
+    expect(() => assertNoOtherSessionOp(store, rec.id, "pause")).not.toThrow();
+    await pause;
+    expect(() => assertNoOtherSessionOp(store, rec.id, "resume")).not.toThrow();
   });
 
   it("a failed resume does not delete a file another live capture is writing", async () => {

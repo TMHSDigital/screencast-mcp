@@ -152,6 +152,19 @@ export function sessionOpInFlight(store: SessionStore, id: string): SessionOpKin
   return sessionOps.get(store)?.get(id)?.kind ?? null;
 }
 
+/** Throw when a different operation on the session is in flight. pause and
+ * resume call this before trusting the stored status, which the operation in
+ * flight has not written yet (#343). */
+export function assertNoOtherSessionOp(store: SessionStore, id: string, kind: SessionOpKind): void {
+  const running = sessionOpInFlight(store, id);
+  if (running && running !== kind) {
+    throw new ScreencastError(
+      `Cannot ${kind} ${id}: a ${running} of it is in progress.`,
+      "Retry once it finishes (get_session shows the session's status).",
+    );
+  }
+}
+
 /**
  * Run `fn` as the session's one operation. `queue` (stop) waits for a
  * different operation in flight instead of rejecting; `fn` is told whether it
@@ -172,7 +185,7 @@ export function withSessionOp<T>(
     return Promise.reject(
       new ScreencastError(
         `Cannot ${kind} ${id}: a ${running.kind} of it is in progress.`,
-        "Retry once it finishes (get_recording shows the session's status).",
+        "Retry once it finishes (get_session shows the session's status).",
       ),
     );
   }
