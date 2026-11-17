@@ -157,10 +157,21 @@ export async function runEditJob(args: string[], job: EditJob): Promise<void> {
   // hang shows whether ffmpeg was still working, done, or silent.
   const trace = traceJob(job.output);
   try {
-    const run = () =>
-      runFfmpeg(ffArgs, jobTimeoutMs(decoded), {
+    const run = () => {
+      // Life is the output time moving, not just progress lines: a run that
+      // reports progress but never writes a frame is hung too (#281).
+      const advance = createProgressParser();
+      let lastT: number | null = null;
+      const progressed = (chunk: string) => {
+        const t = advance(chunk);
+        if (t === null || t === lastT) return false;
+        lastT = t;
+        return true;
+      };
+      return runFfmpeg(ffArgs, jobTimeoutMs(decoded), {
         signal,
         stallMs: EDIT_STALL_MS,
+        progressed,
         onStdout: (chunk) => {
           trace?.output(chunk.length);
           if (!report || !duration) return;
@@ -171,9 +182,11 @@ export async function runEditJob(args: string[], job: EditJob): Promise<void> {
           }
         },
       });
-    // -progress writes every half second while ffmpeg works, so a job silent
-    // for EDIT_STALL_MS is hung (seen on loaded CI runners, #281): kill it and
-    // run it once more rather than wait out the whole job timeout.
+    };
+    // -progress writes every half second while ffmpeg works, so a job whose
+    // output time has not moved for EDIT_STALL_MS is hung (seen on loaded and
+    // arm64 CI runners, #281): kill it and run it once more rather than wait
+    // out the whole job timeout.
     try {
       await run();
     } catch (error) {

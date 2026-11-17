@@ -32,4 +32,23 @@ describe("runCapture stall watchdog (#281)", () => {
     expect(res.code).toBe(0);
     expect(res.stderr).toBe(".".repeat(20));
   }, 30_000);
+
+  it("with progressed, stops a child that keeps talking but never moves on", async () => {
+    // Like the arm64 hang: progress lines every 100 ms, out_time never set.
+    const script = "setInterval(() => process.stdout.write('frame=0\\nout_time_us=N/A\\nprogress=continue\\n'), 100);";
+    const t0 = Date.now();
+    const err = await runCapture(process.execPath, ["-e", script], 15_000, {
+      stallMs: 1_500,
+      progressed: (chunk) => /out_time_us=\d+/.test(chunk),
+    }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(StallError);
+    expect((err as Error).message).toMatch(/made no progress for 2s/);
+    expect(Date.now() - t0).toBeLessThan(10_000);
+  }, 20_000);
+
+  it("with progressed, lets a child whose output time advances run past stallMs", async () => {
+    const script = "let t = 0; const i = setInterval(() => { process.stdout.write('out_time_us=' + (t += 100000) + '\\n'); if (t >= 3000000) { clearInterval(i); } }, 100);";
+    const res = await runCapture(process.execPath, ["-e", script], 30_000, { stallMs: 1_500, progressed: (chunk) => /out_time_us=\d+/.test(chunk) });
+    expect(res.code).toBe(0);
+  }, 30_000);
 });

@@ -131,6 +131,10 @@ export interface RunCaptureOptions {
   /** Kill the child and reject with a StallError when it writes nothing at
    * all (stdout or stderr) for this long. For jobs that report progress. */
   stallMs?: number;
+  /** With stallMs: only a stdout chunk this returns true for counts as life.
+   * An edit job passes "the output time moved", so ffmpeg that keeps writing
+   * progress lines without ever producing a frame is caught too (#281). */
+  progressed?: (stdoutChunk: string) => boolean;
 }
 
 /** A child that went silent for RunCaptureOptions.stallMs and was killed. */
@@ -170,8 +174,9 @@ export function runCapture(
     const armStall = () => {
       if (!opts.stallMs) return;
       clearTimeout(stallTimer);
+      const what = opts.progressed ? "made no progress" : "wrote nothing";
       stallTimer = setTimeout(
-        () => kill(new StallError(`${bin} wrote nothing for ${Math.round(opts.stallMs! / 1000)}s and was stopped.`)),
+        () => kill(new StallError(`${bin} ${what} for ${Math.round(opts.stallMs! / 1000)}s and was stopped.`)),
         opts.stallMs,
       );
     };
@@ -185,13 +190,13 @@ export function runCapture(
     if (opts.signal?.aborted) onAbort();
     else opts.signal?.addEventListener("abort", onAbort, { once: true });
     child.stdout?.on("data", (d) => {
-      armStall();
       const s = d.toString();
+      if (!opts.progressed || opts.progressed(s)) armStall();
       stdout += s;
       opts.onStdout?.(s);
     });
     child.stderr?.on("data", (d) => {
-      armStall();
+      if (!opts.progressed) armStall();
       stderr += d.toString();
     });
     child.on("error", (err) => {
