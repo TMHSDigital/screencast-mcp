@@ -90,6 +90,13 @@
           "description": "Comma-separated toolsets to load: capture, watch, edit, produce, audio (doctor and get_media_info are always on; default all)",
           "isRequired": false,
           "isSecret": false
+        },
+        {
+          "name": "SCREENCAST_DEBUG_JOBS",
+          "description": "1 traces each edit job on stderr (start, a heartbeat every 30 s, and the end) to diagnose a stuck edit; default off",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
         }
       ]
     }

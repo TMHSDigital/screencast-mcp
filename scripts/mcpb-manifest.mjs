@@ -37,6 +37,7 @@ export function buildManifest(p, toolList) {
           SCREENCAST_PS_TIMEOUT_MS: "${user_config.ps_timeout_ms}",
           SCREENCAST_CONFIRM_CAPTURE: "${user_config.confirm_capture}",
           SCREENCAST_TOOLSETS: "${user_config.toolsets}",
+          SCREENCAST_DEBUG_JOBS: "${user_config.debug_jobs}",
         },
       },
     },
@@ -123,6 +124,12 @@ export function buildManifest(p, toolList) {
         description:
           "Comma-separated tool groups to load: capture, watch, edit, produce, audio (doctor and get_media_info " +
           "are always on). Leave empty for all; fewer tools means less context per turn.",
+        required: false,
+      },
+      debug_jobs: {
+        type: "string",
+        title: "Trace edit jobs",
+        description: "Set to 1 to log each edit job's progress to stderr (the client's MCP log), to diagnose a stuck edit. Leave empty for off.",
         required: false,
       },
     },
