@@ -128,8 +128,6 @@ describe.skipIf(!AVAILABLE)("instant replay buffer (#197)", { timeout: 90_000 },
     expect(res.durationSec).toBeCloseTo(3, 1);
     expect(res.toSec - res.fromSec).toBeCloseTo(3, 1);
     expect(res.fromSec).toBeGreaterThan(9);
-    // Well within "about a second" on a dev box; generous for slow CI.
-    expect(elapsed).toBeLessThan(5_000);
     // The event slice is re-timed to the clip: a click every 0.5 s.
     const events = parseEventsJsonl(readFileSync(res.eventsPath!, "utf8"));
     expect(events.length).toBeGreaterThanOrEqual(5);
@@ -137,6 +135,10 @@ describe.skipIf(!AVAILABLE)("instant replay buffer (#197)", { timeout: 90_000 },
     expect(events.every((e) => e.t >= 0 && e.t <= res.durationSec + 0.001)).toBe(true);
     // Snapshot directories are cleaned up.
     expect(readdirSync(buf.dir).filter((f) => f.startsWith("save-"))).toEqual([]);
+    // Last, and loose (#359): a stream-copy save takes about a second on a dev
+    // box. This only guards against a regression to a full re-encode, so a
+    // loaded runner cannot fail the correctness checks above on timing.
+    expect(elapsed).toBeLessThan(20_000);
   });
 
   it("re-encodes frame-exact on request", async () => {
