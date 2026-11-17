@@ -38,9 +38,9 @@ export interface SetupOptions {
 }
 
 export const SETUP_USAGE = `setup options:
-  --yes                   answer yes: install FFmpeg and write client configs without asking
+  --yes, -y               answer yes: install FFmpeg and write client configs without asking
   --dry-run               print the checks and the config changes; change nothing
-  --clients <list>        detected (default) | none | a comma list of
+  --clients <list>        (or --clients=<list>) detected (default) | none | a comma list of
                           ${CLIENT_IDS.join(", ")}
   --no-install            never offer to install FFmpeg
   --force                 replace an existing, different "screencast" server entry

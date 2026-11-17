@@ -5,10 +5,58 @@
 // docs test fail when a committed page differs from what this produces.
 // docs/index.html and docs/404.html are written by hand; the page shell is
 // shared with the tool reference in site-shell.mjs.
-import { writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { page } from "./site-shell.mjs";
+
+const escHtml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const unquote = (s) => s.trim().replace(/^"(.*)"$/, "$1");
+
+/** The Action's inputs, read from action.yml so the CI page cannot drift from
+ * it (#365): name, default, and description. Only the flat `inputs:` block of
+ * this repo's action.yml is parsed, not general YAML. */
+export function actionInputs(yaml) {
+  const out = [];
+  let inInputs = false;
+  let cur = null;
+  for (const line of yaml.split(/\r?\n/)) {
+    if (/^\S/.test(line)) {
+      inInputs = line.startsWith("inputs:");
+      continue;
+    }
+    if (!inInputs) continue;
+    const name = /^ {2}([a-z0-9-]+):\s*$/.exec(line);
+    if (name) {
+      cur = { name: name[1], description: "", default: "", required: false };
+      out.push(cur);
+      continue;
+    }
+    const field = /^ {4}(description|default|required):\s*(.*)$/.exec(line);
+    if (cur && field) {
+      if (field[1] === "required") cur.required = field[2].trim() === "true";
+      else cur[field[1]] = unquote(field[2]);
+    }
+  }
+  return out;
+}
+
+function actionInputsTable() {
+  const yaml = readFileSync(new URL("../action.yml", import.meta.url), "utf8");
+  const rows = actionInputs(yaml).map((i) => {
+    const def = i.required ? "required" : i.default === "" ? "" : `<code>${escHtml(i.default)}</code>`;
+    const desc = escHtml(i.description).replace(/`([^`]+)`/g, "<code>$1</code>");
+    return `          <tr><td><code>${i.name}</code></td><td>${def}</td><td>${desc}</td></tr>`;
+  });
+  return `      <div class="table-scroll">
+      <table>
+        <thead><tr><th>Input</th><th>Default</th><th>What it does</th></tr></thead>
+        <tbody>
+${rows.join("\n")}
+        </tbody>
+      </table>
+      </div>`;
+}
 
 /** Every page this script owns: path under docs/ -> HTML. */
 export const PAGES = new Map();
@@ -341,7 +389,8 @@ ${pre("npx -y @tmhs/screencast-mcp record --target full -- npm run test:e2e")}
       <div class="tc-mark"><span class="tc">00:10</span><span>THE ACTION</span></div>
       <p>A composite action wraps it for <code>windows-latest</code>: it checks Node, installs ffmpeg if it is missing, records the command, uploads the evidence folder as an artifact, writes a job summary, and then fails the step with the command's exit code.</p>
 ${pre(WORKFLOW_YAML)}
-      <p>Outputs: <code>exit-code</code>, <code>end-reason</code>, <code>gif</code>, <code>contact-sheet</code>, <code>recording</code>, <code>evidence-dir</code>, <code>artifact-name</code>, and <code>artifact-url</code>. All inputs are in <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/action.yml"><code>action.yml</code></a>.</p>
+      <p>Outputs: <code>exit-code</code>, <code>end-reason</code>, <code>gif</code>, <code>contact-sheet</code>, <code>recording</code>, <code>evidence-dir</code>, <code>artifact-name</code>, and <code>artifact-url</code>. The inputs, from <a href="https://github.com/TMHSDigital/screencast-mcp/blob/main/action.yml"><code>action.yml</code></a>:</p>
+${actionInputsTable()}
       <p><code>@v0</code> is a floating tag that each release moves to the newest 0.x version, so a broken <code>main</code> never reaches your CI; use a full version tag such as <code>@v0.47.0</code> or a commit SHA to pin exactly. Pinning the action pins the CLI too: by default it runs the npm version the action was released with. Each job and matrix leg uploads its own artifact (<code>screencast-evidence-&lt;job&gt;[-&lt;index&gt;]</code>), so matrices do not collide. The Action is being published to GitHub Marketplace.</p>
       <p><code>comment: true</code> keeps one PR comment per job, created when the command fails and updated on later runs, with the exit code, how the recording ended, OCR&apos;d errors, and a link to the evidence artifact. It needs <code>permissions: pull-requests: write</code>; fork PRs get a read-only token, so the step only warns. GitHub cannot show images stored in artifacts, so the GIF stays in the artifact.</p>
     </section>

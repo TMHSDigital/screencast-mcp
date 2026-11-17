@@ -226,6 +226,7 @@ Every capture tool takes one `target` string: `full`, `monitor:<index>`, `window
 | `SCREENCAST_CONFIRM_CAPTURE` | `auto` | Asks you to confirm each live capture through MCP elicitation. `auto`: ask when the client supports elicitation. `1`/`always`: ask, and refuse captures in clients that cannot. `0`/`off`: never ask |
 | `SCREENCAST_TOOLSETS` | `all` | Comma-separated toolsets to expose; the rest are not loaded, which shrinks the tool list the agent pays for on every turn (`core` is always on) |
 | `FFMPEG_PATH` / `FFPROBE_PATH` | `PATH` lookup | Explicit ffmpeg / ffprobe binaries |
+| `SCREENCAST_DEBUG_JOBS` | off | `1` traces each edit job on stderr: start, a heartbeat every 30 s (bytes written, seconds since ffmpeg's last output), and the end |
 
 <!-- toolsets:start -->
 | Toolset | Tools |
@@ -243,6 +244,7 @@ Every capture tool takes one `target` string: `full`, `monitor:<index>`, `window
 Start by asking your agent to run **`doctor`**: it reports the ffmpeg version and architecture, the filters and capture devices it found, OCR, the settings in effect, and under `problems` what is missing and how to fix it.
 
 - **A tool says a filter is missing.** Older FFmpeg builds run most tools, but `transcribe` (the `whisper` filter) and `backend: "wgc"` (`gfxcapture`) need FFmpeg 8, and "essentials" or distro builds can lack them (Ubuntu LTS `apt install ffmpeg` gives 6.x). Install the full build: `winget install Gyan.FFmpeg`.
+- **An edit seems stuck.** Set `SCREENCAST_DEBUG_JOBS=1` in the server's `env`: each edit job then logs its progress to stderr (your client's MCP log), so you can see whether ffmpeg is still working.
 - **ffmpeg is installed but not found.** Put it on `PATH`, or set `FFMPEG_PATH` / `FFPROBE_PATH` in the server's `env` (see [Configuration](#configuration)).
 - **Captures are refused or never start.** By default each capture asks you to confirm it through your client; see `SCREENCAST_CONFIRM_CAPTURE` under [Configuration](#configuration).
 
@@ -274,6 +276,7 @@ Supported (#246): CI builds and runs the full test suite on `windows-11-arm`. gy
 - **You confirm captures.** By default, every recording, screenshot, live `find_text`, and `wait_for_change` first asks you, through your client, what will be captured. The model cannot answer that prompt for you. Clients without MCP elicitation get no prompt unless `SCREENCAST_CONFIRM_CAPTURE=1`, which refuses captures there instead.
 - **Search runs on masked text.** `index_recording` masks secret-pattern matches before writing the index, and `search_recording` (including regex queries) only sees that masked text.
 - **The event log never records typed text.** Only with `start_recording` `events: true` (or `cursor: "events"`), and only while that recording runs: clicks, scrolls, and cursor positions system-wide, and typing as bursts on a 0.5 s grid with no key names (`keys: "shortcuts"` also names Ctrl/Alt/Win chords). `focus: "app"` also logs which app is in front (its exe name); only `focus: "title"` logs window titles. `elements: true` also logs the accessible name of the control each click lands on (a button's "Save", a list item's text), never for password fields. There is no microphone capture; system audio only with `audio.source` = `system`.
+- **Camera and process data only when asked.** `webcam` records a camera (video only, no sound) to `<output>.webcam.mp4`. `perf: true` samples system CPU and memory, plus the recorded window's app (its process id, exe name, CPU and memory), to `<recording>.perf.jsonl`.
 - **App logs only when you name them.** `start_recording` `logs` reads just the files you list, and only lines written while it records; they are stored next to the recording and masked for secrets before they reach an index or a bug report.
 - **Deleting data.** `delete_recording` removes a recording with its sidecars (event log, webcam, transcript, index with its screen text, markers) and registry entry, asking you first when the client supports it. Otherwise delete files under `SCREENCAST_HOME`, or set `SCREENCAST_RETENTION_DAYS`; recordings and edits are never deleted automatically.
 
