@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.51.2] - 2026-11-17
+
 ### Fixed
 
 - `delete_recording` deletes only a recording file (a video or GIF) and its sidecars. It refuses folders, other file types, and an allowed directory itself, and removes only the recording's `.parts` folder as a tree. Without a confirmation from the client, a file outside SCREENCAST_HOME is deleted only when it is a recording this server made (pass its `sessionId`).
