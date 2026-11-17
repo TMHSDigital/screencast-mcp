@@ -144,6 +144,14 @@ describe("event, marker, and cue text", () => {
     // The input is untouched.
     expect(segs[1]!.markers).toEqual([{ t: 1, text: "stale" }]);
   });
+
+  it("places items like a linear scan would, across many segments (#358)", () => {
+    const segs: IndexSegment[] = Array.from({ length: 600 }, (_, i) => ({ start: 2 + i * 5, end: 2 + (i + 1) * 5, ocr: [] }));
+    const items = [-1, 0, 2, 4.99, 7, 1500, 3001.9, 3002, 9999].map((t) => ({ t, text: String(t) }));
+    const out = attach(segs, items, "events");
+    const where = (t: number) => out.findIndex((s) => s.events?.some((e) => e.t === t));
+    expect([-1, 0, 2, 4.99, 7, 1500, 3001.9, 3002, 9999].map(where)).toEqual([0, 0, 0, 0, 1, 299, 599, 599, 599]);
+  });
 });
 
 describe("searchIndex", () => {

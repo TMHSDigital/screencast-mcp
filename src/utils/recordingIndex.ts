@@ -302,8 +302,23 @@ export function attach(segments: IndexSegment[], items: TimedText[], field: "eve
     return rest as IndexSegment;
   });
   if (out.length === 0) return out;
+  // Segments are in time order and do not overlap: binary-search the last one
+  // starting at or before t, instead of scanning them all per item (#358).
+  const holding = (t: number): number => {
+    let lo = 0;
+    let hi = out.length - 1;
+    let found = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (out[mid]!.start <= t) {
+        found = mid;
+        lo = mid + 1;
+      } else hi = mid - 1;
+    }
+    return found !== -1 && t < out[found]!.end ? found : -1;
+  };
   for (const item of [...items].sort((a, b) => a.t - b.t)) {
-    let i = out.findIndex((s) => item.t >= s.start && item.t < s.end);
+    let i = holding(item.t);
     if (i === -1) i = item.t < out[0]!.start ? 0 : out.length - 1;
     const seg = out[i]!;
     (seg[field] ??= []).push(item);
