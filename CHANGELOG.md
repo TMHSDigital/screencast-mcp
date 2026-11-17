@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [0.52.0] - 2026-11-17
+
 ### Added
 
 - `pipeline`'s `redact` step takes `secrets: true` (or a regex): it OCRs the source for on-screen secrets (API keys, tokens, `password:` values) and blurs each hit for the time it is on screen, in the same render. With a recipe, pass `steps: [{ "op": "redact", "secrets": true }]` and it runs before the recipe's cuts and zoom. Needs Windows OCR (#341).
