@@ -15,6 +15,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - `pause_recording` and `resume_recording` called while the other one is still finishing now return "a pause/resume of it is in progress; retry" instead of "Already recording/paused", which was wrong by the time the first call finished (#343).
 - A recording that ends on its own (its `maxDurationSec` cap, or the window closing) now gets its `durationSec`, so `stop_recording` reports it and the CLI's `--last` window works on a capped run (#344).
 - A paused-and-resumed recording whose server exited before its segments were joined (for example, a slow join cut off at shutdown) is no longer reported as a clean stop: at the next start it gets `endReason: "shutdown"` and an error listing the unjoined parts (#345).
+- Masking secrets with the built-in pattern no longer shares the 1 s regex budget across every line, so `index_recording` and `search_recording` no longer fail on a recording with a large app log, with an error blaming a regex the caller never wrote (#347). Caller-supplied regexes keep the budget.
 - `screencast-mcp record -- "C:\Program Files\...\app.exe" ...` quotes the program path on Windows, so cmd no longer splits it at the space (#357, thanks @bfs2021 in #369).
 
 ## [0.51.1] - 2026-11-16

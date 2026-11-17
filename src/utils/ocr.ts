@@ -144,31 +144,46 @@ export const REGEX_BUDGET_MS = 1_000;
  * way: the engine often reads one as the other, and a secret pattern like
  * `ghp_` must still match `ghp-` (#236). Same length, so offsets map to words
  * as is. Runs inside a vm context so the caller can bound it with a timeout. */
-const REGEX_SCAN = `JSON.stringify(texts.map((text) => {
-  const re = new RegExp(query, "gi");
-  const seen = new Set();
-  const ranges = [];
-  for (const variant of [text, text.replace(/-/g, "_"), text.replace(/_/g, "-")]) {
-    for (const m of variant.matchAll(re)) {
-      const key = m.index + ":" + m[0].length;
-      if (m[0].length > 0 && !seen.has(key)) {
-        seen.add(key);
-        ranges.push([m.index, m.index + m[0].length]);
+function scanRanges(texts: string[], query: string): Array<Array<[number, number]>> {
+  return texts.map((text) => {
+    const re = new RegExp(query, "gi");
+    const seen = new Set<string>();
+    const ranges: Array<[number, number]> = [];
+    for (const variant of [text, text.replace(/-/g, "_"), text.replace(/_/g, "-")]) {
+      for (const m of variant.matchAll(re)) {
+        const key = `${m.index}:${m[0].length}`;
+        if (m[0].length > 0 && !seen.has(key)) {
+          seen.add(key);
+          ranges.push([m.index, m.index + m[0].length]);
+        }
       }
     }
-  }
-  return ranges;
-}))`;
+    return ranges;
+  });
+}
+
+/** The same scan as source for the vm context (self-contained: no imports). */
+const REGEX_SCAN = `JSON.stringify((${scanRanges.toString()})(texts, query))`;
+
+/** Patterns this server ships and reviewed for linear matching. They run
+ * without the budget, which bounds a caller's regex, not the amount of text:
+ * a long log masked with the default secret pattern must not fail (#347). */
+const trustedPatterns = new Set<string>();
+export function trustPattern(pattern: string): string {
+  trustedPatterns.add(pattern);
+  return pattern;
+}
 
 /** Run a user regex over the texts within REGEX_BUDGET_MS, so a pattern that
  * backtracks catastrophically, like `(a+)+$`, fails the call instead of
- * freezing the server (#185). */
+ * freezing the server (#185). A trusted built-in pattern runs directly. */
 export function regexRanges(texts: string[], query: string, budgetMs = REGEX_BUDGET_MS): Array<Array<[number, number]>> {
   try {
     new RegExp(query, "gi");
   } catch (err) {
     throw new ScreencastError(`Invalid regex: ${errorMessage(err)}`);
   }
+  if (trustedPatterns.has(query)) return scanRanges(texts, query);
   try {
     return JSON.parse(runInNewContext(REGEX_SCAN, { texts, query }, { timeout: budgetMs }) as string);
   } catch (err) {

@@ -86,6 +86,20 @@ describe("OCR helpers (#117)", () => {
     expect(regexRanges(["ghp-1 x", "none"], "ghp_")).toEqual([[[0, 4]], []]);
   });
 
+  it("masks a large log with the built-in pattern regardless of the budget (#347)", async () => {
+    const { DEFAULT_SECRET_PATTERN, maskSecrets } = await import("../utils/bugReport.js");
+    const lines = Array.from({ length: 2000 }, (_, i) => `${"x".repeat(900)} token=abc${i} ghp_${"a".repeat(20)}`);
+    // A 1 ms budget would stop a vm run over this much text; the trusted
+    // built-in pattern does not use it.
+    const ranges = regexRanges(lines, DEFAULT_SECRET_PATTERN, 1);
+    expect(ranges).toHaveLength(2000);
+    expect(maskSecrets(lines.slice(0, 1), DEFAULT_SECRET_PATTERN)[0]).not.toMatch(/abc0|ghp_a/);
+    // Wrapped, the same pattern is not the trusted string, so it takes the
+    // budgeted vm path: both paths run the same scan and agree.
+    const sample = lines.slice(0, 3);
+    expect(regexRanges(sample, `(?:${DEFAULT_SECRET_PATTERN})`)).toEqual(regexRanges(sample, DEFAULT_SECRET_PATTERN));
+  });
+
   it("pads redaction rectangles and clamps them to the frame", () => {
     expect(redactionRects([{ x: 2, y: 5, width: 50, height: 10 }], { width: 54, height: 100 })).toEqual([
       { x: 0, y: 1, width: 54, height: 18 },

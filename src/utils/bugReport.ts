@@ -8,7 +8,7 @@
  * Everything here is pure, so it is unit-tested without ffmpeg or Windows.
  */
 import { ScreencastError } from "./errors.js";
-import { findMatches, normalizeForMatch, regexRanges, type OcrLine } from "./ocr.js";
+import { findMatches, normalizeForMatch, regexRanges, trustPattern, type OcrLine } from "./ocr.js";
 import type { TimedRect } from "./ocrScan.js";
 import { formatTimecode } from "./sheet.js";
 import type { ReproStep } from "./steps.js";
@@ -32,22 +32,25 @@ export const MAX_ERROR_LINES = 20;
  * provider API keys (OpenAI, GitHub, Slack, AWS, Google, Stripe), JWTs, and a
  * `password:`, `token=`, `api key` label with the value after it. Matched
  * case-insensitively and with `_`/`-` swapped (OCR misreads, #236). */
-export const DEFAULT_SECRET_PATTERN = [
-  "\\b(?:sk|pk|rk)-[a-z0-9_-]{8,}",
-  "\\bgh[pousr]_[a-z0-9]{10,}",
-  "\\bgithub_pat_[a-z0-9_]{10,}",
-  "\\bxox[abprs]-[a-z0-9-]{8,}",
-  "\\bAKIA[0-9A-Z]{12,}",
-  "\\bAIza[0-9a-z_-]{20,}",
-  "\\beyJ[a-z0-9_-]{8,}\\.[a-z0-9_-]{8,}",
-  "(?:api.?key|secret|token|passw(?:or)?d|bearer|authorization)\\s*[:=]?\\s*\\S+",
-].join("|");
+export const DEFAULT_SECRET_PATTERN = trustPattern(
+  [
+    "\\b(?:sk|pk|rk)-[a-z0-9_-]{8,}",
+    "\\bgh[pousr]_[a-z0-9]{10,}",
+    "\\bgithub_pat_[a-z0-9_]{10,}",
+    "\\bxox[abprs]-[a-z0-9-]{8,}",
+    "\\bAKIA[0-9A-Z]{12,}",
+    "\\bAIza[0-9a-z_-]{20,}",
+    "\\beyJ[a-z0-9_-]{8,}\\.[a-z0-9_-]{8,}",
+    "(?:api.?key|secret|token|passw(?:or)?d|bearer|authorization)\\s*[:=]?\\s*\\S+",
+  ].join("|"),
+);
 
 /** Lines worth quoting as the failure: errors, exceptions, and the usual
  * dialog wording for something that went wrong. */
-export const DEFAULT_ERROR_PATTERN =
+export const DEFAULT_ERROR_PATTERN = trustPattern(
   "error|exception|fail(?:ed|ure)?|fatal|crash|denied|refused|not found|cannot|can't|unable|invalid|" +
-  "timed? ?out|traceback|panic|unhandled|warning";
+    "timed? ?out|traceback|panic|unhandled|warning",
+);
 
 /** The file names written into the report folder. */
 export const REPORT_FILES = {
