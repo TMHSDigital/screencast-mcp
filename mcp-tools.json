@@ -394,10 +394,36 @@
       "idempotentHint": true,
       "openWorldHint": false
     },
-    "description": "List all recording sessions (active and finished) with their status, target, output path, and whether the process is still alive.",
+    "description": "List recording sessions, newest first: id, status, target, output path, duration, and whether the recorder is alive. A summary each unless full; get_session gives one in full.",
     "inputSchema": {
       "type": "object",
-      "properties": {}
+      "properties": {
+        "status": {
+          "description": "Only these.",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "paused",
+              "stopped",
+              "failed",
+              "orphaned"
+            ]
+          }
+        },
+        "limit": {
+          "description": "At most this many (default all).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "full": {
+          "description": "Whole records.",
+          "type": "boolean"
+        }
+      }
     }
   },
   {

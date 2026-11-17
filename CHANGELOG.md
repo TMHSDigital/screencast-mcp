@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Changed
+
+- `list_sessions` returns a short summary of each session, newest first (id, status, target, output path, times, duration, end reason, the error's first line, alive), instead of every full record; `full: true` gives the whole records, as `get_session` does for one. New `status` and `limit` filters (#366).
+
 ## [0.51.2] - 2026-11-17
 
 ### Fixed

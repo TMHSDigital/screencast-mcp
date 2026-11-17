@@ -179,7 +179,13 @@ Minimal call:
 
 **List Sessions** (since v0.2.0)
 
-List all recording sessions (active and finished) with their status, target, output path, and whether the process is still alive.
+List recording sessions, newest first: id, status, target, output path, duration, and whether the recorder is alive. A summary each unless full; get_session gives one in full.
+
+Parameters:
+
+- `status` (("recording" | "paused" | "stopped" | "failed" | "orphaned")[]; at least 1 items): Only these.
+- `limit` (integer; ≥ 1, ≤ 100): At most this many (default all).
+- `full` (boolean): Whole records.
 
 Minimal call:
 

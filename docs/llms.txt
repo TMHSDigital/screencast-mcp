@@ -27,7 +27,7 @@ Every tool is an explicit call: nothing records on its own. Tools return file pa
 - [pause_recording](https://tmhsdigital.github.io/screencast-mcp/tools/pause_recording.html): Pause a recording; until resume_recording nothing is captured, and the gap is left out of the file, events, and markers.
 - [resume_recording](https://tmhsdigital.github.io/screencast-mcp/tools/resume_recording.html): Resume a paused recording (same target and settings).
 - [save_replay](https://tmhsdigital.github.io/screencast-mcp/tools/save_replay.html): Save the last N seconds of a replay buffer (start_recording replayBufferSec) to an mp4; the buffer keeps running.
-- [list_sessions](https://tmhsdigital.github.io/screencast-mcp/tools/list_sessions.html): List all recording sessions (active and finished) with their status, target, output path, and whether the process is still alive.
+- [list_sessions](https://tmhsdigital.github.io/screencast-mcp/tools/list_sessions.html): List recording sessions, newest first: id, status, target, output path, duration, and whether the recorder is alive.
 - [get_session](https://tmhsdigital.github.io/screencast-mcp/tools/get_session.html): Inspect a single recording session by id, including live status and whether its output file exists on disk.
 - [read_events](https://tmhsdigital.github.io/screencast-mcp/tools/read_events.html): Read the input events (clicks, scroll, cursor, shortcuts, typing bursts) of a recording made with events: true, in video seconds and pixels; e.g. types: ['down'], then sample_frames there.
 - [add_marker](https://tmhsdigital.github.io/screencast-mcp/tools/add_marker.html): Mark a labelled moment on a recording, live or at a second.

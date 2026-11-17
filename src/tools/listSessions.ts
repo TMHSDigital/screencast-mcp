@@ -12,23 +12,53 @@ export function register(server: McpServer): void {
     {
       title: "List Sessions",
       description:
-        "List all recording sessions (active and finished) with their status, " +
-        "target, output path, and whether the process is still alive.",
-      inputSchema: {},
+        "List recording sessions, newest first: id, status, target, output path, duration, and whether the " +
+        "recorder is alive. A summary each unless full; get_session gives one in full.",
+      inputSchema: {
+        status: z.array(z.enum(["recording", "paused", "stopped", "failed", "orphaned"])).min(1).optional().describe("Only these."),
+        limit: z.number().int().min(1).max(100).optional().describe("At most this many (default all)."),
+        full: z.boolean().optional().describe("Whole records."),
+      },
       outputSchema: looseOutput({
         count: z.number().int(),
         sessions: z.array(looseOutput({ id: z.string(), status: z.string(), outputPath: z.string(), alive: z.boolean() })),
       }),
       annotations: READ_ONLY,
     },
-    async () => {
+    async (args) => {
       try {
-        const sessions = getStore()
-          .list()
-          .map((s) => ({ ...s, alive: s.status === "recording" && isAlive(s.pid) }));
+        const all = getStore().list();
+        const picked = all
+          .filter((s) => !args.status || args.status.includes(s.status))
+          .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+          .slice(0, args.limit ?? Infinity);
+        // A summary by default (#366): a full record carries segments,
+        // markers, sidecar summaries and the capture plan, and a hundred of
+        // them is tens of KB in the model's context.
+        const sessions = picked.map((s) => {
+          const alive = s.status === "recording" && isAlive(s.pid);
+          if (args.full) return { ...s, alive };
+          return {
+            id: s.id,
+            status: s.status,
+            target: s.target,
+            outputPath: s.outputPath,
+            startedAt: s.startedAt,
+            ...(s.stoppedAt ? { stoppedAt: s.stoppedAt } : {}),
+            durationSec: s.durationSec ?? null,
+            ...(s.endReason ? { endReason: s.endReason } : {}),
+            ...(s.error ? { error: s.error.split("\n")[0] } : {}),
+            alive,
+          };
+        });
         // Triggered recordings still waiting, and what earlier ones became (#336).
         const armed = listArms();
-        return okResponse({ count: sessions.length, sessions, ...(armed.length ? { armed } : {}) });
+        return okResponse({
+          count: sessions.length,
+          ...(sessions.length < all.length ? { total: all.length } : {}),
+          sessions,
+          ...(armed.length ? { armed } : {}),
+        });
       } catch (error) {
         return errorResponse(error);
       }
