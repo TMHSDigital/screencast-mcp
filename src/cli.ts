@@ -277,7 +277,13 @@ export function commandLine(command: readonly string[], platform: NodeJS.Platfor
   const batch = BATCH_SHIM.test(command[0] ?? "");
   return command
     .map((a, i) => {
-      if (i === 0 || (!NEEDS_QUOTES.test(a) && a !== "")) return a;
+      if (i === 0) {
+        // cmd.exe /s strips only the outer quotes node adds, so a quoted
+        // program path keeps its spaces; ^-escaping the quote instead would
+        // stop it opening a quoted run and cmd would split at the first space.
+        return a !== "" && NEEDS_QUOTES.test(a) ? msvcQuote(a) : a;
+      }
+      if (!NEEDS_QUOTES.test(a) && a !== "") return a;
       let q = msvcQuote(a).replace(CMD_META, "^$1");
       if (batch) q = q.replace(CMD_META, "^$1");
       return q;
