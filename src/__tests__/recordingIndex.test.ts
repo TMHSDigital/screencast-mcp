@@ -388,3 +388,36 @@ describe("library search (#325)", () => {
     }
   });
 });
+
+describe("search cost (#346)", () => {
+  it("a multi-word query over one crowded segment is fast and stable across calls", () => {
+    const lines = Array.from({ length: 30_000 }, (_, i) => `log line ${i} connection ${i % 7 === 0 ? "refused" : "ok"}`);
+    const index = makeIndex([{ start: 0, end: 30, ocr: [], logs: lines.map((text, i) => ({ t: i / 1000, text })) }]);
+    const started = Date.now();
+    const first = searchIndex(index, "line refused");
+    const second = searchIndex(index, "line refused");
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(first.total).toBe(1);
+    expect(second).toEqual(first);
+  });
+
+  it("readIndexCached re-parses an index file only when it changes", async () => {
+    const { readIndexCached } = await import("../utils/recordingIndex.js");
+    const dir = mkdtempSync(join(tmpdir(), "sc-idxcache-"));
+    try {
+      const p = join(dir, "a.mp4.index.json");
+      writeIndex(p, makeIndex([{ start: 0, end: 1, ocr: ["one"] }]));
+      const a = readIndexCached(p);
+      expect(readIndexCached(p)).toBe(a);
+      writeIndex(p, makeIndex([{ start: 0, end: 1, ocr: ["two", "more text"] }]));
+      utimesSync(p, new Date(), new Date(Date.now() + 5000));
+      const b = readIndexCached(p);
+      expect(b).not.toBe(a);
+      expect(b?.segments[0]?.ocr).toEqual(["two", "more text"]);
+      rmSync(p);
+      expect(readIndexCached(p)).toBeNull();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

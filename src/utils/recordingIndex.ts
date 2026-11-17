@@ -352,6 +352,32 @@ export function readIndex(path: string): RecordingIndex | null {
   }
 }
 
+/** Parsed indexes for search, keyed by path and checked by size and mtime, so
+ * repeated (library) searches do not re-read and re-parse every file (#346).
+ * Callers must not mutate what it returns. */
+const indexCache = new Map<string, { size: number; mtimeMs: number; index: RecordingIndex }>();
+const INDEX_CACHE_MAX = 64;
+
+export function readIndexCached(path: string): RecordingIndex | null {
+  let st: { size: number; mtimeMs: number };
+  try {
+    st = statSync(path);
+  } catch {
+    indexCache.delete(path);
+    return null;
+  }
+  const hit = indexCache.get(path);
+  if (hit && hit.size === st.size && hit.mtimeMs === st.mtimeMs) return hit.index;
+  const index = readIndex(path);
+  if (!index) {
+    indexCache.delete(path);
+    return null;
+  }
+  if (indexCache.size >= INDEX_CACHE_MAX) indexCache.delete(indexCache.keys().next().value!);
+  indexCache.set(path, { size: st.size, mtimeMs: st.mtimeMs, index });
+  return index;
+}
+
 /** Write atomically (temp + rename). */
 export function writeIndex(path: string, index: RecordingIndex): void {
   const tmp = `${path}.${process.pid}.tmp`;
@@ -402,6 +428,25 @@ export function checkQuery(query: string, regex: boolean): void {
   if (regex) regexRanges([""], query);
 }
 
+/** An index's items with secrets masked, and their normalized text, per
+ * masking pattern ("" = none). Cached on the index object: masking every item
+ * is most of a search's cost, and a cached (readIndexCached) index is searched
+ * again and again (#346). */
+const maskedCache = new WeakMap<RecordingIndex, Map<string, { items: Item[]; norm: string[] }>>();
+
+function maskedItems(index: RecordingIndex, pattern: string): { items: Item[]; norm: string[] } {
+  let byPattern = maskedCache.get(index);
+  if (!byPattern) maskedCache.set(index, (byPattern = new Map()));
+  const hit = byPattern.get(pattern);
+  if (hit) return hit;
+  const raw = itemsOf(index);
+  const masked = pattern ? maskSecrets(raw.map((i) => i.text), pattern) : raw.map((i) => i.text);
+  const items = raw.map((item, i) => ({ ...item, text: masked[i] ?? "" }));
+  const entry = { items, norm: items.map((i) => normalizeForMatch(i.text)) };
+  byPattern.set(pattern, entry);
+  return entry;
+}
+
 export function searchIndex(
   index: RecordingIndex,
   query: string,
@@ -415,9 +460,7 @@ export function searchIndex(
   // one through hit counts and timecodes even in a sidecar written before
   // screen text was masked on disk (#266).
   const pattern = opts.secretPattern === undefined ? DEFAULT_SECRET_PATTERN : opts.secretPattern;
-  const raw = itemsOf(index);
-  const masked = pattern ? maskSecrets(raw.map((i) => i.text), pattern) : raw.map((i) => i.text);
-  const items = raw.map((item, i) => ({ ...item, text: masked[i] ?? "" }));
+  const { items, norm } = maskedItems(index, pattern ?? "");
   const matched = new Map<number, { score: number; matches: Item[] }>();
   const add = (item: Item, score: number) => {
     const entry = matched.get(item.seg) ?? { score: 0, matches: [] };
@@ -433,13 +476,16 @@ export function searchIndex(
   } else {
     const needle = normalizeForMatch(query.trim());
     const words = needle.split("_").filter(Boolean);
-    const norm = items.map((i) => normalizeForMatch(i.text));
     items.forEach((item, i) => {
       if (norm[i]!.includes(needle)) add(item, 2);
     });
     if (words.length > 1) {
       const bySeg = new Map<number, number[]>();
-      items.forEach((item, i) => bySeg.set(item.seg, [...(bySeg.get(item.seg) ?? []), i]));
+      items.forEach((item, i) => {
+        const list = bySeg.get(item.seg);
+        if (list) list.push(i);
+        else bySeg.set(item.seg, [i]);
+      });
       for (const [seg, idx] of bySeg) {
         if (matched.has(seg)) continue;
         if (!words.every((w) => idx.some((i) => norm[i]!.includes(w)))) continue;

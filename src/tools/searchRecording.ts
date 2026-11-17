@@ -16,7 +16,7 @@ import {
   findIndex,
   keyframeTime,
   listLibraryIndexes,
-  readIndex,
+  readIndexCached,
   resolveRecording,
   sameFingerprint,
   searchIndex,
@@ -54,7 +54,7 @@ export function register(server: McpServer): void {
             throw new ScreencastError("images needs one recording.", "Pass input or sessionId, or search the library with images: 0.");
           }
           const entries = listLibraryIndexes(homeRoot()).flatMap((indexPath) => {
-            const index = readIndex(indexPath);
+            const index = readIndexCached(indexPath);
             return index ? [{ indexPath, index }] : [];
           });
           const res = searchLibrary(entries, args.query, { regex: args.regex === true, limit: args.limit });
@@ -71,7 +71,7 @@ export function register(server: McpServer): void {
         const source = await resolveRecording(args);
         const fingerprint = fingerprintFile(source.path);
         const indexPath = findIndex(source.path, subdir("edits"), fingerprint);
-        const index = indexPath ? readIndex(indexPath) : null;
+        const index = indexPath ? readIndexCached(indexPath) : null;
         if (!indexPath || !index) {
           throw new ScreencastError(`No index for ${source.path}.`, "Run index_recording on it first.");
         }
