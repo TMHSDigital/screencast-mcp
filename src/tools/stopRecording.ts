@@ -7,7 +7,7 @@ import { probeDuration, probeMedia, requireFfmpeg } from "../utils/ffmpeg.js";
 import { stopSession } from "../utils/lifecycle.js";
 import { getStore } from "../context.js";
 import { foreignStopRefusal, ownerAlive } from "../utils/sessions.js";
-import { disarm, getArm, isArmId } from "../utils/triggers.js";
+import { disarm, getArm, isArmId, whenStarted } from "../utils/triggers.js";
 import { finishReplay, type ReplayStopResult } from "../utils/replay.js";
 import { webcamPlacement, type WebcamInfo } from "../utils/pause.js";
 
@@ -84,8 +84,11 @@ export function register(server: McpServer): void {
         // that started is stopped like any session.
         let sessionId = args.sessionId;
         if (isArmId(sessionId)) {
-          const arm = getArm(sessionId);
+          let arm = getArm(sessionId);
           if (!arm) throw new ScreencastError(`No armed recording with id "${sessionId}".`);
+          // Its conditions just held and the start is under way: let it
+          // finish, then stop the session it made (#342).
+          if (arm.status === "starting") arm = (await whenStarted(sessionId)) ?? arm;
           const none = { sessionId, outputPath: "", durationSec: null };
           if (disarm(sessionId)) return okResponse({ ...none, status: "cancelled", note: "Disarmed; nothing was recorded." });
           if (!arm.sessionId) return okResponse({ ...none, status: arm.status, ...(arm.error ? { error: arm.error } : {}) });

@@ -1,6 +1,6 @@
 /** Triggered recording (#336): the condition loop and arm lifecycle. */
 import { describe, it, expect } from "vitest";
-import { armStart, describeConditions, disarm, getArm, isArmId, listArms, waitForConditions } from "../utils/triggers.js";
+import { armStart, describeConditions, disarm, getArm, isArmId, listArms, waitForConditions, whenStarted } from "../utils/triggers.js";
 
 /** A fake clock whose sleeps advance time. */
 function clock() {
@@ -54,6 +54,19 @@ describe("triggers (#336)", () => {
     const failing = armStart({ conditions: { text: "x" }, target: "full", timeoutSec: 5, checks: [async () => true], fire: async () => { throw new Error("no ffmpeg"); }, intervalMs: 1 });
     await until(() => getArm(failing.id)?.status === "failed");
     expect(getArm(failing.id)).toMatchObject({ status: "failed", error: "no ffmpeg" });
+  });
+
+  it("is 'starting', not disarmable, while the start runs; whenStarted waits for it (#342)", async () => {
+    let release!: (id: string) => void;
+    const arm = armStart({
+      conditions: { text: "x" }, target: "full", timeoutSec: 5, checks: [async () => true],
+      fire: () => new Promise<string>((r) => (release = r)), intervalMs: 1,
+    });
+    await until(() => getArm(arm.id)?.status === "starting");
+    expect(disarm(arm.id)).toBe(false);
+    const waited = whenStarted(arm.id);
+    release("rec-2");
+    expect(await waited).toMatchObject({ status: "started", sessionId: "rec-2" });
   });
 
   it("describes what it waits for", () => {

@@ -11,6 +11,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 - `delete_recording` deletes only a recording file (a video or GIF) and its sidecars. It refuses folders, other file types, and an allowed directory itself, and removes only the recording's `.parts` folder as a tree. Without a confirmation from the client, a file outside SCREENCAST_HOME is deleted only when it is a recording this server made (pass its `sessionId`).
 - The per-call path check now also covers `compose` `inputs[].path`, `start_recording` `logs[].path`, `chapters` `subtitleTracks[].file`, `perf_overlay` `perf`, `pipeline` `fromEdit`, and the source and step files inside a loaded `.edit.json`. A test fails if any tool adds a path field the check does not cover.
+- Stopping a triggered recording (`startWhen`) while its start is under way now waits for the start and stops that recording, instead of reporting "nothing was recorded" while it went on recording (#342).
 - `screencast-mcp record -- "C:\Program Files\...\app.exe" ...` quotes the program path on Windows, so cmd no longer splits it at the space (#357, thanks @bfs2021 in #369).
 
 ## [0.51.1] - 2026-11-16

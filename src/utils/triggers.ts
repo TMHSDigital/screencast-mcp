@@ -18,7 +18,9 @@ export interface TriggerConditions {
   text?: string;
 }
 
-export type ArmStatus = "armed" | "started" | "timeout" | "cancelled" | "failed";
+/** "starting": the conditions held and the recording is being started; a
+ * stop then waits for it (whenStarted) and stops the session (#342). */
+export type ArmStatus = "armed" | "starting" | "started" | "timeout" | "cancelled" | "failed";
 
 export interface Arm {
   id: string;
@@ -37,7 +39,7 @@ export const DEFAULT_ARM_TIMEOUT_SEC = 600;
 export const MAX_ARM_TIMEOUT_SEC = 24 * 3600;
 export const ARM_POLL_MS = 1500;
 
-const arms = new Map<string, { arm: Arm; abort: AbortController }>();
+const arms = new Map<string, { arm: Arm; abort: AbortController; done?: Promise<void> }>();
 
 export function isArmId(id: string): boolean {
   return id.startsWith("arm-");
@@ -63,6 +65,12 @@ export function disarm(id: string): boolean {
   a.abort.abort();
   a.arm.status = "cancelled";
   return true;
+}
+
+/** The arm once any start in progress has finished (started or failed). */
+export async function whenStarted(id: string): Promise<Arm | undefined> {
+  await arms.get(id)?.done;
+  return getArm(id);
 }
 
 /** Cancel every waiting arm (server shutdown). */
@@ -133,8 +141,9 @@ export function armStart(o: {
     timeoutSec: o.timeoutSec,
   };
   const abort = new AbortController();
-  arms.set(arm.id, { arm, abort });
-  void (async () => {
+  const entry: { arm: Arm; abort: AbortController; done?: Promise<void> } = { arm, abort };
+  arms.set(arm.id, entry);
+  entry.done = (async () => {
     const outcome = await waitForConditions({
       checks: o.checks,
       timeoutMs: o.timeoutSec * 1000,
@@ -145,7 +154,9 @@ export function armStart(o: {
       if (arm.status === "armed") arm.status = outcome;
       return;
     }
+    if (arm.status !== "armed") return;
     arm.firedAt = new Date().toISOString();
+    arm.status = "starting";
     try {
       arm.sessionId = await o.fire();
       arm.status = "started";
