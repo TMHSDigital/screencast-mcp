@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
@@ -20,6 +20,7 @@ import {
   versionText,
 } from "../utils/capabilities.js";
 import { parseToolsets, SELECTABLE_TOOLSETS } from "../utils/toolsets.js";
+import { formatBytes, freeBytes, LOW_FREE_BYTES, storageUsage } from "../utils/storage.js";
 import { ttsStatus } from "../utils/narrate.js";
 import { probeHwEncoders } from "../utils/gpu.js";
 
@@ -146,6 +147,14 @@ export function register(server: McpServer): void {
           problems.push(`SCREENCAST_TOOLSETS names unknown toolsets (ignored): ${toolsets.unknown.join(", ")}.`);
         }
         problems.push(...settingProblems());
+        // Free space and what the store uses (#354): recordings and edits are
+        // never pruned automatically, so the store can fill a drive unseen.
+        const usage = existsSync(home) ? await storageUsage(home) : { freeBytes: await freeBytes(dirname(home)), bytes: null };
+        if (usage.freeBytes !== null && usage.freeBytes < LOW_FREE_BYTES) {
+          problems.push(
+            `Only ${formatBytes(usage.freeBytes)} free on the drive holding SCREENCAST_HOME: a long recording can fail partway. Delete old recordings (delete_recording) or set SCREENCAST_HOME on a bigger drive.`,
+          );
+        }
 
         return okResponse({
           ok: problems.length === 0,
@@ -163,6 +172,8 @@ export function register(server: McpServer): void {
           storage: {
             home,
             homeExists: existsSync(home),
+            freeBytes: usage.freeBytes,
+            ...(usage.bytes ? { bytes: usage.bytes } : {}),
             recordings: join(home, "recordings"),
             screenshots: join(home, "screenshots"),
             edits: join(home, "edits"),
