@@ -67,6 +67,21 @@ describe("commandLine", () => {
     expect(commandLine(["npx", "vitest", "-t", "a & b"], "win32")).toBe('npx vitest -t ^^^"a^^^ ^^^&^^^ b^^^"');
   });
 
+  it("quotes a Windows program path that needs it", () => {
+    // node runs the line through cmd.exe /d /s /c, which strips only the outer
+    // quotes, so the program keeps its own quotes and the space stays inside them.
+    expect(commandLine(["C:\\Program Files\\nodejs\\node.exe", "-e", "process.exit(0)"], "win32")).toBe(
+      '"C:\\Program Files\\nodejs\\node.exe" -e ^"process.exit^(0^)^"',
+    );
+    // Plain quoting, not ^ escaping: a caret-escaped quote would not open a
+    // quoted run, and cmd would split the path at the space.
+    expect(commandLine(["C:\\tools\\a&b\\app.exe", "--help"], "win32")).toBe('"C:\\tools\\a&b\\app.exe" --help');
+    // A program that needs no quoting stays bare.
+    expect(commandLine(["C:\\Windows\\system32\\where.exe", "node"], "win32")).toBe(
+      "C:\\Windows\\system32\\where.exe node",
+    );
+  });
+
   it("single-quotes for sh elsewhere", () => {
     expect(commandLine(["node", "-e", "process.exit(3)"], "linux")).toBe("node -e 'process.exit(3)'");
     expect(commandLine(["echo", "it's"], "linux")).toBe("echo 'it'\\''s'");
