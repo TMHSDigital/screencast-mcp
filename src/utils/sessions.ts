@@ -809,6 +809,18 @@ export class SessionStore {
               error: `The server exited while this recording was paused; its parts were not joined (${record.segments?.parts.map((p) => p.path).join(", ") ?? record.outputPath}).`,
             }
           : {}),
+        // A resumed recording whose owner exited before the stop joined its
+        // segments (a shutdown cap, a crash): outputPath holds only the first
+        // part, so say so instead of reporting a clean stop (#345).
+        ...(record.status === "recording" && (record.segments?.parts.length ?? 0) > 0
+          ? {
+              endReason: "shutdown" as const,
+              error: `The server exited before this recording's segments were joined; ${record.outputPath} holds only the first one. The parts: ${[
+                ...(record.segments?.parts.map((p) => p.path) ?? []),
+                ...(record.segments?.current ? [record.segments.current.path] : []),
+              ].join(", ")}.`,
+            }
+          : {}),
       };
       this.records.set(record.id, { ...record, ...patch });
       this.pending.set(record.id, { ...this.pending.get(record.id), ...patch });

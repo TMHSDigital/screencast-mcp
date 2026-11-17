@@ -14,6 +14,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - Stopping a triggered recording (`startWhen`) while its start is under way now waits for the start and stops that recording, instead of reporting "nothing was recorded" while it went on recording (#342).
 - `pause_recording` and `resume_recording` called while the other one is still finishing now return "a pause/resume of it is in progress; retry" instead of "Already recording/paused", which was wrong by the time the first call finished (#343).
 - A recording that ends on its own (its `maxDurationSec` cap, or the window closing) now gets its `durationSec`, so `stop_recording` reports it and the CLI's `--last` window works on a capped run (#344).
+- A paused-and-resumed recording whose server exited before its segments were joined (for example, a slow join cut off at shutdown) is no longer reported as a clean stop: at the next start it gets `endReason: "shutdown"` and an error listing the unjoined parts (#345).
 - `screencast-mcp record -- "C:\Program Files\...\app.exe" ...` quotes the program path on Windows, so cmd no longer splits it at the space (#357, thanks @bfs2021 in #369).
 
 ## [0.51.1] - 2026-11-16

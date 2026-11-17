@@ -287,6 +287,24 @@ describe("SessionStore", () => {
     expect(reaped).not.toContain("dead");
     expect(b.get("dead")?.status).toBe("stopped");
   });
+
+  it("flags a resumed recording whose segments were never joined (#345)", () => {
+    const p = newPath();
+    const a = new SessionStore(p);
+    a.load();
+    a.create(record({
+      id: "unjoined",
+      pid: 2_000_000_000,
+      segments: { parts: [{ path: "C:/r/a.mp4", startMs: 1, durationSec: 3 }], current: { path: "C:/r/a.mp4.parts/part-001.mp4", startMs: 5 } },
+    }));
+    a.create(record({ id: "plain", pid: 2_000_000_000 }));
+    const b = new SessionStore(p);
+    b.load();
+    b.reapOrphans();
+    expect(b.get("unjoined")).toMatchObject({ status: "stopped", endReason: "shutdown" });
+    expect(b.get("unjoined")?.error).toMatch(/segments were joined[\s\S]*part-001\.mp4/);
+    expect(b.get("plain")?.error).toBeUndefined();
+  });
 });
 
 describe("isLockStale (#55)", () => {
