@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { existsSync, readdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorMessage, errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
@@ -8,7 +8,7 @@ import { getStore } from "../context.js";
 import { isLive } from "../utils/sessions.js";
 import { samePath } from "../utils/recordingIndex.js";
 import { assertDeleteAllowed, recordingSidecars } from "../utils/recordingFiles.js";
-import { subdir } from "../utils/paths.js";
+import { homeRoot, isWithin, subdir } from "../utils/paths.js";
 import { CONFIRM_TIMEOUT_MS, confirmCaptureRequired, CONFIRM_CAPTURE_ENV } from "../utils/consent.js";
 
 const inputSchema = {
@@ -91,14 +91,27 @@ export function register(server: McpServer): void {
         } catch {
           /* the folder is gone */
         }
+        if (existsSync(video) && !lstatSync(video).isFile()) {
+          throw new ScreencastError(`${video} is not a file, so it is not deleted.`, "delete_recording only removes a recording and its sidecars.");
+        }
         const side = recordingSidecars(video, siblings, subdir("edits"));
-        const targets = [video, ...side.files, ...side.dirs].filter((p) => existsSync(p));
+        const files = [video, ...side.files].filter((p) => existsSync(p) && lstatSync(p).isFile());
+        const dirs = side.dirs.filter((p) => existsSync(p));
+        const targets = [...files, ...dirs];
         if (targets.length === 0 && sessions.length === 0) throw new ScreencastError(`Nothing to delete: ${video} does not exist.`);
         const asked = await confirmDelete(
           server,
           `Delete ${video} and ${targets.length - (existsSync(video) ? 1 : 0)} sidecar file(s)? This cannot be undone.`,
           extra.signal,
         );
+        // Without the user's yes, only a file the server made itself goes:
+        // a registered recording, or anything under SCREENCAST_HOME.
+        if (!asked && sessions.length === 0 && !isWithin(video, homeRoot())) {
+          throw new ScreencastError(
+            `Not deleted: ${video} is not a recording this server made, and this client cannot ask you to confirm.`,
+            "Pass the recording's sessionId, use a client that supports MCP elicitation, or delete the file yourself.",
+          );
+        }
 
         let bytesFreed = 0;
         const deleted: string[] = [];
@@ -106,7 +119,8 @@ export function register(server: McpServer): void {
         for (const p of targets) {
           const size = sizeOf(p);
           try {
-            rmSync(p, { recursive: true, force: true });
+            // Only the recording's own .parts folder is removed as a tree.
+            rmSync(p, { recursive: dirs.includes(p), force: true });
             deleted.push(p);
             bytesFreed += size;
           } catch (err) {

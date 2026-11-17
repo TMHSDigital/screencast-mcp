@@ -36,12 +36,20 @@ export function recordingSidecars(video: string, siblings: readonly string[], ed
   return { files: [...new Set(files)].filter((f) => basename(f) !== basename(video)), dirs: [partsDir(video)] };
 }
 
+/** File types delete_recording removes: recordings and the edits made from them. */
+export const DELETABLE_MEDIA = /\.(mp4|m4v|mkv|mov|webm|avi|gif|webp)$/i;
+
 /** Refuse to delete outside SCREENCAST_HOME and the allowed directories.
- * With none configured, only SCREENCAST_HOME, like replacing a file (#321). */
+ * With none configured, only SCREENCAST_HOME, like replacing a file (#321).
+ * The path must sit strictly inside one of them: an allowed folder itself
+ * (or anything above it) is never a recording. */
 export function assertDeleteAllowed(path: string): void {
   assertLocalPath(path, "Recording");
+  if (!DELETABLE_MEDIA.test(path)) {
+    throw new ScreencastError(`${path} is not a video or GIF, so it is not deleted.`, "delete_recording only removes recordings and their sidecars.");
+  }
   const dirs = [homeRoot(), ...(allowedOutputDirs() ?? [])];
-  if (dirs.some((d) => isWithin(path, d))) return;
+  if (dirs.some((d) => isWithin(path, d) && !isWithin(d, path))) return;
   throw new ScreencastError(
     `Recording ${path} is outside SCREENCAST_HOME and the allowed directories, so it is not deleted. ` +
       "Add its folder to SCREENCAST_ALLOWED_DIRS or the client's workspace roots, or delete it yourself.",

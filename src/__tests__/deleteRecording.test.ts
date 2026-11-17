@@ -94,6 +94,57 @@ describe("delete_recording (#321)", () => {
     }
   });
 
+  it("never deletes a folder, an allowed root, or a file that is not a video", async () => {
+    const allowed = mkdtempSync(join(tmpdir(), "sc-allowed-"));
+    process.env.SCREENCAST_ALLOWED_DIRS = allowed;
+    try {
+      writeFileSync(join(allowed, "src.ts"), "code");
+      mkdirSync(join(allowed, "x.mp4"));
+      writeFileSync(join(allowed, "x.mp4", "inner.txt"), "y");
+      for (const input of [allowed, home, join(allowed, "src.ts"), join(dir, "notes.txt"), join(allowed, "x.mp4")]) {
+        if (input.endsWith("notes.txt")) writeFileSync(input, "n");
+        const r = await call({ input });
+        expect(r.isError, `${input}: ${r.text}`).toBe(true);
+        expect(existsSync(input)).toBe(true);
+      }
+      expect(existsSync(join(allowed, "x.mp4", "inner.txt"))).toBe(true);
+    } finally {
+      delete process.env.SCREENCAST_ALLOWED_DIRS;
+      rmSync(allowed, { recursive: true, force: true });
+    }
+  });
+
+  it("needs a confirmation or a session for a video outside SCREENCAST_HOME", async () => {
+    const allowed = mkdtempSync(join(tmpdir(), "sc-allowed-"));
+    process.env.SCREENCAST_ALLOWED_DIRS = allowed;
+    try {
+      const v = join(allowed, "c.mp4");
+      writeFileSync(v, "x");
+      const r = await call({ input: v });
+      expect(r.isError).toBe(true);
+      expect(r.text).toMatch(/cannot ask you to confirm/);
+      expect(existsSync(v)).toBe(true);
+      getStore().create(rec("rec-c", v));
+      const ok = await call({ input: v });
+      expect(ok.isError, ok.text).toBe(false);
+      expect(existsSync(v)).toBe(false);
+    } finally {
+      delete process.env.SCREENCAST_ALLOWED_DIRS;
+      rmSync(allowed, { recursive: true, force: true });
+    }
+  });
+
+  it("leaves a folder that has a sidecar's name", async () => {
+    const v = join(dir, "d.mp4");
+    writeFileSync(v, "x");
+    mkdirSync(join(dir, "d.events.jsonl"));
+    writeFileSync(join(dir, "d.events.jsonl", "keep.txt"), "k");
+    const r = await call({ input: v });
+    expect(r.isError, r.text).toBe(false);
+    expect(existsSync(v)).toBe(false);
+    expect(existsSync(join(dir, "d.events.jsonl", "keep.txt"))).toBe(true);
+  });
+
   it("needs exactly one of sessionId or input", async () => {
     expect((await call({})).isError).toBe(true);
     expect((await call({ sessionId: "x", input: "y.mp4" })).isError).toBe(true);

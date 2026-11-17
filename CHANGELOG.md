@@ -7,6 +7,11 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Fixed
+
+- `delete_recording` deletes only a recording file (a video or GIF) and its sidecars. It refuses folders, other file types, and an allowed directory itself, and removes only the recording's `.parts` folder as a tree. Without a confirmation from the client, a file outside SCREENCAST_HOME is deleted only when it is a recording this server made (pass its `sessionId`).
+- `screencast-mcp record -- "C:\Program Files\...\app.exe" ...` quotes the program path on Windows, so cmd no longer splits it at the space (#357, thanks @bfs2021 in #369).
+
 ## [0.51.1] - 2026-11-16
 
 ### Fixed
