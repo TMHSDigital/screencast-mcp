@@ -165,4 +165,22 @@ describe.skipIf(!AVAILABLE)("bug_report against real ffmpeg (#198)", { timeout: 
     const after = await call("find_text", { input: data.clipPath, scanEverySec: 1, query: "ghp_", returnImage: false });
     expect((after.data as { matchCount: number }).matchCount).toBe(0);
   });
+
+  it.skipIf(!OCR)("pipeline redact secrets: true finds and blurs the token, after a trim (#341)", async () => {
+    const out = join(home, "secrets.mp4");
+    const res = await call("pipeline", { input: video, steps: [{ op: "trim", start: 1, end: 6 }, { op: "redact", secrets: true }], output: out });
+    expect(res.isError, res.text).toBe(false);
+    expect(JSON.stringify(res.data)).toMatch(/Blurred \d+ on-screen secret/);
+    const after = await call("find_text", { input: out, scanEverySec: 1, query: "ghp_", returnImage: false });
+    expect((after.data as { matchCount: number }).matchCount).toBe(0);
+    // The spec keeps secrets: true rather than the regions this scan found.
+    const spec = JSON.parse(readFileSync(`${out}.edit.json`, "utf8")) as { steps: Array<Record<string, unknown>> };
+    expect(spec.steps.find((x) => x.op === "redact")).toEqual({ op: "redact", secrets: true });
+  });
+
+  it("pipeline refuses a redact step with neither regions nor secrets (#341)", async () => {
+    const res = await call("pipeline", { input: video, steps: [{ op: "redact" }], output: join(home, "none.mp4") });
+    expect(res.isError).toBe(true);
+    expect(res.text).toMatch(/redact needs regions, or secrets/);
+  });
 });

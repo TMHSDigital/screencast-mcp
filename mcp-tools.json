@@ -3705,6 +3705,19 @@
                       ]
                     }
                   },
+                  "secrets": {
+                    "description": "OCR for on-screen secrets: true or a regex.",
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      }
+                    ]
+                  },
                   "style": {
                     "type": "string",
                     "enum": [
@@ -3723,8 +3736,7 @@
                   }
                 },
                 "required": [
-                  "op",
-                  "regions"
+                  "op"
                 ]
               },
               {

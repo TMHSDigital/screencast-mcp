@@ -62,7 +62,9 @@ export type PipelineStep =
   | { op: "crop"; x: number; y: number; width: number; height: number }
   | { op: "scale"; width?: number; height?: number }
   | { op: "speed"; factor?: number; segments?: SpeedRange[] }
-  | ({ op: "redact"; regions: RedactRegion[] } & RedactOptions)
+  /** secrets (#341): OCR the source for on-screen secrets (true = the default
+   * pattern, or a regex) and add a timed region per hit before planning. */
+  | ({ op: "redact"; regions: RedactRegion[]; secrets?: boolean | string } & RedactOptions)
   | { op: "callout"; items: Callout[]; fontFile?: string }
   | { op: "reframe"; aspect: Aspect; fit?: ReframeFit }
   | {

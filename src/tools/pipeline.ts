@@ -31,6 +31,8 @@ import { samePath } from "../utils/recordingIndex.js";
 import { calloutItemSchema, fontFileSchema } from "../utils/callout.js";
 import { backdropOptionsSchema } from "../utils/backdrop.js";
 import { assertArgPaths } from "../utils/argPaths.js";
+import { DEFAULT_SCAN_FRAMES, scanMatches, scanVideoFrames } from "../utils/ocrScan.js";
+import { DEFAULT_SECRET_PATTERN } from "../utils/bugReport.js";
 import { keystrokeOptionsSchema, loadBadges, prepareKeystrokeAssets } from "../utils/keystrokes.js";
 
 /** Why a recipe cannot transcribe captions here, or null when it can. */
@@ -65,7 +67,8 @@ const step = z.discriminatedUnion("op", [
   z.object({ op: z.literal("speed"), factor: z.number().positive().optional(), segments: z.array(speedRangeSchema).min(1).optional() }),
   z.object({
     op: z.literal("redact"),
-    regions: z.array(redactRegionSchema).min(1),
+    regions: z.array(redactRegionSchema).min(1).optional(),
+    secrets: z.union([z.boolean(), z.string().min(1).max(500)]).optional().describe("OCR for on-screen secrets: true or a regex."),
     style: z.enum(REDACT_STYLES).optional(),
     pad: z.number().int().nonnegative().optional(),
     color: z.string().optional(),
@@ -252,6 +255,57 @@ export function register(server: McpServer): void {
           idle = useAudio ? intersect(freezes, parseSilences(scan.stderr, total)) : freezes;
         }
 
+        // Secrets (#341): OCR the source for on-screen secrets and give each
+        // hit a timed region on the step's timeline (shifted by an earlier
+        // trim), so a shareable render needs no separate find_text pass.
+        let secretsFound = 0;
+        // The spec keeps the steps as asked (secrets: true, not the regions a
+        // scan found), so a fromEdit re-render scans again instead of doubling.
+        const specSteps = steps;
+        steps = [...steps];
+        for (const [i, s] of steps.entries()) {
+          if (s.op !== "redact") continue;
+          const regions = [...(s.regions ?? [])];
+          if (s.secrets) {
+            const before = steps.slice(0, i);
+            if (before.some((x) => x.op === "speed" || x.op === "cut_idle")) {
+              throw new ScreencastError(`step ${i + 1}: put a redact with secrets before speed and cut_idle; it scans the source's clock.`);
+            }
+            const offset = before.reduce((o, x) => (x.op === "trim" ? o + x.start : o), 0);
+            if (args.dryRun) {
+              warnings.push(`Step ${i + 1}: the secret scan runs when rendering, not in a dry run.`);
+            } else {
+              const scanDir = mkdtempSync(join(tmpdir(), "screencast-secrets-"));
+              try {
+                const total = info.durationSec ?? 0;
+                const scan = await scanVideoFrames(
+                  input,
+                  { everySec: Math.max(1, Math.ceil(total / DEFAULT_SCAN_FRAMES)), maxFrames: DEFAULT_SCAN_FRAMES },
+                  scanDir,
+                  extra.signal,
+                );
+                const pattern = typeof s.secrets === "string" ? s.secrets : DEFAULT_SECRET_PATTERN;
+                for (const r of scanMatches(scan, pattern, true).redactRegions) {
+                  if (r.end - offset <= 0) continue;
+                  const box = { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
+                  regions.push({ ...box, start: Math.max(0, r.start - offset), end: r.end - offset });
+                  secretsFound++;
+                }
+              } finally {
+                rmSync(scanDir, { recursive: true, force: true });
+              }
+            }
+          } else if (regions.length === 0) {
+            throw new ScreencastError(`step ${i + 1}: redact needs regions, or secrets: true to find them.`);
+          }
+          steps[i] = { ...s, regions };
+        }
+        if (steps.some((s) => s.op === "redact" && s.secrets) && !args.dryRun) {
+          warnings.push(secretsFound > 0 ? `Blurred ${secretsFound} on-screen secret region(s).` : "No on-screen secrets found.");
+        }
+        steps = steps.filter((s) => s.op !== "redact" || s.regions.length > 0);
+        if (steps.length === 0) throw new ScreencastError("Nothing to render: the only step was a redact that found no secrets.");
+
         const work = mkdtempSync(join(tmpdir(), "screencast-pipeline-"));
         try {
           // Callout text and arrow files; a dry run plans with placeholder paths.
@@ -399,7 +453,7 @@ export function register(server: McpServer): void {
                 editSpecPath: writeEditSpec(output, {
                   serverVersion: packageVersion(),
                   source: sourceStamp(input),
-                  steps,
+                  steps: specSteps,
                   ...(recipe ? { recipe } : {}),
                   quality,
                   chapters,
