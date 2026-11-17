@@ -30,6 +30,7 @@ import { packageVersion } from "../utils/packageRoot.js";
 import { samePath } from "../utils/recordingIndex.js";
 import { calloutItemSchema, fontFileSchema } from "../utils/callout.js";
 import { backdropOptionsSchema } from "../utils/backdrop.js";
+import { assertArgPaths } from "../utils/argPaths.js";
 import { keystrokeOptionsSchema, loadBadges, prepareKeystrokeAssets } from "../utils/keystrokes.js";
 
 /** Why a recipe cannot transcribe captions here, or null when it can. */
@@ -160,6 +161,9 @@ export function register(server: McpServer): void {
         // given steps replace its same-op steps, like a recipe's.
         const spec = args.fromEdit ? readEditSpec(args.fromEdit) : null;
         if (spec) {
+          // The spec's source and step files come from disk, after the
+          // per-call check ran: hold them to the same rules.
+          assertArgPaths({ input: spec.source.path, steps: spec.steps });
           if (args.recipe) throw new ScreencastError("fromEdit already has its steps; leave recipe out.");
           if (args.input && !samePath(args.input, spec.source.path)) throw new ScreencastError(`The spec is for ${spec.source.path}, not ${args.input}.`);
           const changed = sourceChange(spec);

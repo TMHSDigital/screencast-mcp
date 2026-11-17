@@ -180,6 +180,16 @@ describe("network and device paths", () => {
     expect(() => assertArgPaths({ model: String.raw`\\h\s\ggml.bin` })).toThrow(/network/);
     expect(() => assertArgPaths({ text: "// a code comment" })).not.toThrow();
   });
+
+  it("are refused in path fields of listed objects and in perf/fromEdit", () => {
+    const unc = String.raw`\\host\s\x`;
+    expect(() => assertArgPaths({ inputs: [{ path: `${unc}.mp4` }, { path: String.raw`C:\b.mp4` }] })).toThrow(/network/);
+    expect(() => assertArgPaths({ logs: [{ path: `${unc}.log`, label: "app" }] })).toThrow(/network/);
+    expect(() => assertArgPaths({ subtitleTracks: [{ file: `${unc}.srt` }] })).toThrow(/network/);
+    expect(() => assertArgPaths({ input: String.raw`C:\a.mp4`, perf: `${unc}.perf.jsonl` })).toThrow(/network/);
+    expect(() => assertArgPaths({ fromEdit: `${unc}.edit.json` })).toThrow(/network/);
+    expect(() => assertArgPaths({ perf: true })).not.toThrow();
+  });
 });
 
 describe("input confinement", () => {
@@ -194,6 +204,9 @@ describe("input confinement", () => {
     expect(() => assertArgPaths({ subtitles: join(elsewhere, "a.srt") })).toThrow(/outside the allowed directories/);
     expect(() => assertArgPaths({ clips: [join(project, "a.mp4"), join(elsewhere, "b.mp4")] })).toThrow(/outside/);
     expect(() => assertArgPaths({ transcript: "whisper", fontFile: join(elsewhere, "f.ttf") })).not.toThrow();
+    expect(() => assertArgPaths({ inputs: [{ path: join(project, "a.mp4") }, { path: join(elsewhere, "b.mp4") }] })).toThrow(/outside/);
+    expect(() => assertArgPaths({ subtitleTracks: [{ file: join(elsewhere, "a.srt") }] })).toThrow(/outside/);
+    expect(() => assertArgPaths({ fromEdit: join(elsewhere, "o.mp4.edit.json") })).toThrow(/outside/);
   });
 });
 

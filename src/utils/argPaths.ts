@@ -7,17 +7,21 @@
 import { assertInputAllowed, assertLocalPath } from "./paths.js";
 
 /** Argument names that hold a file to read, at any depth (pipeline steps
- * nest them). */
-const INPUT_KEYS = new Set([
+ * nest them, and lists of objects such as compose `inputs[].path`,
+ * start_recording `logs[].path` and chapters `subtitleTracks[].file` too).
+ * argPaths.test.ts checks every registered tool's path-like fields against
+ * this list, so a new tool cannot add an unchecked one. */
+export const INPUT_KEYS = new Set([
   "input", "inputs", "inputA", "inputB", "clips", "a", "b", "image", "overlay",
   "music", "video", "subtitles", "srt", "transcript", "events",
+  "path", "file", "perf", "fromEdit",
 ]);
 
 /** Paths the server writes: only the network check here; the tools confine
  * them through resolveOutput/assertOutputAllowed. Tool assets (a whisper
  * model, a font) are read but carry no user content, so they are not
  * confined, only kept local. */
-const LOCAL_ONLY_KEYS = new Set(["output", "outputDir", "model", "fontFile"]);
+export const LOCAL_ONLY_KEYS = new Set(["output", "outputDir", "model", "fontFile"]);
 
 /** Values of path arguments that are keywords, not files. */
 const KEYWORDS = new Set(["whisper"]);
