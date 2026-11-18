@@ -17,6 +17,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The `overwrite` option reads "Replace an existing output." in every tool (the default is still false). The shorter text is repeated in about 40 tools and makes room in the tools/list size budget.
 - `pipeline` internals: the step types are derived from the step schema, so the two cannot drift, and the handler is split into phases in `src/utils/pipelineRun.ts`, each with its own tests. A missing `backdrop` image is now reported before a secret scan runs instead of after it (#368).
 - The server answers `initialize` before reconciling interrupted recordings and leftover replay buffers. It used to wait up to 10 s per other running instance on a PowerShell process check. Only records and buffers that existed at startup are reconciled, so a recording started meanwhile is never treated as an orphan (#358).
 
