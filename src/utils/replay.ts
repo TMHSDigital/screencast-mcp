@@ -411,24 +411,29 @@ export function replayDiskBytes(buf: Pick<ReplayBuffer, "dir">): number {
   return total;
 }
 
+/** Names of the replay buffer directories under `root` now. */
+export function replayDirNames(root: string = replayRoot()): string[] {
+  try {
+    return readdirSync(root).filter((name) => DIR_NAME.test(name));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Remove replay buffers no live recording owns: left by a crash, a stop whose
  * save failed, or a session that ended on its own. Runs at server start;
- * `keep` holds the directories of sessions still recording. Returns how many
+ * `keep` holds the directories of sessions still recording, and `only`, when
+ * given, limits it to the names that existed at boot (#358). Returns how many
  * were removed. Only buf-* directories are touched.
  */
-export function cleanupReplayDirs(keep: Iterable<string>, root: string = replayRoot()): number {
+export function cleanupReplayDirs(keep: Iterable<string>, root: string = replayRoot(), only?: ReadonlySet<string>): number {
   const keepSet = new Set([...keep].map((d) => d.toLowerCase()));
-  let names: string[];
-  try {
-    names = readdirSync(root);
-  } catch {
-    return 0;
-  }
   let removed = 0;
-  for (const name of names) {
+  for (const name of replayDirNames(root)) {
+    if (only && !only.has(name)) continue;
     const dir = join(root, name);
-    if (!DIR_NAME.test(name) || keepSet.has(dir.toLowerCase())) continue;
+    if (keepSet.has(dir.toLowerCase())) continue;
     try {
       rmSync(dir, { recursive: true, force: true });
       removed++;

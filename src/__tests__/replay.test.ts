@@ -12,6 +12,7 @@ import {
   REPLAY_SLACK_SEGMENTS,
   buildReplayCutArgs,
   cleanupReplayDirs,
+  replayDirNames,
   finishReplay,
   liveSegmentFile,
   parseSegmentList,
@@ -164,6 +165,16 @@ describe("replay directories", () => {
     expect(existsSync(join(root, "notes"))).toBe(true);
     expect(existsSync(join(root, "keep.txt"))).toBe(true);
     expect(cleanupReplayDirs([], join(root, "missing"))).toBe(0);
+  });
+
+  it("cleanup with `only` leaves buffers made after the boot snapshot (#358)", () => {
+    const root = tempDir();
+    mkdirSync(join(root, "buf-old"));
+    const atBoot = new Set(replayDirNames(root));
+    mkdirSync(join(root, "buf-new"));
+    expect(cleanupReplayDirs([], root, atBoot)).toBe(1);
+    expect(existsSync(join(root, "buf-old"))).toBe(false);
+    expect(existsSync(join(root, "buf-new"))).toBe(true);
   });
 
   it("finishReplay discards without save, and keeps the buffer when a save fails", async () => {

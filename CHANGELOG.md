@@ -10,6 +10,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - `pipeline` internals: the step types are derived from the step schema, so the two cannot drift, and the handler is split into phases in `src/utils/pipelineRun.ts`, each with its own tests. A missing `backdrop` image is now reported before a secret scan runs instead of after it (#368).
+- The server answers `initialize` before reconciling interrupted recordings and leftover replay buffers. It used to wait up to 10 s per other running instance on a PowerShell process check. Only records and buffers that existed at startup are reconciled, so a recording started meanwhile is never treated as an orphan (#358).
 
 ## [0.53.0] - 2026-11-17
 

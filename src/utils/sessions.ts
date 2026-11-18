@@ -10,7 +10,7 @@
  * The child handle is intentionally NOT persisted; only the pid is. Reaping
  * logic (classifyOrphan) is pure so it is unit-tested without real processes.
  */
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import {
   readFileSync,
   writeFileSync,
@@ -231,20 +231,40 @@ export function parseProcessInfo(stdout: string): { image: string; startMs: numb
   return m?.[1] && m[2] ? { image: m[1].trim(), startMs: Number(m[2]) } : null;
 }
 
+/** The PowerShell that prints `<image>|<start ms>` for a pid. */
+function processInfoScript(pid: number): string {
+  return (
+    `$p = Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; ` +
+    `if ($p) { "{0}|{1}" -f $p.Name, ([DateTimeOffset]$p.CreationDate).ToUnixTimeMilliseconds() }`
+  );
+}
+
+const PROCESS_INFO_TIMEOUT_MS = 10_000;
+
 /** Image name and start time of a running pid (Windows), or null when it is
- * gone or cannot be read. Used only at boot, for records another server owns. */
+ * gone or cannot be read. */
 export function processInfo(pid: number): { image: string; startMs: number } | null {
   if (process.platform !== "win32" || !Number.isInteger(pid) || pid <= 0) return null;
-  const script =
-    `$p = Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; ` +
-    `if ($p) { "{0}|{1}" -f $p.Name, ([DateTimeOffset]$p.CreationDate).ToUnixTimeMilliseconds() }`;
-  const res = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], {
+  const res = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", processInfoScript(pid)], {
     encoding: "utf8",
     windowsHide: true,
-    timeout: 10_000,
+    timeout: PROCESS_INFO_TIMEOUT_MS,
     killSignal: "SIGKILL",
   });
   return res.status === 0 && res.stdout ? parseProcessInfo(res.stdout) : null;
+}
+
+/** processInfo without blocking the event loop (#358), for boot reaping. */
+export function processInfoAsync(pid: number): Promise<{ image: string; startMs: number } | null> {
+  if (process.platform !== "win32" || !Number.isInteger(pid) || pid <= 0) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    execFile(
+      "powershell",
+      ["-NoProfile", "-NonInteractive", "-Command", processInfoScript(pid)],
+      { encoding: "utf8", windowsHide: true, timeout: PROCESS_INFO_TIMEOUT_MS, killSignal: "SIGKILL" },
+      (err, stdout) => resolve(!err && stdout ? parseProcessInfo(stdout) : null),
+    );
+  });
 }
 
 /** True if a pid exists. `process.kill(pid, 0)` throws ESRCH when it does not. */
@@ -784,12 +804,13 @@ export class SessionStore {
    * that outlived the previous server, and mark records accordingly. Returns
    * the ids that were reaped.
    */
-  reapOrphans(): string[] {
+  reapOrphans(opts: { ids?: ReadonlySet<string>; owners?: Map<number, ReturnType<typeof processInfo>> } = {}): string[] {
     this.refresh();
     const reaped: string[] = [];
-    const owners = new Map<number, ReturnType<typeof processInfo>>();
+    const owners = opts.owners ?? new Map<number, ReturnType<typeof processInfo>>();
     for (const record of this.records.values()) {
       if (!isLive(record.status)) continue;
+      if (opts.ids && !opts.ids.has(record.id)) continue;
       // Never reap a recording owned by another still-live server instance:
       // that would kill its active capture. Leave the record untouched.
       if (isForeignLiveRecording(record, process.pid, ownerAlive(record, owners))) {
@@ -831,5 +852,27 @@ export class SessionStore {
     }
     if (this.records.size > 0) this.persist();
     return reaped;
+  }
+
+  /** Ids of the live records now: what boot reaping may touch. */
+  liveIds(): Set<string> {
+    return new Set(this.list().flatMap((r) => (isLive(r.status) ? [r.id] : [])));
+  }
+
+  /**
+   * reapOrphans for the records in `ids`, without blocking the event loop on
+   * PowerShell (#358): the owner details of foreign live servers are read
+   * asynchronously first, so the server can answer initialize meanwhile. Only
+   * records that existed at boot are passed, so a recording this server
+   * starts in the meantime is never taken for an orphan.
+   */
+  async reapOrphansAsync(ids: ReadonlySet<string>): Promise<string[]> {
+    const pids = new Set<number>();
+    for (const r of this.list()) {
+      const pid = r.serverPid;
+      if (ids.has(r.id) && pid !== undefined && pid !== process.pid && isAlive(pid)) pids.add(pid);
+    }
+    const owners = new Map(await Promise.all([...pids].map(async (pid) => [pid, await processInfoAsync(pid)] as const)));
+    return this.reapOrphans({ ids, owners });
   }
 }

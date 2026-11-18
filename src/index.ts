@@ -17,7 +17,7 @@ import { abortEditJobs } from "./utils/jobs.js";
 import { stopAll } from "./utils/lifecycle.js";
 import { createServer } from "./server.js";
 import { pruneCaptures, retentionDays, RETENTION_ENV } from "./utils/retention.js";
-import { cleanupReplayDirs } from "./utils/replay.js";
+import { cleanupReplayDirs, replayDirNames } from "./utils/replay.js";
 import { errorMessage } from "./utils/errors.js";
 import { disarmAll } from "./utils/triggers.js";
 
@@ -29,31 +29,18 @@ async function main(): Promise<void> {
   const server = createServer();
   installServerHandlers();
 
-  // Reconcile any sessions interrupted by a previous crash and kill ffmpeg
-  // children that outlived the last run, so no zombie capture survives.
+  // What existed at boot, before any call can start a recording: reaping and
+  // replay cleanup touch only these, so they can run after connecting (#358).
+  let bootIds: Set<string> | null = null;
   try {
-    const reaped = getStore().reapOrphans();
-    if (reaped.length > 0) {
-      process.stderr.write(`Reaped ${reaped.length} orphaned recording(s) on startup.\n`);
-    }
+    bootIds = getStore().liveIds();
   } catch (err) {
-    process.stderr.write(
-      `Orphan reaping skipped: ${errorMessage(err)}\n`,
-    );
+    process.stderr.write(`Orphan reaping skipped: ${errorMessage(err)}\n`);
   }
-  // Replay buffers (#197) no live recording owns are scratch: a crash, a
-  // failed save, or a session that ended on its own left them.
-  try {
-    const live = getStore()
-      .list()
-      .flatMap((r) => (r.status === "recording" && r.replay ? [r.replay.dir] : []));
-    const removed = cleanupReplayDirs(live);
-    if (removed > 0) process.stderr.write(`Removed ${removed} leftover replay buffer(s).\n`);
-  } catch (err) {
-    process.stderr.write(`Replay buffer cleanup skipped: ${errorMessage(err)}\n`);
-  }
+  const bootReplayDirs = new Set(replayDirNames());
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  void reconcileBoot(bootIds, bootReplayDirs);
 
   // After connecting, in the background: frames/ can hold tens of thousands
   // of files, and walking them must not delay the client's initialize (#294).
@@ -80,6 +67,34 @@ async function main(): Promise<void> {
   server.server.onclose = () => void shutdown("transport closed");
   for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
     process.on(sig, () => void shutdown(sig));
+  }
+}
+
+/**
+ * Reconcile sessions a previous crash interrupted and kill ffmpeg children
+ * that outlived the last run, so no zombie capture survives; then remove
+ * replay buffers (#197) no live recording owns. Runs after connecting: the
+ * owner checks of other running instances use PowerShell, which must not hold
+ * up the client's initialize (#358).
+ */
+async function reconcileBoot(bootIds: Set<string> | null, bootReplayDirs: Set<string>): Promise<void> {
+  if (bootIds && bootIds.size > 0) {
+    try {
+      const reaped = await getStore().reapOrphansAsync(bootIds);
+      if (reaped.length > 0) process.stderr.write(`Reaped ${reaped.length} orphaned recording(s) on startup.\n`);
+    } catch (err) {
+      process.stderr.write(`Orphan reaping skipped: ${errorMessage(err)}\n`);
+    }
+  }
+  if (bootReplayDirs.size === 0) return;
+  try {
+    const live = getStore()
+      .list()
+      .flatMap((r) => (r.status === "recording" && r.replay ? [r.replay.dir] : []));
+    const removed = cleanupReplayDirs(live, undefined, bootReplayDirs);
+    if (removed > 0) process.stderr.write(`Removed ${removed} leftover replay buffer(s).\n`);
+  } catch (err) {
+    process.stderr.write(`Replay buffer cleanup skipped: ${errorMessage(err)}\n`);
   }
 }
 

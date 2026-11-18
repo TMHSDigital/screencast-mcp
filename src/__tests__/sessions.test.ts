@@ -22,6 +22,7 @@ import {
   isSameServer,
   parseProcessInfo,
   processInfo,
+  processInfoAsync,
   serverIdentity,
   breakStaleLock,
   withRegistryLock,
@@ -305,6 +306,46 @@ describe("SessionStore", () => {
     expect(b.get("unjoined")?.error).toMatch(/segments were joined[\s\S]*part-001\.mp4/);
     expect(b.get("plain")?.error).toBeUndefined();
   });
+
+  it("boot reaping touches only the records that existed at boot (#358)", async () => {
+    const p = newPath();
+    const a = new SessionStore(p);
+    a.load();
+    a.create(record({ id: "boot", pid: 2_000_000_000 }));
+    const b = new SessionStore(p);
+    b.load();
+    const ids = b.liveIds();
+    expect([...ids]).toEqual(["boot"]);
+    // Started after the snapshot, before the reap ran: not this boot's to judge.
+    a.create(record({ id: "fresh", pid: 2_000_000_000 }));
+    await b.reapOrphansAsync(ids);
+    expect(b.get("boot")?.status).toBe("stopped");
+    expect(b.get("fresh")?.status).toBe("recording");
+  });
+
+  it("boot reaping leaves a record another live server owns (#358)", async () => {
+    const p = newPath();
+    const a = new SessionStore(p);
+    a.load();
+    // Owned by a running process (the parent) that started before the record.
+    a.create(record({ id: "theirs", pid: 2_000_000_000, serverPid: process.ppid, serverStartedAt: new Date().toISOString() }));
+    const b = new SessionStore(p);
+    b.load();
+    await b.reapOrphansAsync(b.liveIds());
+    expect(b.get("theirs")?.status).toBe("recording");
+  });
+});
+
+describe("processInfoAsync (#358)", () => {
+  it("is null for a pid that cannot exist", async () => {
+    expect(await processInfoAsync(-1)).toBeNull();
+    expect(await processInfoAsync(2_000_000_000)).toBeNull();
+  });
+
+  it.runIf(process.platform === "win32")("reads the same image as processInfo", async () => {
+    const info = await processInfoAsync(process.pid);
+    expect(info?.image.toLowerCase()).toBe(processInfo(process.pid)?.image.toLowerCase());
+  }, 30_000);
 });
 
 describe("isLockStale (#55)", () => {
