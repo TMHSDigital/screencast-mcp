@@ -1026,7 +1026,7 @@ Parameters:
 - `language` (string): With translations: ISO 639-2 code, e.g. "spa".
 - `translations` (string[]; at most 2000 items): One translated string per cue, in order. Omit to get the cues to translate.
 - `output` (string): Default: <input>.<language>.srt.
-- `overwrite` (boolean): Allow replacing an existing output file.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1203,7 +1203,7 @@ Parameters:
 - `subtitleTracks[].default` (boolean)
 - `textOnly` (boolean): Return chapters and YouTube text only; write no file.
 - `output` (string): Optional .mp4/.mkv/.mov path. Defaults under SCREENCAST_HOME/edits.
-- `overwrite` (boolean): Allow replacing an existing output file.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 

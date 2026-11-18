@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { editOutput, requireInput } from "../utils/editTool.js";
+import { editOutput, requireInput, overwriteField, editOutputField } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
@@ -15,8 +15,8 @@ const inputSchema = {
   fadeIn: z.number().nonnegative().optional().describe("Fade-in seconds (default 1)."),
   fadeOut: z.number().nonnegative().optional().describe("Fade-out seconds (default 2)."),
   duck: z.boolean().optional().describe("Duck the music under the original audio (default false)."),
-  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  output: editOutputField,
+  overwrite: overwriteField,
 };
 
 export function register(server: McpServer): void {

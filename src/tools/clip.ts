@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { editOutput, requireInput } from "../utils/editTool.js";
+import { editOutput, requireInput, overwriteField } from "../utils/editTool.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
@@ -22,7 +22,7 @@ const inputSchema = {
     .string()
     .optional()
     .describe("Optional output path. Only honored for a single segment; multi-segment output lands under SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  overwrite: overwriteField,
 };
 
 export function register(server: McpServer): void {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { editOutput, requireInput } from "../utils/editTool.js";
+import { editOutput, requireInput, overwriteField, editOutputField } from "../utils/editTool.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
@@ -31,8 +31,8 @@ const inputSchema = {
     .describe(`Starting width in px (default ${DEFAULT_ANIM_WIDTH}).`),
   start: z.number().nonnegative().optional().describe("Start second."),
   duration: z.number().positive().optional().describe("Seconds to export (default: to the end)."),
-  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  output: editOutputField,
+  overwrite: overwriteField,
 };
 
 export function register(server: McpServer): void {

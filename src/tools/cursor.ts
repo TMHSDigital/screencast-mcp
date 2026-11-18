@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { editOutput, requireInput } from "../utils/editTool.js";
+import { editOutput, requireInput, overwriteField, editOutputField } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
@@ -30,8 +30,8 @@ const inputSchema = {
   clicks: o.clicks.describe("Ripple on clicks (default true)."),
   spotlight: o.spotlight.describe("Dim all but the area around the cursor."),
   dryRun: z.boolean().optional().describe("Return the plan; write nothing."),
-  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  output: editOutputField,
+  overwrite: overwriteField,
 };
 
 export function register(server: McpServer): void {

@@ -14,6 +14,7 @@ import { RECIPES } from "../utils/recipes.js";
 import { sourceStamp, writeEditSpec } from "../utils/editSpec.js";
 import { packageVersion } from "../utils/packageRoot.js";
 import { addChapters, checkSteps, makePlanner, prepareAssets, resolvePending, resolveRequest, resolveSecrets, scanIdle, writeSidecars, type PipelineRequest } from "../utils/pipelineRun.js";
+import { overwriteField, editOutputField } from "../utils/editTool.js";
 
 const inputSchema = {
   input: z.string().min(1).optional().describe("Source video path."),
@@ -37,8 +38,8 @@ const inputSchema = {
     ),
   quality: z.enum(["draft", "standard", "high"]).optional().describe("Encoder preset for an mp4 result (default standard)."),
   dryRun: z.boolean().optional().describe("Return the plan (ffmpeg command, output size) without running it."),
-  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  output: editOutputField,
+  overwrite: overwriteField,
   chapters: z
     .boolean()
     .optional()

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { requireInput } from "../utils/editTool.js";
+import { requireInput, overwriteField } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE } from "../utils/toolSpec.js";
 import { assertOutputAllowed, assertOverwriteAllowed } from "../utils/paths.js";
@@ -19,7 +19,7 @@ const inputSchema = {
     .optional()
     .describe("One translated string per cue, in order. Omit to get the cues to translate."),
   output: z.string().optional().describe("Default: <input>.<language>.srt."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing output file."),
+  overwrite: overwriteField,
 };
 
 export function register(server: McpServer): void {

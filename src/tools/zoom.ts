@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { editOutput, requireInput } from "../utils/editTool.js";
+import { editOutput, requireInput, overwriteField, editOutputField } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpegFrames, probeMedia } from "../utils/ffmpeg.js";
@@ -71,8 +71,8 @@ const inputSchema = {
     .describe(`Auto mode: the furthest it zooms in (default ${DEFAULT_AUTO_MAX_ZOOM}).`),
   holdSec: z.number().positive().max(30).optional().describe("Auto mode: stay zoomed this long after activity (default 2)."),
   dryRun: z.boolean().optional().describe("Return the planned keyframes only (editable, pass back)."),
-  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  output: editOutputField,
+  overwrite: overwriteField,
 };
 
 export function register(server: McpServer): void {

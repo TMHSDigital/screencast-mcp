@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { editOutput, requireInput } from "../utils/editTool.js";
+import { editOutput, requireInput, overwriteField } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpeg, probeMedia, hasFilter } from "../utils/ffmpeg.js";
@@ -26,7 +26,7 @@ const inputSchema = {
   language: z.string().optional().describe("Spoken language code, e.g. 'en', or 'auto' (default)."),
   words: z.boolean().optional().describe("One word per cue, for word timing (cut_by_transcript)."),
   output: z.string().optional().describe("Optional output .srt path. Defaults under SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  overwrite: overwriteField,
 };
 
 export function register(server: McpServer): void {

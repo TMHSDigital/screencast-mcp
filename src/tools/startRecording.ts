@@ -86,7 +86,7 @@ import {
   saveReplay,
   segmentOutputArgs,
 } from "../utils/replay.js";
-import { editOutput } from "../utils/editTool.js";
+import { editOutput, overwriteField } from "../utils/editTool.js";
 import { logMessage } from "../utils/logging.js";
 import { MAX_LABEL } from "../utils/chapters.js";
 import {
@@ -146,7 +146,7 @@ const inputSchema = {
     .string()
     .optional()
     .describe("Output .mp4 path (default under SCREENCAST_HOME/recordings)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  overwrite: overwriteField,
   label: z.string().min(1).max(80).optional().describe("Name for list_sessions query."),
   maxDurationSec: z
     .number()

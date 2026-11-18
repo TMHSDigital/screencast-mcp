@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { editOutput } from "../utils/editTool.js";
+import { editOutput, overwriteField, editOutputField } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
@@ -20,8 +20,8 @@ const inputSchema = {
     .describe("Cue numbers as the .srt numbers them, or transcript text quoted exactly (must occur once)."),
   fillers: z.boolean().optional().describe("Also cut fillers (um, uh...) that have their own cue."),
   dryRun: z.boolean().optional().describe("Only report the cuts."),
-  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  output: editOutputField,
+  overwrite: overwriteField,
 };
 
 export function register(server: McpServer): void {

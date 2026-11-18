@@ -3,7 +3,7 @@ import { extname, join } from "node:path";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { editOutput, requireInput } from "../utils/editTool.js";
+import { editOutput, requireInput, overwriteField } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia, runCapture } from "../utils/ffmpeg.js";
@@ -61,7 +61,7 @@ const inputSchema = {
     .describe("Or several tracks, e.g. one per language (translate_subtitles makes them)."),
   textOnly: z.boolean().optional().describe("Return chapters and YouTube text only; write no file."),
   output: z.string().optional().describe("Optional .mp4/.mkv/.mov path. Defaults under SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing output file."),
+  overwrite: overwriteField,
 };
 
 export function register(server: McpServer): void {

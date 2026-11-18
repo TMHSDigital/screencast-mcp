@@ -1853,7 +1853,7 @@
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing output file.",
+          "description": "Replace an existing output (default false).",
           "type": "boolean"
         }
       },
@@ -2689,7 +2689,7 @@
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing output file.",
+          "description": "Replace an existing output (default false).",
           "type": "boolean"
         }
       }

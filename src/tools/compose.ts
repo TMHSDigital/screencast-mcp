@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { editOutput, requireInput } from "../utils/editTool.js";
+import { editOutput, requireInput, overwriteField, editOutputField } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
@@ -29,8 +29,8 @@ const inputSchema = {
   alignMarker: z.string().min(1).optional().describe("Line inputs up on this add_marker label."),
   endWith: z.enum(["longest", "shortest"]).optional().describe("longest (default; shorter ones hold their last frame) or shortest."),
   audio: z.union([z.number().int().min(0), z.enum(["mix", "none"])]).optional().describe('Input index whose audio to keep (default 0), "mix", or "none".'),
-  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  output: editOutputField,
+  overwrite: overwriteField,
 };
 
 export function register(server: McpServer): void {

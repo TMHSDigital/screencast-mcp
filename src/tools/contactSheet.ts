@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { requireInput } from "../utils/editTool.js";
+import { requireInput, overwriteField } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, runFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
@@ -54,7 +54,7 @@ const inputSchema = {
     .optional()
     .describe("Write one representative poster frame instead of a sheet."),
   output: z.string().optional().describe("Optional output .png path. Defaults under SCREENCAST_HOME/frames."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  overwrite: overwriteField,
   returnImage: z
     .boolean()
     .optional()

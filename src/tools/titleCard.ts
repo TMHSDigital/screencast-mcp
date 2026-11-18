@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { writeFileSync, rmSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { editOutput } from "../utils/editTool.js";
+import { editOutput, overwriteField, editOutputField } from "../utils/editTool.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
@@ -22,8 +22,8 @@ const inputSchema = {
   fontSize: z.number().int().positive().optional().describe("Text size in px (default 96)."),
   bold: z.boolean().optional().describe("Use the bold weight (default true)."),
   fontFile: fontFileSchema,
-  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  output: editOutputField,
+  overwrite: overwriteField,
 };
 
 export function register(server: McpServer): void {

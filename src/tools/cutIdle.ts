@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { editOutput, requireInput } from "../utils/editTool.js";
+import { editOutput, requireInput, overwriteField, editOutputField } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
@@ -39,8 +39,8 @@ const inputSchema = {
   action: z.enum(["cut", "speed"]).optional().describe("cut (default), or speed: fast-forward them."),
   factor: z.number().gt(1).max(MAX_RANGE_FACTOR).optional().describe(`speed: times faster (default ${DEFAULT_IDLE_FACTOR}).`),
   dryRun: z.boolean().optional().describe("Only report what would be cut."),
-  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  output: editOutputField,
+  overwrite: overwriteField,
 };
 
 export function register(server: McpServer): void {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { editOutput } from "../utils/editTool.js";
+import { editOutput, overwriteField } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
@@ -18,7 +18,7 @@ const inputSchema = {
     .optional()
     .describe("Seconds back from now (default and max: the buffer length)."),
   output: z.string().optional().describe("Output .mp4 path (default under SCREENCAST_HOME/recordings)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  overwrite: overwriteField,
   reencode: z
     .boolean()
     .optional()

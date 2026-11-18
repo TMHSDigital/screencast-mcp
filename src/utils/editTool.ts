@@ -5,11 +5,19 @@
  * confinement) lands in every tool at once.
  */
 import { existsSync } from "node:fs";
+import { z } from "zod";
 import { ScreencastError } from "./errors.js";
 import { assertEditContainer } from "./media.js";
 import { resolveOutput, subdir, stamp, rand } from "./paths.js";
 
 /** Throw "<label> not found: <path>" unless `path` exists. */
+/** The `overwrite` field every file-writing tool takes (#360): one copy, so
+ * the wording cannot drift and the tools/list bytes stay counted once here. */
+export const overwriteField = z.boolean().optional().describe("Replace an existing output (default false).");
+
+/** The `output` field of a tool that writes under SCREENCAST_HOME/edits. */
+export const editOutputField = z.string().optional().describe("Output path; default SCREENCAST_HOME/edits.");
+
 export function requireInput(path: string, label = "Input file"): void {
   if (!existsSync(path)) throw new ScreencastError(`${label} not found: ${path}`);
 }

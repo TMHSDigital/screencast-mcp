@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { editOutput } from "../utils/editTool.js";
+import { editOutput, overwriteField } from "../utils/editTool.js";
 import { errorResponse, okResponse } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
@@ -35,7 +35,7 @@ const inputSchema = {
     .describe(
       "Optional output .png path. Defaults to a file under SCREENCAST_HOME/screenshots.",
     ),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  overwrite: overwriteField,
   returnImage: z
     .boolean()
     .optional()

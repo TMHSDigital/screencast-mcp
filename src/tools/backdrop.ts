@@ -2,7 +2,7 @@ import { z } from "zod";
 import { existsSync } from "node:fs";
 import { extname } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { requireInput } from "../utils/editTool.js";
+import { requireInput, overwriteField } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE, looseOutput } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
@@ -26,7 +26,7 @@ const inputSchema = {
   shadowOpacity: o.shadowOpacity.describe("Default 0.5."),
   aspect: o.aspect.describe("Output on this aspect's canvas (1920x1080, ...), content scaled to fit."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits (screenshots for an image)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  overwrite: overwriteField,
 };
 
 export function register(server: McpServer): void {

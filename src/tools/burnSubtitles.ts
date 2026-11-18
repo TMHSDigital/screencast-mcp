@@ -2,7 +2,7 @@ import { z } from "zod";
 import { dirname } from "node:path";
 import { existsSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { editOutput } from "../utils/editTool.js";
+import { editOutput, overwriteField, editOutputField } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg, probeMedia, hasFilter } from "../utils/ffmpeg.js";
@@ -21,8 +21,8 @@ const inputSchema = {
       "clean (default for .srt): outlined line. social: big bold text on a dark box. .ass keeps its own " +
         "styling unless set.",
     ),
-  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  output: editOutputField,
+  overwrite: overwriteField,
 };
 
 export function register(server: McpServer): void {
