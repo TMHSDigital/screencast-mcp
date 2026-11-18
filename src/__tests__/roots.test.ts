@@ -120,8 +120,13 @@ describe("rootDirs", () => {
 });
 
 describe("client roots over MCP", () => {
+  let createServer: typeof import("../server.js").createServer;
+  // Load every tool module in a hook (30 s), not under the 5 s per-test timeout (#370).
+  beforeAll(async () => {
+    ({ createServer } = await import("../server.js"));
+  }, 30_000);
+
   it("reads roots after initialize, refuses outputs outside them, and follows list_changed", async () => {
-    const { createServer } = await import("../server.js");
     let roots = [{ uri: pathToFileURL(project).href, name: "project" }];
     const client = new Client({ name: "roots-test", version: "0.0.0" }, { capabilities: { roots: { listChanged: true } } });
     client.setRequestHandler(ListRootsRequestSchema, () => ({ roots }));
