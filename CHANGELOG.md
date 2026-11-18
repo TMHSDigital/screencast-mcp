@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- `start_recording` checks free space on the output drive first: it refuses below 500 MB, so a capture no longer fails partway with a write error, and returns a `diskNote` below 2 GB (#354).
+
 ## [0.52.0] - 2026-11-17
 
 ### Added

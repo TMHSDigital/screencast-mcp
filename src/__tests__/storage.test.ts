@@ -3,7 +3,7 @@ import { describe, it, expect, afterAll } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { folderBytes, formatBytes, freeBytes, storageUsage } from "../utils/storage.js";
+import { LOW_FREE_BYTES, MIN_FREE_BYTES, diskCheck, folderBytes, formatBytes, freeBytes, freeBytesFor, storageUsage } from "../utils/storage.js";
 
 const home = mkdtempSync(join(tmpdir(), "sc-storage-"));
 afterAll(() => rmSync(home, { recursive: true, force: true }));
@@ -20,6 +20,15 @@ describe("storage usage (#354)", () => {
     expect(u.freeBytes).toBeGreaterThan(0);
     expect(await folderBytes(join(home, "nope"))).toBe(0);
     expect(await freeBytes(join(home, "nope", "deeper"))).toBeNull();
+  });
+
+  it("start_recording's disk check refuses, notes, or stays quiet (#354)", async () => {
+    expect(diskCheck(100 * 1024 ** 2).refuse).toMatch(/100\.0 MB free/);
+    expect(diskCheck(MIN_FREE_BYTES + 1).note).toMatch(/may run out of space/);
+    expect(diskCheck(LOW_FREE_BYTES + 1)).toEqual({});
+    expect(diskCheck(null)).toEqual({});
+    // A folder that does not exist yet is checked on the volume above it.
+    expect(await freeBytesFor(join(home, "not", "made", "yet"))).toBeGreaterThan(0);
   });
 
   it("formats sizes for messages", () => {

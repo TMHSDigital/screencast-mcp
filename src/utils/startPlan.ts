@@ -147,6 +147,7 @@ export function startResult(o: {
   maxDurationSec: number;
   encoder: string;
   encoderNote?: string;
+  diskNote?: string;
   gpuFrames?: boolean;
   webcamDevice?: string;
   window?: WindowBounds;
@@ -168,6 +169,7 @@ export function startResult(o: {
     maxDurationSec: o.maxDurationSec > 0 ? o.maxDurationSec : null,
     encoder: o.encoder,
     ...(o.encoderNote ? { encoderNote: o.encoderNote } : {}),
+    ...(o.diskNote ? { diskNote: o.diskNote } : {}),
     ...(o.gpuFrames !== undefined ? { gpuFrames: o.gpuFrames } : {}),
     ...(o.webcamDevice ? { webcam: { device: o.webcamDevice, path: webcamOutputPath(r.outputPath) } } : {}),
     ...(o.window ? windowMatchReport(o.window) : {}),

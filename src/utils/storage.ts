@@ -4,7 +4,7 @@
  * is how the agent and the person find out the store is filling up.
  */
 import { readdir, stat, statfs } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 /** Below this much free space on the home volume, doctor lists a problem: an
  * hour of 1080p30 at the standard quality is a few GB. */
@@ -38,6 +38,32 @@ export async function freeBytes(path: string): Promise<number | null> {
   } catch {
     return null;
   }
+}
+
+/** Below this, start_recording refuses: ffmpeg would fail partway with a
+ * write error and leave a broken file (#354). */
+export const MIN_FREE_BYTES = 500 * 1024 ** 2;
+
+/** Free bytes on the volume that will hold `path`, which need not exist yet:
+ * the nearest existing folder above it is asked. */
+export async function freeBytesFor(path: string): Promise<number | null> {
+  let p = path;
+  for (;;) {
+    const free = await freeBytes(p);
+    if (free !== null) return free;
+    const up = dirname(p);
+    if (up === p) return null;
+    p = up;
+  }
+}
+
+/** start_recording's disk check: refuse below MIN_FREE_BYTES, note below
+ * LOW_FREE_BYTES, nothing otherwise or when free space cannot be read. Pure. */
+export function diskCheck(free: number | null): { refuse?: string; note?: string } {
+  if (free === null) return {};
+  if (free < MIN_FREE_BYTES) return { refuse: `Only ${formatBytes(free)} free on the output drive.` };
+  if (free < LOW_FREE_BYTES) return { note: `Only ${formatBytes(free)} free on the output drive; a long recording may run out of space.` };
+  return {};
 }
 
 export async function storageUsage(home: string): Promise<{ freeBytes: number | null; bytes: Record<(typeof STORE_FOLDERS)[number], number> }> {

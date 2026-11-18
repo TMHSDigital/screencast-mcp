@@ -61,7 +61,8 @@ import {
   sessionEnded,
   webcamPartPath,
 } from "../utils/pause.js";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
+import { diskCheck, freeBytesFor } from "../utils/storage.js";
 import {
   MAX_REPLAY_SEC,
   MIN_REPLAY_SEC,
@@ -529,6 +530,9 @@ async function prepareStart(server: McpServer, args: StartArgs, extra: Extra) {
   const quality: Quality = (args.quality as Quality) ?? DEFAULT_QUALITY;
   const maxDurationSec = resolveMaxDuration(args.maxDurationSec);
   const output = resolveOutput(args.output, subdir("recordings"), `rec-${stamp()}-${rand()}.mp4`, args.overwrite);
+  // A nearly full drive fails partway with a write error (#354).
+  const disk = diskCheck(await freeBytesFor(dirname(output)));
+  if (disk.refuse) throw new ScreencastError(disk.refuse, "Free some space (delete_recording removes old recordings), or record to another drive with output.");
   // Devices are resolved up front so a missing one fails before anything
   // is spawned, with a clear install hint.
   const audio = args.audio?.source === "system" ? { device: await resolveLoopbackDevice(args.audio.device) } : undefined;
@@ -566,7 +570,7 @@ async function prepareStart(server: McpServer, args: StartArgs, extra: Extra) {
     throw new ScreencastError("Desktop Duplication (ddagrab) does not capture on this machine (a remote session, or no D3D11 GPU).", 'Use backend "gdigrab".');
   }
 
-  return { ffmpeg, hideCursor, target, monitors, window, backend, replay, fps, quality, maxDurationSec, output, audio, webcamDevice, dda, firstPick, ddaUsable };
+  return { ffmpeg, hideCursor, target, monitors, window, backend, replay, fps, quality, maxDurationSec, output, audio, webcamDevice, dda, firstPick, ddaUsable, diskNote: disk.note };
 }
 /** The video clock's zero, the event log's frame, and the session record,
  * once the capture runs. */
@@ -735,6 +739,7 @@ export function register(server: McpServer): void {
             maxDurationSec,
             encoder: pick.encoder,
             encoderNote: pick.note,
+            diskNote: prep.diskNote,
             ...(dda ? { gpuFrames: pick.gpuFrames } : {}),
             webcamDevice,
             window,
