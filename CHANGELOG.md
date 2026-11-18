@@ -10,6 +10,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Internals: the video clock (`parseCaptureStart`, `videoTimeSec`) and the sidecar finalizers (`trackFinalizer`, `whenFinalized`) moved out of `events.ts` into `src/utils/clock.ts` and `src/utils/finalizers.ts`, so perf and log sidecars and the stop paths no longer load the input-hook module (#360).
+- Internals: `sessions.ts` is split. Pid metadata (`isAlive`, `processInfo`, `killPid`) moved to `src/utils/processes.ts`, the ownership and orphan rules to `src/utils/orphans.ts`, and the registry lockfile to `src/utils/fileLock.ts`. `sessions.ts` re-exports them (#360).
 
 ## [0.54.0] - 2026-11-17
 
