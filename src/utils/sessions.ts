@@ -58,6 +58,8 @@ export type EndReason = "stopped" | "max_duration" | "crashed" | "shutdown" | "w
 export interface SessionRecord {
   id: string;
   target: string;
+  /** A name the caller gave it (#366), for list_sessions query. */
+  label?: string;
   outputPath: string;
   fps: number;
   quality: Quality;

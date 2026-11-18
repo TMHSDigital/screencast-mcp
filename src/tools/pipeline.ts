@@ -118,7 +118,7 @@ const step = z.discriminatedUnion("op", [
 ]);
 
 const inputSchema = {
-  input: z.string().min(1).optional().describe("Path to the source video."),
+  input: z.string().min(1).optional().describe("Source video path."),
   fromEdit: z.string().min(1).optional().describe("Re-render an .edit.json; steps replace same-op steps."),
   steps: z
     .array(step)

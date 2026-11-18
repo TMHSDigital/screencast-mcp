@@ -8,7 +8,7 @@ import { runEditJob } from "../utils/jobs.js";
 import { buildClipArgs, editOutputExt, assertEditContainer } from "../utils/media.js";
 
 const inputSchema = {
-  input: z.string().min(1).describe("Path to the source video."),
+  input: z.string().min(1).describe("Source video path."),
   segments: z
     .array(
       z.object({

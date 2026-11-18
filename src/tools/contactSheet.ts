@@ -23,7 +23,7 @@ import { resolveOutput, subdir, stamp, rand } from "../utils/paths.js";
 import { encodeInlineImages, DEFAULT_MAX_IMAGE_WIDTH } from "../utils/images.js";
 
 const inputSchema = {
-  input: z.string().min(1).describe("Path to the source video."),
+  input: z.string().min(1).describe("Source video path."),
   count: z
     .number()
     .int()

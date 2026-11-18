@@ -20,7 +20,7 @@ import {
 import { editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
-  input: z.string().min(1).describe("Path to the source video."),
+  input: z.string().min(1).describe("Source video path."),
   minIdleSec: z
     .number()
     .positive()

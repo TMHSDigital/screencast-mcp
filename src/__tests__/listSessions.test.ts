@@ -32,6 +32,8 @@ describe("list_sessions (#366)", () => {
     store.create(rec("b", "failed", 2));
     store.create(rec("c", "stopped", 3));
     store.create(rec("d", "paused", 4));
+    store.create({ ...rec("e", "stopped", 0), label: "Checkout flow" });
+    store.create({ ...rec("f", "paused", 0), serverPid: process.pid });
     const [x, y] = InMemoryTransport.createLinkedPair();
     await createServer().connect(x);
     client = new Client({ name: "c", version: "0" });
@@ -44,7 +46,7 @@ describe("list_sessions (#366)", () => {
 
   it("returns a summary of each session, newest first", async () => {
     const r = await list();
-    expect(r.sessions.map((s) => s.id)).toEqual(["d", "c", "b", "a"]);
+    expect(r.sessions.map((s) => s.id)).toEqual(["d", "c", "b", "a", "e", "f"]);
     expect(r.total).toBeUndefined();
     expect(r.sessions[0]).not.toHaveProperty("segments");
     expect(r.sessions.find((s) => s.id === "b")?.error).toBe("ffmpeg exited with code 1:");
@@ -52,11 +54,23 @@ describe("list_sessions (#366)", () => {
 
   it("filters by status, limits, and gives whole records when asked", async () => {
     const stopped = await list({ status: ["stopped"] });
-    expect(stopped.sessions.map((s) => s.id)).toEqual(["c", "a"]);
-    expect(stopped.total).toBe(4);
+    expect(stopped.sessions.map((s) => s.id)).toEqual(["c", "a", "e"]);
+    expect(stopped.total).toBe(6);
     const one = await list({ limit: 1, full: true });
     expect(one.sessions).toHaveLength(1);
     expect(one.sessions[0]).toHaveProperty("segments");
     expect(one.sessions[0]?.id).toBe("d");
+  });
+
+  it("matches a query against label, id, target and path, and shows the label (#366)", async () => {
+    const r = await list({ query: "checkout" });
+    expect(r.sessions.map((s) => s.id)).toEqual(["e"]);
+    expect(r.sessions[0]?.label).toBe("Checkout flow");
+    expect((await list({ query: "B.MP4" })).sessions.map((s) => s.id)).toEqual(["b"]);
+  });
+
+  it("a paused session is alive while its server is (#366)", async () => {
+    const r = await list({ status: ["paused"] });
+    expect(Object.fromEntries(r.sessions.map((s) => [s.id, s.alive]))).toEqual({ d: false, f: true });
   });
 });

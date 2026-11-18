@@ -9,7 +9,7 @@ import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildTrimArgs, editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
-  input: z.string().min(1).describe("Path to the source video."),
+  input: z.string().min(1).describe("Source video path."),
   start: z.number().nonnegative().describe("Start time in seconds."),
   end: z.number().positive().optional().describe("End time in seconds. Use end OR duration."),
   duration: z.number().positive().optional().describe("Clip length in seconds. Use end OR duration."),

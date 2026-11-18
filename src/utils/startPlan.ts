@@ -71,6 +71,7 @@ export function consentPrompt(o: {
 export interface RecordFacts {
   id: string;
   target: string;
+  label?: string;
   output: string;
   fps: number;
   quality: SessionRecord["quality"];
@@ -98,6 +99,7 @@ export function buildSessionRecord(f: RecordFacts): SessionRecord {
   return {
     id: f.id,
     target: f.target,
+    ...(f.label ? { label: f.label } : {}),
     outputPath: f.output,
     fps: f.fps,
     quality: f.quality,

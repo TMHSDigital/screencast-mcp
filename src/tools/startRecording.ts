@@ -147,6 +147,7 @@ const inputSchema = {
     .optional()
     .describe("Output .mp4 path (default under SCREENCAST_HOME/recordings)."),
   overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
+  label: z.string().min(1).max(80).optional().describe("Name for list_sessions query."),
   maxDurationSec: z
     .number()
     .int()
@@ -662,6 +663,7 @@ function sessionRecordFor(
   const record = buildSessionRecord({
     id: run.id,
     target: args.target,
+    label: args.label,
     output,
     fps,
     quality,

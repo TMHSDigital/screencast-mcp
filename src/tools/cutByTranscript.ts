@@ -12,7 +12,7 @@ import { planTranscriptCuts, retimeCues } from "../utils/transcriptCut.js";
 import { editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
-  input: z.string().min(1).describe("Path to the source video."),
+  input: z.string().min(1).describe("Source video path."),
   srt: z.string().min(1).describe("Its .srt (transcribe; words: true for word timing)."),
   remove: z
     .array(z.union([z.number().int().min(0).max(99999), z.string().min(1)]))

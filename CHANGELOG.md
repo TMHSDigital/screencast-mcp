@@ -14,6 +14,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - `cut_idle` (and the pipeline `cut_idle` step) take `sensitivity` (`strict`, the old behaviour, `normal` or `loose`, so a blinking caret or spinner still counts as idle), `ignoreRegions` (rectangles masked out of the freeze check, such as a clock), and `basis`: `events` finds idle time from the `.events.jsonl` (no clicks, wheel or typing), `both` needs a frozen screen and no input (#353).
 - `start_recording { replayBufferSec, saveWhen: { text } }` saves the buffer on its own when the text shows on screen (OCR): it waits `postRollSec` (default 3) so the clip holds what followed, writes the last `lastSec` to `recordings/`, adds a marker, lists the clip under the session's `autoSaves` (so resource subscribers hear about it), and re-arms once the text goes, up to `maxSaves` (default 5) (#356).
 - `record --bug-report` (Action input `bug-report: true`): when the command fails, the recording is packaged with `bug_report` into `bug-report/` in the output folder, and `evidence.json`, the job summary and the PR comment point at its `report.md` (#355).
+- `start_recording` takes an optional `label`, shown in `list_sessions`, whose new `query` matches label, id, target or output path. A paused session's `alive` now says whether the server that can resume it is still running (#366).
 
 ## [0.52.0] - 2026-11-17
 

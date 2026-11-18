@@ -8,7 +8,7 @@ import { runEditJob } from "../utils/jobs.js";
 import { buildCropArgs, editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
-  input: z.string().min(1).describe("Path to the source video."),
+  input: z.string().min(1).describe("Source video path."),
   x: z.number().int().nonnegative(),
   y: z.number().int().nonnegative(),
   width: z.number().int().positive(),

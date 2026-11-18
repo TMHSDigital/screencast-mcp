@@ -8,7 +8,7 @@ import { DEFAULT_ANIM_FPS, DEFAULT_ANIM_WIDTH, DEFAULT_MAX_BYTES, type AnimForma
 import { exportAnimation } from "../utils/animExport.js";
 
 const inputSchema = {
-  input: z.string().min(1).describe("Path to the source video."),
+  input: z.string().min(1).describe("Source video path."),
   format: z
     .enum(["gif", "webp"])
     .optional()

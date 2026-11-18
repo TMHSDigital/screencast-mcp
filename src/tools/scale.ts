@@ -8,7 +8,7 @@ import { runEditJob, probeDuration } from "../utils/jobs.js";
 import { buildScaleArgs, editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
-  input: z.string().min(1).describe("Path to the source video."),
+  input: z.string().min(1).describe("Source video path."),
   width: z.number().int().positive().optional().describe("Target width in px. Omit to derive from height (keeps aspect)."),
   height: z.number().int().positive().optional().describe("Target height in px. Omit to derive from width (keeps aspect)."),
   output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),

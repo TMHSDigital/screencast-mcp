@@ -188,8 +188,7 @@ export const fontFileSchema = z
   .min(1)
   .optional()
   .describe(
-    "Font: a .ttf/.otf/.ttc path or a C:\\Windows\\Fonts file name. Default: bundled Inter, with a " +
-      "covering system font for scripts it lacks (CJK, emoji, Arabic, ...).",
+    "Font: .ttf/.otf/.ttc path or C:\\Windows\\Fonts name. Default: bundled Inter, plus a system font for CJK, emoji, Arabic.",
   );
 
 /** One callout; shared with pipeline. */

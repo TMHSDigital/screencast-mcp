@@ -57,6 +57,7 @@ Parameters:
 - `audio.device` (string): dshow loopback device (from list_audio_devices); auto-detected if omitted.
 - `output` (string): Output .mp4 path (default under SCREENCAST_HOME/recordings).
 - `overwrite` (boolean): Replace an existing output (default false).
+- `label` (string; at most 80 characters): Name for list_sessions query.
 - `maxDurationSec` (integer; ≥ 0, ≤ 604800): Auto-stop after this many seconds (default 3600 or SCREENCAST_MAX_RECORDING_SEC; max 7 days; 0 = no cap).
 - `events` (boolean): Also log clicks, scroll, cursor, and typing (video-timed, video pixels) for read_events (default false; ~1 s slower start).
 - `keys` ("masked" | "shortcuts"): With events: masked (default) logs typing only as 0.5 s-grid bursts, never keys; shortcuts also names Ctrl/Alt/Win chords. Typed text is never logged.
@@ -190,6 +191,7 @@ Parameters:
 
 - `status` (("recording" | "paused" | "stopped" | "failed" | "orphaned")[]; at least 1 items): Only these.
 - `limit` (integer; ≥ 1, ≤ 100): At most this many (default all).
+- `query` (string; at most 80 characters): In label, id, target or output.
 - `full` (boolean): Whole records.
 
 Minimal call:
@@ -392,7 +394,7 @@ Tile timestamped frames of a video into one image to see a whole recording at a 
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Source video path.
 - `count` (integer; ≥ 1, ≤ 48): Frames to tile (default 12).
 - `mode` ("even" | "scenes"): even (default) or scenes (strongest changes; static stretches take no tiles).
 - `sceneThreshold` (number; > 0, < 1): Mode scenes: change needed, 0-1 (default 0.1).
@@ -538,7 +540,7 @@ Cut a video down to one sub-clip by start + (end or duration). For several segme
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Source video path.
 - `start` (number; required, ≥ 0): Start time in seconds.
 - `end` (number; > 0): End time in seconds. Use end OR duration.
 - `duration` (number; > 0): Clip length in seconds. Use end OR duration.
@@ -599,7 +601,7 @@ Export an animated GIF or WebP that fits a size budget (for PRs, issues, READMEs
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Source video path.
 - `format` ("gif" | "webp"): gif (default) or webp (usually much smaller).
 - `maxBytes` (integer; ≥ 10000, ≤ 9007199254740991): Size budget in bytes (default 10000000, under GitHub's 10 MB image limit).
 - `fps` (number; > 0, ≤ 30): Starting frame rate (default 12).
@@ -623,7 +625,7 @@ Crop a video to a pixel rectangle; one running off the frame is rejected.
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Source video path.
 - `x` (integer; required, ≥ 0, ≤ 9007199254740991)
 - `y` (integer; required, ≥ 0, ≤ 9007199254740991)
 - `width` (integer; required, > 0, ≤ 9007199254740991)
@@ -645,7 +647,7 @@ Resize a video to a target width and/or height and re-encode. Provide one side t
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Source video path.
 - `width` (integer; > 0, ≤ 9007199254740991): Target width in px. Omit to derive from height (keeps aspect).
 - `height` (integer; > 0, ≤ 9007199254740991): Target height in px. Omit to derive from width (keeps aspect).
 - `output` (string): Output path; default SCREENCAST_HOME/edits.
@@ -665,7 +667,7 @@ Change playback speed, or fast-forward ranges, and re-encode. Audio is retempo'd
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Source video path.
 - `factor` (number; > 0): Whole clip: >1 faster, <1 slower.
 - `segments` (object[]; at least 1 items): Or fast-forward just these ranges (audio shortened, not pitched).
 - `segments[].start` (number; required, ≥ 0)
@@ -688,7 +690,7 @@ Re-encode a video smaller (H.264 CRF ladder, optional width cap). For a platform
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Source video path.
 - `level` ("light" | "medium" | "heavy"): CRF 23 / 28 / 32 (default medium).
 - `maxWidth` (integer; > 0, ≤ 9007199254740991): Width cap in px (only downscales).
 - `output` (string): Output path; default SCREENCAST_HOME/edits.
@@ -708,7 +710,7 @@ Extract several frame-exact segments, each to its own file. For one segment, tri
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Source video path.
 - `segments` (object[]; required, at least 1 items): {start, end} segments in seconds; each becomes its own file.
 - `segments[].start` (number; required, ≥ 0)
 - `segments[].end` (number; required, > 0)
@@ -729,7 +731,7 @@ Remove dead air: cut stretches where the screen is frozen (and silent), keeping 
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Source video path.
 - `minIdleSec` (number; > 0): Only cut still stretches at least this long (default 2).
 - `keepSec` (number; ≥ 0): Seconds kept at each edge of a cut (default 0.4).
 - `useAudio` (boolean): Require silent audio too (default true when there is audio).
@@ -760,7 +762,7 @@ Edit a video by its transcript: cut quoted text, cue numbers, or fillers. Also w
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Source video path.
 - `srt` (string; required): Its .srt (transcribe; words: true for word timing).
 - `remove` ((integer | string)[]): Cue numbers as the .srt numbers them, or transcript text quoted exactly (must occur once).
 - `fillers` (boolean): Also cut fillers (um, uh...) that have their own cue.
@@ -810,7 +812,7 @@ Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystrok
 
 Parameters:
 
-- `input` (string): Path to the source video.
+- `input` (string): Source video path.
 - `fromEdit` (string): Re-render an .edit.json; steps replace same-op steps.
 - `steps` (object[]; at most 30 items): Edits in order, each { op, ...its tool's options }; export_preset/export_gif only last. Times and pixels are relative to the video as it is at that step (after earlier trims, speed, crops). zoom follow:"clicks" plans from the event log; burn_subtitles takes subtitles or transcribe:true.
 - `steps[trim].start` (number; required, ≥ 0)
@@ -864,7 +866,7 @@ Parameters:
 - `steps[callout].items[arrow].from` (number; ≥ 0)
 - `steps[callout].items[arrow].to` (number; > 0)
 - `steps[callout].items[arrow].color` (string)
-- `steps[callout].fontFile` (string): Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).
+- `steps[callout].fontFile` (string): Font: .ttf/.otf/.ttc path or C:\Windows\Fonts name. Default: bundled Inter, plus a system font for CJK, emoji, Arabic.
 - `steps[reframe].aspect` ("16:9" | "9:16" | "1:1" | "4:5"; required)
 - `steps[reframe].fit` ("pad" | "crop")
 - `steps[zoom].keyframes` (object[]; at least 1 items, at most 100 items)
@@ -1067,7 +1069,7 @@ Parameters:
 - `items[arrow].from` (number; ≥ 0)
 - `items[arrow].to` (number; > 0)
 - `items[arrow].color` (string)
-- `fontFile` (string): Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).
+- `fontFile` (string): Font: .ttf/.otf/.ttc path or C:\Windows\Fonts name. Default: bundled Inter, plus a system font for CJK, emoji, Arabic.
 - `output` (string): Output path; default SCREENCAST_HOME/edits.
 - `overwrite` (boolean): Replace an existing output (default false).
 
@@ -1094,7 +1096,7 @@ Parameters:
 - `position` ("bottom" | "bottom-left" | "bottom-right" | "top" | "top-left" | "top-right"): Default bottom (centred).
 - `size` (number; ≥ 8, ≤ 400): Font px (default 4.5% of the frame height).
 - `color` (string): Text color (default white).
-- `fontFile` (string): Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).
+- `fontFile` (string): Font: .ttf/.otf/.ttc path or C:\Windows\Fonts name. Default: bundled Inter, plus a system font for CJK, emoji, Arabic.
 - `dryRun` (boolean): Return the planned badges; write nothing.
 - `output` (string): Output path; default SCREENCAST_HOME/edits.
 - `overwrite` (boolean): Replace an existing output (default false).
@@ -1164,7 +1166,7 @@ Burn SRT/ASS subtitles (e.g. from transcribe) into a video in the bundled font.
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Source video path.
 - `subtitles` (string; required): Path to an .srt (e.g. from transcribe) or .ass subtitle file.
 - `style` ("clean" | "social"): clean (default for .srt): outlined line. social: big bold text on a dark box. .ass keeps its own styling unless set.
 - `output` (string): Output path; default SCREENCAST_HOME/edits.
@@ -1270,7 +1272,7 @@ Parameters:
 - `fontColor` (string): Text color (default white).
 - `fontSize` (integer; > 0, ≤ 9007199254740991): Text size in px (default 96).
 - `bold` (boolean): Use the bold weight (default true).
-- `fontFile` (string): Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).
+- `fontFile` (string): Font: .ttf/.otf/.ttc path or C:\Windows\Fonts name. Default: bundled Inter, plus a system font for CJK, emoji, Arabic.
 - `output` (string): Output path; default SCREENCAST_HOME/edits.
 - `overwrite` (boolean): Replace an existing output (default false).
 
@@ -1288,7 +1290,7 @@ Re-aspect a video to 16:9, 9:16, 1:1, or 4:5 by padding or cropping.
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Source video path.
 - `aspect` ("16:9" | "9:16" | "1:1" | "4:5"; required): Target aspect ratio.
 - `fit` ("pad" | "crop"): pad (default): letterbox, nothing lost. crop: fill and center-crop.
 - `output` (string): Output path; default SCREENCAST_HOME/edits.
@@ -1308,7 +1310,7 @@ Smooth animated zoom-and-pan into the action and back out, from keyframes or pla
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Source video path.
 - `keyframes` (object[]; at most 100 items): Views reached by time t: a source rectangle (x, y, width, height), or { t, full: true } to zoom out. Omit to plan them (see follow).
 - `keyframes[].t` (number; required, ≥ 0)
 - `keyframes[].x` (number)
@@ -1341,7 +1343,7 @@ Encode a platform-ready H.264 file (aspect, fps, bitrate, faststart) for a named
 
 Parameters:
 
-- `input` (string; required): Path to the source video.
+- `input` (string; required): Source video path.
 - `platform` ("youtube" | "instagram_reel" | "tiktok" | "x" | "square" | "steam_trailer" | "vertical_reel"; required): Sets aspect, size, fps, bitrate. steam_trailer: 1080p 5.5 Mbps CBR, -14 LUFS. vertical_reel: 1080x1920 over a blurred copy of itself, -14 LUFS (ignores fit).
 - `fit` ("pad" | "crop"): Fit to the platform aspect: pad (default) or crop.
 - `output` (string): Output path; default SCREENCAST_HOME/edits.

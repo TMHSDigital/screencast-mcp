@@ -17,6 +17,7 @@ export function register(server: McpServer): void {
       inputSchema: {
         status: z.array(z.enum(["recording", "paused", "stopped", "failed", "orphaned"])).min(1).optional().describe("Only these."),
         limit: z.number().int().min(1).max(100).optional().describe("At most this many (default all)."),
+        query: z.string().min(1).max(80).optional().describe("In label, id, target or output."),
         full: z.boolean().optional().describe("Whole records."),
       },
       outputSchema: looseOutput({
@@ -28,18 +29,22 @@ export function register(server: McpServer): void {
     async (args) => {
       try {
         const all = getStore().list();
+        const q = args.query?.toLowerCase();
         const picked = all
           .filter((s) => !args.status || args.status.includes(s.status))
+          .filter((s) => !q || [s.label, s.id, s.target, s.outputPath].some((v) => v?.toLowerCase().includes(q)))
           .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
           .slice(0, args.limit ?? Infinity);
         // A summary by default (#366): a full record carries segments,
         // markers, sidecar summaries and the capture plan, and a hundred of
         // them is tens of KB in the model's context.
         const sessions = picked.map((s) => {
-          const alive = s.status === "recording" && isAlive(s.pid);
+          // A paused session has no capture process; its server's is what matters.
+          const alive = s.status === "recording" ? isAlive(s.pid) : s.status === "paused" ? isAlive(s.serverPid ?? null) : false;
           if (args.full) return { ...s, alive };
           return {
             id: s.id,
+            ...(s.label ? { label: s.label } : {}),
             status: s.status,
             target: s.target,
             outputPath: s.outputPath,

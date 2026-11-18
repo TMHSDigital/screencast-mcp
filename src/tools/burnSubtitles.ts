@@ -12,7 +12,7 @@ import { bundledFontPath } from "../utils/fonts.js";
 import { editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
-  input: z.string().min(1).describe("Path to the source video."),
+  input: z.string().min(1).describe("Source video path."),
   subtitles: z.string().min(1).describe("Path to an .srt (e.g. from transcribe) or .ass subtitle file."),
   style: z
     .enum(CAPTION_STYLE_NAMES)

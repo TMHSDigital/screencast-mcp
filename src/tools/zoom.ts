@@ -29,7 +29,7 @@ export const MAX_RINGS = 200;
 import { editOutputExt } from "../utils/media.js";
 
 const inputSchema = {
-  input: z.string().min(1).describe("Path to the source video."),
+  input: z.string().min(1).describe("Source video path."),
   keyframes: z
     .array(zoomKeyframeSchema)
     .max(100)

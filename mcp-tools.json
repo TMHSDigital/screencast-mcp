@@ -65,6 +65,12 @@
           "description": "Replace an existing output (default false).",
           "type": "boolean"
         },
+        "label": {
+          "description": "Name for list_sessions query.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
         "maxDurationSec": {
           "description": "Auto-stop after this many seconds (default 3600 or SCREENCAST_MAX_RECORDING_SEC; max 7 days; 0 = no cap).",
           "type": "integer",
@@ -448,6 +454,12 @@
           "minimum": 1,
           "maximum": 100
         },
+        "query": {
+          "description": "In label, id, target or output.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
         "full": {
           "description": "Whole records.",
           "type": "boolean"
@@ -801,7 +813,7 @@
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Source video path."
         },
         "count": {
           "description": "Frames to tile (default 12).",
@@ -1204,7 +1216,7 @@
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Source video path."
         },
         "start": {
           "type": "number",
@@ -1347,7 +1359,7 @@
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Source video path."
         },
         "format": {
           "description": "gif (default) or webp (usually much smaller).",
@@ -1416,7 +1428,7 @@
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Source video path."
         },
         "x": {
           "type": "integer",
@@ -1473,7 +1485,7 @@
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Source video path."
         },
         "width": {
           "description": "Target width in px. Omit to derive from height (keeps aspect).",
@@ -1518,7 +1530,7 @@
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Source video path."
         },
         "factor": {
           "description": "Whole clip: >1 faster, <1 slower.",
@@ -2020,7 +2032,7 @@
           "description": "Boxes, text labels, and arrows, drawn in order (later on top), in video pixels. Each shows from..to seconds (default: whole video); color is a name, #RRGGBB, or name@alpha."
         },
         "fontFile": {
-          "description": "Font: a .ttf/.otf/.ttc path or a C:\\Windows\\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).",
+          "description": "Font: .ttf/.otf/.ttc path or C:\\Windows\\Fonts name. Default: bundled Inter, plus a system font for CJK, emoji, Arabic.",
           "type": "string",
           "minLength": 1
         },
@@ -2107,7 +2119,7 @@
           "type": "string"
         },
         "fontFile": {
-          "description": "Font: a .ttf/.otf/.ttc path or a C:\\Windows\\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).",
+          "description": "Font: .ttf/.otf/.ttc path or C:\\Windows\\Fonts name. Default: bundled Inter, plus a system font for CJK, emoji, Arabic.",
           "type": "string",
           "minLength": 1
         },
@@ -2304,7 +2316,7 @@
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Source video path."
         },
         "level": {
           "description": "CRF 23 / 28 / 32 (default medium).",
@@ -2534,7 +2546,7 @@
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Source video path."
         },
         "subtitles": {
           "type": "string",
@@ -2700,7 +2712,7 @@
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Source video path."
         },
         "segments": {
           "minItems": 1,
@@ -2756,7 +2768,7 @@
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Source video path."
         },
         "minIdleSec": {
           "description": "Only cut still stretches at least this long (default 2).",
@@ -2871,7 +2883,7 @@
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Source video path."
         },
         "srt": {
           "type": "string",
@@ -3267,7 +3279,7 @@
           "type": "boolean"
         },
         "fontFile": {
-          "description": "Font: a .ttf/.otf/.ttc path or a C:\\Windows\\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).",
+          "description": "Font: .ttf/.otf/.ttc path or C:\\Windows\\Fonts name. Default: bundled Inter, plus a system font for CJK, emoji, Arabic.",
           "type": "string",
           "minLength": 1
         },
@@ -3433,7 +3445,7 @@
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Source video path."
         },
         "aspect": {
           "type": "string",
@@ -3485,7 +3497,7 @@
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Source video path."
         },
         "keyframes": {
           "description": "Views reached by time t: a source rectangle (x, y, width, height), or { t, full: true } to zoom out. Omit to plan them (see follow).",
@@ -3593,7 +3605,7 @@
       "type": "object",
       "properties": {
         "input": {
-          "description": "Path to the source video.",
+          "description": "Source video path.",
           "type": "string",
           "minLength": 1
         },
@@ -3975,7 +3987,7 @@
                     }
                   },
                   "fontFile": {
-                    "description": "Font: a .ttf/.otf/.ttc path or a C:\\Windows\\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).",
+                    "description": "Font: .ttf/.otf/.ttc path or C:\\Windows\\Fonts name. Default: bundled Inter, plus a system font for CJK, emoji, Arabic.",
                     "type": "string",
                     "minLength": 1
                   }
@@ -4498,7 +4510,7 @@
         "input": {
           "type": "string",
           "minLength": 1,
-          "description": "Path to the source video."
+          "description": "Source video path."
         },
         "platform": {
           "type": "string",

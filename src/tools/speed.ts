@@ -9,7 +9,7 @@ import { buildSpeedArgs, editOutputExt } from "../utils/media.js";
 import { buildSpeedRangesArgs, checkSpeedRanges, rangesSavedSec, speedRangeSchema } from "../utils/idle.js";
 
 const inputSchema = {
-  input: z.string().min(1).describe("Path to the source video."),
+  input: z.string().min(1).describe("Source video path."),
   factor: z.number().positive().optional().describe("Whole clip: >1 faster, <1 slower."),
   segments: z
     .array(speedRangeSchema)
