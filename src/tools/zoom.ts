@@ -71,8 +71,8 @@ const inputSchema = {
     .describe(`Auto mode: the furthest it zooms in (default ${DEFAULT_AUTO_MAX_ZOOM}).`),
   holdSec: z.number().positive().max(30).optional().describe("Auto mode: stay zoomed this long after activity (default 2)."),
   dryRun: z.boolean().optional().describe("Return the planned keyframes only (editable, pass back)."),
-  output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
 };
 
 export function register(server: McpServer): void {

@@ -37,8 +37,8 @@ const inputSchema = {
   voice: z.string().optional().describe("Voice name or part (doctor lists them)."),
   rate: z.number().min(MIN_RATE).max(MAX_RATE).optional().describe("Default 1."),
   duck: z.boolean().optional().describe("Duck the original audio (default true)."),
-  output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
 };
 
 export function register(server: McpServer): void {

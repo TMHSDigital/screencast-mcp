@@ -33,7 +33,7 @@ import type { AnimExportOptions } from "./animExport.js";
 import type { TimeOp } from "./chapters.js";
 import { backdropSteps, type BackdropOptions } from "./backdrop.js";
 import { groupBadges, keystrokeSteps, retimeBadges, type Badge, type BadgePlanOptions, type BadgeStyle, type KeystrokeAssets } from "./keystrokes.js";
-import { checkSpeedRanges, cutFilters, cutsFor, rangesSavedSec, speedRangeFilters, DEFAULT_IDLE_FACTOR, DEFAULT_KEEP_SEC, DEFAULT_MIN_IDLE_SEC, type SpeedRange } from "./idle.js";
+import { checkSpeedRanges, cutFilters, cutsFor, rangesSavedSec, speedRangeFilters, DEFAULT_IDLE_FACTOR, DEFAULT_KEEP_SEC, DEFAULT_MIN_IDLE_SEC, type SpeedRange, type IdleBasis, type IdleRect, type IdleSensitivity } from "./idle.js";
 import { denoiseFilter, loudnessTarget, loudnormFilter, type DenoiseStrength, type LoudnessMeasurement, type LoudnessPreset } from "./audio.js";
 import { subtitlesFilter, type CaptionStyle, type Cue } from "./captions.js";
 import { mapSpans, mapTime, retimeCues, type Span } from "./timeline.js";
@@ -76,7 +76,16 @@ export type PipelineStep =
       holdSec?: number;
       transitionSec?: number;
     }
-  | { op: "cut_idle"; minIdleSec?: number; keepSec?: number; action?: "cut" | "speed"; factor?: number }
+  | {
+      op: "cut_idle";
+      minIdleSec?: number;
+      keepSec?: number;
+      action?: "cut" | "speed";
+      factor?: number;
+      sensitivity?: IdleSensitivity;
+      ignoreRegions?: IdleRect[];
+      basis?: IdleBasis;
+    }
   | { op: "audio"; normalize?: LoudnessPreset | number; denoise?: DenoiseStrength }
   | { op: "burn_subtitles"; subtitles?: string; transcribe?: boolean; style?: CaptionStyle }
   | ({ op: "backdrop" } & BackdropOptions)

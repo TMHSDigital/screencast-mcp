@@ -15,8 +15,8 @@ const inputSchema = {
   fadeIn: z.number().nonnegative().optional().describe("Fade-in seconds (default 1)."),
   fadeOut: z.number().nonnegative().optional().describe("Fade-out seconds (default 2)."),
   duck: z.boolean().optional().describe("Duck the music under the original audio (default false)."),
-  output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
 };
 
 export function register(server: McpServer): void {

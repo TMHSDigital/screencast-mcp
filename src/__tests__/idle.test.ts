@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { argAfter } from "./testUtils.js";
-import { buildIdleScanArgs, parseFreezes, parseSilences, intersect, cutsFor, buildCutIdleArgs } from "../utils/idle.js";
+import { buildIdleScanArgs, parseFreezes, parseSilences, intersect, cutsFor, buildCutIdleArgs, eventIdle } from "../utils/idle.js";
 
 // What ffmpeg printed for a clip with a frozen, silent stretch from 2 s to 6 s.
 const SCAN = `[Parsed_silencedetect_0 @ 0x1] silence_start: 1.999977
@@ -50,5 +50,25 @@ describe("cut_idle (#122)", () => {
     const a = buildCutIdleArgs("in.mp4", "o.mp4", cuts, false);
     const vf = argAfter(a, "-vf");
     expect(vf.startsWith("select='not((between(t,0,1)+")).toBe(true);
+  });
+});
+
+describe("cut_idle tolerance, ignore regions and event basis (#353)", () => {
+  it("maps sensitivity to the freeze threshold and masks ignored regions first", () => {
+    expect(argAfter(buildIdleScanArgs("in.mp4", 2, false), "-vf")).toBe("freezedetect=n=-60dB:d=2");
+    const vf = argAfter(buildIdleScanArgs("in.mp4", 2, false, { sensitivity: "loose", ignoreRegions: [{ x: 10, y: 20, width: 30, height: 40 }] }), "-vf");
+    expect(vf).toBe("drawbox=x=10:y=20:w=30:h=40:color=black:t=fill,freezedetect=n=-40dB:d=2");
+  });
+
+  it("finds stretches with no clicks, wheel or typing; moves do not count, a log gap does", () => {
+    const events = [
+      { t: 1, type: "down" },
+      { t: 2, type: "move" },
+      { t: 5, type: "typing", durationSec: 1 },
+      { t: 9, type: "gap", durationSec: 2 },
+    ];
+    expect(eventIdle(events, 14, 2)).toEqual([{ start: 1, end: 5 }, { start: 6, end: 9 }, { start: 11, end: 14 }]);
+    expect(eventIdle([], 3, 2)).toEqual([{ start: 0, end: 3 }]);
+    expect(eventIdle(events, 14, 3.5)).toEqual([{ start: 1, end: 5 }]);
   });
 });

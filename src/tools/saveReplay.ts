@@ -18,7 +18,7 @@ const inputSchema = {
     .optional()
     .describe("Seconds back from now (default and max: the buffer length)."),
   output: z.string().optional().describe("Output .mp4 path (default under SCREENCAST_HOME/recordings)."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
   reencode: z
     .boolean()
     .optional()

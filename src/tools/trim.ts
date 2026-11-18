@@ -20,8 +20,8 @@ const inputSchema = {
       "Re-encode for a frame-exact cut with the removed content really gone (default true). false = fast " +
         "stream copy that snaps to a keyframe and keeps hidden earlier frames; never use it to remove secrets.",
     ),
-  output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
 };
 
 export function register(server: McpServer): void {

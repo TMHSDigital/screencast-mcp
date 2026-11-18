@@ -11,6 +11,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 - `start_recording` checks free space on the output drive first: it refuses below 500 MB, so a capture no longer fails partway with a write error, and returns a `diskNote` below 2 GB (#354).
 - `pipeline` writes the input's `.events.jsonl`, `.logs.jsonl` and `.perf.jsonl` beside the output, moved through its trims, speed changes and cuts (and crops and scales, for event positions), so `step_guide`, `read_events`, `zoom` and `bug_report` work on the edited file. After a zoom, reframe or backdrop the event log is left out, with a warning (#352).
+- `cut_idle` (and the pipeline `cut_idle` step) take `sensitivity` (`strict`, the old behaviour, `normal` or `loose`, so a blinking caret or spinner still counts as idle), `ignoreRegions` (rectangles masked out of the freeze check, such as a clock), and `basis`: `events` finds idle time from the `.events.jsonl` (no clicks, wheel or typing), `both` needs a frozen screen and no input (#353).
 
 ## [0.52.0] - 2026-11-17
 

@@ -54,7 +54,7 @@ const inputSchema = {
     .optional()
     .describe("Write one representative poster frame instead of a sheet."),
   output: z.string().optional().describe("Optional output .png path. Defaults under SCREENCAST_HOME/frames."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
   returnImage: z
     .boolean()
     .optional()

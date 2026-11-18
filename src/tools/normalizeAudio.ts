@@ -22,8 +22,8 @@ const inputSchema = {
     .describe(
       "youtube (-14 LUFS, default), podcast (-16), broadcast (-23), or a LUFS number (-70 to -5).",
     ),
-  output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
 };
 
 export function register(server: McpServer): void {

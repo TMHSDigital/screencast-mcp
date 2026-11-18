@@ -189,6 +189,22 @@ describe.skipIf(!AVAILABLE)("bug_report against real ffmpeg (#198)", { timeout: 
     expect(events.find((e) => e.type === "down")).toMatchObject({ t: 0.5, x: 20, y: 30 });
   });
 
+  it("cut_idle finds idle time from the event log, and from both with a masked region (#353)", async () => {
+    // Input stops at 2.0 s; the screen changes at 3 s, when the error text appears.
+    const events = await call("cut_idle", { input: video, basis: "events", minIdleSec: 2, keepSec: 0, dryRun: true });
+    expect(events.isError, events.text).toBe(false);
+    expect(events.data).toMatchObject({ cuts: [{ start: 2, end: 6 }], idleRule: "no clicks, wheel or typing" });
+    const both = await call("cut_idle", {
+      input: video, basis: "both", sensitivity: "loose", ignoreRegions: [{ x: 0, y: 180, width: 640, height: 180 }], minIdleSec: 2, keepSec: 0, dryRun: true,
+    });
+    expect(both.isError, both.text).toBe(false);
+    // With the error line masked the screen never changes, so 2-6 s is idle on both counts.
+    const cuts = (both.data as { cuts: Array<{ start: number; end: number }> }).cuts;
+    expect(cuts).toHaveLength(1);
+    expect(cuts[0]!.start).toBeCloseTo(2, 0);
+    expect(cuts[0]!.end).toBeCloseTo(6, 0);
+  });
+
   it("pipeline refuses a redact step with neither regions nor secrets (#341)", async () => {
     const res = await call("pipeline", { input: video, steps: [{ op: "redact" }], output: join(home, "none.mp4") });
     expect(res.isError).toBe(true);

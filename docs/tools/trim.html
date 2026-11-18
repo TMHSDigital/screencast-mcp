@@ -60,8 +60,8 @@
           <tr id="p-end"><td><a class="param-link" href="#p-end"><code>end</code></a></td><td><code class="type">number</code></td><td>End time in seconds. Use end OR duration. <span class="bounds">&gt; 0</span></td></tr>
           <tr id="p-duration"><td><a class="param-link" href="#p-duration"><code>duration</code></a></td><td><code class="type">number</code></td><td>Clip length in seconds. Use end OR duration. <span class="bounds">&gt; 0</span></td></tr>
           <tr id="p-exact"><td><a class="param-link" href="#p-exact"><code>exact</code></a></td><td><code class="type">boolean</code></td><td>Re-encode for a frame-exact cut with the removed content really gone (default true). false = fast stream copy that snaps to a keyframe and keeps hidden earlier frames; never use it to remove secrets.</td></tr>
-          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Optional output path. Defaults under SCREENCAST_HOME/edits.</td></tr>
-          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Allow replacing an existing file at the output path (default false).</td></tr>
+          <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Output path (default: under SCREENCAST_HOME/edits).</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Replace an existing output file (default false).</td></tr>
         </tbody>
       </table>
       </div>

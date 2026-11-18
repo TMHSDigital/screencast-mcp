@@ -19,8 +19,8 @@ const inputSchema = {
   metric: z.enum(PERF_METRICS).optional().describe("Default cpu (the app's) if sampled, else sysCpu."),
   corner: z.enum(PERF_CORNERS).optional().describe("Default top_right."),
   width: z.number().int().min(80).max(1920).optional().describe("Chart width px (default video/4)."),
-  output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
 };
 
 export function register(server: McpServer): void {

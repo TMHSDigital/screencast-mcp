@@ -26,7 +26,7 @@ const inputSchema = {
   shadowOpacity: o.shadowOpacity.describe("Default 0.5."),
   aspect: o.aspect.describe("Output on this aspect's canvas (1920x1080, ...), content scaled to fit."),
   output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits (screenshots for an image)."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
 };
 
 export function register(server: McpServer): void {

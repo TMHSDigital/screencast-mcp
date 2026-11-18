@@ -130,7 +130,7 @@ const inputSchema = {
     .string()
     .optional()
     .describe("Output .mp4 path (default under SCREENCAST_HOME/recordings)."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
   maxDurationSec: z
     .number()
     .int()

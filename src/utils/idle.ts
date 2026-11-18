@@ -20,13 +20,43 @@ export const DEFAULT_KEEP_SEC = 0.4;
 /** Cap on cut intervals, keeping the select expression a sane length. */
 export const MAX_CUTS = 200;
 
+/** freezedetect noise tolerance (#353): strict (the old default) needs a
+ * truly still frame; loose lets a blinking caret, spinner or clock count as idle. */
+export const IDLE_SENSITIVITY_DB = { strict: -60, normal: -50, loose: -40 } as const;
+export type IdleSensitivity = keyof typeof IDLE_SENSITIVITY_DB;
+export const IDLE_BASES = ["screen", "events", "both"] as const;
+export type IdleBasis = (typeof IDLE_BASES)[number];
+
+const rect = z.object({ x: z.number().nonnegative(), y: z.number().nonnegative(), width: z.number().positive(), height: z.number().positive() });
+export type IdleRect = z.infer<typeof rect>;
+export const MAX_IGNORE_REGIONS = 8;
+
+/** Options cut_idle and the pipeline step share (#353); the step's copy is
+ * undescribed, like its other fields, to keep tools/list small. */
+export const idleOptionFields = {
+  sensitivity: z.enum(["strict", "normal", "loose"]).optional(),
+  ignoreRegions: z.array(rect).max(MAX_IGNORE_REGIONS).optional(),
+  basis: z.enum(IDLE_BASES).optional(),
+};
+export const describedIdleOptionFields = {
+  sensitivity: idleOptionFields.sensitivity.describe("Freeze tolerance: strict (default), normal, loose (a caret or spinner still counts as idle)."),
+  ignoreRegions: idleOptionFields.ignoreRegions.describe("Rectangles (a clock) left out of the freeze check."),
+  basis: idleOptionFields.basis.describe("screen (default), events (no input in .events.jsonl), or both."),
+};
+
+export interface IdleScanOptions {
+  sensitivity?: IdleSensitivity;
+  ignoreRegions?: IdleRect[];
+}
+
 /** Scan for freezes (and silences, when the file has audio); the reports go
- * to stderr at info level. */
-export function buildIdleScanArgs(input: string, minIdleSec: number, withAudio: boolean): string[] {
+ * to stderr at info level. Ignored regions are filled black first. */
+export function buildIdleScanArgs(input: string, minIdleSec: number, withAudio: boolean, opts: IdleScanOptions = {}): string[] {
   if (!(minIdleSec > 0)) throw new ScreencastError("minIdleSec must be positive.");
+  const mask = (opts.ignoreRegions ?? []).map((r) => `drawbox=x=${Math.round(r.x)}:y=${Math.round(r.y)}:w=${Math.round(r.width)}:h=${Math.round(r.height)}:color=black:t=fill`);
   return [
     "-hide_banner", "-nostats", "-v", "info", "-i", input,
-    "-vf", `freezedetect=n=-60dB:d=${minIdleSec}`,
+    "-vf", [...mask, `freezedetect=n=${IDLE_SENSITIVITY_DB[opts.sensitivity ?? "strict"]}dB:d=${minIdleSec}`].join(","),
     ...(withAudio ? ["-af", `silencedetect=n=-40dB:d=${minIdleSec}`] : ["-an"]),
     "-f", "null", "-",
   ];
@@ -59,6 +89,28 @@ export function parseFreezes(stderr: string, duration: number): Interval[] {
 
 export function parseSilences(stderr: string, duration: number): Interval[] {
   return pairs(stderr, /silence_start:\s*([\d.]+)/, /silence_end:\s*([\d.]+)/, duration);
+}
+
+/** Idle by the event log (#353): stretches of at least `minIdleSec` with no
+ * click, wheel, key or typing. A gap in the log counts as activity, since
+ * what happened then is unknown; pointer moves alone do not. Pure. */
+export function eventIdle(
+  events: ReadonlyArray<{ t: number; type: string; durationSec?: number }>,
+  duration: number,
+  minIdleSec: number,
+): Interval[] {
+  const busy = events
+    .filter((e) => e.type !== "move" && e.type !== "focus")
+    .map((e) => ({ start: e.t, end: e.t + (e.durationSec ?? 0) }))
+    .sort((a, b) => a.start - b.start);
+  const out: Interval[] = [];
+  let from = 0;
+  for (const b of [...busy, { start: duration, end: duration }]) {
+    const end = Math.min(b.start, duration);
+    if (end - from >= minIdleSec) out.push({ start: from, end });
+    from = Math.max(from, b.end);
+  }
+  return out;
 }
 
 /** Overlap of two sorted interval lists. Pure. */

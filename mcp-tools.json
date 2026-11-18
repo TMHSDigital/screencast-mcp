@@ -62,7 +62,7 @@
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         },
         "maxDurationSec": {
@@ -371,7 +371,7 @@
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         },
         "reencode": {
@@ -653,7 +653,7 @@
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         },
         "returnImage": {
@@ -815,7 +815,7 @@
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         },
         "returnImage": {
@@ -1197,11 +1197,11 @@
           "type": "boolean"
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -1235,11 +1235,11 @@
           "description": "Video paths to join, in order."
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -1287,11 +1287,11 @@
           "exclusiveMinimum": 0
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -1357,11 +1357,11 @@
           "exclusiveMinimum": 0
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -1410,11 +1410,11 @@
           "maximum": 9007199254740991
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -1459,11 +1459,11 @@
           "maximum": 9007199254740991
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -1525,11 +1525,11 @@
           }
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -1605,11 +1605,11 @@
           ]
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -1698,11 +1698,11 @@
           ]
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -1761,11 +1761,11 @@
           "maximum": 1920
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -1996,11 +1996,11 @@
           "minLength": 1
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -2087,11 +2087,11 @@
           "type": "boolean"
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -2154,11 +2154,11 @@
           "type": "boolean"
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -2249,7 +2249,7 @@
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -2293,11 +2293,11 @@
           "maximum": 9007199254740991
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -2336,11 +2336,11 @@
           "description": "Audio output codec. copy keeps the source codec without re-encoding."
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -2388,11 +2388,11 @@
           ]
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -2430,11 +2430,11 @@
           ]
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -2479,7 +2479,7 @@
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -2521,11 +2521,11 @@
           ]
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -2700,7 +2700,7 @@
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -2743,6 +2743,56 @@
           "description": "Require silent audio too (default true when there is audio).",
           "type": "boolean"
         },
+        "sensitivity": {
+          "description": "Freeze tolerance: strict (default), normal, loose (a caret or spinner still counts as idle).",
+          "type": "string",
+          "enum": [
+            "strict",
+            "normal",
+            "loose"
+          ]
+        },
+        "ignoreRegions": {
+          "description": "Rectangles (a clock) left out of the freeze check.",
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number",
+                "minimum": 0
+              },
+              "y": {
+                "type": "number",
+                "minimum": 0
+              },
+              "width": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "height": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "x",
+              "y",
+              "width",
+              "height"
+            ]
+          }
+        },
+        "basis": {
+          "description": "screen (default), events (no input in .events.jsonl), or both.",
+          "type": "string",
+          "enum": [
+            "screen",
+            "events",
+            "both"
+          ]
+        },
         "action": {
           "description": "cut (default), or speed: fast-forward them.",
           "type": "string",
@@ -2762,11 +2812,11 @@
           "type": "boolean"
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -2825,11 +2875,11 @@
           "type": "boolean"
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -2922,11 +2972,11 @@
           "type": "string"
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -3049,11 +3099,11 @@
           "exclusiveMinimum": 0
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -3114,11 +3164,11 @@
           "maximum": 9007199254740991
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -3193,11 +3243,11 @@
           "minLength": 1
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -3250,11 +3300,11 @@
           "type": "boolean"
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -3323,11 +3373,11 @@
           "type": "boolean"
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -3375,11 +3425,11 @@
           ]
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -3486,11 +3536,11 @@
           "type": "boolean"
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },
@@ -4026,6 +4076,53 @@
                     "type": "number",
                     "exclusiveMinimum": 1,
                     "maximum": 100
+                  },
+                  "sensitivity": {
+                    "type": "string",
+                    "enum": [
+                      "strict",
+                      "normal",
+                      "loose"
+                    ]
+                  },
+                  "ignoreRegions": {
+                    "maxItems": 8,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "y": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "width": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "height": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y",
+                        "width",
+                        "height"
+                      ]
+                    }
+                  },
+                  "basis": {
+                    "type": "string",
+                    "enum": [
+                      "screen",
+                      "events",
+                      "both"
+                    ]
                   }
                 },
                 "required": [
@@ -4341,11 +4438,11 @@
           "type": "boolean"
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         },
         "chapters": {
@@ -4396,11 +4493,11 @@
           ]
         },
         "output": {
-          "description": "Optional output path. Defaults under SCREENCAST_HOME/edits.",
+          "description": "Output path (default: under SCREENCAST_HOME/edits).",
           "type": "string"
         },
         "overwrite": {
-          "description": "Allow replacing an existing file at the output path (default false).",
+          "description": "Replace an existing output file (default false).",
           "type": "boolean"
         }
       },

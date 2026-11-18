@@ -3,13 +3,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { editOutput, requireInput } from "../utils/editTool.js";
 import { errorResponse, okResponse, ScreencastError } from "../utils/errors.js";
 import { WRITES_FILE } from "../utils/toolSpec.js";
-import { requireFfmpeg, runCapture, probeMedia } from "../utils/ffmpeg.js";
+import { requireFfmpeg, probeMedia } from "../utils/ffmpeg.js";
+import { findIdle } from "../utils/idleScan.js";
 import { runEditJob, jobTimeoutMs } from "../utils/jobs.js";
 import {
-  buildIdleScanArgs,
-  parseFreezes,
-  parseSilences,
-  intersect,
   cutsFor,
   buildCutIdleArgs,
   buildSpeedRangesArgs,
@@ -18,6 +15,7 @@ import {
   DEFAULT_MIN_IDLE_SEC,
   DEFAULT_KEEP_SEC,
   MAX_RANGE_FACTOR,
+  describedIdleOptionFields,
 } from "../utils/idle.js";
 import { editOutputExt } from "../utils/media.js";
 
@@ -37,11 +35,12 @@ const inputSchema = {
     .boolean()
     .optional()
     .describe("Require silent audio too (default true when there is audio)."),
+  ...describedIdleOptionFields,
   action: z.enum(["cut", "speed"]).optional().describe("cut (default), or speed: fast-forward them."),
   factor: z.number().gt(1).max(MAX_RANGE_FACTOR).optional().describe(`speed: times faster (default ${DEFAULT_IDLE_FACTOR}).`),
   dryRun: z.boolean().optional().describe("Only report what would be cut."),
-  output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
 };
 
 export function register(server: McpServer): void {
@@ -67,12 +66,16 @@ export function register(server: McpServer): void {
         const hasAudio = info.audioCodec !== null;
         const useAudio = (args.useAudio ?? true) && hasAudio;
 
-        const scan = await runCapture(ffmpeg, buildIdleScanArgs(args.input, minIdle, useAudio), jobTimeoutMs(duration), {
+        const { idle, rule } = await findIdle(ffmpeg, args.input, {
+          minIdleSec: minIdle,
+          useAudio,
+          duration,
+          sensitivity: args.sensitivity,
+          ignoreRegions: args.ignoreRegions,
+          basis: args.basis,
+          timeoutMs: jobTimeoutMs(duration),
           signal: extra.signal,
         });
-        if (scan.code !== 0) throw new ScreencastError(`Idle scan failed (exit ${scan.code}): ${scan.stderr.trim().slice(-400)}`);
-        const freezes = parseFreezes(scan.stderr, duration);
-        const idle = useAudio ? intersect(freezes, parseSilences(scan.stderr, duration)) : freezes;
         const cuts = cutsFor(idle, minIdle, keep);
         const speedUp = args.action === "speed";
         const factor = args.factor ?? DEFAULT_IDLE_FACTOR;
@@ -84,7 +87,7 @@ export function register(server: McpServer): void {
           removedSec,
           originalSec: Number(duration.toFixed(2)),
           newDurationSec: Number((duration - removedSec).toFixed(2)),
-          idleRule: useAudio ? "frozen video and silent audio" : "frozen video",
+          idleRule: rule,
         };
         if (args.dryRun || cuts.length === 0) {
           return okResponse({ ...summary, ...(cuts.length === 0 ? { note: "No idle stretches found; nothing to cut." } : { dryRun: true }) });

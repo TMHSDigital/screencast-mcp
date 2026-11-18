@@ -14,8 +14,8 @@ const inputSchema = {
     .describe("mp4 (H.264), webm (VP9), or gif (palette)."),
   fps: z.number().positive().optional().describe("gif only: fps (default 12)."),
   width: z.number().positive().optional().describe("gif only: width in px (default 720)."),
-  output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
 };
 
 export function register(server: McpServer): void {

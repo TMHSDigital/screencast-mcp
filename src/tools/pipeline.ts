@@ -19,7 +19,8 @@ import { buildChapters, ffmetadata, markerPoints, markersOrChapters, retimeMarke
 import type { CursorStepAssets, KeystrokeStepAssets } from "../utils/pipeline.js";
 import { cursorSpritePath, cursorOptionsSchema, loadCursor } from "../utils/cursor.js";
 import { MAX_ZOOM, type ClickPoint, readClicks, zoomKeyframeSchema } from "../utils/zoom.js";
-import { buildIdleScanArgs, intersect, parseFreezes, parseSilences, speedRangeSchema, DEFAULT_MIN_IDLE_SEC, MAX_RANGE_FACTOR } from "../utils/idle.js";
+import { idleOptionFields, speedRangeSchema, DEFAULT_MIN_IDLE_SEC, MAX_RANGE_FACTOR } from "../utils/idle.js";
+import { findIdle } from "../utils/idleScan.js";
 import { buildLoudnessMeasureArgs, buildNoiseFloorArgs, loudnessTarget, parseLoudnorm, parseNoiseFloor, DENOISE_STRENGTHS, loudnessTargetSchema } from "../utils/audio.js";
 import { buildTranscribeArgs, formatSrt, normalizeCues, parseSrt, resolveWhisperModel, type Cue, CAPTION_STYLE_NAMES } from "../utils/captions.js";
 import { eventPaths } from "../utils/events.js";
@@ -90,6 +91,7 @@ const step = z.discriminatedUnion("op", [
     keepSec: z.number().min(0).optional(),
     action: z.enum(["cut", "speed"]).optional(),
     factor: z.number().gt(1).max(MAX_RANGE_FACTOR).optional(),
+    ...idleOptionFields,
   }),
   z.object({
     op: z.literal("audio"),
@@ -137,8 +139,8 @@ const inputSchema = {
     ),
   quality: z.enum(["draft", "standard", "high"]).optional().describe("Encoder preset for an mp4 result (default standard)."),
   dryRun: z.boolean().optional().describe("Return the plan (ffmpeg command, output size) without running it."),
-  output: z.string().optional().describe("Optional output path. Defaults under SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Allow replacing an existing file at the output path (default false)."),
+  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
   chapters: z
     .boolean()
     .optional()
@@ -247,13 +249,16 @@ export function register(server: McpServer): void {
           if (total === null) throw new ScreencastError(`Could not read the duration of ${input}.`);
           // A stretch minIdleSec long at the step is longer in the source after a speed-up.
           const speedUp = steps.slice(0, idleAt).reduce((f, x) => (x.op === "speed" && x.factor ? f * x.factor : f), 1);
-          const useAudio = hasAudio;
-          const scan = await runCapture(ffmpeg, buildIdleScanArgs(input, (idleStep.minIdleSec ?? DEFAULT_MIN_IDLE_SEC) * speedUp, useAudio), timeout, {
+          ({ idle } = await findIdle(ffmpeg, input, {
+            minIdleSec: (idleStep.minIdleSec ?? DEFAULT_MIN_IDLE_SEC) * speedUp,
+            useAudio: hasAudio,
+            duration: total,
+            sensitivity: idleStep.sensitivity,
+            ignoreRegions: idleStep.ignoreRegions,
+            basis: idleStep.basis,
+            timeoutMs: timeout,
             signal: extra.signal,
-          });
-          if (scan.code !== 0) throw new ScreencastError(`Idle scan failed (exit ${scan.code}): ${scan.stderr.trim().slice(-400)}`);
-          const freezes = parseFreezes(scan.stderr, total);
-          idle = useAudio ? intersect(freezes, parseSilences(scan.stderr, total)) : freezes;
+          }));
         }
 
         // Secrets (#341): OCR the source for on-screen secrets and give each
