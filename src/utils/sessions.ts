@@ -10,7 +10,7 @@
  * The child handle is intentionally NOT persisted; only the pid is. Reaping
  * logic (classifyOrphan) is pure so it is unit-tested without real processes.
  */
-import { execFile, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import {
   readFileSync,
   writeFileSync,
@@ -26,6 +26,7 @@ import {
 import type { ChildProcess } from "node:child_process";
 import { basename } from "node:path";
 import { errorMessage, ScreencastError } from "./errors.js";
+import { powerShellArgs, runPowerShell } from "./powershell.js";
 import type { Quality } from "./targets.js";
 import { WGC_WINDOW_CLOSED_EXIT } from "./wgc.js";
 import type { ReplayBuffer } from "./replay.js";
@@ -245,7 +246,7 @@ const PROCESS_INFO_TIMEOUT_MS = 10_000;
  * gone or cannot be read. */
 export function processInfo(pid: number): { image: string; startMs: number } | null {
   if (process.platform !== "win32" || !Number.isInteger(pid) || pid <= 0) return null;
-  const res = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", processInfoScript(pid)], {
+  const res = spawnSync("powershell", powerShellArgs(processInfoScript(pid)), {
     encoding: "utf8",
     windowsHide: true,
     timeout: PROCESS_INFO_TIMEOUT_MS,
@@ -254,17 +255,14 @@ export function processInfo(pid: number): { image: string; startMs: number } | n
   return res.status === 0 && res.stdout ? parseProcessInfo(res.stdout) : null;
 }
 
-/** processInfo without blocking the event loop (#358), for boot reaping. */
+/** processInfo without blocking the event loop (#358), for boot reaping,
+ * through the shared PowerShell runner (#360). */
 export function processInfoAsync(pid: number): Promise<{ image: string; startMs: number } | null> {
   if (process.platform !== "win32" || !Number.isInteger(pid) || pid <= 0) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    execFile(
-      "powershell",
-      ["-NoProfile", "-NonInteractive", "-Command", processInfoScript(pid)],
-      { encoding: "utf8", windowsHide: true, timeout: PROCESS_INFO_TIMEOUT_MS, killSignal: "SIGKILL" },
-      (err, stdout) => resolve(!err && stdout ? parseProcessInfo(stdout) : null),
-    );
-  });
+  return runPowerShell(processInfoScript(pid), `process ${pid}`, { timeoutMs: PROCESS_INFO_TIMEOUT_MS }).then(
+    (stdout) => parseProcessInfo(stdout),
+    () => null,
+  );
 }
 
 /** True if a pid exists. `process.kill(pid, 0)` throws ESRCH when it does not. */

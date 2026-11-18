@@ -13,7 +13,7 @@ import {
   powerShellArgs,
   runPowerShell,
   withPayloadFile,
-} from "../utils/monitors.js";
+} from "../utils/powershell.js";
 import { MAX_LINES, MAX_LINE_CHARS, ttsCall } from "../utils/narrate.js";
 import { ocrCall } from "../utils/ocr.js";
 import { MAX_INDEX_FRAMES } from "../utils/recordingIndex.js";

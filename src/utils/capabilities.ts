@@ -7,7 +7,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { isAbsolute } from "node:path";
-import { runPowerShell, psTimeoutMs } from "./monitors.js";
+import { runPowerShell, psTimeoutMs } from "./powershell.js";
 import { errorMessage } from "./errors.js";
 
 /** FFmpeg major version that transcribe (whisper) and backend "wgc" (gfxcapture) need. */

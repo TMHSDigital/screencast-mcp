@@ -1,6 +1,6 @@
 /** #183: PowerShell helpers are killed after a timeout instead of hanging. */
 import { describe, it, expect } from "vitest";
-import { runPowerShell, psTimeoutMs, PS_TIMEOUT_MS, PS_TIMEOUT_ENV } from "../utils/monitors.js";
+import { runPowerShell, psTimeoutMs, PS_TIMEOUT_MS, PS_TIMEOUT_ENV } from "../utils/powershell.js";
 
 describe("runPowerShell timeout (#183)", () => {
   it("kills a script that does not answer and says what timed out", async () => {

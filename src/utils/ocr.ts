@@ -13,7 +13,7 @@
  */
 import { runInNewContext } from "node:vm";
 import { errorMessage, ScreencastError } from "./errors.js";
-import { runPowerShell, psTimeoutMs } from "./monitors.js";
+import { runPowerShell, psTimeoutMs } from "./powershell.js";
 import type { Rect } from "./diff.js";
 
 /** Upscale factors for the two recognition passes. */

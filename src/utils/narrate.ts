@@ -13,7 +13,7 @@
  * parser, and the ffmpeg builder are pure.
  */
 import { errorMessage, ScreencastError } from "./errors.js";
-import { runPowerShell, psTimeoutMs } from "./monitors.js";
+import { runPowerShell, psTimeoutMs } from "./powershell.js";
 import { audioCodecFor } from "./audio.js";
 import { isAudioOnlyPath } from "./media.js";
 import type { Marker } from "./chapters.js";

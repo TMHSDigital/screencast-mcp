@@ -14,7 +14,7 @@
  * pure so it is unit-tested without Windows.
  */
 import { errorMessage, ScreencastError } from "./errors.js";
-import { runPowerShell } from "./monitors.js";
+import { runPowerShell } from "./powershell.js";
 
 export interface RawWindow {
   title: string;
