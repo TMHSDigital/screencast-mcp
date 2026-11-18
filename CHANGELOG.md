@@ -13,6 +13,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - `pipeline` writes the input's `.events.jsonl`, `.logs.jsonl` and `.perf.jsonl` beside the output, moved through its trims, speed changes and cuts (and crops and scales, for event positions), so `step_guide`, `read_events`, `zoom` and `bug_report` work on the edited file. After a zoom, reframe or backdrop the event log is left out, with a warning (#352).
 - `cut_idle` (and the pipeline `cut_idle` step) take `sensitivity` (`strict`, the old behaviour, `normal` or `loose`, so a blinking caret or spinner still counts as idle), `ignoreRegions` (rectangles masked out of the freeze check, such as a clock), and `basis`: `events` finds idle time from the `.events.jsonl` (no clicks, wheel or typing), `both` needs a frozen screen and no input (#353).
 - `start_recording { replayBufferSec, saveWhen: { text } }` saves the buffer on its own when the text shows on screen (OCR): it waits `postRollSec` (default 3) so the clip holds what followed, writes the last `lastSec` to `recordings/`, adds a marker, lists the clip under the session's `autoSaves` (so resource subscribers hear about it), and re-arms once the text goes, up to `maxSaves` (default 5) (#356).
+- `record --bug-report` (Action input `bug-report: true`): when the command fails, the recording is packaged with `bug_report` into `bug-report/` in the output folder, and `evidence.json`, the job summary and the PR comment point at its `report.md` (#355).
 
 ## [0.52.0] - 2026-11-17
 

@@ -69,6 +69,9 @@ inputs:
   logs:
     description: App log files to follow into recording.logs.jsonl, one path per line (at most 5).
     default: ""
+  bug-report:
+    description: "When the command fails, write a bug_report package (secret-scanned clip and GIF, steps from the event log, OCR'd errors, report.md) to bug-report/ in the output folder. Needs Windows OCR; pairs well with events, logs and perf."
+    default: "false"
   comment:
     description: "On pull_request events, keep one sticky PR comment per job with the exit code, how the recording ended, OCR'd errors, and a link to the evidence artifact. Created when the command fails, updated on later runs. Needs `permissions: pull-requests: write`."
     default: "false"
@@ -193,6 +196,7 @@ runs:
         SC_EVENTS: ${{ inputs.events }}
         SC_PERF: ${{ inputs.perf }}
         SC_LOGS: ${{ inputs.logs }}
+        SC_BUG_REPORT: ${{ inputs.bug-report }}
       run: |
         $PSNativeCommandArgumentPassing = 'Windows'
         $cliArgs = @('record', '--target', $env:SC_TARGET, '--fps', $env:SC_FPS, '--out', $env:SC_OUT,
@@ -205,6 +209,7 @@ runs:
         if ($env:SC_EVENTS -eq 'true') { $cliArgs += '--events' }
         if ($env:SC_PERF -eq 'true') { $cliArgs += '--perf' }
         foreach ($log in ($env:SC_LOGS -split "`r?`n")) { if ($log.Trim()) { $cliArgs += @('--log', $log.Trim()) } }
+        if ($env:SC_BUG_REPORT -eq 'true') { $cliArgs += '--bug-report' }
         if ($env:SC_CLI_PATH) { & node $env:SC_CLI_PATH @cliArgs } else { & npx -y $env:SC_PACKAGE @cliArgs }
         $code = $LASTEXITCODE
         "exit-code=$code" >> $env:GITHUB_OUTPUT
@@ -223,6 +228,7 @@ runs:
           if ($e.gif) { $lines += "- GIF: ``$(Split-Path $e.gif -Leaf)``" }
           if ($e.contactSheet) { $lines += "- Contact sheet: ``$(Split-Path $e.contactSheet -Leaf)``" }
           if ($e.recording) { $lines += "- Recording: ``$(Split-Path $e.recording -Leaf)`` ($($e.durationSec) s)" }
+          if ($e.bugReport) { $lines += "- Bug report: ``bug-report/report.md``" }
           foreach ($w in $e.warnings) { $lines += "- Warning: $w"; Write-Host "::warning::screencast: $w" }
           $lines += ""
           $lines -join "`n" >> $env:GITHUB_STEP_SUMMARY
@@ -283,6 +289,7 @@ runs:
         if ($e -and $e.gif) { $have += 'GIF' }
         if ($e -and $e.contactSheet) { $have += 'contact sheet' }
         if ($e -and $e.recording) { $have += 'recording' }
+        if ($e -and $e.bugReport) { $have += 'bug report (bug-report/report.md)' }
         $have += 'evidence.json'
         if ($env:SC_ARTIFACT_URL) { $lines += "**Evidence:** [$env:SC_ARTIFACT_NAME]($env:SC_ARTIFACT_URL) ($($have -join ', ')) from [this run]($env:SC_RUN_URL)." }
         else { $lines += "**Evidence:** [this run]($env:SC_RUN_URL) (no artifact was uploaded)." }

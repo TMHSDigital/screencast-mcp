@@ -206,6 +206,24 @@ describe("runRecord evidence", () => {
     expect(r.evidence.warnings.join(" ")).toMatch(/recording failed at 3 s/);
   });
 
+  it("--bug-report packages a failing run, and only a failing one (#355)", async () => {
+    const stopped = { sessionId: "s1", status: "stopped", outputPath: "rec.mp4", durationSec: 40 };
+    const r = await run({ start_recording: started, stop_recording: stopped, bug_report: { outputDir: join("out", "bug-report") } }, 2, { bugReport: true, artifacts: "never" });
+    const call = r.calls.find((c) => c.name === "bug_report");
+    expect(call?.args).toMatchObject({ input: "rec.mp4", actual: "Exited with code 2.", clipSec: 30, overwrite: true });
+    expect(String(call?.args.outputDir)).toMatch(/bug-report$/);
+    expect(r.evidence.bugReport).toBe(join("out", "bug-report", "report.md"));
+
+    const passing = await run({ start_recording: started, stop_recording: stopped }, 0, { bugReport: true });
+    expect(passing.calls.some((c) => c.name === "bug_report")).toBe(false);
+    expect(passing.evidence.bugReport).toBeUndefined();
+
+    const noOcr = await run({ start_recording: started, stop_recording: stopped, bug_report: new Error("pass redact: false") }, 1, { bugReport: true, artifacts: "never" });
+    expect(noOcr.evidence.bugReport).toBeNull();
+    expect(noOcr.evidence.warnings.join(" ")).toMatch(/bug_report failed: .*pass redact: false/);
+    expect(recordOpts(["record", "--bug-report", "--", "x"]).bugReport).toBe(true);
+  });
+
   it("OCRs the tail of a failing run for error lines with --ocr-errors", async () => {
     const r = await run(
       {

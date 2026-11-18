@@ -54,6 +54,8 @@ export interface RecordOptions {
   events?: boolean;
   perf?: boolean;
   logs?: string[];
+  /** On failure, package the recording with bug_report into <out>/bug-report/ (#355). */
+  bugReport?: boolean;
   /** The command to run, as given after `--` (or the one --command-env names). */
   command: string[];
 }
@@ -105,6 +107,8 @@ record options:
   --events                also log clicks, scrolls and typing bursts to recording.events.jsonl
   --perf                  also sample CPU and memory to recording.perf.jsonl
   --log <path>            follow an app log into recording.logs.jsonl (repeatable)
+  --bug-report            on failure, write a redacted bug_report package (clip, GIF, steps,
+                          errors, report.md) to <out>/bug-report/
   --command-env <NAME>    run the command line in environment variable NAME instead of
                           the arguments after --, so quotes and & survive any shell
 
@@ -211,6 +215,9 @@ function parseRecord(argv: readonly string[], env: NodeJS.ProcessEnv): RecordOpt
         break;
       case "--log":
         options.logs = [...(options.logs ?? []), value()];
+        break;
+      case "--bug-report":
+        options.bugReport = true;
         break;
       default:
         throw new CliUsageError(`Unknown record option "${raw}". Run screencast-mcp --help.`);
@@ -452,6 +459,8 @@ export interface Evidence {
   errors: string[] | null;
   /** With --redact-secrets: secret regions blurred in the GIF and contact sheet. */
   redactions?: number;
+  /** With --bug-report on a failing run: the package's report.md. */
+  bugReport?: string | null;
   warnings: string[];
 }
 
@@ -596,6 +605,24 @@ export async function runRecord(opts: RecordOptions, io: CliIo = defaultIo, deps
     }
     if (evidence.recording && failed && opts.ocrErrors) {
       evidence.errors = await ocrErrors(client, evidence.recording, evidence.durationSec, opts.lastSec, outDir, warn);
+    }
+    if (evidence.recording && failed && opts.bugReport) {
+      // The redacted repro package (#355). bug_report refuses to package
+      // media it could not scan for secrets, so a missing OCR is a warning.
+      evidence.bugReport = null;
+      try {
+        const pkg = await mustCall(client, "bug_report", {
+          input: evidence.recording,
+          title: `${evidence.command} failed`,
+          actual: `Exited with code ${evidence.exitCode}.`,
+          clipSec: opts.lastSec > 0 ? opts.lastSec : undefined,
+          outputDir: join(outDir, "bug-report"),
+          overwrite: true,
+        });
+        evidence.bugReport = join(String(pkg.outputDir), "report.md");
+      } catch (err) {
+        warn(`bug_report failed: ${errorMessage(err)}`);
+      }
     }
     if (!failed && opts.discardOnSuccess && evidence.recording) {
       rmSync(evidence.recording, { force: true });
