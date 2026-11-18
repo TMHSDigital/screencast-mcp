@@ -24,8 +24,8 @@ const inputSchema = {
     .optional()
     .describe("Grow each region by this many px (default 0)."),
   color: z.string().optional().describe("Box fill color (default black)."),
-  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
 };
 
 export function register(server: McpServer): void {

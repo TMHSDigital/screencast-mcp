@@ -13,8 +13,8 @@ const inputSchema = {
   y: z.number().int().nonnegative(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
-  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
 };
 
 export function register(server: McpServer): void {

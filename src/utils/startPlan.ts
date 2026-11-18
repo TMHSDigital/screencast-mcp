@@ -22,6 +22,7 @@ export interface StartChoices {
   webcam: boolean;
   logs: boolean;
   perf: boolean;
+  saveWhen?: boolean;
 }
 
 /** Reject combinations that cannot work, before any resource is taken. Pure
@@ -35,6 +36,7 @@ export function checkStartChoices(c: StartChoices, facts: { windowHwnd: boolean;
   if (c.webcam && (c.backend === "wgc" || c.replay)) {
     throw new ScreencastError("webcam works with backend gdigrab or ddagrab, without replayBufferSec.");
   }
+  if (c.saveWhen && !c.replay) throw new ScreencastError("saveWhen saves from a replay buffer: add replayBufferSec.");
   if ((c.logs || c.perf) && c.replay) throw new ScreencastError("logs and perf are not supported with replayBufferSec yet.");
 }
 

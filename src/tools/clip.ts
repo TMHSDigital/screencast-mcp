@@ -22,7 +22,7 @@ const inputSchema = {
     .string()
     .optional()
     .describe("Optional output path. Only honored for a single segment; multi-segment output lands under SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
 };
 
 export function register(server: McpServer): void {

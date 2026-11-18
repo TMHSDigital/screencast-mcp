@@ -21,8 +21,8 @@ const inputSchema = {
       "clean (default for .srt): outlined line. social: big bold text on a dark box. .ass keeps its own " +
         "styling unless set.",
     ),
-  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
 };
 
 export function register(server: McpServer): void {

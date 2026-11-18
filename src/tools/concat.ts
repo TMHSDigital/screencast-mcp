@@ -16,8 +16,8 @@ const inputSchema = {
     .array(z.string().min(1))
     .min(2)
     .describe("Video paths to join, in order."),
-  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
 };
 
 export function register(server: McpServer): void {

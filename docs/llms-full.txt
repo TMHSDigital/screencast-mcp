@@ -56,7 +56,7 @@ Parameters:
 - `audio.source` ("system" | "none"; required): system = what the machine plays (needs a loopback device); none = video only.
 - `audio.device` (string): dshow loopback device (from list_audio_devices); auto-detected if omitted.
 - `output` (string): Output .mp4 path (default under SCREENCAST_HOME/recordings).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `overwrite` (boolean): Replace an existing output (default false).
 - `maxDurationSec` (integer; ≥ 0, ≤ 604800): Auto-stop after this many seconds (default 3600 or SCREENCAST_MAX_RECORDING_SEC; max 7 days; 0 = no cap).
 - `events` (boolean): Also log clicks, scroll, cursor, and typing (video-timed, video pixels) for read_events (default false; ~1 s slower start).
 - `keys` ("masked" | "shortcuts"): With events: masked (default) logs typing only as 0.5 s-grid bursts, never keys; shortcuts also names Ctrl/Alt/Win chords. Typed text is never logged.
@@ -82,6 +82,11 @@ Parameters:
 - `startWhen.timeoutSec` (number; > 0, ≤ 86400): Default 600.
 - `stopWhen` (object): Stop once this text shows (OCR).
 - `stopWhen.text` (string; required, at most 200 characters)
+- `saveWhen` (object): Replay buffer: save_replay when text shows (OCR), postRollSec (3) later; re-arms once it goes (maxSaves 5).
+- `saveWhen.text` (string; required, at most 200 characters)
+- `saveWhen.lastSec` (number; > 0, ≤ 3600)
+- `saveWhen.postRollSec` (number; ≥ 0, ≤ 30)
+- `saveWhen.maxSaves` (integer; ≥ 1, ≤ 50)
 
 Minimal call:
 
@@ -166,7 +171,7 @@ Parameters:
 - `sessionId` (string; required): Session id of a replay buffer.
 - `lastSec` (number; > 0, ≤ 3600): Seconds back from now (default and max: the buffer length).
 - `output` (string): Output .mp4 path (default under SCREENCAST_HOME/recordings).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `overwrite` (boolean): Replace an existing output (default false).
 - `reencode` (boolean): Frame-exact re-encode. Default: instant stream copy that may hide up to 2 s of earlier frames.
 
 Minimal call:
@@ -262,7 +267,7 @@ Parameters:
 - `exactTitle` (boolean): window: targets match the whole title only, never a substring (default false).
 - `backend` ("gdigrab" | "wgc"): gdigrab (default, ~0.2 s): what is visible. wgc (window:, FFmpeg 8+, ~1-2 s): the window even if covered.
 - `output` (string): Optional output .png path. Defaults to a file under SCREENCAST_HOME/screenshots.
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `overwrite` (boolean): Replace an existing output (default false).
 - `returnImage` (boolean): Return the image inline (default true; the PNG on disk stays full size).
 - `maxImageWidth` (integer; ≥ 16, ≤ 9007199254740991): Max inline image width (default 1280).
 
@@ -395,7 +400,7 @@ Parameters:
 - `tileWidth` (integer; ≥ 64, ≤ 1920): Tile width in px (default 320).
 - `poster` (boolean): Write one representative poster frame instead of a sheet.
 - `output` (string): Optional output .png path. Defaults under SCREENCAST_HOME/frames.
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `overwrite` (boolean): Replace an existing output (default false).
 - `returnImage` (boolean): Return the sheet inline (default true).
 - `maxImageWidth` (integer; ≥ 16, ≤ 9007199254740991): Max inline image width (default 1280).
 
@@ -538,8 +543,8 @@ Parameters:
 - `end` (number; > 0): End time in seconds. Use end OR duration.
 - `duration` (number; > 0): Clip length in seconds. Use end OR duration.
 - `exact` (boolean): Re-encode for a frame-exact cut with the removed content really gone (default true). false = fast stream copy that snaps to a keyframe and keeps hidden earlier frames; never use it to remove secrets.
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -556,8 +561,8 @@ Join videos end to end with hard cuts: stream copy when they match, else a re-en
 Parameters:
 
 - `inputs` (string[]; required, at least 2 items): Video paths to join, in order.
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -577,8 +582,8 @@ Parameters:
 - `format` ("mp4" | "gif" | "webm"; required): mp4 (H.264), webm (VP9), or gif (palette).
 - `fps` (number; > 0): gif only: fps (default 12).
 - `width` (number; > 0): gif only: width in px (default 720).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -601,8 +606,8 @@ Parameters:
 - `width` (integer; ≥ 64, ≤ 1920): Starting width in px (default 960).
 - `start` (number; ≥ 0): Start second.
 - `duration` (number; > 0): Seconds to export (default: to the end).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -623,8 +628,8 @@ Parameters:
 - `y` (integer; required, ≥ 0, ≤ 9007199254740991)
 - `width` (integer; required, > 0, ≤ 9007199254740991)
 - `height` (integer; required, > 0, ≤ 9007199254740991)
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -643,8 +648,8 @@ Parameters:
 - `input` (string; required): Path to the source video.
 - `width` (integer; > 0, ≤ 9007199254740991): Target width in px. Omit to derive from height (keeps aspect).
 - `height` (integer; > 0, ≤ 9007199254740991): Target height in px. Omit to derive from width (keeps aspect).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -666,8 +671,8 @@ Parameters:
 - `segments[].start` (number; required, ≥ 0)
 - `segments[].end` (number; required, > 0)
 - `segments[].factor` (number; required, > 1, ≤ 100)
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -686,8 +691,8 @@ Parameters:
 - `input` (string; required): Path to the source video.
 - `level` ("light" | "medium" | "heavy"): CRF 23 / 28 / 32 (default medium).
 - `maxWidth` (integer; > 0, ≤ 9007199254740991): Width cap in px (only downscales).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -708,7 +713,7 @@ Parameters:
 - `segments[].start` (number; required, ≥ 0)
 - `segments[].end` (number; required, > 0)
 - `output` (string): Optional output path. Only honored for a single segment; multi-segment output lands under SCREENCAST_HOME/edits.
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -738,8 +743,8 @@ Parameters:
 - `action` ("cut" | "speed"): cut (default), or speed: fast-forward them.
 - `factor` (number; > 1, ≤ 100): speed: times faster (default 8).
 - `dryRun` (boolean): Only report what would be cut.
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -760,8 +765,8 @@ Parameters:
 - `remove` ((integer | string)[]): Cue numbers as the .srt numbers them, or transcript text quoted exactly (must occur once).
 - `fillers` (boolean): Also cut fillers (um, uh...) that have their own cue.
 - `dryRun` (boolean): Only report the cuts.
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -788,8 +793,8 @@ Parameters:
 - `style` ("box" | "blur" | "pixelate"): box (default): irreversible fill; blur/pixelate are partially recoverable.
 - `pad` (integer; ≥ 0, ≤ 9007199254740991): Grow each region by this many px (default 0).
 - `color` (string): Box fill color (default black).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -921,8 +926,8 @@ Parameters:
 - `recipe` ("pr_demo" | "tutorial" | "social_reel"): Polish preset expanded to steps (see dryRun): pr_demo = cut_idle, click zoom, GIF <=10 MB; tutorial = + audio, captions, 1080p mp4; social_reel = 9:16, big captions. Given steps replace its same-op step; trim, redact, crop and cursor go first (source pixels and time).
 - `quality` ("draft" | "standard" | "high"): Encoder preset for an mp4 result (default standard).
 - `dryRun` (boolean): Return the plan (ffmpeg command, output size) without running it.
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 - `chapters` (boolean): Keep the input's markers as chapters, re-timed through trims and speed.
 
 Minimal call:
@@ -952,8 +957,8 @@ Parameters:
 - `start` (number; ≥ 0): Show from this second.
 - `end` (number; > 0): Hide after this second.
 - `shape` ("rect" | "circle"): circle: centre square masked round (webcam).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -976,8 +981,8 @@ Parameters:
 - `alignMarker` (string): Line inputs up on this add_marker label.
 - `endWith` ("longest" | "shortest"): longest (default; shorter ones hold their last frame) or shortest.
 - `audio` (integer | "mix" | "none"): Input index whose audio to keep (default 0), "mix", or "none".
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -998,8 +1003,8 @@ Parameters:
 - `metric` ("cpu" | "sysCpu" | "rssMB" | "sysMem"): Default cpu (the app's) if sampled, else sysCpu.
 - `corner` ("top_left" | "top_right" | "bottom_left" | "bottom_right"): Default top_right.
 - `width` (integer; ≥ 80, ≤ 1920): Chart width px (default video/4).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1063,8 +1068,8 @@ Parameters:
 - `items[arrow].to` (number; > 0)
 - `items[arrow].color` (string)
 - `fontFile` (string): Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1091,8 +1096,8 @@ Parameters:
 - `color` (string): Text color (default white).
 - `fontFile` (string): Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).
 - `dryRun` (boolean): Return the planned badges; write nothing.
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1116,8 +1121,8 @@ Parameters:
 - `clicks` (boolean): Ripple on clicks (default true).
 - `spotlight` (boolean): Dim all but the area around the cursor.
 - `dryRun` (boolean): Return the plan; write nothing.
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1143,7 +1148,7 @@ Parameters:
 - `shadowOpacity` (number; ≥ 0, ≤ 1): Default 0.5.
 - `aspect` ("16:9" | "9:16" | "1:1" | "4:5"): Output on this aspect's canvas (1920x1080, ...), content scaled to fit.
 - `output` (string): Optional output path. Defaults under SCREENCAST_HOME/edits (screenshots for an image).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1162,8 +1167,8 @@ Parameters:
 - `input` (string; required): Path to the source video.
 - `subtitles` (string; required): Path to an .srt (e.g. from transcribe) or .ass subtitle file.
 - `style` ("clean" | "social"): clean (default for .srt): outlined line. social: big bold text on a dark box. .ass keeps its own styling unless set.
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1216,8 +1221,8 @@ Parameters:
 - `inputB` (string; required): Incoming video.
 - `transition` (string): xfade name (default fade): fade, wipeleft, slideup, circleopen, dissolve, ...
 - `duration` (number; > 0): Transition length in seconds (default 1).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1239,8 +1244,8 @@ Parameters:
 - `width` (integer; > 0, ≤ 9007199254740991): Common output width (default 1920).
 - `height` (integer; > 0, ≤ 9007199254740991): Common output height (default 1080).
 - `fps` (integer; > 0, ≤ 9007199254740991): Common output fps (default 30).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1266,8 +1271,8 @@ Parameters:
 - `fontSize` (integer; > 0, ≤ 9007199254740991): Text size in px (default 96).
 - `bold` (boolean): Use the bold weight (default true).
 - `fontFile` (string): Font: a .ttf/.otf/.ttc path or a C:\Windows\Fonts file name. Default: bundled Inter, with a covering system font for scripts it lacks (CJK, emoji, Arabic, ...).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1286,8 +1291,8 @@ Parameters:
 - `input` (string; required): Path to the source video.
 - `aspect` ("16:9" | "9:16" | "1:1" | "4:5"; required): Target aspect ratio.
 - `fit` ("pad" | "crop"): pad (default): letterbox, nothing lost. crop: fill and center-crop.
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1319,8 +1324,8 @@ Parameters:
 - `maxZoom` (number; ≥ 1, ≤ 6): Auto mode: the furthest it zooms in (default 2.5).
 - `holdSec` (number; > 0, ≤ 30): Auto mode: stay zoomed this long after activity (default 2).
 - `dryRun` (boolean): Return the planned keyframes only (editable, pass back).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1339,8 +1344,8 @@ Parameters:
 - `input` (string; required): Path to the source video.
 - `platform` ("youtube" | "instagram_reel" | "tiktok" | "x" | "square" | "steam_trailer" | "vertical_reel"; required): Sets aspect, size, fps, bitrate. steam_trailer: 1080p 5.5 Mbps CBR, -14 LUFS. vertical_reel: 1080x1920 over a blurred copy of itself, -14 LUFS (ignores fit).
 - `fit` ("pad" | "crop"): Fit to the platform aspect: pad (default) or crop.
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1423,8 +1428,8 @@ Parameters:
 
 - `input` (string; required): Path to the source media.
 - `format` ("mp3" | "aac" | "wav" | "copy"; required): Audio output codec. copy keeps the source codec without re-encoding.
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1442,8 +1447,8 @@ Parameters:
 
 - `input` (string; required): Path to the source video or audio file.
 - `target` ("youtube" | "podcast" | "broadcast" | number): youtube (-14 LUFS, default), podcast (-16), broadcast (-23), or a LUFS number (-70 to -5).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1461,8 +1466,8 @@ Parameters:
 
 - `input` (string; required): Path to the source video or audio file.
 - `strength` ("light" | "medium" | "strong"): How hard to reduce noise: light (6 dB), medium (12 dB, default), strong (20 dB).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1483,7 +1488,7 @@ Parameters:
 - `language` (string): Spoken language code, e.g. 'en', or 'auto' (default).
 - `words` (boolean): One word per cue, for word timing (cut_by_transcript).
 - `output` (string): Optional output .srt path. Defaults under SCREENCAST_HOME/edits.
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1505,8 +1510,8 @@ Parameters:
 - `fadeIn` (number; ≥ 0): Fade-in seconds (default 1).
 - `fadeOut` (number; ≥ 0): Fade-out seconds (default 2).
 - `duck` (boolean): Duck the music under the original audio (default false).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 
@@ -1530,8 +1535,8 @@ Parameters:
 - `voice` (string): Voice name or part (doctor lists them).
 - `rate` (number; ≥ 0.5, ≤ 3): Default 1.
 - `duck` (boolean): Duck the original audio (default true).
-- `output` (string): Output path (default: under SCREENCAST_HOME/edits).
-- `overwrite` (boolean): Replace an existing output file (default false).
+- `output` (string): Output path; default SCREENCAST_HOME/edits.
+- `overwrite` (boolean): Replace an existing output (default false).
 
 Minimal call:
 

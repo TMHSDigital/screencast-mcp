@@ -9,6 +9,9 @@ const facts = { windowHwnd: true, wgcAvailable: true };
 describe("checkStartChoices (#307)", () => {
   it("accepts what works and names what does not", () => {
     expect(() => checkStartChoices(base, facts)).not.toThrow();
+    // saveWhen (#356) saves from a replay buffer.
+    expect(() => checkStartChoices({ ...base, saveWhen: true }, facts)).toThrow(/add replayBufferSec/);
+    expect(() => checkStartChoices({ ...base, saveWhen: true, replay: true }, facts)).not.toThrow();
     expect(() => checkStartChoices({ ...base, backend: "wgc" }, { ...facts, windowHwnd: false })).toThrow(/one window/);
     // System audio works with wgc (#316).
     expect(() => checkStartChoices({ ...base, backend: "wgc", systemAudio: true }, facts)).not.toThrow();

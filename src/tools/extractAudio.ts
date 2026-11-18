@@ -27,8 +27,8 @@ const inputSchema = {
   format: z
     .enum(["mp3", "aac", "wav", "copy"])
     .describe("Audio output codec. copy keeps the source codec without re-encoding."),
-  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
 };
 
 export function register(server: McpServer): void {

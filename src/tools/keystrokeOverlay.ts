@@ -34,8 +34,8 @@ const inputSchema = {
   color: o.color.describe("Text color (default white)."),
   fontFile: fontFileSchema,
   dryRun: z.boolean().optional().describe("Return the planned badges; write nothing."),
-  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
 };
 
 export function register(server: McpServer): void {

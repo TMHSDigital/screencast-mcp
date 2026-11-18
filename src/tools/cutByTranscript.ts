@@ -20,8 +20,8 @@ const inputSchema = {
     .describe("Cue numbers as the .srt numbers them, or transcript text quoted exactly (must occur once)."),
   fillers: z.boolean().optional().describe("Also cut fillers (um, uh...) that have their own cue."),
   dryRun: z.boolean().optional().describe("Only report the cuts."),
-  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
 };
 
 export function register(server: McpServer): void {

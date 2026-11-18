@@ -22,8 +22,8 @@ const inputSchema = {
   fontSize: z.number().int().positive().optional().describe("Text size in px (default 96)."),
   bold: z.boolean().optional().describe("Use the bold weight (default true)."),
   fontFile: fontFileSchema,
-  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
 };
 
 export function register(server: McpServer): void {

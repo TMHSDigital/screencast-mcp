@@ -111,6 +111,8 @@ export interface SessionRecord {
   perf?: { path: string; summary?: PerfSummary; error?: string };
   /** App logs followed during the recording (#334), on the video clock. */
   logs?: { path: string; sources: string[]; count?: number; errors?: number; error?: string };
+  /** Clips saveWhen wrote from the replay buffer (#356), oldest first. */
+  autoSaves?: Array<{ at: string; outputPath?: string; durationSec?: number; error?: string }>;
   /** Epoch ms of the first captured frame (ffmpeg's input start), the zero of
    * the video clock that add_marker stamps markers on (#174). */
   videoStartMs?: number;

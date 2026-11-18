@@ -26,7 +26,7 @@ const inputSchema = {
   language: z.string().optional().describe("Spoken language code, e.g. 'en', or 'auto' (default)."),
   words: z.boolean().optional().describe("One word per cue, for word timing (cut_by_transcript)."),
   output: z.string().optional().describe("Optional output .srt path. Defaults under SCREENCAST_HOME/edits."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
 };
 
 export function register(server: McpServer): void {

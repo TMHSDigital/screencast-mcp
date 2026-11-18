@@ -11,8 +11,8 @@ const inputSchema = {
   input: z.string().min(1).describe("Path to the source video."),
   width: z.number().int().positive().optional().describe("Target width in px. Omit to derive from height (keeps aspect)."),
   height: z.number().int().positive().optional().describe("Target height in px. Omit to derive from width (keeps aspect)."),
-  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
 };
 
 export function register(server: McpServer): void {

@@ -39,8 +39,8 @@ const inputSchema = {
   action: z.enum(["cut", "speed"]).optional().describe("cut (default), or speed: fast-forward them."),
   factor: z.number().gt(1).max(MAX_RANGE_FACTOR).optional().describe(`speed: times faster (default ${DEFAULT_IDLE_FACTOR}).`),
   dryRun: z.boolean().optional().describe("Only report what would be cut."),
-  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
 };
 
 export function register(server: McpServer): void {

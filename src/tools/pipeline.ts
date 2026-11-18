@@ -139,8 +139,8 @@ const inputSchema = {
     ),
   quality: z.enum(["draft", "standard", "high"]).optional().describe("Encoder preset for an mp4 result (default standard)."),
   dryRun: z.boolean().optional().describe("Return the plan (ffmpeg command, output size) without running it."),
-  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
   chapters: z
     .boolean()
     .optional()

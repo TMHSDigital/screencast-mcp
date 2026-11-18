@@ -35,7 +35,7 @@ const inputSchema = {
     .describe(
       "Optional output .png path. Defaults to a file under SCREENCAST_HOME/screenshots.",
     ),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
   returnImage: z
     .boolean()
     .optional()

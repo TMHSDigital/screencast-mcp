@@ -38,6 +38,12 @@ export interface Arm {
 export const DEFAULT_ARM_TIMEOUT_SEC = 600;
 export const MAX_ARM_TIMEOUT_SEC = 24 * 3600;
 export const ARM_POLL_MS = 1500;
+/** saveWhen (#356): seconds after the text shows before the clip is cut, so
+ * it holds what followed; and how many clips one session saves. */
+export const DEFAULT_POST_ROLL_SEC = 3;
+export const MAX_POST_ROLL_SEC = 30;
+export const DEFAULT_AUTO_SAVES = 5;
+export const MAX_AUTO_SAVES = 50;
 
 const arms = new Map<string, { arm: Arm; abort: AbortController; done?: Promise<void> }>();
 
@@ -118,6 +124,34 @@ export async function waitForConditions(o: WaitForOptions): Promise<"met" | "tim
     if (now() - started >= o.timeoutMs) return "timeout";
     await sleep(o.intervalMs);
   }
+}
+
+/** saveWhen's loop (#356): each time `seen` turns true, wait `postRollMs`,
+ * run `act` (false ends the loop), then wait for `seen` to turn false before
+ * re-arming, at most `max` times. A failed check counts as not seen. Returns
+ * how many times `act` ran. */
+export async function repeatOnSeen(o: {
+  seen: () => Promise<boolean>;
+  act: () => Promise<boolean>;
+  max: number;
+  postRollMs: number;
+  intervalMs: number;
+  signal: AbortSignal;
+  sleep?: (ms: number) => Promise<void>;
+}): Promise<number> {
+  const sleep = o.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const wait = (check: () => Promise<boolean>) =>
+    waitForConditions({ checks: [check], timeoutMs: Number.POSITIVE_INFINITY, intervalMs: o.intervalMs, signal: o.signal, sleep });
+  let n = 0;
+  while (n < o.max) {
+    if ((await wait(o.seen)) !== "met") break;
+    await sleep(o.postRollMs);
+    if (o.signal.aborted) break;
+    n++;
+    if (!(await o.act())) break;
+    if (n < o.max && (await wait(async () => !(await o.seen().catch(() => false)))) !== "met") break;
+  }
+  return n;
 }
 
 /**

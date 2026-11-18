@@ -31,8 +31,8 @@ const inputSchema = {
     .describe(`Starting width in px (default ${DEFAULT_ANIM_WIDTH}).`),
   start: z.number().nonnegative().optional().describe("Start second."),
   duration: z.number().positive().optional().describe("Seconds to export (default: to the end)."),
-  output: z.string().optional().describe("Output path (default: under SCREENCAST_HOME/edits)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  output: z.string().optional().describe("Output path; default SCREENCAST_HOME/edits."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
 };
 
 export function register(server: McpServer): void {

@@ -34,7 +34,19 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { captureStill } from "../utils/still.js";
 import { readFrames } from "../utils/ocrScan.js";
 import { findMatches } from "../utils/ocr.js";
-import { armStart, describeConditions, waitForConditions, ARM_POLL_MS, DEFAULT_ARM_TIMEOUT_SEC, MAX_ARM_TIMEOUT_SEC } from "../utils/triggers.js";
+import {
+  armStart,
+  describeConditions,
+  repeatOnSeen,
+  waitForConditions,
+  ARM_POLL_MS,
+  DEFAULT_ARM_TIMEOUT_SEC,
+  DEFAULT_AUTO_SAVES,
+  DEFAULT_POST_ROLL_SEC,
+  MAX_ARM_TIMEOUT_SEC,
+  MAX_AUTO_SAVES,
+  MAX_POST_ROLL_SEC,
+} from "../utils/triggers.js";
 import { LogTailer, MAX_LOG_SOURCES, convertLogLines, formatLogsJsonl, logsPath } from "../utils/logTail.js";
 import { PerfSampler, convertPerfSamples, formatPerfJsonl, perfPath, summarizePerf } from "../utils/perf.js";
 import {
@@ -71,8 +83,12 @@ import {
   prepareReplayDir,
   replayEventRotateSec,
   resetReplaySegments,
+  saveReplay,
   segmentOutputArgs,
 } from "../utils/replay.js";
+import { editOutput } from "../utils/editTool.js";
+import { logMessage } from "../utils/logging.js";
+import { MAX_LABEL } from "../utils/chapters.js";
 import {
   DEFAULT_KEY_MODE,
   eventPaths,
@@ -130,7 +146,7 @@ const inputSchema = {
     .string()
     .optional()
     .describe("Output .mp4 path (default under SCREENCAST_HOME/recordings)."),
-  overwrite: z.boolean().optional().describe("Replace an existing output file (default false)."),
+  overwrite: z.boolean().optional().describe("Replace an existing output (default false)."),
   maxDurationSec: z
     .number()
     .int()
@@ -208,6 +224,15 @@ const inputSchema = {
     .optional()
     .describe("Arm: start once these hold (stop_recording disarms)."),
   stopWhen: z.object({ text: z.string().min(1).max(200) }).optional().describe("Stop once this text shows (OCR)."),
+  saveWhen: z
+    .object({
+      text: z.string().min(1).max(200),
+      lastSec: z.number().positive().max(MAX_REPLAY_SEC).optional(),
+      postRollSec: z.number().min(0).max(MAX_POST_ROLL_SEC).optional(),
+      maxSaves: z.number().int().min(1).max(MAX_AUTO_SAVES).optional(),
+    })
+    .optional()
+    .describe(`Replay buffer: save_replay when text shows (OCR), postRollSec (${DEFAULT_POST_ROLL_SEC}) later; re-arms once it goes (maxSaves ${DEFAULT_AUTO_SAVES}).`),
 };
 
 /** True when `text` is on the target now (one OCR read). */
@@ -461,6 +486,41 @@ function watchStopWhen(store: SessionStore, id: string, o: { target: string; exa
   });
 }
 
+/** saveWhen (#356): on a replay buffer, save a clip each time the text
+ * shows, after a post-roll, then wait for it to go before re-arming. Each
+ * save is a marker and an autoSaves entry, so subscribers hear about it. */
+function watchSaveWhen(store: SessionStore, id: string, o: { target: string; exactTitle?: boolean; when: NonNullable<StartArgs["saveWhen"]> }): void {
+  const done = new AbortController();
+  void sessionEnded(id).then(() => done.abort());
+  const save = async (): Promise<boolean> => {
+    const cur = store.get(id);
+    if (!cur?.replay || cur.status !== "recording") return false;
+    const at = new Date().toISOString();
+    try {
+      const { ffmpeg, ffprobe } = requireFfmpeg();
+      const output = editOutput(undefined, "replay", ".mp4", { dir: "recordings", anyContainer: true });
+      if (cur.replay.events) prepareEventPaths(eventPaths(output));
+      const lastSec = Math.min(o.when.lastSec ?? cur.replay.bufferSec, cur.replay.bufferSec);
+      const res = await saveReplay(cur.replay, { ffmpeg, ffprobe, lastSec, output, quality: cur.quality, live: true, signal: done.signal });
+      addSessionMarker(store, id, `saveWhen: ${o.when.text}`.slice(0, MAX_LABEL));
+      store.tryUpdate(id, { autoSaves: [...(store.get(id)?.autoSaves ?? []), { at, outputPath: output, durationSec: res.durationSec }] });
+      logMessage("info", `saveWhen saved ${res.durationSec}s of replay ${id} to ${output}.`, { sessionId: id, outputPath: output });
+    } catch (err) {
+      if (done.signal.aborted) return false;
+      store.tryUpdate(id, { autoSaves: [...(store.get(id)?.autoSaves ?? []), { at, error: errorMessage(err) }] });
+    }
+    return true;
+  };
+  void repeatOnSeen({
+    seen: () => textOnTarget(o.target, o.exactTitle, o.when.text),
+    act: save,
+    max: o.when.maxSaves ?? DEFAULT_AUTO_SAVES,
+    postRollMs: (o.when.postRollSec ?? DEFAULT_POST_ROLL_SEC) * 1000,
+    intervalMs: ARM_POLL_MS,
+    signal: done.signal,
+  });
+}
+
 /** Triggered recording (#336): arm now, and start later with the same args
  * through the tool's own handler. Consent is asked here, describing the
  * trigger, and not again when it fires. */
@@ -521,7 +581,7 @@ async function prepareStart(server: McpServer, args: StartArgs, extra: Extra) {
   const { target, monitors, window } = await resolveCaptureTarget(args.target, { exactTitle: args.exactTitle, backend: args.backend });
   const backend = args.backend ?? "gdigrab";
   checkStartChoices(
-    { backend, systemAudio: args.audio?.source === "system", replay: args.replayBufferSec !== undefined, webcam: !!args.webcam, logs: !!args.logs, perf: !!args.perf },
+    { backend, systemAudio: args.audio?.source === "system", replay: args.replayBufferSec !== undefined, webcam: !!args.webcam, logs: !!args.logs, perf: !!args.perf, saveWhen: !!args.saveWhen },
     { windowHwnd: !!window?.hwnd, wgcAvailable: backend === "wgc" && wgcAvailable() },
   );
   // Instant replay (#197): a segment ring instead of one mp4.
@@ -731,6 +791,7 @@ export function register(server: McpServer): void {
         if (tailer && args.logs) trackLogs(store, id, { tailer, logs: args.logs, output, startMs });
         if (args.hotkeys) onHotkey = hotkeyHandler(store, id);
         if (args.stopWhen) watchStopWhen(store, id, { target: args.target, exactTitle: args.exactTitle, text: args.stopWhen.text });
+        if (args.saveWhen) watchSaveWhen(store, id, { target: args.target, exactTitle: args.exactTitle, when: args.saveWhen });
 
         return okResponse(
           startResult({
