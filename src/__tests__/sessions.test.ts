@@ -333,14 +333,15 @@ describe("SessionStore", () => {
     b.load();
     await b.reapOrphansAsync(b.liveIds());
     expect(b.get("theirs")?.status).toBe("recording");
-  });
+    // A real PowerShell query: seconds on a CI runner.
+  }, 30_000);
 });
 
 describe("processInfoAsync (#358)", () => {
   it("is null for a pid that cannot exist", async () => {
     expect(await processInfoAsync(-1)).toBeNull();
     expect(await processInfoAsync(2_000_000_000)).toBeNull();
-  });
+  }, 30_000);
 
   it.runIf(process.platform === "win32")("reads the same image as processInfo", async () => {
     const info = await processInfoAsync(process.pid);
