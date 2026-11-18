@@ -26,7 +26,7 @@
 import { ScreencastError } from "./errors.js";
 import { atempoChain, cropFilter, redactSteps, scaleFilter, scaledSize, trimSpan } from "./media.js";
 import { calloutSteps, type CalloutAssets } from "./callout.js";
-import { ASPECT_DIMS, exportPresetParts, reframeFilter } from "./produce.js";
+import { ASPECT_DIMS, exportPresetParts, musicMixSteps, reframeFilter } from "./produce.js";
 import { keyframesToViews, planClickZoom, zoomFilter, DEFAULT_TRANSITION_SEC, type ClickPoint } from "./zoom.js";
 import { resolveQuality, type Quality } from "./targets.js";
 import type { AnimExportOptions } from "./animExport.js";
@@ -57,6 +57,8 @@ export interface KeystrokeStepAssets extends KeystrokeAssets {
 }
 
 export const MAX_PIPELINE_STEPS = 30;
+
+type MusicBed = { input: number; step: Extract<PipelineStep, { op: "music" }>; durationSec: number; at: number };
 
 /** Steps are typed from their zod schema (#368). */
 export type { PipelineStep, PipelineStepInput };
@@ -192,6 +194,9 @@ export function planPipeline(
   const graph: string[] = [];
   const audio: string[] = [];
   let audioReencode = false;
+  // A music step (#367): its input, options, the length it is laid over, and
+  // how many audio filters came before it (the rest run on the mix).
+  let music: MusicBed | null = null;
   let cur = "[0:v]";
   let encode: string[] | null = null;
   let gif: AnimExportOptions | undefined;
@@ -467,6 +472,20 @@ export function planPipeline(
         summary.push(`cursor ${moved.path.length} segment(s), ${moved.clicks.length} click(s)${s.spotlight ? ", spotlight" : ""}`);
         break;
       }
+      case "music": {
+        // Only an export may follow: later timing edits would cut the music's
+        // fades, and later audio probes do not hear it.
+        if (!steps.slice(i + 1).every((x) => x.op === "export_preset")) {
+          throw new ScreencastError(`step ${at}: music goes last (only export_preset may follow; a GIF has no sound).`);
+        }
+        if (dur === null) throw new ScreencastError(`step ${at}: music needs the video's length, which could not be read.`);
+        music = { input: nextInput, step: s, durationSec: dur, at: audio.length };
+        extraInputs.push("-stream_loop", "-1", "-i", s.music);
+        nextInput += 1;
+        audioReencode = true;
+        summary.push(`music${src.hasAudio ? (s.duck ? ", ducked under the audio" : ", mixed with the audio") : ""}`);
+        break;
+      }
       case "export_preset": {
         const p = exportPresetParts(s.platform, s.fit ?? "pad", tag);
         geo = null;
@@ -494,11 +513,26 @@ export function planPipeline(
   const chaptersInput = opts.chaptersFile ? args.filter((a) => a === "-i").length : -1;
   if (opts.chaptersFile) args.push("-f", "ffmetadata", "-i", opts.chaptersFile);
   // Audio filters run even when no step touched the picture (an audio-only pipeline).
-  const audioGraph = src.hasAudio && audio.length > 0;
-  if (audioGraph) graph.push(`[0:a]${audio.join(",")}[aout]`);
+  // Assigned inside the forEach above, which TypeScript does not track.
+  const bed = music as MusicBed | null;
+  const hasAudioOut = src.hasAudio || bed !== null;
+  const audioGraph = hasAudioOut && (audio.length > 0 || bed !== null);
+  if (bed) {
+    const before = audio.slice(0, bed.at);
+    const after = audio.slice(bed.at);
+    let base: string | null = null;
+    if (src.hasAudio && before.length > 0) {
+      graph.push(`[0:a]${before.join(",")}[mbase]`);
+      base = "[mbase]";
+    } else if (src.hasAudio) base = "[0:a]";
+    const { op: _op, music: _file, ...mopts } = bed.step;
+    const out = after.length > 0 ? "[mmix]" : "[aout]";
+    graph.push(...musicMixSteps(`[${bed.input}:a]`, base, bed.durationSec, { ...mopts, endTrim: true }, out, "m"));
+    if (after.length > 0) graph.push(`[mmix]${after.join(",")}[aout]`);
+  } else if (audioGraph) graph.push(`[0:a]${audio.join(",")}[aout]`);
   if (graph.length > 0) args.push("-filter_complex", graph.join(";"));
   args.push("-map", cur === "[0:v]" ? "0:v" : cur);
-  if (src.hasAudio) args.push("-map", audioGraph ? "[aout]" : "0:a");
+  if (hasAudioOut) args.push("-map", audioGraph ? "[aout]" : "0:a");
   // Assigned inside the forEach above, which TypeScript does not track.
   const finalEncode = encode as string[] | null;
   if (finalEncode) {
@@ -507,7 +541,7 @@ export function planPipeline(
     // An export_gif tail reads this file once, so give it more quality; a
     // redaction gets it too, like redact_region, so its edges stay crisp (#204).
     args.push(...resolveQuality(gif || redacts ? "high" : quality));
-    if (src.hasAudio) args.push(...(audioReencode ? ["-c:a", "aac", "-b:a", "160k"] : ["-c:a", "copy"]));
+    if (hasAudioOut) args.push(...(audioReencode ? ["-c:a", "aac", "-b:a", "160k"] : ["-c:a", "copy"]));
     args.push("-movflags", "+faststart");
   }
   if (chaptersInput !== -1) args.push("-map_chapters", String(chaptersInput));

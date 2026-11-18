@@ -98,3 +98,47 @@ describe("pipeline redaction safety (#204)", () => {
     expect(crf(red.args)).toBe(crf(planPipeline("in.mp4", "out.mp4", [{ op: "scale", width: 640 }], SRC, {}, "high").args));
   });
 });
+
+describe("pipeline music step (#367)", () => {
+  const graphOf = (args: string[]) => args[args.indexOf("-filter_complex") + 1] ?? "";
+  const music = { op: "music", music: "bed.mp3" } as const;
+
+  it("loops the music in as an extra input and mixes it under the audio", () => {
+    const p = plan([{ op: "scale", width: 640 }, music]);
+    expect(p.args.join(" ")).toContain("-stream_loop -1 -i bed.mp3");
+    const g = graphOf(p.args);
+    expect(g).toContain("[1:a]atrim=end=20,afade=t=in:st=0:d=1,afade=t=out:st=18:d=2,volume=0.25[mmusic]");
+    expect(g).toContain("[0:a][mmusic]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]");
+    expect(p.args.join(" ")).toContain("-map [aout]");
+    expect(p.args.join(" ")).toContain("-c:a aac");
+    expect(p.summary.at(-1)).toBe("music, mixed with the audio");
+  });
+
+  it("is the only audio of a silent video, cut to its length after a trim", () => {
+    const p = plan([{ op: "trim", start: 2, end: 7 }, { ...music, musicVolume: 0.5 }], { ...SRC, hasAudio: false });
+    expect(graphOf(p.args)).toContain("[1:a]atrim=end=5,afade=t=in:st=0:d=1,afade=t=out:st=3:d=2,volume=0.5[aout]");
+    expect(p.args.join(" ")).toContain("-map [aout]");
+    expect(p.args.join(" ")).toContain("-c:a aac");
+  });
+
+  it("ducks under audio that earlier steps filtered, splitting it for the sidechain", () => {
+    const p = plan([{ op: "speed", factor: 2 }, { ...music, duck: true }]);
+    const g = graphOf(p.args);
+    expect(g).toMatch(/\[0:a\]atempo=2(\.0)?\[mbase\]/);
+    expect(g).toContain("[mbase]asplit[mbase][mkey]");
+    expect(g).toContain("[mmusic][mkey]sidechaincompress");
+    expect(g).toContain("[mbase][mducked]amix");
+    expect(g).toContain("atrim=end=10,");
+  });
+
+  it("an export after it filters the mix", () => {
+    const g = graphOf(plan([music, { op: "export_preset", platform: "steam_trailer" }]).args);
+    expect(g).toMatch(/\[0:a\]\[mmusic\]amix=[^;]*\[mmix\]/);
+    expect(g).toMatch(/\[mmix\]loudnorm=[^;]*\[aout\]/);
+  });
+
+  it("must come last, before an export_preset only", () => {
+    expect(() => plan([music, { op: "scale", width: 640 }])).toThrow("step 1: music goes last");
+    expect(() => plan([music, { op: "export_gif" }])).toThrow("a GIF has no sound");
+  });
+});

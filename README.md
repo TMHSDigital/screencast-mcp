@@ -154,7 +154,7 @@ Cut, convert, compress, and redact. A tool that writes a file refuses to replace
 | [`cut_idle`](https://tmhsdigital.github.io/screencast-mcp/tools/cut_idle.html) | Remove dead air: cut stretches where the screen is frozen (and silent), keeping a short pad. Returns the time saved. |
 | [`cut_by_transcript`](https://tmhsdigital.github.io/screencast-mcp/tools/cut_by_transcript.html) | Edit a video by its transcript: cut quoted text, cue numbers, or fillers. Also writes the re-timed .srt. |
 | [`redact_region`](https://tmhsdigital.github.io/screencast-mcp/tools/redact_region.html) | Cover given rectangles in a video or screenshot (e.g. secrets on screen). Not automatic detection: find them with find_text redact: true. Off-frame regions are rejected. |
-| [`pipeline`](https://tmhsdigital.github.io/screencast-mcp/tools/pipeline.html) | Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call. |
+| [`pipeline`](https://tmhsdigital.github.io/screencast-mcp/tools/pipeline.html) | Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call. |
 
 </details>
 

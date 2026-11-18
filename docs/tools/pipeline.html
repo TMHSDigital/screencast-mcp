@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>pipeline — Screencast MCP</title>
-  <meta name="description" content="Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files.">
+  <meta name="description" content="Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files.">
   <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/tools/pipeline.html">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
   <meta property="og:title" content="pipeline — Screencast MCP">
-  <meta property="og:description" content="Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files.">
+  <meta property="og:description" content="Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files.">
   <meta property="og:type" content="article">
   <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/tools/pipeline.html">
   <meta property="og:site_name" content="Screencast MCP">
@@ -45,7 +45,7 @@
       <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">TOOLS</a> / EDIT</p>
       <h1>Edit Pipeline</h1>
       <p class="tool-id"><code>pipeline</code></p>
-      <p class="lede">Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.</p>
+      <p class="lede">Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.</p>
       <p class="chips"><span class="chip set">edit</span><span class="chip warn">writes</span><span class="chip warn">destructive</span><span class="chip">since v0.30.0</span></p>
     </section>
 
@@ -162,6 +162,11 @@
           <tr id="p-steps-cursor.hideAfterSec" class="nested d1"><td><a class="param-link" href="#p-steps-cursor.hideAfterSec"><code>steps[cursor].hideAfterSec</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0, ≤ 600</span></td></tr>
           <tr id="p-steps-cursor.clicks" class="nested d1"><td><a class="param-link" href="#p-steps-cursor.clicks"><code>steps[cursor].clicks</code></a></td><td><code class="type">boolean</code></td><td></td></tr>
           <tr id="p-steps-cursor.spotlight" class="nested d1"><td><a class="param-link" href="#p-steps-cursor.spotlight"><code>steps[cursor].spotlight</code></a></td><td><code class="type">boolean</code></td><td></td></tr>
+          <tr id="p-steps-music.music" class="nested d1"><td><a class="param-link" href="#p-steps-music.music"><code>steps[music].music</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="p-steps-music.musicVolume" class="nested d1"><td><a class="param-link" href="#p-steps-music.musicVolume"><code>steps[music].musicVolume</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-steps-music.fadeIn" class="nested d1"><td><a class="param-link" href="#p-steps-music.fadeIn"><code>steps[music].fadeIn</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-steps-music.fadeOut" class="nested d1"><td><a class="param-link" href="#p-steps-music.fadeOut"><code>steps[music].fadeOut</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
+          <tr id="p-steps-music.duck" class="nested d1"><td><a class="param-link" href="#p-steps-music.duck"><code>steps[music].duck</code></a></td><td><code class="type">boolean</code></td><td></td></tr>
           <tr id="p-steps-export_preset.platform" class="nested d1"><td><a class="param-link" href="#p-steps-export_preset.platform"><code>steps[export_preset].platform</code></a> <span class="req">required</span></td><td><code class="type">&quot;youtube&quot; | &quot;instagram_reel&quot; | &quot;tiktok&quot; | &quot;x&quot; | &quot;square&quot; | &quot;steam_trailer&quot; | &quot;vertical_reel&quot;</code></td><td></td></tr>
           <tr id="p-steps-export_preset.fit" class="nested d1"><td><a class="param-link" href="#p-steps-export_preset.fit"><code>steps[export_preset].fit</code></a></td><td><code class="type">&quot;pad&quot; | &quot;crop&quot;</code></td><td></td></tr>
           <tr id="p-steps-export_gif.format" class="nested d1"><td><a class="param-link" href="#p-steps-export_gif.format"><code>steps[export_gif].format</code></a></td><td><code class="type">&quot;gif&quot; | &quot;webp&quot;</code></td><td></td></tr>
@@ -172,7 +177,7 @@
           <tr id="p-quality"><td><a class="param-link" href="#p-quality"><code>quality</code></a></td><td><code class="type">&quot;draft&quot; | &quot;standard&quot; | &quot;high&quot;</code></td><td>Encoder preset for an mp4 result (default standard).</td></tr>
           <tr id="p-dryRun"><td><a class="param-link" href="#p-dryRun"><code>dryRun</code></a></td><td><code class="type">boolean</code></td><td>Return the plan (ffmpeg command, output size) without running it.</td></tr>
           <tr id="p-output"><td><a class="param-link" href="#p-output"><code>output</code></a></td><td><code class="type">string</code></td><td>Output path; default SCREENCAST_HOME/edits.</td></tr>
-          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Replace an existing output (default false).</td></tr>
+          <tr id="p-overwrite"><td><a class="param-link" href="#p-overwrite"><code>overwrite</code></a></td><td><code class="type">boolean</code></td><td>Replace an existing output.</td></tr>
           <tr id="p-chapters"><td><a class="param-link" href="#p-chapters"><code>chapters</code></a></td><td><code class="type">boolean</code></td><td>Keep the input's markers as chapters, re-timed through trims and speed.</td></tr>
         </tbody>
       </table>

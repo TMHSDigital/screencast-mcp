@@ -428,6 +428,21 @@ describe.skipIf(!AVAILABLE)("edit and produce builders against real ffmpeg", { t
     expect(Math.abs(mixed - src)).toBeLessThan(0.5);
   });
 
+  it("a pipeline music step mixes at unity, ends with the video, and gives a silent video sound (#367)", async () => {
+    const mixed = p("pipe-music.mp4");
+    const steps: PipelineStep[] = [{ op: "trim", start: 1, end: 6 }, { op: "music", music, musicVolume: 0 }];
+    await runFfmpeg(planPipeline(av, mixed, steps, { width: 320, height: 240, fps: 30, durationSec: 10, hasAudio: true }, {}, "draft").args);
+    const info = await probeMedia(mixed);
+    expect(Math.abs(info.durationSec! - 5)).toBeLessThan(0.2);
+    expect(Math.abs((await meanVolume(mixed)) - (await meanVolume(av)))).toBeLessThan(1);
+
+    const scored = p("pipe-music-silent.mp4");
+    await runFfmpeg(planPipeline(vOnly, scored, [{ op: "music", music }], { width: 320, height: 240, fps: 30, durationSec: 4, hasAudio: false }, {}, "draft").args);
+    const s = await probeMedia(scored);
+    expect(s.audioCodec).toBe("aac");
+    expect(Math.abs(s.durationSec! - 4)).toBeLessThan(0.2);
+  });
+
   it("title_card renders from a path containing an apostrophe (#87)", async () => {
     const textFile = p("title.txt");
     writeFileSync(textFile, "It's a title: 100%");

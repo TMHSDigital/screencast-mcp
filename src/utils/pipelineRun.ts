@@ -157,6 +157,8 @@ export function checkSteps(steps: readonly PipelineStepInput[], input: string): 
         if (!hasFilter("whisper")) throw new ScreencastError(`step ${i + 1}: transcribe needs FFmpeg 8 built with whisper.cpp (no whisper filter here).`);
         resolveWhisperModel(undefined);
       }
+    } else if (s.op === "music" && !existsSync(s.music)) {
+      throw new ScreencastError(`step ${i + 1}: music file not found: ${s.music}`);
     } else if (s.op === "backdrop" && s.image && !existsSync(s.image)) {
       throw new ScreencastError(`step ${i + 1}: background image not found: ${s.image}`);
     } else if (s.op === "zoom" && s.follow === "clicks") {

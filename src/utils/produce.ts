@@ -292,6 +292,58 @@ export interface MusicBedOptions {
   duck?: boolean;
 }
 
+/** The filter steps that lay the music stream `music` (an input label such as
+ * [1:a]) under the audio labelled `base`, ending in `out`. With a null base
+ * there is no other audio, and the music alone is the result. The music
+ * fades in and out over `durationSec` at its level; with `duck` it is
+ * compressed under the base. `endTrim` cuts the looped music at durationSec,
+ * for a graph run without -t. Shared by music_bed and the pipeline music
+ * step (#367). Pure. */
+export function musicMixSteps(
+  music: string,
+  base: string | null,
+  durationSec: number,
+  opts: MusicBedOptions & { endTrim?: boolean },
+  out: string,
+  tag = "",
+): string[] {
+  if (!Number.isFinite(durationSec) || durationSec <= 0) {
+    throw new ScreencastError("video duration must be known and positive.");
+  }
+  const vol = opts.musicVolume ?? (base ? 0.25 : 0.8);
+  const fin = opts.fadeIn ?? 1;
+  const fout = opts.fadeOut ?? 2;
+  for (const [v, label] of [[vol, "musicVolume"], [fin, "fadeIn"], [fout, "fadeOut"]] as const) {
+    if (!Number.isFinite(v) || v < 0) {
+      throw new ScreencastError(`${label} must be a non-negative number.`);
+    }
+  }
+  const fadeOutStart = Math.max(0, round3(durationSec - fout));
+  const trim = opts.endTrim ? `atrim=end=${round3(durationSec)},` : "";
+  const musicChain = `${music}${trim}afade=t=in:st=0:d=${fin},afade=t=out:st=${fadeOutStart}:d=${fout},volume=${vol}`;
+  if (!base) return [`${musicChain}${out}`];
+
+  // normalize=0: amix otherwise scales every input by 1/N, dropping the
+  // original track ~6 dB (#77). The music level is set by musicVolume alone.
+  const mix = "amix=inputs=2:duration=first:dropout_transition=0:normalize=0";
+  const steps = [`${musicChain}[${tag}music]`];
+  if (!opts.duck) {
+    steps.push(`${base}[${tag}music]${mix}${out}`);
+    return steps;
+  }
+  // An input stream can feed two filters; a filter's output must be split.
+  let main = base;
+  let key = base;
+  if (!/^\[\d+:a\]$/.test(base)) {
+    main = `[${tag}base]`;
+    key = `[${tag}key]`;
+    steps.unshift(`${base}asplit${main}${key}`);
+  }
+  steps.push(`[${tag}music]${key}sidechaincompress=threshold=0.03:ratio=8:attack=20:release=300[${tag}ducked]`);
+  steps.push(`${main}[${tag}ducked]${mix}${out}`);
+  return steps;
+}
+
 /** Lay a music track under a video: loop/trim the music to the video duration,
  * fade it in/out, and set its level. When the video already has audio the two
  * are mixed (optionally ducking the music under the original via a sidechain).
@@ -304,38 +356,7 @@ export function buildMusicBedArgs(
   hasVideoAudio: boolean,
   opts: MusicBedOptions = {},
 ): string[] {
-  if (!Number.isFinite(videoDuration) || videoDuration <= 0) {
-    throw new ScreencastError("video duration must be known and positive.");
-  }
-  const vol = opts.musicVolume ?? (hasVideoAudio ? 0.25 : 0.8);
-  const fin = opts.fadeIn ?? 1;
-  const fout = opts.fadeOut ?? 2;
-  for (const [v, label] of [[vol, "musicVolume"], [fin, "fadeIn"], [fout, "fadeOut"]] as const) {
-    if (!Number.isFinite(v) || v < 0) {
-      throw new ScreencastError(`${label} must be a non-negative number.`);
-    }
-  }
-  const duck = opts.duck ?? false;
-  const fadeOutStart = Math.max(0, round3(videoDuration - fout));
-  const musicChain =
-    `[1:a]afade=t=in:st=0:d=${fin},afade=t=out:st=${fadeOutStart}:d=${fout},volume=${vol}`;
-
-  // normalize=0: amix otherwise scales every input by 1/N, dropping the
-  // original track ~6 dB (#77). The music level is set by musicVolume alone.
-  const mix = "amix=inputs=2:duration=first:dropout_transition=0:normalize=0";
-  const parts: string[] = [];
-  if (hasVideoAudio) {
-    parts.push(`${musicChain}[music]`);
-    if (duck) {
-      parts.push("[music][0:a]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=300[ducked]");
-      parts.push(`[0:a][ducked]${mix}[aout]`);
-    } else {
-      parts.push(`[0:a][music]${mix}[aout]`);
-    }
-  } else {
-    parts.push(`${musicChain}[aout]`);
-  }
-
+  const parts = musicMixSteps("[1:a]", hasVideoAudio ? "[0:a]" : null, videoDuration, opts, "[aout]");
   return [
     "-y",
     "-i", video,

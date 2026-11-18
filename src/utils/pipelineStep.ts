@@ -74,6 +74,14 @@ export const pipelineStepSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("backdrop"), ...backdropOptionsSchema }),
   z.object({ op: z.literal("keystroke_overlay"), ...keystrokeOptionsSchema }),
   z.object({ op: z.literal("cursor"), ...cursorOptionsSchema }),
+  z.object({
+    op: z.literal("music"),
+    music: z.string().min(1),
+    musicVolume: z.number().nonnegative().optional(),
+    fadeIn: z.number().nonnegative().optional(),
+    fadeOut: z.number().nonnegative().optional(),
+    duck: z.boolean().optional(),
+  }),
   z.object({ op: z.literal("export_preset"), platform: z.enum(PLATFORMS), fit }),
   z.object({
     op: z.literal("export_gif"),

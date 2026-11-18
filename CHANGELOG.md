@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- `pipeline` has a `music` step with `music_bed`'s options (`music`, `musicVolume`, `fadeIn`, `fadeOut`, `duck`). The music is looped or cut to the result's length and mixed into the same render, so a polished edit with music takes one encode instead of two. It goes last, before an optional `export_preset`. On a video with no sound, the music becomes its audio (#367).
+
 ### Fixed
 
 - `trim` refuses a start past the end of the video instead of running ffmpeg into an empty file, and clamps an end beyond it, as a `pipeline` trim step already did. Both now use one shared rule (#360).
