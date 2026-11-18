@@ -167,7 +167,7 @@ export function backdropSteps(
   firstInput: number,
   tag: string,
   still = false,
-): { steps: string[]; out: string; extraInputs: string[]; layout: BackdropLayout } {
+): { steps: string[]; out: string; extraInputs: string[]; inputs: number; layout: BackdropLayout } {
   const L = backdropLayout(src.width, src.height, opts);
   if (opts.shadowOpacity !== undefined && !(opts.shadowOpacity >= 0 && opts.shadowOpacity <= 1)) {
     throw new ScreencastError("shadowOpacity must be between 0 and 1.");
@@ -231,7 +231,7 @@ export function backdropSteps(
   const fit = L.scaled ? `scale=${w}:${h},setsar=1,` : "";
   steps.push(`${input}${fit}pad=${CW}:${CH}:${x}:${y}:color=black${padded}`);
   steps.push(`${padded}${frame}overlay=0:0${still ? ":format=rgb" : ""}${out}`);
-  return { steps, out, extraInputs, layout: L };
+  return { steps, out, extraInputs, inputs: opts.image ? 1 : 0, layout: L };
 }
 
 /** Put a video (or, with `still`, one image) on a backdrop. Pure. */

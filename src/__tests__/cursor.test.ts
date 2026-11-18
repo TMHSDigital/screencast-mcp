@@ -207,6 +207,32 @@ describe("cursor as a pipeline step", () => {
   const assets = { 3: { plan, sprite: "arrow.png", commandsFile: "c.cmd" } };
   const steps: PipelineStep[] = [{ op: "trim", start: 5, end: 15 }, { op: "speed", factor: 2 }, { op: "scale", width: 320 }, { op: "cursor", spotlight: true }];
 
+  it("numbers extra inputs from each helper's count, in step order (#360)", () => {
+    const arrow = { type: "arrow" as const, x1: 10, y1: 10, x2: 200, y2: 120 };
+    const callout = { fontFile: "f.ttf", textFiles: [null, null, null], arrowFiles: ["a0.png", null, "a2.png"] };
+    const p = planPipeline(
+      "in.mp4",
+      "out.mp4",
+      [
+        { op: "callout", items: [arrow, { type: "box", x: 0, y: 0, width: 10, height: 10 }, arrow] },
+        { op: "cursor" },
+        { op: "backdrop", image: "bg.png" },
+      ],
+      src,
+      { 0: callout },
+      "standard",
+      { cursor: { 1: { plan, sprite: "arrow.png", commandsFile: "c.cmd" } } },
+    );
+    const files = p.args.flatMap((a, i) => (p.args[i - 1] === "-i" ? [a] : []));
+    expect(files).toEqual(["in.mp4", "a0.png", "a2.png", "arrow.png", "bg.png"]);
+    const graph = p.args[p.args.indexOf("-filter_complex") + 1]!;
+    // Each extra input is read by the step that added it.
+    expect(graph.indexOf("[1:v]")).toBeLessThan(graph.indexOf("[2:v]"));
+    expect(graph.indexOf("[2:v]")).toBeLessThan(graph.indexOf("[3:v]"));
+    expect(graph.indexOf("[3:v]")).toBeLessThan(graph.indexOf("[4:v]"));
+    expect(graph).not.toContain("[5:v]");
+  });
+
   it("re-times and re-scales the cursor and hands back its sendcmd script", () => {
     const p = planPipeline("in.mp4", "out.mp4", steps, src, {}, "standard", { cursor: assets });
     expect(p.summary.at(-1)).toBe("cursor 3 segment(s), 1 click(s), spotlight");

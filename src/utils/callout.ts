@@ -114,9 +114,10 @@ export function calloutSteps(
   input: string,
   firstInput: number,
   tag: string,
-): { steps: string[]; out: string; extraInputs: string[] } {
+): { steps: string[]; out: string; extraInputs: string[]; inputs: number } {
   if (items.length === 0) throw new ScreencastError("Give at least one callout.");
   const extraInputs: string[] = [];
+  let inputs = 0;
   const steps: string[] = [];
   let cur = input;
   items.forEach((c, i) => {
@@ -142,13 +143,13 @@ export function calloutSteps(
       const file = assets.arrowFiles[i];
       if (!file) throw new ScreencastError("Internal: missing image for an arrow callout.");
       const { cx, cy } = arrowGeometry(c);
-      const n = firstInput + extraInputs.length / 4;
+      const n = firstInput + inputs++;
       extraInputs.push("-loop", "1", "-i", file);
       steps.push(`${cur}[${n}:v]overlay=x=${cx.toFixed(1)}-w/2:y=${cy.toFixed(1)}-h/2:shortest=1${enable(c)}${out}`);
     }
     cur = out;
   });
-  return { steps, out: cur, extraInputs };
+  return { steps, out: cur, extraInputs, inputs };
 }
 
 /** Draw every callout in order (later items on top). With `still`, the input

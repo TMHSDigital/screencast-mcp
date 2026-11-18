@@ -290,10 +290,10 @@ export function planPipeline(
       case "callout": {
         const a = assets[i];
         if (!a) throw new ScreencastError(`Internal: missing callout assets for step ${at}.`);
-        const { steps: st, out: o, extraInputs: ex } = calloutSteps(s.items, a, cur, nextInput, tag);
+        const { steps: st, out: o, extraInputs: ex, inputs: added } = calloutSteps(s.items, a, cur, nextInput, tag);
         graph.push(...st);
         extraInputs.push(...ex);
-        nextInput += ex.length / 4;
+        nextInput += added;
         cur = o;
         summary.push(`callout ${s.items.length} item(s)`);
         break;
@@ -416,11 +416,11 @@ export function planPipeline(
       }
       case "backdrop": {
         const { op: _op, ...bo } = s;
-        const { steps: st, out: o, extraInputs: ex, layout } = backdropSteps(bo, { width: W, height: H }, cur, nextInput, tag);
+        const { steps: st, out: o, extraInputs: ex, inputs: added, layout } = backdropSteps(bo, { width: W, height: H }, cur, nextInput, tag);
         geo = null;
         graph.push(...st);
         extraInputs.push(...ex);
-        nextInput += ex.length / 2;
+        nextInput += added;
         cur = o;
         W = layout.canvasW;
         H = layout.canvasH;
@@ -458,10 +458,10 @@ export function planPipeline(
           summary.push("cursor: no cursor movement in this part of the video");
           break;
         }
-        const { steps: st, out: o, extraInputs: ex, commands } = cursorSteps(moved, s, { width: W, height: H }, cur, nextInput, tag, c.sprite, c.commandsFile);
+        const { steps: st, out: o, extraInputs: ex, inputs: added, commands } = cursorSteps(moved, s, { width: W, height: H }, cur, nextInput, tag, c.sprite, c.commandsFile);
         graph.push(...st);
         extraInputs.push(...ex);
-        nextInput += ex.length / 2;
+        nextInput += added;
         cur = o;
         files.push({ path: c.commandsFile, content: commands });
         summary.push(`cursor ${moved.path.length} segment(s), ${moved.clicks.length} click(s)${s.spotlight ? ", spotlight" : ""}`);

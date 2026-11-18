@@ -376,7 +376,7 @@ export function cursorSteps(
   tag: string,
   sprite: string,
   commandsFile: string,
-): { steps: string[]; out: string; extraInputs: string[]; commands: string } {
+): { steps: string[]; out: string; extraInputs: string[]; inputs: number; commands: string } {
   if (plan.path.length === 0) throw new ScreencastError("No cursor positions to draw.");
   const L = cursorLayout(frame.height, style.size);
   const { width: W, height: H } = frame;
@@ -441,7 +441,7 @@ export function cursorSteps(
   layer(`[${tag}csp]`, "p", -L.hotX, -L.hotY, plan.visible);
   cmds.push(...pathCommands(plan.path, name("p"), -L.hotX, -L.hotY));
 
-  return { steps, out: cur, extraInputs: ["-i", sprite], commands: formatCommands(cmds) };
+  return { steps, out: cur, extraInputs: ["-i", sprite], inputs: 1, commands: formatCommands(cmds) };
 }
 
 /** Draw the cursor over a video. Pure. */
