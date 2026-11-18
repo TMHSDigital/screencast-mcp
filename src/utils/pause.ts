@@ -30,7 +30,7 @@ import { jobTimeoutMs } from "./jobs.js";
 import { buildConcatArgs, concatListContent } from "./media.js";
 import type { ClockSpan } from "./clock.js";
 import type { CaptureOptions, Target } from "./targets.js";
-import { FASTSTART } from "./targets.js";
+import { FASTSTART } from "./encode.js";
 import type { SessionRecord } from "./sessions.js";
 
 /** One finished segment. */

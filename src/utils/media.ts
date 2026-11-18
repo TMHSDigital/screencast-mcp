@@ -6,7 +6,8 @@
  */
 import { extname } from "node:path";
 import { ScreencastError } from "./errors.js";
-import { encodeTail, aacArgs, type Quality } from "./targets.js";
+import { type Quality } from "./targets.js";
+import { encodeTail, aacArgs } from "./encode.js";
 import { validateColor, validateEvenDimension } from "./validate.js";
 import { isStillImage, stillOutput } from "./paths.js";
 import { z } from "zod";

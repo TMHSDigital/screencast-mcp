@@ -7,7 +7,8 @@
  */
 import { z } from "zod";
 import { ScreencastError } from "./errors.js";
-import { encodeTail, type Quality } from "./targets.js";
+import { type Quality } from "./targets.js";
+import { encodeTail } from "./encode.js";
 import { sumExpr } from "./expr.js";
 
 export interface Interval {

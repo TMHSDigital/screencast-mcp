@@ -8,7 +8,8 @@
  */
 import { ScreencastError } from "./errors.js";
 import { escapeFilterPath } from "./fonts.js";
-import { encodeTail, type Quality } from "./targets.js";
+import { type Quality } from "./targets.js";
+import { encodeTail } from "./encode.js";
 import { BUSY_CPU_PCT, type PerfSample } from "./perf.js";
 
 export const PERF_METRICS = ["cpu", "sysCpu", "rssMB", "sysMem"] as const;

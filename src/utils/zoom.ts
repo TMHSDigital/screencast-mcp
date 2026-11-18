@@ -15,7 +15,8 @@
  */
 import { ScreencastError } from "./errors.js";
 import { diffFrames, type Rect } from "./diff.js";
-import { resolveQuality, type Quality } from "./targets.js";
+import { type Quality } from "./targets.js";
+import { encodeTail } from "./encode.js";
 import { sumExpr } from "./expr.js";
 import { z } from "zod";
 import { existsSync, readFileSync } from "node:fs";
@@ -118,7 +119,7 @@ export function buildZoomArgs(
   const { width: W, height: H, fps } = size;
   const vf = zoomFilter(views, size, transition);
   if (!rings || rings.clicks.length === 0) {
-    return ["-y", "-i", input, "-vf", vf, ...resolveQuality(quality), "-c:a", "copy", output];
+    return ["-y", "-i", input, "-vf", vf, ...encodeTail({ quality, audio: "copy" }), output];
   }
   // Rings go on before the zoom, in source pixels, so they move with it.
   const graph = [
@@ -128,7 +129,7 @@ export function buildZoomArgs(
   ].join(";");
   return [
     "-y", "-i", input, "-filter_complex", graph,
-    "-map", "[v]", "-map", "0:a?", ...resolveQuality(quality), "-c:a", "copy", output,
+    "-map", "[v]", "-map", "0:a?", ...encodeTail({ quality, audio: "copy" }), output,
   ];
 }
 

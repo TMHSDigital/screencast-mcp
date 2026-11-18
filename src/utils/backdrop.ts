@@ -13,7 +13,8 @@
 import { ScreencastError } from "./errors.js";
 import { validateColor } from "./validate.js";
 import { ASPECT_DIMS, type Aspect, ASPECTS } from "./produce.js";
-import { resolveQuality, type Quality } from "./targets.js";
+import { type Quality } from "./targets.js";
+import { encodeTail } from "./encode.js";
 import { stillOutput } from "./paths.js";
 import { z } from "zod";
 
@@ -249,7 +250,7 @@ export function buildBackdropArgs(
   const head = ["-y", "-i", input, ...extraInputs, "-filter_complex", steps.join(";"), "-map", final];
   const args = still
     ? [...head, "-frames:v", "1", ...stillOutput(output)]
-    : [...head, "-map", "0:a?", ...resolveQuality(quality), "-c:a", "copy", "-movflags", "+faststart", output];
+    : [...head, "-map", "0:a?", ...encodeTail({ quality, audio: "copy", faststart: true }), output];
   return { args, layout };
 }
 

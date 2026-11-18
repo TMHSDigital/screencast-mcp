@@ -10,7 +10,8 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { binaryWorks } from "../../utils/ffmpeg.js";
-import { captureKeyframeArgs, resolveQuality } from "../../utils/targets.js";
+import { captureKeyframeArgs } from "../../utils/targets.js";
+import { resolveQuality } from "../../utils/encode.js";
 import {
   parseSegmentList,
   saveReplay,

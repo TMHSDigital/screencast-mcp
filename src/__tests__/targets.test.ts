@@ -1,21 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  parseTarget,
-  resolveQuality,
-  encodeTail,
-  aacArgs,
-  buildCaptureArgs,
-  buildScreenshotArgs,
-  buildAudioInputArgs,
-  resolveMonitor,
-  virtualDesktopBounds,
-  validateRegionOnDesktop,
-  QUALITY_PRESETS,
-  resolveMaxDuration,
-  MAX_RECORDING_CAP_SEC,
-  DEFAULT_MAX_RECORDING_SEC,
-  buildWgcScreenshotArgs,
-} from "../utils/targets.js";
+import { parseTarget, buildCaptureArgs, buildScreenshotArgs, buildAudioInputArgs, resolveMonitor, virtualDesktopBounds, validateRegionOnDesktop, resolveMaxDuration, MAX_RECORDING_CAP_SEC, DEFAULT_MAX_RECORDING_SEC, buildWgcScreenshotArgs } from "../utils/targets.js";
+import { resolveQuality, encodeTail, aacArgs, QUALITY_PRESETS } from "../utils/encode.js";
 import type { Monitor } from "../utils/monitors.js";
 
 // A 4480x1440 dual-monitor desktop: primary 2560x1440 at origin, second

@@ -27,7 +27,8 @@ import { runCapture } from "./ffmpeg.js";
 import { jobTimeoutMs } from "./jobs.js";
 import { buildConcatArgs, buildProbeArgs, concatListContent, parseMediaInfo } from "./media.js";
 import { homeRoot, rand, sequencePattern, stamp } from "./paths.js";
-import { encodeTail, FASTSTART, type Quality } from "./targets.js";
+import { type Quality } from "./targets.js";
+import { encodeTail, FASTSTART } from "./encode.js";
 import {
   convertEvents,
   eventPaths,

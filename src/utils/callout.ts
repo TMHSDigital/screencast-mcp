@@ -8,7 +8,8 @@
 import { ScreencastError } from "./errors.js";
 import { escapeFilterPath } from "./fonts.js";
 import { enableExpr } from "./media.js";
-import { resolveQuality, type Quality } from "./targets.js";
+import { type Quality } from "./targets.js";
+import { encodeTail } from "./encode.js";
 import { validateColor } from "./validate.js";
 import { stillOutput } from "./paths.js";
 import { z } from "zod";
@@ -171,8 +172,7 @@ export function buildCalloutArgs(
     "-y", "-i", input, ...extraInputs,
     "-filter_complex", steps.join(";"),
     "-map", out, "-map", "0:a?",
-    ...resolveQuality(quality),
-    "-c:a", "copy",
+    ...encodeTail({ quality, audio: "copy" }),
     output,
   ];
 }

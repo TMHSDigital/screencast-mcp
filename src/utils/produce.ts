@@ -8,7 +8,8 @@
  * unit-tested without ffmpeg present.
  */
 import { ScreencastError } from "./errors.js";
-import { encodeTail, aacArgs, FASTSTART, type Quality } from "./targets.js";
+import { type Quality } from "./targets.js";
+import { encodeTail, FASTSTART } from "./encode.js";
 import { escapeFilterPath } from "./fonts.js";
 import {
   validateTransition,
@@ -485,13 +486,19 @@ export function exportPresetParts(
     vf: `${frame},fps=${p.fps},format=yuv420p`,
     ...(af ? { af } : {}),
     encode: [
-      "-c:v", "libx264", "-preset", "medium",
-      ...(p.cbr ? ["-profile:v", "high"] : []),
-      "-b:v", p.videoBitrate,
-      ...(p.cbr ? ["-minrate", p.videoBitrate, "-x264-params", "nal-hrd=cbr"] : []),
-      "-maxrate", p.videoBitrate, "-bufsize", p.bufsize,
-      "-pix_fmt", "yuv420p",
-      ...aacArgs(p.audioBitrate),
+      // A bitrate ladder, not a CRF preset, so the video args are explicit.
+      ...encodeTail({
+        video: [
+          "-c:v", "libx264", "-preset", "medium",
+          ...(p.cbr ? ["-profile:v", "high"] : []),
+          "-b:v", p.videoBitrate,
+          ...(p.cbr ? ["-minrate", p.videoBitrate, "-x264-params", "nal-hrd=cbr"] : []),
+          "-maxrate", p.videoBitrate, "-bufsize", p.bufsize,
+          "-pix_fmt", "yuv420p",
+        ],
+        audio: "aac",
+        bitrate: p.audioBitrate,
+      }),
       ...(p.loudness?.sampleRate ? ["-ar", String(p.loudness.sampleRate), "-ac", "2"] : []),
       "-r", String(p.fps),
       ...FASTSTART,

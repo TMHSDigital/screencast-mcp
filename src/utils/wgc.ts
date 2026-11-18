@@ -17,7 +17,8 @@
  * exits 0. Everything in this module is pure.
  */
 import { ScreencastError } from "./errors.js";
-import { aacArgs, buildAudioInputArgs } from "./targets.js";
+import { buildAudioInputArgs } from "./targets.js";
+import { aacArgs } from "./encode.js";
 
 export interface WgcRecorderConfig {
   ffmpeg: string;

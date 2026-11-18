@@ -17,7 +17,8 @@
 import { ScreencastError } from "./errors.js";
 import { runCapture } from "./ffmpeg.js";
 import { runPowerShell } from "./powershell.js";
-import { QUALITY_PRESETS, resolveQuality, type Quality } from "./targets.js";
+import { type Quality } from "./targets.js";
+import { QUALITY_PRESETS, resolveQuality } from "./encode.js";
 
 export type HwEncoder = "nvenc" | "qsv" | "amf";
 export type VideoEncoder = "x264" | HwEncoder;

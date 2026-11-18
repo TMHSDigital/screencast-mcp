@@ -14,7 +14,8 @@ import {
   type DxgiOutput,
   type EncoderPick,
 } from "../utils/gpu.js";
-import { buildCaptureArgs, resolveQuality } from "../utils/targets.js";
+import { buildCaptureArgs } from "../utils/targets.js";
+import { resolveQuality } from "../utils/encode.js";
 
 describe("encoderArgs (#199)", () => {
   it("is libx264's preset for x264", () => {

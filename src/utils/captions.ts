@@ -10,7 +10,8 @@
 import { existsSync } from "node:fs";
 import { ScreencastError } from "./errors.js";
 import { escapeFilterPath } from "./fonts.js";
-import { resolveQuality, type Quality } from "./targets.js";
+import { type Quality } from "./targets.js";
+import { encodeTail } from "./encode.js";
 
 /** Env var naming the default whisper.cpp model file. */
 export const WHISPER_MODEL_ENV = "SCREENCAST_WHISPER_MODEL";
@@ -152,8 +153,7 @@ export function buildBurnSubtitlesArgs(
   return [
     "-y", "-i", input,
     "-vf", subtitlesFilter(subtitles, fontsDir, style),
-    ...resolveQuality(quality),
-    "-c:a", "copy",
+    ...encodeTail({ quality, audio: "copy" }),
     output,
   ];
 }

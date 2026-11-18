@@ -8,7 +8,8 @@
  */
 import { ScreencastError } from "./errors.js";
 import { escapeFilterPath } from "./fonts.js";
-import { encodeTail, type Quality } from "./targets.js";
+import { type Quality } from "./targets.js";
+import { encodeTail } from "./encode.js";
 
 export const COMPOSE_LAYOUTS = ["side_by_side", "stack", "grid"] as const;
 export type ComposeLayout = (typeof COMPOSE_LAYOUTS)[number];

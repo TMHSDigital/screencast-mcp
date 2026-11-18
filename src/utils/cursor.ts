@@ -26,7 +26,8 @@ import { escapeFilterPath } from "./fonts.js";
 import { MOVE_SAMPLE_MS, type InputEvent, eventPaths, parseEventsJsonl } from "./events.js";
 import type { TimeOp } from "./chapters.js";
 import { mapTime, mapWindow } from "./timeline.js";
-import { resolveQuality, type Quality } from "./targets.js";
+import { type Quality } from "./targets.js";
+import { encodeTail } from "./encode.js";
 import { z } from "zod";
 import { existsSync, readFileSync } from "node:fs";
 
@@ -461,8 +462,7 @@ export function buildCursorArgs(
       "-y", "-i", input, ...extraInputs,
       "-filter_complex", steps.join(";"),
       "-map", out, "-map", "0:a?",
-      ...resolveQuality(quality),
-      "-c:a", "copy",
+      ...encodeTail({ quality, audio: "copy" }),
       output,
     ],
     commands,

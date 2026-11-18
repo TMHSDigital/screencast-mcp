@@ -16,7 +16,8 @@ import { ScreencastError } from "./errors.js";
 import { escapeFilterPath, resolveTextFont } from "./fonts.js";
 import { sumExpr } from "./expr.js";
 import type { InputEvent } from "./events.js";
-import { resolveQuality, type Quality } from "./targets.js";
+import { type Quality } from "./targets.js";
+import { encodeTail } from "./encode.js";
 import { validateColor } from "./validate.js";
 import type { TimeOp } from "./chapters.js";
 import { mapWindow } from "./timeline.js";
@@ -271,8 +272,7 @@ export function buildKeystrokeArgs(
     "-y", "-i", input,
     "-filter_complex", steps.join(";"),
     "-map", out, "-map", "0:a?",
-    ...resolveQuality(quality),
-    "-c:a", "copy",
+    ...encodeTail({ quality, audio: "copy" }),
     output,
   ];
 }

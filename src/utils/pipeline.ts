@@ -28,7 +28,8 @@ import { atempoChain, cropFilter, redactSteps, scaleFilter, scaledSize, trimSpan
 import { calloutSteps, type CalloutAssets } from "./callout.js";
 import { ASPECT_DIMS, exportPresetParts, musicMixSteps, reframeFilter } from "./produce.js";
 import { keyframesToViews, planClickZoom, zoomFilter, DEFAULT_TRANSITION_SEC, type ClickPoint } from "./zoom.js";
-import { resolveQuality, type Quality } from "./targets.js";
+import { type Quality } from "./targets.js";
+import { encodeTail } from "./encode.js";
 import type { AnimExportOptions } from "./animExport.js";
 import type { TimeOp } from "./chapters.js";
 import { backdropSteps } from "./backdrop.js";
@@ -540,9 +541,8 @@ export function planPipeline(
   } else {
     // An export_gif tail reads this file once, so give it more quality; a
     // redaction gets it too, like redact_region, so its edges stay crisp (#204).
-    args.push(...resolveQuality(gif || redacts ? "high" : quality));
-    if (hasAudioOut) args.push(...(audioReencode ? ["-c:a", "aac", "-b:a", "160k"] : ["-c:a", "copy"]));
-    args.push("-movflags", "+faststart");
+    const audio = !hasAudioOut ? "omit" : audioReencode ? "aac" : "copy";
+    args.push(...encodeTail({ quality: gif || redacts ? "high" : quality, audio, faststart: true }));
   }
   if (chaptersInput !== -1) args.push("-map_chapters", String(chaptersInput));
   args.push(output);
