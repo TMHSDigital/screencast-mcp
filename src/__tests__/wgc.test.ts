@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import { defined } from "./testUtils.js";
 import { buildWgcEncodeArgs, buildWgcGrabArgs, FrameAssembler, framesDue, nudgeScript, parseRawSize, startBanner, yuv420FrameBytes, wgcStopFile } from "../utils/wgc.js";
-import { parseCaptureStart } from "../utils/events.js";
+import { parseCaptureStart } from "../utils/clock.js";
 
 const CFG = { ffmpeg: "ffmpeg", hwnd: 4242, fps: 15, encode: ["-c:v", "libx264", "-crf", "23", "-pix_fmt", "yuv420p"], output: "o.mp4", maxDurationSec: 0 };
 

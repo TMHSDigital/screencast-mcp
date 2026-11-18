@@ -10,7 +10,7 @@ import { rmSync, writeFileSync } from "node:fs";
 import type { ChildProcess } from "node:child_process";
 import { probeDuration, requireFfmpeg } from "./ffmpeg.js";
 import { finishReplay, type ReplayStopResult } from "./replay.js";
-import { whenFinalized } from "./events.js";
+import { whenFinalized } from "./finalizers.js";
 import { errorMessage, ScreencastError } from "./errors.js";
 import { wgcStopFile } from "./wgc.js";
 import { encoderArgs } from "./gpu.js";

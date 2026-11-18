@@ -18,10 +18,9 @@ import {
   LOGGER_STOP_GRACE_MS,
   startEventLogger,
   stopEventLogger,
-  trackFinalizer,
-  whenFinalized,
   writeEventsFile,
 } from "../utils/events.js";
+import { trackFinalizer, whenFinalized } from "../utils/finalizers.js";
 
 type FakeHelper = EventEmitter & {
   stdout: EventEmitter;

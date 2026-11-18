@@ -10,13 +10,13 @@ import {
   convertEvents,
   eventPaths,
   formatEventsJsonl,
-  parseCaptureStart,
   prepareEventPaths,
   parseEventsJsonl,
   selectEvents,
   summarizeEvents,
   eventGaps,
 } from "../utils/events.js";
+import { parseCaptureStart } from "../utils/clock.js";
 import { captureFrame } from "../utils/targets.js";
 
 const BANNER = `Input #0, gdigrab, from 'desktop':

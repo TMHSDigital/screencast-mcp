@@ -17,7 +17,8 @@ import {
   webcamPlacement,
   type SegmentState,
 } from "../utils/pause.js";
-import { convertEvents, parseCaptureStart, videoTimeSec } from "../utils/events.js";
+import { convertEvents } from "../utils/events.js";
+import { parseCaptureStart, videoTimeSec } from "../utils/clock.js";
 import { buildCaptureArgs, buildWebcamInputArgs } from "../utils/targets.js";
 import { classifyOrphan, isForeignLiveRecording, isLive, pruneRecords, type SessionRecord } from "../utils/sessions.js";
 import { parseDshowAudioDevices, parseDshowVideoDevices } from "../utils/audioDevices.js";

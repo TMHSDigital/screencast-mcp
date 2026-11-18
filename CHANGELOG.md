@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Changed
+
+- Internals: the video clock (`parseCaptureStart`, `videoTimeSec`) and the sidecar finalizers (`trackFinalizer`, `whenFinalized`) moved out of `events.ts` into `src/utils/clock.ts` and `src/utils/finalizers.ts`, so perf and log sidecars and the stop paths no longer load the input-hook module (#360).
+
 ## [0.54.0] - 2026-11-17
 
 ### Added

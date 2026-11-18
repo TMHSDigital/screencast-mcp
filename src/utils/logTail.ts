@@ -13,8 +13,7 @@
  */
 import { open, stat } from "node:fs/promises";
 import { basename } from "node:path";
-import { videoTimeSec } from "./events.js";
-import type { ClockSpan } from "./events.js";
+import { videoTimeSec, type ClockSpan } from "./clock.js";
 
 export const MAX_LOG_SOURCES = 5;
 /** Lines kept per recording; a chatty log keeps its newest ones. */

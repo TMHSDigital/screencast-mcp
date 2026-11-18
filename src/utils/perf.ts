@@ -11,7 +11,7 @@
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { cpus, freemem, totalmem } from "node:os";
-import { videoTimeSec, type ClockSpan } from "./events.js";
+import { videoTimeSec, type ClockSpan } from "./clock.js";
 
 export const PERF_INTERVAL_MS = 1000;
 /** A stretch at or above this CPU share counts as pinned. */

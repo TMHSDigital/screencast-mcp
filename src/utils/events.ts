@@ -35,6 +35,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync, unlinkSync, rmSync } from "node:fs";
 import { ScreencastError } from "./errors.js";
+import { videoTimeSec, type ClockSpan } from "./clock.js";
 
 export type KeyMode = "masked" | "shortcuts";
 export const DEFAULT_KEY_MODE: KeyMode = "masked";
@@ -99,39 +100,6 @@ export interface CaptureFrame {
   /** Video size in pixels. */
   w: number;
   h: number;
-}
-
-/** The first input's start time in epoch ms from ffmpeg's stderr banner, or
- * null if it has not been printed. gdigrab stamps frames with wall-clock time,
- * so `start: 1792936190.232363` is when the first frame was grabbed. */
-export function parseCaptureStart(stderr: string, inputIndex = 0): number | null {
-  const input = stderr.indexOf(`Input #${inputIndex},`);
-  if (input < 0) return null;
-  const next = stderr.indexOf("Input #", input + 1);
-  const m = /start: (\d{9,}\.\d+)/.exec(stderr.slice(input, next < 0 ? undefined : next));
-  return m ? Math.round(Number(m[1]) * 1000) : null;
-}
-
-/** One recorded stretch of a paused-and-resumed recording (#200): it began at
- * `startMs` (epoch) and sits at `offsetSec` in the joined video. The last one
- * may be open-ended (still recording). */
-export interface ClockSpan {
-  startMs: number;
-  offsetSec: number;
-  durationSec?: number;
-}
-
-/** Map an epoch time to video seconds across spans; null inside a pause.
- * Before the first span, times stay negative (dropped like before). Pure. */
-export function videoTimeSec(epochMs: number, spans: ClockSpan[]): number | null {
-  const first = spans[0];
-  if (!first) return null;
-  if (epochMs < first.startMs) return (epochMs - first.startMs) / 1000;
-  for (const s of spans) {
-    const rel = (epochMs - s.startMs) / 1000;
-    if (rel >= 0 && (s.durationSec === undefined || rel <= s.durationSec)) return s.offsetSec + rel;
-  }
-  return null;
 }
 
 /**
@@ -711,25 +679,4 @@ export function writeEventsFile(
     // Left behind if locked; harmless and gitignored.
   }
   return events;
-}
-
-// Event logs finish converting after ffmpeg exits. stopSession waits on this
-// so stop_recording reports the finished log instead of racing it.
-const finalizers = new Map<string, Promise<void>>();
-
-/** Track work that finishes a session's sidecars; several (the event log,
- * app logs) combine into one wait. */
-export function trackFinalizer(sessionId: string, work: Promise<void>): void {
-  const prev = finalizers.get(sessionId);
-  const done = prev ? Promise.all([prev, work]).then(() => {}) : work;
-  finalizers.set(sessionId, done);
-  void done.finally(() => {
-    if (finalizers.get(sessionId) === done) finalizers.delete(sessionId);
-  });
-}
-
-export async function whenFinalized(sessionId: string, timeoutMs = 10_000): Promise<void> {
-  const done = finalizers.get(sessionId);
-  if (!done) return;
-  await Promise.race([done, new Promise((r) => setTimeout(r, timeoutMs))]);
 }

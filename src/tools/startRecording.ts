@@ -93,17 +93,17 @@ import {
   DEFAULT_KEY_MODE,
   eventPaths,
   hotkeysTaken,
-  parseCaptureStart,
   prepareEventPaths,
   startEventLogger,
   stopEventLogger,
   summarizeEvents,
-  trackFinalizer,
   writeEventsFile,
   type CaptureFrame,
   type HotkeyAction,
   type KeyMode,
 } from "../utils/events.js";
+import { parseCaptureStart } from "../utils/clock.js";
+import { trackFinalizer } from "../utils/finalizers.js";
 
 const inputSchema = {
   target: z
