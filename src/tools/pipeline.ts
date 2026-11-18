@@ -14,6 +14,7 @@ import { exportAnimation } from "../utils/animExport.js";
 import type { CalloutAssets } from "../utils/callout.js";
 import { redactRegionSchema, REDACT_STYLES } from "../utils/media.js";
 import { PLATFORMS, ASPECTS, REFRAME_FITS } from "../utils/produce.js";
+import { writeRetimedSidecars } from "../utils/sidecarRetime.js";
 import { buildChapters, ffmetadata, markerPoints, markersOrChapters, retimeMarkers, writeMarkers, type Chapter, type Marker } from "../utils/chapters.js";
 import type { CursorStepAssets, KeystrokeStepAssets } from "../utils/pipeline.js";
 import { cursorSpritePath, cursorOptionsSchema, loadCursor } from "../utils/cursor.js";
@@ -493,7 +494,18 @@ export function register(server: McpServer): void {
               /* best effort: the chapters are in the file */
             }
           }
-          return okResponse({ outputPath: output, ...result, ...(markersPath && { markersPath }), ...(subtitlesPath && { subtitlesPath }), ...saveSpec() });
+          // The input's event log and log/perf sidecars, on the output's timeline (#352).
+          const { note: sidecarNote, ...sidecars } = writeRetimedSidecars(input, output, plan);
+          if (sidecarNote) warnings.push(sidecarNote);
+          return okResponse({
+            outputPath: output,
+            ...result,
+            ...(warnings.length > 0 && { warnings }),
+            ...(markersPath && { markersPath }),
+            ...(subtitlesPath && { subtitlesPath }),
+            ...sidecars,
+            ...saveSpec(),
+          });
         } finally {
           rmSync(work, { recursive: true, force: true });
         }

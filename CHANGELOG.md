@@ -10,6 +10,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - `start_recording` checks free space on the output drive first: it refuses below 500 MB, so a capture no longer fails partway with a write error, and returns a `diskNote` below 2 GB (#354).
+- `pipeline` writes the input's `.events.jsonl`, `.logs.jsonl` and `.perf.jsonl` beside the output, moved through its trims, speed changes and cuts (and crops and scales, for event positions), so `step_guide`, `read_events`, `zoom` and `bug_report` work on the edited file. After a zoom, reframe or backdrop the event log is left out, with a warning (#352).
 
 ## [0.52.0] - 2026-11-17
 

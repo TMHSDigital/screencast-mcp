@@ -144,6 +144,9 @@ export interface PipelinePlan {
   summary: string[];
   /** The trims, speed changes and cuts, in order, to re-time markers (#174). */
   timeOps: TimeOp[];
+  /** Source pixels -> output pixels, or null once a zoom, reframe or backdrop
+   * moved the content; for the re-timed event log (#352). */
+  geometry: { sx: number; sy: number; ox: number; oy: number } | null;
   /** Probes still to run, in step order; until then the plan uses stand-ins. */
   pending: PipelinePending[];
   /** Files the command reads that the plan wrote the text of (cursor sendcmd
@@ -536,5 +539,5 @@ export function planPipeline(
   }
   if (chaptersInput !== -1) args.push("-map_chapters", String(chaptersInput));
   args.push(output);
-  return { args, width: W, height: H, fps, durationSec: dur === null ? null : r3(dur), gif, summary, timeOps, pending, files };
+  return { args, width: W, height: H, fps, durationSec: dur === null ? null : r3(dur), gif, summary, timeOps, geometry: geo, pending, files };
 }

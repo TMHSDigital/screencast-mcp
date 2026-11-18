@@ -178,6 +178,17 @@ describe.skipIf(!AVAILABLE)("bug_report against real ffmpeg (#198)", { timeout: 
     expect(spec.steps.find((x) => x.op === "redact")).toEqual({ op: "redact", secrets: true });
   });
 
+  it("pipeline carries the event log over, re-timed and cropped (#352)", async () => {
+    const out = join(home, "cut.mp4");
+    const res = await call("pipeline", { input: video, steps: [{ op: "trim", start: 0.5, end: 6 }, { op: "crop", x: 100, y: 50, width: 400, height: 300 }], output: out });
+    expect(res.isError, res.text).toBe(false);
+    expect(res.data!.eventsPath).toBe(join(home, "cut.events.jsonl"));
+    const read = await call("read_events", { input: out });
+    expect(read.isError, read.text).toBe(false);
+    const events = (read.data as { events: Array<{ t: number; type: string; x: number; y: number }> }).events;
+    expect(events.find((e) => e.type === "down")).toMatchObject({ t: 0.5, x: 20, y: 30 });
+  });
+
   it("pipeline refuses a redact step with neither regions nor secrets (#341)", async () => {
     const res = await call("pipeline", { input: video, steps: [{ op: "redact" }], output: join(home, "none.mp4") });
     expect(res.isError).toBe(true);
