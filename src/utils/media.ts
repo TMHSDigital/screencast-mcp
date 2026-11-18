@@ -298,32 +298,38 @@ export function assertEditContainer(output: string | undefined): void {
 /** Trim by start + (end | duration). Re-encodes by default so the file holds
  * nothing from before `start`; `exact: false` stream-copies, which is fast but
  * keeps the GOP before `start` in the file, hidden behind an edit list (#203). */
+/**
+ * The one trim rule, shared by the trim tool and the pipeline's trim step
+ * (#360): start, and end OR duration; the end after the start; and, when the
+ * video's length is known, a start inside it (the end is clamped to it).
+ * Returns the span in seconds. Pure.
+ */
+export function trimSpan(
+  opts: { start: number; end?: number; duration?: number },
+  lengthSec: number | null = null,
+): { start: number; end: number } {
+  const { start } = opts;
+  if (!Number.isFinite(start) || start < 0) throw new ScreencastError("trim start must be a non-negative number.");
+  if (opts.end === undefined && opts.duration === undefined) throw new ScreencastError("trim requires either end or duration.");
+  if (opts.end !== undefined && opts.duration !== undefined) throw new ScreencastError("trim takes end OR duration, not both.");
+  const end = opts.end ?? start + validatePositive(opts.duration!, "duration");
+  if (!(end > start)) throw new ScreencastError("trim end must be after start.");
+  if (lengthSec !== null && start >= lengthSec) {
+    throw new ScreencastError(`trim starts at ${start}s, but the video is ${Math.round(lengthSec * 1000) / 1000}s long.`);
+  }
+  return { start, end: lengthSec !== null ? Math.min(end, lengthSec) : end };
+}
+
 export function buildTrimArgs(
   input: string,
   output: string,
   opts: { start: number; end?: number; duration?: number; exact?: boolean },
+  lengthSec: number | null = null,
 ): string[] {
-  const start = opts.start;
-  if (!Number.isFinite(start) || start < 0) {
-    throw new ScreencastError("start must be a non-negative number.");
-  }
-  if (opts.end === undefined && opts.duration === undefined) {
-    throw new ScreencastError("trim requires either end or duration.");
-  }
-  if (opts.end !== undefined && opts.duration !== undefined) {
-    throw new ScreencastError("trim takes end OR duration, not both.");
-  }
-  const args = ["-y", "-ss", String(start), "-i", input];
-  if (opts.end !== undefined) {
-    if (opts.end <= start) {
-      throw new ScreencastError("end must be greater than start.");
-    }
-    // Input-side -ss resets output timestamps to 0, so an output -to would be
-    // read as a duration (#75). Emit the real length instead.
-    args.push("-t", String(Math.round((opts.end - start) * 1000) / 1000));
-  } else {
-    args.push("-t", String(validatePositive(opts.duration!, "duration")));
-  }
+  const { start, end } = trimSpan(opts, lengthSec);
+  // Input-side -ss resets output timestamps to 0, so an output -to would be
+  // read as a duration (#75). Emit the real length instead.
+  const args = ["-y", "-ss", String(start), "-i", input, "-t", String(Math.round((end - start) * 1000) / 1000)];
   if (opts.exact === false) args.push("-c", "copy", output);
   else args.push(...encodeTail({ quality: DEFAULT_EDIT_QUALITY, audio: "aac", bitrate: null }), output);
   return args;

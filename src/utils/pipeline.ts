@@ -24,7 +24,7 @@
  * after it land on the cut timeline.
  */
 import { ScreencastError } from "./errors.js";
-import { atempoChain, cropFilter, redactSteps, scaleFilter, scaledSize } from "./media.js";
+import { atempoChain, cropFilter, redactSteps, scaleFilter, scaledSize, trimSpan } from "./media.js";
 import { calloutSteps, type CalloutAssets } from "./callout.js";
 import { ASPECT_DIMS, exportPresetParts, reframeFilter } from "./produce.js";
 import { keyframesToViews, planClickZoom, zoomFilter, DEFAULT_TRANSITION_SEC, type ClickPoint } from "./zoom.js";
@@ -203,17 +203,14 @@ export function planPipeline(
   // have changed the frame; null once a zoom, reframe or backdrop has.
   let geo: { sx: number; sy: number; ox: number; oy: number } | null = { sx: 1, sy: 1, ox: 0, oy: 0 };
 
+  // The trim tool's rule (#360), against the video's length at this step.
   const trimRange = (s: { start: number; end?: number; duration?: number }, at: number) => {
-    if (!Number.isFinite(s.start) || s.start < 0) throw new ScreencastError(`step ${at}: trim start must be a non-negative number.`);
-    if ((s.end === undefined) === (s.duration === undefined)) {
-      throw new ScreencastError(`step ${at}: trim takes end OR duration.`);
+    try {
+      return trimSpan(s, dur);
+    } catch (err) {
+      if (err instanceof ScreencastError) throw new ScreencastError(`step ${at}: ${err.message}`);
+      throw err;
     }
-    const end = s.end ?? s.start + s.duration!;
-    if (!(end > s.start)) throw new ScreencastError(`step ${at}: trim end must be after start.`);
-    if (dur !== null && s.start >= dur) {
-      throw new ScreencastError(`step ${at}: trim starts at ${s.start}s, but the video is ${r3(dur)}s long at that point.`);
-    }
-    return { start: s.start, end: dur !== null ? Math.min(end, dur) : end };
   };
 
   steps.forEach((s, i) => {

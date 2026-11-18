@@ -14,6 +14,7 @@ import {
   DEFAULT_MAX_FRAMES,
   buildSampleAtTimestampArgs,
   buildTrimArgs,
+  trimSpan,
   buildConcatListContent,
   buildConcatArgs,
   buildConvertArgs,
@@ -36,6 +37,7 @@ import {
   buildClipArgs,
   copyAudioExtension,
 } from "../utils/media.js";
+import { planPipeline } from "../utils/pipeline.js";
 
 describe("parseFrameRate", () => {
   it("parses rational and integer rates", () => {
@@ -158,6 +160,42 @@ describe("buildTrimArgs", () => {
     expect(() => buildTrimArgs("i", "o", { start: 0, end: 5, duration: 5 })).toThrow();
     expect(() => buildTrimArgs("i", "o", { start: 5, end: 2 })).toThrow();
   });
+  it("with the video's length, refuses a start past it and clamps the end (#360)", () => {
+    expect(() => buildTrimArgs("i", "o", { start: 12, end: 15 }, 10)).toThrow("trim starts at 12s, but the video is 10s long.");
+    expect(buildTrimArgs("i", "o", { start: 8, duration: 5 }, 10)).toContain("2");
+    expect(trimSpan({ start: 8, duration: 5 }, 10)).toEqual({ start: 8, end: 10 });
+    expect(trimSpan({ start: 8, duration: 5 })).toEqual({ start: 8, end: 13 });
+  });
+});
+
+describe("trim parity: the trim tool and a pipeline trim step share one rule (#360)", () => {
+  const SRC = { width: 320, height: 240, fps: 30, durationSec: 10, hasAudio: false };
+  const cases: Array<{ start: number; end?: number; duration?: number }> = [
+    { start: 0 },
+    { start: 0, end: 5, duration: 5 },
+    { start: 5, end: 2 },
+    { start: 12, end: 15 },
+    { start: -1, end: 2 },
+    { start: 2, duration: 3 },
+    { start: 8, end: 30 },
+  ];
+  for (const c of cases) {
+    it(JSON.stringify(c), () => {
+      let tool: string | null = null;
+      let step: string | null = null;
+      try {
+        buildTrimArgs("i", "o", c, SRC.durationSec);
+      } catch (e) {
+        tool = (e as Error).message;
+      }
+      try {
+        planPipeline("i", "o", [{ op: "trim", ...c }], SRC, {});
+      } catch (e) {
+        step = (e as Error).message;
+      }
+      expect(step).toBe(tool === null ? null : `step 1: ${tool}`);
+    });
+  }
 });
 
 describe("concat", () => {

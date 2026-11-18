@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Fixed
+
+- `trim` refuses a start past the end of the video instead of running ffmpeg into an empty file, and clamps an end beyond it, as a `pipeline` trim step already did. Both now use one shared rule (#360).
+
 ### Changed
 
 - `pipeline` internals: the step types are derived from the step schema, so the two cannot drift, and the handler is split into phases in `src/utils/pipelineRun.ts`, each with its own tests. A missing `backdrop` image is now reported before a secret scan runs instead of after it (#368).

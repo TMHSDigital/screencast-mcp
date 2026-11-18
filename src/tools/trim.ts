@@ -6,7 +6,7 @@ import { errorResponse, okResponse } from "../utils/errors.js";
 import { OUTPUT_PATH, WRITES_FILE } from "../utils/toolSpec.js";
 import { requireFfmpeg } from "../utils/ffmpeg.js";
 import { runEditJob, probeDuration } from "../utils/jobs.js";
-import { buildTrimArgs, editOutputExt } from "../utils/media.js";
+import { buildTrimArgs, editOutputExt, trimSpan } from "../utils/media.js";
 
 const inputSchema = {
   input: z.string().min(1).describe("Source video path."),
@@ -44,17 +44,13 @@ export function register(server: McpServer): void {
         // holds libx264/AAC.
         const ext = args.exact === false ? extname(args.input) || ".mp4" : editOutputExt(args.input);
         const output = editOutput(args.output, "trim", ext, { overwrite: args.overwrite, anyContainer: args.exact === false });
-        const ffArgs = buildTrimArgs(args.input, output, {
-          start: args.start,
-          end: args.end,
-          duration: args.duration,
-          exact: args.exact,
-        });
+        // The video's length: a start past it is refused and the end is
+        // clamped to it, as a pipeline trim step does (#360).
+        const length = await probeDuration(args.input);
+        const span = trimSpan(args, length);
+        const ffArgs = buildTrimArgs(args.input, output, { ...span, exact: args.exact });
         // Length of the trimmed clip, which sizes the job's timeout and progress.
-        const start = args.start ?? 0;
-        const end = args.end ?? (await probeDuration(args.input));
-        const durationSec = args.duration ?? (end !== null ? end - start : null);
-        await runEditJob(ffArgs, { output, durationSec, extra });
+        await runEditJob(ffArgs, { output, durationSec: span.end - span.start, extra });
         return okResponse({ outputPath: output });
       } catch (error) {
         return errorResponse(error);
