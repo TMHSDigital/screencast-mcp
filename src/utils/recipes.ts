@@ -7,7 +7,7 @@
  * are left out with a note rather than failing. Pure.
  */
 import { ScreencastError } from "./errors.js";
-import type { PipelineStep } from "./pipeline.js";
+import type { PipelineStepInput } from "./pipelineStep.js";
 
 export const RECIPES = ["pr_demo", "tutorial", "social_reel"] as const;
 export type Recipe = (typeof RECIPES)[number];
@@ -23,13 +23,13 @@ export interface RecipeContext {
   transcribeBlocker: string | null;
 }
 
-const EXPORTS = new Set<PipelineStep["op"]>(["export_preset", "export_gif"]);
+const EXPORTS = new Set<PipelineStepInput["op"]>(["export_preset", "export_gif"]);
 
 /** The steps a recipe stands for, given what the input has, plus notes on
  * anything left out. Pure. */
-export function recipeSteps(recipe: Recipe, ctx: RecipeContext): { steps: PipelineStep[]; notes: string[] } {
+export function recipeSteps(recipe: Recipe, ctx: RecipeContext): { steps: PipelineStepInput[]; notes: string[] } {
   const notes: string[] = [];
-  const steps: PipelineStep[] = [{ op: "cut_idle" }];
+  const steps: PipelineStepInput[] = [{ op: "cut_idle" }];
   if (ctx.hasClicks) steps.push({ op: "zoom", follow: "clicks" });
   else notes.push("zoom left out: no event log with clicks (record with start_recording events: true).");
   const captions = (style: "clean" | "social") => {
@@ -64,20 +64,20 @@ export function recipeSteps(recipe: Recipe, ctx: RecipeContext): { steps: Pipeli
  * of the recipe's steps (after any trim), before a cut_idle closes gaps or a
  * zoom or reframe moves the content. A redact or cursor after a zoom is
  * refused by planPipeline, and after a cut or reframe would miss its target. */
-const SOURCE_OPS = new Set<PipelineStep["op"]>(["redact", "crop", "cursor"]);
+const SOURCE_OPS = new Set<PipelineStepInput["op"]>(["redact", "crop", "cursor"]);
 
 /** Lay caller steps over a recipe's: a step replaces the recipe's step with
  * the same op (any export replaces the recipe's export); a trim goes first,
  * then redact, crop and cursor (in source coordinates and time); the rest go
  * before the recipe's export, in order. Pure. */
-export function applyOverrides(base: PipelineStep[], overrides: PipelineStep[]): PipelineStep[] {
+export function applyOverrides(base: PipelineStepInput[], overrides: PipelineStepInput[]): PipelineStepInput[] {
   const out = [...base];
   const tail = out.at(-1) && EXPORTS.has(out.at(-1)!.op) ? out.pop()! : null;
   let exportStep = tail;
   const recipeLen = out.length;
   const replaced = new Set<number>();
-  const trims: PipelineStep[] = [];
-  const front: PipelineStep[] = [];
+  const trims: PipelineStepInput[] = [];
+  const front: PipelineStepInput[] = [];
   for (const o of overrides) {
     if (EXPORTS.has(o.op)) {
       exportStep = o;

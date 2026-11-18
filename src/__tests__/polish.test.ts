@@ -4,7 +4,7 @@
  * a cut, and recipe expansion.
  */
 import { describe, it, expect } from "vitest";
-import { planPipeline, probeArgs, sidecarCues, type PipelineStep } from "../utils/pipeline.js";
+import { planPipeline, probeArgs, sidecarCues, type PipelineStep, type PipelineStepInput } from "../utils/pipeline.js";
 import { cutShift, mapTime, mapWindow, mapSpans, retimeCues, retimeAss } from "../utils/timeline.js";
 import { retimeMarkers, type TimeOp } from "../utils/chapters.js";
 import { retimeBadges } from "../utils/keystrokes.js";
@@ -191,7 +191,8 @@ describe("recipes (#244)", () => {
   // ahead of the recipe's cut_idle, zoom and reframe (after any trim).
   const redact: PipelineStep = { op: "redact", regions: [{ x: 100, y: 100, width: 60, height: 30, start: 12, end: 16 }] };
   const cursorPlan = { path: [{ t: 0, x: 10, y: 10 }, { t: 15, x: 200, y: 150 }], visible: [[0, Infinity]] as Array<[number, number]>, clicks: [{ t: 9, x: 120, y: 80 }] };
-  const plan = (steps: PipelineStep[]) => {
+  const plan = (asked: PipelineStepInput[]) => {
+    const steps: PipelineStep[] = asked.map((s) => (s.op === "redact" ? { ...s, regions: s.regions ?? [] } : s));
     const at = (op: PipelineStep["op"]) => steps.findIndex((s) => s.op === op);
     const clickAt = steps.findIndex((s) => s.op === "zoom" && s.follow === "clicks");
     const cursorAt = at("cursor");

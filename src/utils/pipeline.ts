@@ -24,20 +24,21 @@
  * after it land on the cut timeline.
  */
 import { ScreencastError } from "./errors.js";
-import { atempoChain, cropFilter, redactSteps, scaleFilter, scaledSize, type RedactRegion, type RedactOptions } from "./media.js";
-import { calloutSteps, type Callout, type CalloutAssets } from "./callout.js";
-import { ASPECT_DIMS, exportPresetParts, reframeFilter, type Aspect, type Platform, type ReframeFit } from "./produce.js";
-import { keyframesToViews, planClickZoom, zoomFilter, DEFAULT_TRANSITION_SEC, type ClickPoint, type ZoomKeyframe } from "./zoom.js";
+import { atempoChain, cropFilter, redactSteps, scaleFilter, scaledSize } from "./media.js";
+import { calloutSteps, type CalloutAssets } from "./callout.js";
+import { ASPECT_DIMS, exportPresetParts, reframeFilter } from "./produce.js";
+import { keyframesToViews, planClickZoom, zoomFilter, DEFAULT_TRANSITION_SEC, type ClickPoint } from "./zoom.js";
 import { resolveQuality, type Quality } from "./targets.js";
 import type { AnimExportOptions } from "./animExport.js";
 import type { TimeOp } from "./chapters.js";
-import { backdropSteps, type BackdropOptions } from "./backdrop.js";
-import { groupBadges, keystrokeSteps, retimeBadges, type Badge, type BadgePlanOptions, type BadgeStyle, type KeystrokeAssets } from "./keystrokes.js";
-import { checkSpeedRanges, cutFilters, cutsFor, rangesSavedSec, speedRangeFilters, DEFAULT_IDLE_FACTOR, DEFAULT_KEEP_SEC, DEFAULT_MIN_IDLE_SEC, type SpeedRange, type IdleBasis, type IdleRect, type IdleSensitivity } from "./idle.js";
-import { denoiseFilter, loudnessTarget, loudnormFilter, type DenoiseStrength, type LoudnessMeasurement, type LoudnessPreset } from "./audio.js";
-import { subtitlesFilter, type CaptionStyle, type Cue } from "./captions.js";
+import { backdropSteps } from "./backdrop.js";
+import { groupBadges, keystrokeSteps, retimeBadges, type Badge, type KeystrokeAssets } from "./keystrokes.js";
+import { checkSpeedRanges, cutFilters, cutsFor, rangesSavedSec, speedRangeFilters, DEFAULT_IDLE_FACTOR, DEFAULT_KEEP_SEC, DEFAULT_MIN_IDLE_SEC } from "./idle.js";
+import { denoiseFilter, loudnessTarget, loudnormFilter, type LoudnessMeasurement } from "./audio.js";
+import { subtitlesFilter, type Cue } from "./captions.js";
 import { mapSpans, mapTime, retimeCues, type Span } from "./timeline.js";
-import { cursorSteps, transformCursor, type CursorPlan, type CursorPlanOptions, type CursorStyle } from "./cursor.js";
+import { cursorSteps, transformCursor, type CursorPlan } from "./cursor.js";
+import type { PipelineStep, PipelineStepInput } from "./pipelineStep.js";
 
 /** What a cursor step needs (#170): the cursor planned from the event log on
  * the source's clock and pixels (moved here through earlier timing changes,
@@ -57,42 +58,8 @@ export interface KeystrokeStepAssets extends KeystrokeAssets {
 
 export const MAX_PIPELINE_STEPS = 30;
 
-export type PipelineStep =
-  | { op: "trim"; start: number; end?: number; duration?: number }
-  | { op: "crop"; x: number; y: number; width: number; height: number }
-  | { op: "scale"; width?: number; height?: number }
-  | { op: "speed"; factor?: number; segments?: SpeedRange[] }
-  /** secrets (#341): OCR the source for on-screen secrets (true = the default
-   * pattern, or a regex) and add a timed region per hit before planning. */
-  | ({ op: "redact"; regions: RedactRegion[]; secrets?: boolean | string } & RedactOptions)
-  | { op: "callout"; items: Callout[]; fontFile?: string }
-  | { op: "reframe"; aspect: Aspect; fit?: ReframeFit }
-  | {
-      op: "zoom";
-      keyframes?: ZoomKeyframe[];
-      /** Plan the keyframes from the event log's clicks (#244). */
-      follow?: "clicks";
-      maxZoom?: number;
-      holdSec?: number;
-      transitionSec?: number;
-    }
-  | {
-      op: "cut_idle";
-      minIdleSec?: number;
-      keepSec?: number;
-      action?: "cut" | "speed";
-      factor?: number;
-      sensitivity?: IdleSensitivity;
-      ignoreRegions?: IdleRect[];
-      basis?: IdleBasis;
-    }
-  | { op: "audio"; normalize?: LoudnessPreset | number; denoise?: DenoiseStrength }
-  | { op: "burn_subtitles"; subtitles?: string; transcribe?: boolean; style?: CaptionStyle }
-  | ({ op: "backdrop" } & BackdropOptions)
-  | ({ op: "keystroke_overlay"; events?: string; fontFile?: string } & BadgePlanOptions & BadgeStyle)
-  | ({ op: "cursor"; events?: string } & CursorPlanOptions & CursorStyle)
-  | { op: "export_preset"; platform: Platform; fit?: ReframeFit }
-  | ({ op: "export_gif" } & AnimExportOptions);
+/** Steps are typed from their zod schema (#368). */
+export type { PipelineStep, PipelineStepInput };
 
 export interface SourceInfo {
   width: number;

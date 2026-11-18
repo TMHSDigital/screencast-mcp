@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Changed
+
+- `pipeline` internals: the step types are derived from the step schema, so the two cannot drift, and the handler is split into phases in `src/utils/pipelineRun.ts`, each with its own tests. A missing `backdrop` image is now reported before a secret scan runs instead of after it (#368).
+
 ## [0.53.0] - 2026-11-17
 
 ### Added

@@ -8,7 +8,7 @@
  */
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { ScreencastError } from "./errors.js";
-import type { PipelineStep } from "./pipeline.js";
+import type { PipelineStepInput } from "./pipelineStep.js";
 
 export const EDIT_SPEC_VERSION = 1;
 
@@ -21,7 +21,7 @@ export interface EditSpec {
   source: { path: string; size: number; mtimeMs: number };
   output: string;
   /** Steps after a recipe was expanded and overrides applied. */
-  steps: PipelineStep[];
+  steps: PipelineStepInput[];
   recipe?: string;
   quality?: "draft" | "standard" | "high";
   chapters?: boolean;
