@@ -194,5 +194,7 @@ describe.skipIf(process.platform !== "win32")("isRecorderProcess on Windows (#29
     expect(isRecorderProcess(process.pid, image)).toBe(true);
     expect(isRecorderProcess(process.pid, "ffmpeg.exe")).toBe(false);
     expect(isRecorderProcess(null, image)).toBe(false);
-  });
+    // Two synchronous process lookups; a cold or busy runner can take well over
+    // vitest's 5 s default, as the other process tests allow for (#373).
+  }, 30_000);
 });
