@@ -9,6 +9,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Release workflow: `publish.yml` installs, builds, tests, and packs in a job without the OIDC permission, and a separate job with `id-token: write` only publishes the packed tarball and lists it in the MCP Registry. Dependency install scripts and test code no longer run where a publish token can be minted (#363).
 - Internals: the video clock (`parseCaptureStart`, `videoTimeSec`) and the sidecar finalizers (`trackFinalizer`, `whenFinalized`) moved out of `events.ts` into `src/utils/clock.ts` and `src/utils/finalizers.ts`, so perf and log sidecars and the stop paths no longer load the input-hook module (#360).
 - Internals: `sessions.ts` is split. Pid metadata (`isAlive`, `processInfo`, `killPid`) moved to `src/utils/processes.ts`, the ownership and orphan rules to `src/utils/orphans.ts`, and the registry lockfile to `src/utils/fileLock.ts`. `sessions.ts` re-exports them (#360).
 - Internals: the encode helpers (`resolveQuality`, `aacArgs`, `FASTSTART`, `encodeTail`) moved from the capture-target module to `src/utils/encode.ts`. The pipeline, `callout`, `cursor`, `keystroke_overlay`, `burn_subtitles`, `zoom`, `backdrop` and `export_preset` builders now use `encodeTail` instead of assembling their own; their ffmpeg arguments are unchanged (#360).

@@ -8,7 +8,39 @@ on:
 permissions: {}
 
 jobs:
+  # Install, build, test, and pack without the OIDC permission, so dependency
+  # install scripts and test-time code never hold a token that can publish
+  # (#363). The publish job below gets only the packed tarball.
+  build-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: Pack
+        run: |
+          set -euo pipefail
+          mkdir -p pkg
+          npm pack --pack-destination pkg
+          ls -l pkg
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-package
+          path: pkg/*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
   publish:
+    needs: build-test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -23,18 +55,29 @@ jobs:
       # then authenticates with GitHub OIDC (id-token: write): no token, no OTP.
       TRUSTED: ${{ vars.NPM_TRUSTED_PUBLISHING == 'true' }}
     steps:
+      # The checkout supplies package.json and server.json for the version and
+      # registry steps; nothing from it is installed or run. No npm cache here.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-          cache: npm
       # Trusted publishing needs npm 11.5+; a major pin keeps an unreviewed npm
       # major out of the job that holds the OIDC token (#191).
       - run: npm install -g npm@11
-      - run: npm ci
-      - run: npm run build
-      - run: npm test
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-package
+          path: pkg
+      - name: Locate the tarball
+        id: tgz
+        run: |
+          set -euo pipefail
+          files=(pkg/*.tgz)
+          [ "${#files[@]}" -eq 1 ] || { echo "::error::expected one tarball, found ${#files[@]}"; exit 1; }
+          echo "path=${files[0]}" >> "$GITHUB_OUTPUT"
 
       - name: Check if this version is already published
         id: pub
@@ -66,7 +109,7 @@ jobs:
         if: steps.pub.outputs.skip == 'false' && (env.HAS_NPM_TOKEN == 'true' || env.TRUSTED == 'true')
         run: |
           set -o pipefail
-          if npm publish --provenance --access public --tag "${{ steps.pub.outputs.dist_tag }}" 2>&1 | tee publish.log; then exit 0; fi
+          if npm publish "$TARBALL" --provenance --access public --tag "${{ steps.pub.outputs.dist_tag }}" 2>&1 | tee publish.log; then exit 0; fi
           if grep -q EOTP publish.log; then
             echo "::error::npm asked for a one-time password: NPM_TOKEN is a 2FA-protected token, which CI cannot use. Configure npm trusted publishing (npmjs.com > package > Settings > Trusted publishing: GitHub Actions, this repo, publish.yml) and set the repository variable NPM_TRUSTED_PUBLISHING=true."
           fi
@@ -74,6 +117,7 @@ jobs:
         env:
           # With trusted publishing, no token: npm uses the OIDC identity instead.
           NODE_AUTH_TOKEN: ${{ env.TRUSTED != 'true' && secrets.NPM_TOKEN || '' }}
+          TARBALL: ${{ steps.tgz.outputs.path }}
 
       # List the release in the official MCP Registry (#90). The registry checks
       # that the npm package's mcpName matches server.json, and it reads npm, so
