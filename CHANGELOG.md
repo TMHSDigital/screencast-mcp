@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- The review player can limit a redaction box to a time window. The box form has optional **FROM** and **TO** fields (seconds of the original video, with a **Playhead** button beside each to take the current time); leave both blank for the whole video. The box list shows each window (`01:10.0–01:13.5`), the stage draws a box only while the playhead is inside its window, and the export sends `start`/`end` for that region to the `pipeline` `redact` step, which already supported them. Before, a box covered the whole kept range (#377).
+
 ### Changed
 
 - Release workflow: `publish.yml` installs, builds, tests, and packs in a job without the OIDC permission, and a separate job with `id-token: write` only publishes the packed tarball and lists it in the MCP Registry. Dependency install scripts and test code no longer run where a publish token can be minted (#363).

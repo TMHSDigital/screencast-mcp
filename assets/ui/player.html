@@ -93,6 +93,7 @@
     width: 5.2rem; padding: .3rem .45rem; font: 12px var(--mono); color: var(--ink);
     background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
   }
+  #boxFields .win { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
   #boxFields:disabled { opacity: .45; }
   #sampling { margin-left: auto; }
   #status { font: 12px var(--mono); color: var(--dim); overflow-wrap: anywhere; }
@@ -141,6 +142,14 @@
       <label>Y <input id="by" type="number" min="0" step="1" inputmode="numeric"></label>
       <label>W <input id="bw" type="number" min="4" step="1" inputmode="numeric"></label>
       <label>H <input id="bh" type="number" min="4" step="1" inputmode="numeric"></label>
+      <!-- #377: an optional window, in seconds of the original video; both blank = the whole video.
+           It applies to the next box added, drawn or typed. -->
+      <span class="win">
+        <label>FROM s <input id="bs" type="number" min="0" step="0.1" inputmode="decimal" placeholder="start"></label>
+        <button class="btn" type="button" id="bsNow" aria-label="Set window start to the playhead">Playhead</button>
+        <label>TO s <input id="be" type="number" min="0" step="0.1" inputmode="decimal" placeholder="end"></label>
+        <button class="btn" type="button" id="beNow" aria-label="Set window end to the playhead">Playhead</button>
+      </span>
       <button class="btn" type="submit">Add box</button>
     </fieldset>
   </form>

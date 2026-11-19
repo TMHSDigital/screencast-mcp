@@ -86,6 +86,7 @@
     stop();
     S.input = input;
     S.boxes = [];
+    $("bs").value = $("be").value = "";
     $("file").textContent = input.split(/[\\/]/).pop();
     $("file").title = input;
     setEmpty("Loading frames...");
@@ -158,6 +159,7 @@
     $("tc").textContent = `${fmt(t)} / ${fmt(S.duration)}`;
     $("head").style.left = `${pct(t)}%`;
     setSlider($("seek"), t, `${fmt(t)} of ${fmt(S.duration)}`);
+    placeBoxes(); // the stage shows only the boxes active at this frame (#377)
   }
 
   function setSlider(el, t, text) {
@@ -289,7 +291,10 @@
     if (!start) return;
     const r = rectOf(start, toVideo(e.clientX, e.clientY));
     dropDraft();
-    if (r.width >= 4 && r.height >= 4) S.boxes.push(r);
+    if (r.width >= 4 && r.height >= 4) {
+      const win = readWindow();
+      if (win) S.boxes.push({ ...r, ...win });
+    }
     render();
   });
   // A cancelled drag adds nothing and leaves no dashed box behind (#243).
@@ -313,10 +318,33 @@
     }
     const r = { x, y, width: Math.min(w, S.W - x), height: Math.min(h, S.H - y) };
     if (r.width < 4 || r.height < 4) return status("A box needs to be at least 4 px wide and tall inside the video.", "err");
-    S.boxes.push(r);
+    const win = readWindow();
+    if (!win) return;
+    S.boxes.push({ ...r, ...win });
     render();
-    status(`Added box ${S.boxes.length}: ${r.width}\u00d7${r.height} at ${r.x},${r.y}.`);
+    status(`Added box ${S.boxes.length}: ${r.width}\u00d7${r.height} at ${r.x},${r.y}${windowText(S.boxes.at(-1)) ? `, visible ${windowText(S.boxes.at(-1))}` : ""}.`);
   });
+
+  // The optional time window (#377). Blank fields mean the video's start / end,
+  // and both blank means the whole video, which sends no start/end at all.
+  /** {start?, end?} in seconds from the FROM / TO fields, or null (after a status message) when invalid. */
+  function readWindow() {
+    const [start, end] = ["bs", "be"].map((id) => ($(id).value.trim() === "" ? undefined : Math.round(Number($(id).value) * 1000) / 1000));
+    if ([start, end].some((v) => v !== undefined && !(v >= 0 && v <= S.duration))) {
+      status(`A window time needs to be within 0-${S.duration.toFixed(1)}s.`, "err");
+      return null;
+    }
+    if (end !== undefined && end <= (start ?? 0)) {
+      status("A window needs to end after it starts.", "err");
+      return null;
+    }
+    return { ...(start !== undefined && { start }), ...(end !== undefined && { end }) };
+  }
+  for (const [btn, field] of [["bsNow", "bs"], ["beNow", "be"]]) {
+    $(btn).addEventListener("click", () => {
+      $(field).value = String(Math.round((S.times[S.i] || 0) * 1000) / 1000);
+    });
+  }
 
   function placeBox(el, r) {
     const ir = img.getBoundingClientRect(), sr = stage.getBoundingClientRect();
@@ -326,11 +354,17 @@
     el.style.width = `${r.width * k}px`;
     el.style.height = `${r.height * k}px`;
   }
-  function renderBoxes() {
+  /** Whether box r covers time t. A missing start/end is the video's edge;
+   * both ends are inclusive, as in the ffmpeg between() the export uses. */
+  const activeAt = (r, t) => (r.start === undefined || t >= r.start) && (r.end === undefined || t <= r.end);
+  /** "01:10.0-01:13.5" for a limited box, "" for one that covers the whole video. */
+  const windowText = (r) => (r.start === undefined && r.end === undefined ? "" : `${fmt(r.start ?? 0)}\u2013${r.end === undefined ? "end" : fmt(r.end)}`);
+  /** Draws the boxes active at the current frame on the stage (#377). */
+  function placeBoxes() {
     stage.querySelectorAll(".box:not(.draft)").forEach((b) => b.remove());
-    const list = $("boxList");
-    list.replaceChildren();
+    const t = S.times[S.i] || 0;
     S.boxes.forEach((r, n) => {
+      if (!activeAt(r, t)) return;
       const el = document.createElement("div");
       el.className = "box";
       const tag = document.createElement("span");
@@ -338,8 +372,16 @@
       el.appendChild(tag);
       stage.appendChild(el);
       placeBox(el, r);
+    });
+  }
+  function renderBoxes() {
+    placeBoxes();
+    const list = $("boxList");
+    list.replaceChildren();
+    S.boxes.forEach((r, n) => {
       const li = document.createElement("li");
       li.textContent = `#${n + 1} ${r.width}\u00d7${r.height} at ${r.x},${r.y}`;
+      if (windowText(r)) li.textContent += ` ${windowText(r)}`;
       const rm = document.createElement("button");
       rm.type = "button";
       rm.textContent = "\u2715";
@@ -356,14 +398,15 @@
       list.appendChild(li);
     });
   }
-  img.addEventListener("load", renderBoxes);
-  new ResizeObserver(renderBoxes).observe(stage);
+  img.addEventListener("load", placeBoxes);
+  new ResizeObserver(placeBoxes).observe(stage);
 
   // --- export: one pipeline call -----------------------------------------
   $("apply").addEventListener("click", async () => {
     stop();
     const steps = [];
-    // Redact first, so a box covers every frame of the kept range.
+    // Redact first, so a box covers every frame of the kept range. That also
+    // keeps a box's start/end in the original video's time, not the trimmed copy's.
     if (S.boxes.length) steps.push({ op: "redact", regions: S.boxes.map((b) => ({ ...b })) });
     const tin = Math.round((S.times[S.inI] || 0) * 1000) / 1000, tout = Math.round(end(S.outI) * 1000) / 1000;
     if (trimmed()) steps.push({ op: "trim", start: tin, end: Math.min(tout, S.duration) });
