@@ -44,7 +44,9 @@ export type TimeOp =
   | { op: "trim"; start: number; end: number }
   | { op: "speed"; factor: number }
   /** Spans removed, or with `factor`, played faster (#320). */
-  | { op: "cut"; spans: Array<{ start: number; end: number; factor?: number }> };
+  | { op: "cut"; spans: Array<{ start: number; end: number; factor?: number }> }
+  /** Everything moved later by `sec` (an intro title card put in front, #367). */
+  | { op: "shift"; sec: number };
 
 export const MAX_MARKERS = 500;
 export const MAX_LABEL = 200;
@@ -137,6 +139,10 @@ export function retimeMarkers(markers: readonly Marker[], ops: readonly TimeOp[]
     if (op.op === "cut") {
       // A marker inside a removed span lands where the span was.
       cur = cur.map((m) => ({ ...m, t: r3(m.t - cutShift(m.t, op.spans)) }));
+      continue;
+    }
+    if (op.op === "shift") {
+      cur = cur.map((m) => ({ ...m, t: r3(m.t + op.sec) }));
       continue;
     }
     const inside = cur.filter((m) => m.t >= op.start && m.t < op.end).map((m) => ({ ...m, t: r3(m.t - op.start) }));

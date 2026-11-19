@@ -2,7 +2,8 @@
  * Moving times through a pipeline's timing changes (#174, #244): a trim keeps
  * [start, end) and shifts it to 0, a speed change divides every time by its
  * factor, and a cut (cut_idle) removes spans, so a time inside a removed span
- * lands where the span was. Markers, keystroke badges, clicks, subtitle cues
+ * lands where the span was, and a shift (an intro title card, #367) moves
+ * every time later. Markers, keystroke badges, clicks, subtitle cues
  * and idle stretches recorded on the source's clock all go through here.
  * Everything is pure.
  */
@@ -38,6 +39,7 @@ export function mapTime(t: number, ops: readonly TimeOp[]): number | null {
       if (v < op.start || v >= op.end) return null;
       v -= op.start;
     } else if (op.op === "speed") v /= op.factor;
+    else if (op.op === "shift") v += op.sec;
     else v -= cutShift(v, op.spans);
   }
   return v;
@@ -54,6 +56,9 @@ export function mapWindow(from: number, to: number, ops: readonly TimeOp[]): [nu
     } else if (op.op === "speed") {
       a /= op.factor;
       b /= op.factor;
+    } else if (op.op === "shift") {
+      a += op.sec;
+      b += op.sec;
     } else {
       a -= cutShift(a, op.spans);
       b -= cutShift(b, op.spans);

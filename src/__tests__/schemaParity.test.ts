@@ -30,6 +30,7 @@ const PAIRS: Record<string, { tool: string; rename?: Record<string, string> }> =
   backdrop: { tool: "backdrop" },
   keystroke_overlay: { tool: "keystroke_overlay" },
   cursor: { tool: "cursor" },
+  title_card: { tool: "title_card" },
   music: { tool: "music_bed" },
   export_preset: { tool: "export_preset" },
   export_gif: { tool: "export_gif" },

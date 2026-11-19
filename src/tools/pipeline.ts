@@ -53,7 +53,7 @@ export function register(server: McpServer): void {
       title: "Edit Pipeline",
       description:
         "Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, " +
-        "audio, burn_subtitles, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no " +
+        "audio, burn_subtitles, title_card, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no " +
         "intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.",
       inputSchema,
       outputSchema: looseOutput({ processes: z.number().int(), steps: z.array(z.string()) }),

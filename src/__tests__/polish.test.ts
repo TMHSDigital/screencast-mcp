@@ -37,6 +37,14 @@ describe("timeline helpers", () => {
     const ass = "[Events]\nDialogue: 0,0:00:06.00,0:00:08.00,Default,,0,0,0,,hi\nDialogue: 0,0:00:03.00,0:00:04.00,Default,,0,0,0,,gone";
     expect(retimeAss(ass, [cut])).toBe("[Events]\nDialogue: 0,0:00:03.00,0:00:05.00,Default,,0,0,0,,hi");
   });
+  it("moves everything later by an intro card's shift (#367)", () => {
+    const ops: TimeOp[] = [{ op: "trim", start: 2, end: 12 }, { op: "shift", sec: 3 }];
+    expect(mapTime(5, ops)).toBe(6);
+    expect(mapTime(1, ops)).toBeNull();
+    expect(mapWindow(4, 6, ops)).toEqual([5, 7]);
+    expect(retimeMarkers([{ t: 1, label: "a" }, { t: 4, label: "b" }], ops).map((m) => m.t)).toEqual([3, 5]);
+    expect(retimeCues([{ start: 4, end: 5, text: "hi" }], ops)).toEqual([{ start: 5, end: 6, text: "hi" }]);
+  });
 });
 
 describe("pipeline cut_idle (#244)", () => {
@@ -185,6 +193,11 @@ describe("recipes (#244)", () => {
     expect(out.at(-1)).toEqual({ op: "export_gif", maxBytes: 5_000_000 });
     expect(applyOverrides(base, [{ op: "scale", width: 640 }]).at(-2)).toEqual({ op: "scale", width: 640 });
     expect(out).toHaveLength(base.length + 1);
+  });
+  it("adds title cards to a recipe before its export, with music after them (#367)", () => {
+    const base = recipeSteps("tutorial", full).steps;
+    const out = applyOverrides(base, [{ op: "music", music: "bed.mp3" }, { op: "title_card", text: "Intro" }]);
+    expect(out.slice(-3).map((s) => s.op)).toEqual(["title_card", "music", "export_preset"]);
   });
 
   // #251: redact, crop and cursor are in source pixels and time, so they go

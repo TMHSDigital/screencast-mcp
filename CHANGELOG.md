@@ -7,7 +7,9 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
-### Changed
+### Added
+
+- `pipeline` has a `title_card` step: an intro (default) or outro card (`text`, `at`, `duration`, `bg`, `fontColor`, `fontSize`, `fontFile`) rendered in the same ffmpeg pass as the edits, at the frame size and rate the footage has at that point, with silence under it. It goes after the edits; only another `title_card`, `music`, or an export may follow, so `music` lays over the cards too. An intro moves markers (as chapters, with an "Intro" chapter in front), caption sidecars and the re-timed event log later by its length. A recipe takes one as an override and puts it before its export, ahead of any `music` (#367).
 
 - Release workflow: `publish.yml` installs, builds, tests, and packs in a job without the OIDC permission, and a separate job with `id-token: write` only publishes the packed tarball and lists it in the MCP Registry. Dependency install scripts and test code no longer run where a publish token can be minted (#363).
 - Internals: the video clock (`parseCaptureStart`, `videoTimeSec`) and the sidecar finalizers (`trackFinalizer`, `whenFinalized`) moved out of `events.ts` into `src/utils/clock.ts` and `src/utils/finalizers.ts`, so perf and log sidecars and the stop paths no longer load the input-hook module (#360).

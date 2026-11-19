@@ -75,6 +75,16 @@ export const pipelineStepSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("keystroke_overlay"), ...keystrokeOptionsSchema }),
   z.object({ op: z.literal("cursor"), ...cursorOptionsSchema }),
   z.object({
+    op: z.literal("title_card"),
+    text: z.string().min(1),
+    at: z.enum(["intro", "outro"]).optional(),
+    duration: z.number().positive().optional(),
+    bg: z.string().optional(),
+    fontColor: z.string().optional(),
+    fontSize: z.number().int().positive().optional(),
+    fontFile: fontFileSchema,
+  }),
+  z.object({
     op: z.literal("music"),
     music: z.string().min(1),
     musicVolume: z.number().nonnegative().optional(),

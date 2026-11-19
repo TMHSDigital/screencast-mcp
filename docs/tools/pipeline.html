@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>pipeline — Screencast MCP</title>
-  <meta name="description" content="Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files.">
+  <meta name="description" content="Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, title_card, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files.">
   <link rel="canonical" href="https://tmhsdigital.github.io/screencast-mcp/tools/pipeline.html">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='34' fill='%23FF4545'/></svg>">
   <meta property="og:title" content="pipeline — Screencast MCP">
-  <meta property="og:description" content="Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files.">
+  <meta property="og:description" content="Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, title_card, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files.">
   <meta property="og:type" content="article">
   <meta property="og:url" content="https://tmhsdigital.github.io/screencast-mcp/tools/pipeline.html">
   <meta property="og:site_name" content="Screencast MCP">
@@ -45,7 +45,7 @@
       <p class="crumbs"><a href="../">SCREENCAST-MCP</a> / <a href="./">TOOLS</a> / EDIT</p>
       <h1>Edit Pipeline</h1>
       <p class="tool-id"><code>pipeline</code></p>
-      <p class="lede">Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.</p>
+      <p class="lede">Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, title_card, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.</p>
       <p class="chips"><span class="chip set">edit</span><span class="chip warn">writes</span><span class="chip warn">destructive</span><span class="chip">since v0.30.0</span></p>
     </section>
 
@@ -162,6 +162,13 @@
           <tr id="p-steps-cursor.hideAfterSec" class="nested d1"><td><a class="param-link" href="#p-steps-cursor.hideAfterSec"><code>steps[cursor].hideAfterSec</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0, ≤ 600</span></td></tr>
           <tr id="p-steps-cursor.clicks" class="nested d1"><td><a class="param-link" href="#p-steps-cursor.clicks"><code>steps[cursor].clicks</code></a></td><td><code class="type">boolean</code></td><td></td></tr>
           <tr id="p-steps-cursor.spotlight" class="nested d1"><td><a class="param-link" href="#p-steps-cursor.spotlight"><code>steps[cursor].spotlight</code></a></td><td><code class="type">boolean</code></td><td></td></tr>
+          <tr id="p-steps-title_card.text" class="nested d1"><td><a class="param-link" href="#p-steps-title_card.text"><code>steps[title_card].text</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="p-steps-title_card.at" class="nested d1"><td><a class="param-link" href="#p-steps-title_card.at"><code>steps[title_card].at</code></a></td><td><code class="type">&quot;intro&quot; | &quot;outro&quot;</code></td><td></td></tr>
+          <tr id="p-steps-title_card.duration" class="nested d1"><td><a class="param-link" href="#p-steps-title_card.duration"><code>steps[title_card].duration</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">&gt; 0</span></td></tr>
+          <tr id="p-steps-title_card.bg" class="nested d1"><td><a class="param-link" href="#p-steps-title_card.bg"><code>steps[title_card].bg</code></a></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="p-steps-title_card.fontColor" class="nested d1"><td><a class="param-link" href="#p-steps-title_card.fontColor"><code>steps[title_card].fontColor</code></a></td><td><code class="type">string</code></td><td></td></tr>
+          <tr id="p-steps-title_card.fontSize" class="nested d1"><td><a class="param-link" href="#p-steps-title_card.fontSize"><code>steps[title_card].fontSize</code></a></td><td><code class="type">integer</code></td><td> <span class="bounds">&gt; 0, ≤ 9007199254740991</span></td></tr>
+          <tr id="p-steps-title_card.fontFile" class="nested d1"><td><a class="param-link" href="#p-steps-title_card.fontFile"><code>steps[title_card].fontFile</code></a></td><td><code class="type">string</code></td><td>Font: .ttf/.otf/.ttc path or C:\Windows\Fonts name. Default: bundled Inter, plus a system font for CJK, emoji, Arabic.</td></tr>
           <tr id="p-steps-music.music" class="nested d1"><td><a class="param-link" href="#p-steps-music.music"><code>steps[music].music</code></a> <span class="req">required</span></td><td><code class="type">string</code></td><td></td></tr>
           <tr id="p-steps-music.musicVolume" class="nested d1"><td><a class="param-link" href="#p-steps-music.musicVolume"><code>steps[music].musicVolume</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>
           <tr id="p-steps-music.fadeIn" class="nested d1"><td><a class="param-link" href="#p-steps-music.fadeIn"><code>steps[music].fadeIn</code></a></td><td><code class="type">number</code></td><td> <span class="bounds">≥ 0</span></td></tr>

@@ -26,7 +26,7 @@
 import { ScreencastError } from "./errors.js";
 import { atempoChain, cropFilter, redactSteps, scaleFilter, scaledSize, trimSpan } from "./media.js";
 import { calloutSteps, type CalloutAssets } from "./callout.js";
-import { ASPECT_DIMS, exportPresetParts, musicMixSteps, reframeFilter } from "./produce.js";
+import { ASPECT_DIMS, exportPresetParts, musicMixSteps, reframeFilter, titleCardParts } from "./produce.js";
 import { keyframesToViews, planClickZoom, zoomFilter, DEFAULT_TRANSITION_SEC, type ClickPoint } from "./zoom.js";
 import { type Quality } from "./targets.js";
 import { encodeTail } from "./encode.js";
@@ -58,6 +58,9 @@ export interface KeystrokeStepAssets extends KeystrokeAssets {
 }
 
 export const MAX_PIPELINE_STEPS = 30;
+
+/** What may follow a title_card step (#367). */
+const CARD_TAIL = new Set<PipelineStep["op"]>(["title_card", "music", "export_preset", "export_gif"]);
 
 type MusicBed = { input: number; step: Extract<PipelineStep, { op: "music" }>; durationSec: number; at: number };
 
@@ -107,6 +110,8 @@ export interface PipelineOptions {
   subtitles?: Record<number, string>;
   /** Where libass finds the bundled fonts. */
   fontsDir?: string;
+  /** The text file and font per title_card step (#367). */
+  titles?: Record<number, { textFile: string; fontFile: string }>;
 }
 
 export interface PipelinePlan {
@@ -194,6 +199,9 @@ export function planPipeline(
   let nextInput = 1;
   const graph: string[] = [];
   const audio: string[] = [];
+  // Where the `audio` filters start: the source's track, or a title card's
+  // concat once one has closed the chain (#367).
+  let audioIn = "[0:a]";
   let audioReencode = false;
   // A music step (#367): its input, options, the length it is laid over, and
   // how many audio filters came before it (the rest run on the mix).
@@ -473,6 +481,42 @@ export function planPipeline(
         summary.push(`cursor ${moved.path.length} segment(s), ${moved.clicks.length} click(s)${s.spotlight ? ", spotlight" : ""}`);
         break;
       }
+      case "title_card": {
+        // A card goes in front of or after the footage as it is now (#367), in
+        // the same graph. Only another card, music or an export may follow, so
+        // every edit, probe and logged position is still about the footage.
+        if (!steps.slice(i + 1).every((x) => CARD_TAIL.has(x.op))) {
+          throw new ScreencastError(`step ${at}: title_card goes after the edits (only title_card, music, export_preset or export_gif may follow).`);
+        }
+        const a = opts.titles?.[i];
+        if (!a) throw new ScreencastError(`Internal: missing title card text for step ${at}.`);
+        const intro = (s.at ?? "intro") === "intro";
+        // title_card's 96 px at 1080p, kept in proportion to this frame.
+        const fontSize = s.fontSize ?? Math.max(8, Math.round((H * 96) / 1080));
+        const card = titleCardParts(a.textFile, a.fontFile, { ...s, width: W, height: H, fps: r3(fps), fontSize });
+        graph.push(`${card.color},${card.draw},setsar=1,format=yuv420p[${tag}c]`, `${cur}setsar=1,format=yuv420p[${tag}v]`);
+        const [first, second] = intro ? ["c", "v"] : ["v", "c"];
+        if (src.hasAudio) {
+          // The audio so far closes here; the card gets silence of its length.
+          graph.push(
+            `${audioIn}${[...audio, "aresample=48000", "aformat=channel_layouts=stereo"].join(",")}[${tag}a]`,
+            `anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${card.duration}[${tag}s]`,
+          );
+          const pair = (k: string) => `[${tag}${k}][${tag}${k === "c" ? "s" : "a"}]`;
+          graph.push(`${pair(first)}${pair(second)}concat=n=2:v=1:a=1${out}[${tag}m]`);
+          audioIn = `[${tag}m]`;
+          audio.length = 0;
+        } else {
+          graph.push(`[${tag}${first}][${tag}${second}]concat=n=2:v=1:a=0${out}`);
+        }
+        cur = out;
+        audioReencode = true;
+        if (dur !== null) dur += card.duration;
+        // Markers, cues and logged events land after the intro.
+        if (intro) timeOps.push({ op: "shift", sec: card.duration });
+        summary.push(`title_card ${intro ? "intro" : "outro"}, ${card.duration}s`);
+        break;
+      }
       case "music": {
         // Only an export may follow: later timing edits would cut the music's
         // fades, and later audio probes do not hear it.
@@ -523,17 +567,17 @@ export function planPipeline(
     const after = audio.slice(bed.at);
     let base: string | null = null;
     if (src.hasAudio && before.length > 0) {
-      graph.push(`[0:a]${before.join(",")}[mbase]`);
+      graph.push(`${audioIn}${before.join(",")}[mbase]`);
       base = "[mbase]";
-    } else if (src.hasAudio) base = "[0:a]";
+    } else if (src.hasAudio) base = audioIn;
     const { op: _op, music: _file, ...mopts } = bed.step;
     const out = after.length > 0 ? "[mmix]" : "[aout]";
     graph.push(...musicMixSteps(`[${bed.input}:a]`, base, bed.durationSec, { ...mopts, endTrim: true }, out, "m"));
     if (after.length > 0) graph.push(`[mmix]${after.join(",")}[aout]`);
-  } else if (audioGraph) graph.push(`[0:a]${audio.join(",")}[aout]`);
+  } else if (audioGraph) graph.push(`${audioIn}${audio.join(",")}[aout]`);
   if (graph.length > 0) args.push("-filter_complex", graph.join(";"));
   args.push("-map", cur === "[0:v]" ? "0:v" : cur);
-  if (hasAudioOut) args.push("-map", audioGraph ? "[aout]" : "0:a");
+  if (hasAudioOut) args.push("-map", audioGraph ? "[aout]" : audioIn === "[0:a]" ? "0:a" : audioIn);
   // Assigned inside the forEach above, which TypeScript does not track.
   const finalEncode = encode as string[] | null;
   if (finalEncode) {

@@ -69,7 +69,8 @@ const SOURCE_OPS = new Set<PipelineStepInput["op"]>(["redact", "crop", "cursor"]
 /** Lay caller steps over a recipe's: a step replaces the recipe's step with
  * the same op (any export replaces the recipe's export); a trim goes first,
  * then redact, crop and cursor (in source coordinates and time); the rest go
- * before the recipe's export, in order. Pure. */
+ * before the recipe's export, in order, with music last. A title_card step
+ * adds an intro or outro to any recipe. Pure. */
 export function applyOverrides(base: PipelineStepInput[], overrides: PipelineStepInput[]): PipelineStepInput[] {
   const out = [...base];
   const tail = out.at(-1) && EXPORTS.has(out.at(-1)!.op) ? out.pop()! : null;
@@ -93,5 +94,8 @@ export function applyOverrides(base: PipelineStepInput[], overrides: PipelineSte
       replaced.add(i);
     }
   }
-  return [...trims, ...front, ...out, ...(exportStep ? [exportStep] : [])];
+  // Music lays over the whole result, so it goes after any title card (#367).
+  const music = out.filter((s) => s.op === "music");
+  const rest = out.filter((s) => s.op !== "music");
+  return [...trims, ...front, ...rest, ...music, ...(exportStep ? [exportStep] : [])];
 }

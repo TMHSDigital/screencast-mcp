@@ -142,3 +142,57 @@ describe("pipeline music step (#367)", () => {
     expect(() => plan([music, { op: "export_gif" }])).toThrow("a GIF has no sound");
   });
 });
+
+describe("pipeline title_card step (#367)", () => {
+  const titles = { 1: { textFile: "t1.txt", fontFile: "f.ttf" }, 2: { textFile: "t2.txt", fontFile: "f.ttf" } };
+  const planT = (steps: PipelineStep[], src = SRC) => planPipeline("in.mp4", "out.mp4", steps, src, {}, "standard", { titles });
+  const intro = { op: "title_card", text: "Hello", duration: 2 } as const;
+  const outro = { op: "title_card", text: "Bye", at: "outro", duration: 3 } as const;
+
+  it("puts an intro card in front, in the same graph, at the frame the edits left", () => {
+    const p = planT([{ op: "scale", width: 640 }, intro]);
+    const g = graphOf(p.args);
+    expect(g).toContain("color=c=black:s=640x360:d=2:r=30,drawtext=");
+    expect(g).toContain("fontsize=32:"); // 96 px at 1080p, scaled to 360p
+    expect(g).toContain("[p1c][p1s][p1v][p1a]concat=n=2:v=1:a=1[p1][p1m]");
+    expect(g).toContain("anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=2[p1s]");
+    expect(p.args).toContain("[p1m]");
+    expect(p.durationSec).toBe(22);
+    expect(p.timeOps.at(-1)).toEqual({ op: "shift", sec: 2 });
+    expect(p.summary.at(-1)).toBe("title_card intro, 2s");
+  });
+
+  it("closes the audio chain so far into the concat", () => {
+    const g = graphOf(planT([{ op: "speed", factor: 2 }, intro]).args);
+    expect(g).toContain("[0:a]atempo=2,aresample=48000,aformat=channel_layouts=stereo[p1a]");
+  });
+
+  it("appends an outro without moving the timeline, and stacks with an intro", () => {
+    const p = planT([{ op: "scale", width: 640 }, intro, outro]);
+    const g = graphOf(p.args);
+    expect(g).toContain("[p1]setsar=1,format=yuv420p[p2v]");
+    expect(g).toContain("[p2v][p2a][p2c][p2s]concat=n=2:v=1:a=1[p2][p2m]");
+    expect(g).toContain("[p1m]aresample=48000");
+    expect(p.durationSec).toBe(25);
+    expect(p.timeOps).toEqual([{ op: "shift", sec: 2 }]);
+  });
+
+  it("concatenates video only when the input has no audio", () => {
+    const p = planT([{ op: "scale", width: 640 }, intro], { ...SRC, hasAudio: false });
+    expect(graphOf(p.args)).toContain("[p1c][p1v]concat=n=2:v=1:a=0[p1]");
+    expect(p.args).not.toContain("[p1m]");
+  });
+
+  it("lays music and an export over the cards", () => {
+    const p = planT([{ op: "scale", width: 640 }, intro, { op: "music", music: "bed.mp3" }, { op: "export_preset", platform: "youtube" }]);
+    const g = graphOf(p.args);
+    expect(g).toContain("atrim=end=22,"); // the music covers the card too
+    expect(g).toMatch(/\[p1m\]\[mmusic\]amix=/);
+  });
+
+  it("must come after the edits", () => {
+    expect(() => planT([{ op: "scale", width: 640 }, intro, { op: "crop", x: 0, y: 0, width: 100, height: 100 }])).toThrow(
+      "step 2: title_card goes after the edits",
+    );
+  });
+});

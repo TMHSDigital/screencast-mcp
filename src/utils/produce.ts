@@ -258,32 +258,42 @@ export function buildTitleCardArgs(
   opts: TitleCardOptions = {},
 ): string[] {
   const { w, h } = producedDims(opts);
+  const card = titleCardParts(textFile, fontFile, { ...opts, width: w, height: h, fps: opts.fps ?? DEFAULT_PRODUCE_FPS, fontSize: opts.fontSize ?? 96 });
+  return [
+    "-y",
+    "-f", "lavfi", "-i", card.color,
+    "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+    "-vf", card.draw,
+    "-shortest",
+    ...encodeTail({ quality: opts.quality ?? DEFAULT_QUALITY, audio: "aac", faststart: true }),
+    output,
+  ];
+}
+
+/** A title card's two filters: the `color` source (size, length, rate, and
+ * background) and the centered `drawtext` over it. Shared by title_card and
+ * the pipeline's title_card step (#367). Pure; validates the options. */
+export function titleCardParts(
+  textFile: string,
+  fontFile: string,
+  opts: TitleCardOptions & { width: number; height: number; fps: number; fontSize: number },
+): { color: string; draw: string; duration: number } {
   const dur = opts.duration ?? DEFAULT_TITLE_DURATION;
-  const fps = opts.fps ?? DEFAULT_PRODUCE_FPS;
   const bg = validateColor(opts.bg ?? "black", "bg");
   const fontColor = validateColor(opts.fontColor ?? "white", "fontColor");
-  const fontSize = opts.fontSize ?? 96;
   if (!Number.isFinite(dur) || dur <= 0) {
     throw new ScreencastError("title duration must be a positive number.");
   }
-  if (!Number.isInteger(fontSize) || fontSize <= 0) {
+  if (!Number.isInteger(opts.fontSize) || opts.fontSize <= 0) {
     throw new ScreencastError("fontSize must be a positive integer.");
   }
   const draw =
     `drawtext=fontfile=${escapeFilterPath(fontFile)}:` +
     `textfile=${escapeFilterPath(textFile)}:expansion=none:` +
-    `fontcolor=${fontColor}:fontsize=${fontSize}:` +
+    `fontcolor=${fontColor}:fontsize=${opts.fontSize}:` +
     `x=(w-text_w)/2:y=(h-text_h)/2:` +
     `shadowcolor=black@0.5:shadowx=2:shadowy=2`;
-  return [
-    "-y",
-    "-f", "lavfi", "-i", `color=c=${bg}:s=${w}x${h}:d=${dur}:r=${fps}`,
-    "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
-    "-vf", draw,
-    "-shortest",
-    ...encodeTail({ quality: opts.quality ?? DEFAULT_QUALITY, audio: "aac", faststart: true }),
-    output,
-  ];
+  return { color: `color=c=${bg}:s=${opts.width}x${opts.height}:d=${dur}:r=${opts.fps}`, draw, duration: dur };
 }
 
 export interface MusicBedOptions {

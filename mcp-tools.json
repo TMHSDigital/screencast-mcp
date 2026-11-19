@@ -3600,7 +3600,7 @@
       "idempotentHint": false,
       "openWorldHint": false
     },
-    "description": "Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.",
+    "description": "Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, title_card, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -4385,6 +4385,50 @@
                 },
                 "required": [
                   "op"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "const": "title_card"
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "at": {
+                    "type": "string",
+                    "enum": [
+                      "intro",
+                      "outro"
+                    ]
+                  },
+                  "duration": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "bg": {
+                    "type": "string"
+                  },
+                  "fontColor": {
+                    "type": "string"
+                  },
+                  "fontSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "fontFile": {
+                    "description": "Font: .ttf/.otf/.ttc path or C:\\Windows\\Fonts name. Default: bundled Inter, plus a system font for CJK, emoji, Arabic.",
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "op",
+                  "text"
                 ]
               },
               {

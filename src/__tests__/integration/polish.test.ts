@@ -136,6 +136,34 @@ describe.skipIf(!AVAILABLE)("pipeline polish ops and recipes against real ffmpeg
     expect((r.steps as string[]).join(" | ")).toMatch(/zoom \d+ keyframe\(s\) from 1 click/);
   });
 
+  it("title_card adds an intro and outro in the same render, shifting chapters past the intro (#367)", async () => {
+    const out = p("titled.mp4");
+    const r = await call({
+      input: raw,
+      steps: [
+        { op: "trim", start: 0, end: 10 },
+        { op: "scale", width: 160 },
+        { op: "title_card", text: "Intro: 100% \"quoted\"", duration: 2 },
+        { op: "title_card", text: "Thanks", at: "outro", duration: 1.5 },
+      ],
+      chapters: true,
+      quality: "draft",
+      output: out,
+    });
+    expect(r.processes).toBe(1);
+    expect(r.durationSec).toBeCloseTo(13.5, 1);
+    const info = await probeMedia(out);
+    expect([info.width, info.height]).toEqual([160, 120]);
+    expect(info.durationSec!).toBeCloseTo(13.5, 1);
+    const d = await streams(out);
+    expect(Math.abs(d.video - d.audio)).toBeLessThan(0.1);
+    // Markers at source 0 s and 8 s land 2 s later, behind an Intro chapter.
+    const chapters = await probeChapters(out);
+    expect(chapters.map((c) => c.title)).toEqual(["Intro", "Start", "After the wait"]);
+    expect(chapters[1]!.start).toBeCloseTo(2, 1);
+    expect(chapters[2]!.start).toBeCloseTo(10, 1);
+  });
+
   it("burn_subtitles after cut_idle shows a source-clock cue on the cut timeline", async () => {
     const plain = p("subs-off.mp4");
     const subbed = p("subs-on.mp4");

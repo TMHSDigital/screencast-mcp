@@ -808,7 +808,7 @@ Minimal call:
 
 **Edit Pipeline** (since v0.30.0)
 
-Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.
+Run several edits (trim, crop, scale, speed, cut_idle, redact, callout, keystroke_overlay, cursor, reframe, zoom, backdrop, audio, burn_subtitles, title_card, music, then optionally export_preset or export_gif) in one ffmpeg pass: one re-encode, no intermediate files. Prefer it over chaining edit tools; a recipe does the usual polish in one call.
 
 Parameters:
 
@@ -919,6 +919,13 @@ Parameters:
 - `steps[cursor].hideAfterSec` (number; ≥ 0, ≤ 600)
 - `steps[cursor].clicks` (boolean)
 - `steps[cursor].spotlight` (boolean)
+- `steps[title_card].text` (string; required)
+- `steps[title_card].at` ("intro" | "outro")
+- `steps[title_card].duration` (number; > 0)
+- `steps[title_card].bg` (string)
+- `steps[title_card].fontColor` (string)
+- `steps[title_card].fontSize` (integer; > 0, ≤ 9007199254740991)
+- `steps[title_card].fontFile` (string): Font: .ttf/.otf/.ttc path or C:\Windows\Fonts name. Default: bundled Inter, plus a system font for CJK, emoji, Arabic.
 - `steps[music].music` (string; required)
 - `steps[music].musicVolume` (number; ≥ 0)
 - `steps[music].fadeIn` (number; ≥ 0)

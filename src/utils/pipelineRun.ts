@@ -27,7 +27,7 @@ import { findIdle } from "./idleScan.js";
 import { buildLoudnessMeasureArgs, buildNoiseFloorArgs, loudnessTarget, parseLoudnorm, parseNoiseFloor } from "./audio.js";
 import { buildTranscribeArgs, formatSrt, normalizeCues, parseSrt, resolveWhisperModel, type Cue } from "./captions.js";
 import { eventPaths } from "./events.js";
-import { bundledFontPath } from "./fonts.js";
+import { bundledFontPath, resolveTextFont } from "./fonts.js";
 import { retimeAss, retimeCues, type Span } from "./timeline.js";
 import { applyOverrides, recipeSteps, type Recipe } from "./recipes.js";
 import { readEditSpec, sourceChange } from "./editSpec.js";
@@ -252,6 +252,7 @@ export interface PipelineAssets {
   fallbackFonts: Array<{ step: number; item: number; fontFile: string }>;
   keystrokes: Record<number, KeystrokeStepAssets>;
   cursor: Record<number, CursorStepAssets>;
+  titles: Record<number, { textFile: string; fontFile: string }>;
 }
 
 const stepWarning = (i: number, w: string) => `Step ${i}, ${w.charAt(0).toLowerCase()}${w.slice(1)}`;
@@ -262,7 +263,7 @@ const stepWarning = (i: number, w: string) => `Step ${i}, ${w.charAt(0).toLowerC
  * planned on the source's clock; planPipeline moves them through earlier
  * timing changes, crops and scales. */
 export async function prepareAssets(steps: readonly PipelineStep[], req: PipelineRequest, work: string, dryRun: boolean): Promise<PipelineAssets> {
-  const a: PipelineAssets = { callouts: {}, fallbackFonts: [], keystrokes: {}, cursor: {} };
+  const a: PipelineAssets = { callouts: {}, fallbackFonts: [], keystrokes: {}, cursor: {}, titles: {} };
   for (const [i, s] of steps.entries()) {
     if (s.op === "callout") {
       const c = dryRun
@@ -288,6 +289,14 @@ export async function prepareAssets(steps: readonly PipelineStep[], req: Pipelin
         sprite: cursorSpritePath(),
         commandsFile: dryRun ? `<cursor ${i}.cmd>` : join(work, `s${i}_cursor.cmd`),
       };
+    } else if (s.op === "title_card") {
+      // The text goes in a file, like title_card's, so it needs no filter escaping (#367).
+      const font = resolveTextFont(s.text, { weight: "bold", fontFile: s.fontFile });
+      const textFile = dryRun ? `<title ${i}.txt>` : join(work, `s${i}_title.txt`);
+      if (!dryRun) writeFileSync(textFile, s.text);
+      a.titles[i] = { textFile, fontFile: font.fontFile };
+      if (font.fallback) a.fallbackFonts.push({ step: i, item: 0, fontFile: font.fontFile });
+      if (font.warning) req.warnings.push(stepWarning(i, font.warning));
     }
   }
   return a;
@@ -310,6 +319,7 @@ export function makePlanner(
     planPipeline(req.input, target, steps, req.src, assets.callouts, req.quality, {
       keystrokes: assets.keystrokes,
       cursor: assets.cursor,
+      titles: assets.titles,
       idle: measured.idle,
       clicks: measured.clicks,
       audio: measured.audio,
