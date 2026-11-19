@@ -24,22 +24,30 @@ const PROCESS_INFO_TIMEOUT_MS = 10_000;
 
 /** Image name and start time of a running pid (Windows), or null when it is
  * gone or cannot be read. */
-export function processInfo(pid: number): { image: string; startMs: number } | null {
+export function processInfo(
+  pid: number,
+  timeoutMs: number = PROCESS_INFO_TIMEOUT_MS,
+): { image: string; startMs: number } | null {
   if (process.platform !== "win32" || !Number.isInteger(pid) || pid <= 0) return null;
   const res = spawnSync("powershell", powerShellArgs(processInfoScript(pid)), {
     encoding: "utf8",
     windowsHide: true,
-    timeout: PROCESS_INFO_TIMEOUT_MS,
+    timeout: timeoutMs,
     killSignal: "SIGKILL",
   });
   return res.status === 0 && res.stdout ? parseProcessInfo(res.stdout) : null;
 }
 
 /** processInfo without blocking the event loop (#358), for boot reaping,
- * through the shared PowerShell runner (#360). */
-export function processInfoAsync(pid: number): Promise<{ image: string; startMs: number } | null> {
+ * through the shared PowerShell runner (#360). `timeoutMs` lets a caller that
+ * can afford to wait (a test on a slow runner, #372) outlast a cold PowerShell
+ * start; production keeps the 10 s default. */
+export function processInfoAsync(
+  pid: number,
+  timeoutMs: number = PROCESS_INFO_TIMEOUT_MS,
+): Promise<{ image: string; startMs: number } | null> {
   if (process.platform !== "win32" || !Number.isInteger(pid) || pid <= 0) return Promise.resolve(null);
-  return runPowerShell(processInfoScript(pid), `process ${pid}`, { timeoutMs: PROCESS_INFO_TIMEOUT_MS }).then(
+  return runPowerShell(processInfoScript(pid), `process ${pid}`, { timeoutMs }).then(
     (stdout) => parseProcessInfo(stdout),
     () => null,
   );

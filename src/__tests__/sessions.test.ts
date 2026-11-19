@@ -344,9 +344,12 @@ describe("processInfoAsync (#358)", () => {
   }, 30_000);
 
   it.runIf(process.platform === "win32")("reads the same image as processInfo", async () => {
-    const info = await processInfoAsync(process.pid);
-    expect(info?.image.toLowerCase()).toBe(processInfo(process.pid)?.image.toLowerCase());
-  }, 30_000);
+    // A cold PowerShell start on a loaded windows-arm64 runner can take over
+    // the 10 s production limit (#372), so give each lookup 40 s here.
+    const info = await processInfoAsync(process.pid, 40_000);
+    expect(info).not.toBeNull();
+    expect(info?.image.toLowerCase()).toBe(processInfo(process.pid, 40_000)?.image.toLowerCase());
+  }, 90_000);
 });
 
 describe("isLockStale (#55)", () => {
