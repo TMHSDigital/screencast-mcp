@@ -313,4 +313,83 @@ describe("the player page's script in jsdom (#243)", () => {
       },
     });
   });
+
+  describe("a box limited to a time window (#377)", () => {
+    const setField = (id: string, v: string) => (($(id) as HTMLInputElement).value = v);
+    const addBox = (x: string, y: string, w: string, h: string) => {
+      for (const [id, v] of [["bx", x], ["by", y], ["bw", w], ["bh", h]] as const) setField(id, v);
+      ($("boxForm") as HTMLFormElement).requestSubmit();
+    };
+    /** Moves the playhead to frame index i (times: 0 1 2 3 4 4.5 5 6 7 8 9). */
+    const seekToFrame = (i: number) => {
+      key("seek", "Home");
+      for (let n = 0; n < i; n++) key("seek", "ArrowRight");
+    };
+    const stageBoxes = () => [...$("stage").querySelectorAll(".box:not(.draft)")].map((b) => b.textContent);
+    const boxCount = () => $("boxList").children.length;
+
+    it("fills the window fields from the playhead", () => {
+      seekToFrame(4);
+      $("bsNow").click();
+      seekToFrame(10);
+      $("beNow").click();
+      expect([($("bs") as HTMLInputElement).value, ($("be") as HTMLInputElement).value]).toEqual(["4", "9"]);
+    });
+
+    it("adds a windowed box, shows its window in the list, and refuses a window that ends before it starts", () => {
+      const before = boxCount();
+      addBox("20", "20", "40", "40");
+      expect(boxCount()).toBe(before + 1);
+      expect($("boxList").lastElementChild?.firstChild?.textContent).toBe(`#2 40${String.fromCharCode(0xd7)}40 at 20,20 00:04.0${String.fromCharCode(0x2013)}00:09.0`);
+      setField("bs", "6");
+      setField("be", "5");
+      addBox("20", "20", "40", "40");
+      expect($("status").className).toBe("err");
+      expect($("status").textContent).toMatch(/end after it starts/);
+      setField("be", "99");
+      addBox("20", "20", "40", "40");
+      expect($("status").textContent).toMatch(/within 0-10\.0s/);
+      expect(boxCount()).toBe(before + 1);
+    });
+
+    it("draws a box on the stage only while the playhead is inside its window", () => {
+      seekToFrame(2); // 2 s: before the window
+      expect(stageBoxes()).toEqual(["1"]);
+      seekToFrame(4); // 4 s: the window opens (inclusive)
+      expect(stageBoxes()).toEqual(["1", "2"]);
+      seekToFrame(8); // 7 s: inside
+      expect(stageBoxes()).toEqual(["1", "2"]);
+      seekToFrame(10); // 9 s: the window closes (inclusive)
+      expect(stageBoxes()).toEqual(["1", "2"]);
+    });
+
+    it("exports start and end only on the box that has them", async () => {
+      const before = calls.length;
+      $("apply").click();
+      await vi.waitFor(() => expect(calls).toHaveLength(before + 1));
+      expect(calls.at(-1)?.arguments).toMatchObject({
+        steps: [
+          { op: "redact", regions: [
+            { x: 10, y: 20, width: 50, height: 30 },
+            { x: 20, y: 20, width: 40, height: 40, start: 4, end: 9 },
+          ] },
+          { op: "trim", start: 2, end: 9 },
+        ],
+      });
+      const regions = (calls.at(-1)?.arguments.steps as Array<{ regions?: object[] }>)[0]?.regions;
+      expect(regions?.[0]).not.toHaveProperty("start");
+      expect(regions?.[0]).not.toHaveProperty("end");
+    });
+
+    it("accepts a half-open window: only a start runs to the end of the video", () => {
+      setField("bs", "7");
+      setField("be", "");
+      addBox("0", "0", "10", "10");
+      expect($("boxList").lastElementChild?.firstChild?.textContent).toMatch(/00:07\.0–end$/);
+      seekToFrame(4); // 4 s: before the new box's start
+      expect(stageBoxes()).toEqual(["1", "2"]);
+      seekToFrame(9); // 8 s
+      expect(stageBoxes()).toEqual(["1", "2", "3"]);
+    });
+  });
 });
